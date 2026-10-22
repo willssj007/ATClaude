@@ -813,7 +813,7 @@ export class Game {
 
   turnBanner(state, me) {
     const key = state.game.turn + ':' + state.game.activePlayer;
-    if (key === this.prevTurnKey || state.game.turn < 1) {
+    if (key === this.prevTurnKey || state.game.turn < 1 || state.game.gameOver) {
       this.prevTurnKey = key;
       return;
     }
@@ -1205,6 +1205,7 @@ export class Game {
     if (!this.table || this.over) {
       return;
     }
+    this.table.querySelectorAll('.banner').forEach(b => b.remove());
     const me = this.state && this.state.players.find(p => p.me);
     const won = me && info.winner && info.winner === me.name;
     const title = info.draw ? 'Égalité' : won ? 'Victoire !' : 'Défaite';
