@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Même dessin que ui/img/icon.svg, centré dans la zone sûre de l'icône adaptative (108 dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="128"
+    android:viewportHeight="128">
+    <group android:scaleX="0.62" android:scaleY="0.62" android:pivotX="64" android:pivotY="64">
+        <path android:strokeColor="#C99A45" android:strokeWidth="4" android:strokeAlpha="0.6"
+            android:pathData="M64,24 a40,40 0 1,0 0.01,0 z" />
+        <path android:fillColor="#E9C06A" android:pathData="M64,18 L84,64 L64,110 L44,64 Z" />
+        <path android:fillColor="#1C1640" android:fillAlpha="0.55" android:pathData="M64,30 L77,64 L64,98 L51,64 Z" />
+        <path android:fillColor="#E9C06A" android:fillAlpha="0.85" android:pathData="M22,64 L64,52 L106,64 L64,76 Z" />
+        <path android:fillColor="#FFF4D6" android:pathData="M64,57 a7,7 0 1,0 0.01,0 z" />
+    </group>
+</vector>

@@ -88,6 +88,7 @@ export const bridge = {
   connect() {
     if (android) {
       window.__atReceive = receive;
+      window.__atReceiveMany = (list) => list.forEach(receive);
       connected = true;
       emit('connection', {type: 'connection', connected: true});
       return;
@@ -104,6 +105,15 @@ export const bridge = {
         emit('connection', {type: 'connection', connected: false});
       }
     };
+  },
+
+  /** Ouvre un lien dans le navigateur du système. */
+  openUrl(url) {
+    if (android && window.AndroidBridge.openUrl) {
+      window.AndroidBridge.openUrl(url);
+    } else {
+      window.open(url, '_blank');
+    }
   },
 
   /** Adresse de l'image d'une carte, servie par le pont depuis le cache de Forge. */

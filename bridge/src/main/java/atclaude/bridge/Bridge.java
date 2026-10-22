@@ -99,6 +99,19 @@ public final class Bridge {
         send(message);
     }
 
+    /** Progression affichée par l'écran de chargement de l'interface (pourcentage de 0 à 100, ou -1). */
+    public void notifyLoading(final String text, final int percent) {
+        sendEvent("loading", m -> {
+            m.addProperty("text", text);
+            m.addProperty("percent", percent);
+        });
+    }
+
+    /** Erreur bloquante au démarrage : l'interface l'affiche à la place du chargement. */
+    public void notifyFatal(final String text) {
+        sendEvent("fatal", m -> m.addProperty("message", text));
+    }
+
     void reportError(final Throwable e) {
         e.printStackTrace();
         sendEvent("error", m -> m.addProperty("message", String.valueOf(e.getMessage() != null ? e.getMessage() : e)));

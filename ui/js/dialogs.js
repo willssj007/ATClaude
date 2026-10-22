@@ -438,6 +438,7 @@ export function handleForgeDialog(d) {
     return;
   }
   const s = shell({title: d.title || defaultTitle(d.kind), message: d.message, narrow: ['option', 'input', 'integer'].includes(d.kind) && !d.card});
+  s.back.dataset.forge = '1';
   open.set(d.id, s);
   handler(d, s, (value) => {
     s.close();

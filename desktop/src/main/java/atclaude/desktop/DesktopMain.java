@@ -113,17 +113,10 @@ public final class DesktopMain {
                 System.out.println("Forge prêt.");
             } catch (final Throwable e) {
                 e.printStackTrace();
-                bridge.send(errorMessage("Échec du chargement de Forge : " + e));
+                bridge.notifyFatal("Échec du chargement de Forge : " + e);
             }
         }, "atclaude-loader");
         loader.start();
-    }
-
-    private static com.google.gson.JsonObject errorMessage(final String text) {
-        final com.google.gson.JsonObject o = new com.google.gson.JsonObject();
-        o.addProperty("type", "fatal");
-        o.addProperty("message", text);
-        return o;
     }
 
     /** Flux Server-Sent Events : un message JSON par événement. */

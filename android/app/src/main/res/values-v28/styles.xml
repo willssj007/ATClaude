@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Utilise toute la largeur de l'écran, encoche comprise (Android 9 et plus). -->
+    <style name="ArcaneTheme" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/arcane_background</item>
+        <item name="android:statusBarColor">@color/arcane_background</item>
+        <item name="android:navigationBarColor">@color/arcane_background</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

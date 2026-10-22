@@ -277,7 +277,7 @@ function init() {
   bridge.on('notice', (m) => toast(m.message, {title: m.title}));
   bridge.on('error', (m) => toast(m.message, {title: 'Erreur', error: true, duration: 6000}));
   bridge.on('gameOver', (m) => game && game.gameOver(m));
-  bridge.on('openUrl', (m) => window.open(m.url, '_blank'));
+  bridge.on('openUrl', (m) => bridge.openUrl(m.url));
   bridge.on('incorrectAction', () => {
     const p = document.querySelector('.prompt');
     if (p) {
@@ -286,6 +286,29 @@ function init() {
       p.classList.add('shake');
     }
   });
+
+  // Bouton retour d'Android : ferme ce qui est ouvert ; renvoie false pour mettre l'application en arrière-plan.
+  window.__atBack = () => {
+    if (hideZoom()) {
+      return true;
+    }
+    const box = document.querySelector('#dialogs .modal-back:last-child');
+    if (box && !box.dataset.forge) {
+      box.remove();
+      return true;
+    }
+    if (current === 'game') {
+      if (game && game.closeOverlays()) {
+        return true;
+      }
+      return false;
+    }
+    if (current !== 'home') {
+      showScreen('home');
+      return true;
+    }
+    return false;
+  };
 
   bridge.connect();
   if ('serviceWorker' in navigator && !bridge.android && location.protocol === 'https:') {

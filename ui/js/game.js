@@ -995,6 +995,20 @@ export class Game {
     drawer.querySelector('.close').addEventListener('click', () => this.closeDrawer());
   }
 
+  /** Ferme le tiroir ou la zone ouverte ; renvoie vrai s'il y avait quelque chose à fermer. */
+  closeOverlays() {
+    if (this.drawer) {
+      this.closeDrawer();
+      return true;
+    }
+    if (this.trayZone) {
+      this.trayZone = null;
+      this.refreshTray();
+      return true;
+    }
+    return false;
+  }
+
   closeDrawer() {
     this.drawer = null;
     this.table && this.table.querySelector('[data-drawer]').classList.remove('open');
