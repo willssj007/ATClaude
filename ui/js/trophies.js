@@ -40,7 +40,7 @@ export class Trophies {
         <b>${esc(t.name)}</b>
         ${t.desc ? `<div class="muted small">${esc(t.desc)}</div>` : ''}
         ${tiers ? `<ul class="tiers">${tiers}</ul>` : ''}
-        ${t.best ? `<div class="best small">${esc(t.best)}</div>` : ''}
+        ${t.best && /[1-9]/.test(t.best) ? `<div class="best small">${esc(t.best)}</div>` : ''}
       </div>
     </div>`;
   }
