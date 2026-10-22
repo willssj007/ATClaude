@@ -323,8 +323,10 @@ final class GameSerializer {
                 o.addProperty("defender", defender.getId());
                 o.addProperty("defenderIsPlayer", defender instanceof PlayerView);
             }
+            // Pendant la déclaration des bloqueurs, Forge les range d'abord dans la liste « prévue ».
             final JsonArray blockers = new JsonArray();
-            for (final CardView b : copy(combat.getBlockers(attacker))) {
+            final List<CardView> declared = copy(combat.getBlockers(attacker));
+            for (final CardView b : declared.isEmpty() ? copy(combat.getPlannedBlockers(attacker)) : declared) {
                 blockers.add(b.getId());
             }
             o.add("blockers", blockers);

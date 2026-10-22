@@ -161,8 +161,13 @@ final class MatchSession {
         timer.shutdownNow();
         try {
             final PlayerControllerHuman c = gui.controller();
-            if (c != null && gui.getGameView() != null && !gui.getGameView().isGameOver()) {
-                c.concede();
+            if (c != null && gui.getGameView() != null) {
+                if (gui.getGameView().isGameOver()) {
+                    // Partie finie : Forge attend de savoir s'il faut en lancer une autre.
+                    c.nextGameDecision(forge.gamemodes.match.NextGameDecision.QUIT);
+                } else {
+                    c.concede();
+                }
             }
         } catch (final RuntimeException e) {
             e.printStackTrace();
