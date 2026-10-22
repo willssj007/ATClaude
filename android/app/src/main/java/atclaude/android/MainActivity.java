@@ -68,6 +68,8 @@ public class MainActivity extends Activity {
     private static Bridge bridge;
     private static MainActivity current;
     private static boolean started;
+    /** Dossier res/ des ressources installées (musiques et sons servis à l'interface). */
+    private static volatile File resRoot;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final List<String> outbox = new ArrayList<>();
@@ -129,6 +131,7 @@ public class MainActivity extends Activity {
         final Thread loader = new Thread(() -> {
             try {
                 final File assets = ResInstaller.ensure(this, percent -> bridge.notifyLoading("Installation des cartes…", percent));
+                resRoot = new File(assets, "res");
                 final File cache = external != null ? new File(external, "cache") : new File(filesDir, "cache");
                 ForgeRuntime.init(bridge, new ForgeRuntime.Paths(
                         assets.getAbsolutePath(), new File(filesDir, "data").getAbsolutePath(), cache.getAbsolutePath()), false);
@@ -208,6 +211,9 @@ public class MainActivity extends Activity {
             if (path.equals("/cardimg")) {
                 return cardImage(url.getQueryParameter("key"), url.getQueryParameter("lang"));
             }
+            if (path.startsWith("/audio/")) {
+                return audio(path.substring("/audio/".length()));
+            }
             try {
                 final InputStream in = getAssets().open("ui" + path);
                 final String ext = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : "";
@@ -253,6 +259,27 @@ public class MainActivity extends Activity {
             final Map<String, String> headers = new HashMap<>();
             // L'anglais servi en attendant la version française ne doit pas rester dans le cache.
             headers.put("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
+            response.setResponseHeaders(headers);
+            return response;
+        } catch (final IOException e) {
+            return notFound();
+        }
+    }
+
+    /** Musiques et sons fournis avec Forge, dans les ressources installées (res/music, res/sound). */
+    private static WebResourceResponse audio(final String rel) {
+        final File root = resRoot;
+        if (root == null || !(rel.startsWith("sound/") || rel.startsWith("music/"))) {
+            return notFound();
+        }
+        try {
+            final File file = new File(root, rel).getCanonicalFile();
+            if (!file.getPath().startsWith(root.getCanonicalPath()) || !file.isFile()) {
+                return notFound();
+            }
+            final WebResourceResponse response = new WebResourceResponse("audio/mpeg", null, new FileInputStream(file));
+            final Map<String, String> headers = new HashMap<>();
+            headers.put("Cache-Control", "max-age=604800");
             response.setResponseHeaders(headers);
             return response;
         } catch (final IOException e) {

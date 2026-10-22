@@ -32,6 +32,7 @@ final class Texts {
     private static final Pattern HIDDEN = Pattern.compile("(?:Face-down card ?)?\\(H\\d+\\)");
     private static final Pattern LINE_START = Pattern.compile("(?m)^carte face cachée");
     private static final String FACE_DOWN = "carte face cachée";
+    private static final Pattern YOUR_ZONE = Pattern.compile("\\b(de|dans|à|sur|depuis) vous (bibliothèque|main|cimetière|exil|zone de commandement|champ de bataille|réserve)");
     private static final int CACHE_SIZE = 800;
 
     /** Textes déjà nettoyés (le journal et la pile reviennent à chaque photo de la partie). */
@@ -124,6 +125,8 @@ final class Texts {
         result = HIDDEN.matcher(result).replaceAll(FACE_DOWN);
         result = translateEnglish(result);
         result = LINE_START.matcher(result).replaceAll("Carte face cachée");
+        // Forge remplace « {player's} » par « vous » : « une carte de vous bibliothèque ».
+        result = YOUR_ZONE.matcher(result).replaceAll("$1 votre $2");
         if (!unresolved[0] && version == patternVersion) {
             // Un identifiant non reconnu (partie en cours de modification, carte pas encore vue) sera
             // retenté à la prochaine photo.

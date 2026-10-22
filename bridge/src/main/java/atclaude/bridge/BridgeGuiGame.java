@@ -22,6 +22,7 @@ import forge.player.PlayerZoneUpdate;
 import forge.trackable.TrackableCollection;
 import forge.util.FSerializableFunction;
 import forge.util.ITriggerEvent;
+import forge.util.Localizer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +57,8 @@ final class BridgeGuiGame extends AbstractGuiGame {
     // Invite affichée au joueur local : texte, carte concernée et deux boutons.
     private volatile String promptMessage = "";
     private volatile CardView promptCard;
+    /** Ordre du dessus choisi dans la fenêtre de regard, rendu à Forge quand il le demande juste après. */
+    private volatile List<Object> pendingTopOrder;
     private volatile String okLabel = "OK";
     private volatile String cancelLabel = "Annuler";
     private volatile boolean okEnabled;
@@ -146,8 +149,13 @@ final class BridgeGuiGame extends AbstractGuiGame {
         p.addProperty("okEnabled", okEnabled);
         p.addProperty("cancelEnabled", cancelEnabled);
         p.addProperty("focusOk", focusOk);
-        if (promptCard != null) {
-            p.addProperty("card", promptCard.getId());
+        final CardView pc = promptCard;
+        if (pc != null) {
+            p.addProperty("card", pc.getId());
+            // La carte concernée peut être hors du plateau (regard du dessus de la bibliothèque) : on l'envoie.
+            if (mayView(pc) && getGameView() != null) {
+                p.add("cardInfo", new GameSerializer(this).card(pc, getGameView()));
+            }
         }
         p.addProperty("selectMin", getSelectionMin());
         p.addProperty("selectMax", getSelectionMax());
@@ -335,6 +343,25 @@ final class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public <T> OrderResult<T> order(final String title, final String top, final int remainingObjectsMin, final int remainingObjectsMax, final List<T> sourceChoices, final List<T> destChoices, final CardView referenceCard, final boolean sideboardingMode, final boolean showRememberCheckbox) {
+        final Localizer loc = Localizer.getInstance();
+        // Regard et surveillance : Forge demande d'abord les cartes à déplacer, puis l'ordre de celles du dessus.
+        // On pose les deux questions d'un coup, dans une fenêtre où l'on glisse les cartes d'une zone à l'autre.
+        final boolean scry = title != null && title.equals(loc.getMessage("lblSelectCardsToBeOutOnTheBottomOfYourLibrary"));
+        final boolean surveil = title != null && title.equals(loc.getMessage("lblSelectCardsToBePutIntoTheGraveyard"));
+        if ((scry || surveil) && (destChoices == null || destChoices.isEmpty())) {
+            final Dialogs.Arrangement<T> a = dialogs.arrange(scry ? "Regard" : "Surveillance", sourceChoices, surveil);
+            pendingTopOrder = new ArrayList<>(a.top());
+            return new OrderResult<>(a.moved(), false);
+        }
+        final List<Object> pending = pendingTopOrder;
+        if (pending != null && title != null && title.equals(loc.getMessage("lblArrangeCardsToBePutOnTopOfYourLibrary"))
+                && (destChoices == null || destChoices.isEmpty())
+                && pending.size() == sourceChoices.size() && pending.containsAll(sourceChoices)) {
+            pendingTopOrder = null;
+            @SuppressWarnings("unchecked") final List<T> ordered = (List<T>) new ArrayList<>(pending);
+            return new OrderResult<>(ordered, false);
+        }
+        pendingTopOrder = null;
         return new OrderResult<>(dialogs.order(title, top, remainingObjectsMin, remainingObjectsMax, sourceChoices, destChoices), false);
     }
 
@@ -346,18 +373,34 @@ final class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public GameEntityView chooseSingleEntityForEffect(final String title, final List<? extends GameEntityView> optionList, final DelayedReveal delayedReveal, final boolean isOptional) {
-        if (delayedReveal != null && !delayedReveal.getCards().isEmpty()) {
-            dialogs.reveal(delayedReveal.getMessagePrefix(), new ArrayList<>(delayedReveal.getCards()));
-        }
-        return dialogs.one(title, new ArrayList<GameEntityView>(optionList), null, isOptional);
+        // Recherche : une seule fenêtre avec les cartes valides, le reste de la zone repliable en dessous.
+        final List<GameEntityView> picked = dialogs.choose(title, isOptional ? 0 : 1, 1, new ArrayList<GameEntityView>(optionList), null, null,
+                revealed(delayedReveal), revealTitle(delayedReveal));
+        return picked.isEmpty() ? null : picked.get(0);
     }
 
     @Override
     public List<GameEntityView> chooseEntitiesForEffect(final String title, final List<? extends GameEntityView> optionList, final int min, final int max, final DelayedReveal delayedReveal) {
-        if (delayedReveal != null && !delayedReveal.getCards().isEmpty()) {
-            dialogs.reveal(delayedReveal.getMessagePrefix(), new ArrayList<>(delayedReveal.getCards()));
+        return dialogs.choose(title, Math.max(0, min), max, new ArrayList<GameEntityView>(optionList), null, null,
+                revealed(delayedReveal), revealTitle(delayedReveal));
+    }
+
+    private static List<CardView> revealed(final DelayedReveal reveal) {
+        return reveal == null || reveal.getCards() == null ? null : new ArrayList<>(reveal.getCards());
+    }
+
+    /** Titre du reste de la zone fouillée : « Reste de la bibliothèque ». */
+    private static String revealTitle(final DelayedReveal reveal) {
+        if (reveal == null) {
+            return null;
         }
-        return dialogs.choose(title, Math.max(0, min), max, new ArrayList<GameEntityView>(optionList), null, null);
+        final StringBuilder zones = new StringBuilder();
+        if (reveal.getZone() != null) {
+            for (final forge.game.zone.ZoneType z : reveal.getZone()) {
+                zones.append(zones.length() > 0 ? ", " : "").append(z.getTranslatedName().toLowerCase());
+            }
+        }
+        return zones.length() == 0 ? "Autres cartes" : "Reste : " + zones;
     }
 
     @Override

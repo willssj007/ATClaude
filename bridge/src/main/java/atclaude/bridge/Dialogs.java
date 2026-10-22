@@ -109,11 +109,37 @@ final class Dialogs {
     /** Choisir entre {@code min} et {@code max} éléments. */
     <T> List<T> choose(final String title, final int min, final int max, final Collection<T> choices,
                        final Collection<T> selected, final FSerializableFunction<T, String> display) {
+        return choose(title, min, max, choices, selected, display, null, null);
+    }
+
+    /**
+     * Comme {@link #choose}, avec en plus des cartes montrées sans pouvoir être choisies (le reste de la
+     * bibliothèque pendant une recherche), repliées sous un bouton.
+     */
+    <T> List<T> choose(final String title, final int min, final int max, final Collection<T> choices,
+                       final Collection<T> selected, final FSerializableFunction<T, String> display,
+                       final Collection<CardView> others, final String othersTitle) {
         final List<T> source = choices == null ? new ArrayList<>() : new ArrayList<>(choices);
         if (source.isEmpty()) {
+            if (others != null && !others.isEmpty()) {
+                // Rien à choisir (aucune carte valide) : on montre quand même ce qu'il y avait.
+                reveal(othersTitle == null ? title : othersTitle, new ArrayList<>(others));
+            }
             return new ArrayList<>();
         }
         final JsonObject d = dialog(title, "");
+        if (others != null && !others.isEmpty()) {
+            final List<CardView> rest = new ArrayList<>();
+            for (final CardView c : others) {
+                if (!source.contains(c)) {
+                    rest.add(c);
+                }
+            }
+            if (!rest.isEmpty()) {
+                d.add("others", items(rest, null));
+                d.addProperty("othersTitle", Texts.clean(othersTitle == null ? "" : othersTitle));
+            }
+        }
         d.addProperty("min", min);
         d.addProperty("max", max);
         d.add("items", items(source, display));
@@ -232,6 +258,36 @@ final class Dialogs {
             return fallback;
         }
         return pick(all, order);
+    }
+
+    /** Résultat du regard : cartes laissées dessus (la première sera piochée en premier) et cartes déplacées. */
+    record Arrangement<T>(List<T> top, List<T> moved) { }
+
+    /**
+     * Regard ou surveillance façon Arena : les cartes se glissent entre « dessus de la bibliothèque » et
+     * « dessous » (ou « cimetière »), dans l'ordre voulu.
+     */
+    <T> Arrangement<T> arrange(final String title, final List<T> cards, final boolean toGraveyard) {
+        final JsonObject d = dialog(title, "");
+        d.add("items", items(cards, null));
+        d.addProperty("topLabel", "Dessus de la bibliothèque");
+        d.addProperty("movedLabel", toGraveyard ? "Cimetière" : "Dessous de la bibliothèque");
+        d.addProperty("graveyard", toGraveyard);
+        final JsonElement answer = bridge.ask("arrange", d);
+        final List<T> top = new ArrayList<>();
+        final List<T> moved = new ArrayList<>();
+        if (answer != null && answer.isJsonObject()) {
+            final JsonObject a = answer.getAsJsonObject();
+            top.addAll(pick(cards, indices(a.get("top"))));
+            moved.addAll(pick(cards, indices(a.get("moved"))));
+        }
+        // Réponse incomplète (partie abandonnée...) : les cartes oubliées restent dessus, dans l'ordre.
+        for (final T c : cards) {
+            if (!top.contains(c) && !moved.contains(c)) {
+                top.add(c);
+            }
+        }
+        return new Arrangement<>(top, moved);
     }
 
     <T> void reveal(final String title, final List<T> items) {

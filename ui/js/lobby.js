@@ -123,9 +123,31 @@ export class Lobby {
       const seat = this.seats[Number(node.dataset.i)];
       node.querySelectorAll('[data-f]').forEach(input => input.addEventListener('change', () => {
         seat[input.dataset.f] = input.value;
+        if (input.dataset.f === 'deckKey') {
+          this.seatArt(node, seat.deckKey);
+        }
       }));
+      this.seatArt(node, seat.deckKey);
     });
     this.root.querySelector('[data-start]').addEventListener('click', () => this.start());
+  }
+
+  /** Illustration du commandant du deck choisi, en fond de la place. */
+  seatArt(node, key) {
+    const all = [...((this.decks && this.decks.decks) || []), ...((this.decks && this.decks.precons) || [])];
+    const deck = all.find(d => d.key === key);
+    node.classList.remove('has-art');
+    node.style.removeProperty('--seat-art');
+    if (!deck || !deck.image || !prefs.get('images')) {
+      return;
+    }
+    const url = bridge.imageUrl(deck.image, prefs.get('imageLang'));
+    const img = new Image();
+    img.onload = () => {
+      node.style.setProperty('--seat-art', `url("${url}")`);
+      node.classList.add('has-art');
+    };
+    img.src = url;
   }
 
   async start() {

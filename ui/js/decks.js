@@ -4,7 +4,7 @@ import {bridge} from './bridge.js';
 import {cardElement, showZoom, onLongPress} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {SearchPanel} from './search.js';
-import {esc, el, manaHtml, toast, debounce} from './util.js';
+import {esc, el, manaHtml, prefs, toast, debounce} from './util.js';
 
 const GROUPS = [
   ['Créatures', c => c.creature],
@@ -34,6 +34,44 @@ const PROBLEMS = [
 
 function translateProblem(text) {
   return PROBLEMS.reduce((s, [re, to]) => s.replace(re, to), String(text));
+}
+
+/**
+ * Tuile de deck façon Arena : l'illustration du commandant (recadrée sur l'image de la carte) en bandeau,
+ * puis le nom, le commandant et l'identité de couleur.
+ */
+function deckTile(d, actionHtml, subtitle) {
+  const tile = el(`<div class="deck-tile panel" data-key="${esc(d.key)}">
+    <div class="deck-art" style="--id-grad:${identityGradient(d.identity)}"><div class="deck-art-img"></div><div class="deck-pips">${identityHtml(d.identity)}</div></div>
+    <div class="deck-body">
+      <div class="info"><b title="${esc(d.name)}">${esc(d.name)}</b>
+        <div class="muted small">${esc((d.commanders || []).join(' & ') || subtitle)}</div>
+        ${(d.commanders || []).length ? `<div class="muted small">${esc(subtitle)}</div>` : ''}</div>
+      ${actionHtml}
+    </div></div>`);
+  if (d.image && prefs.get('images')) {
+    const url = bridge.imageUrl(d.image, prefs.get('imageLang'));
+    const img = new Image();
+    img.onload = () => {
+      tile.querySelector('.deck-art-img').style.backgroundImage = `url("${url}")`;
+      tile.querySelector('.deck-art').classList.add('has-img');
+    };
+    img.src = url;
+  }
+  return tile;
+}
+
+const ID_COLORS = {W: '#e9e2c4', U: '#3d8fd8', B: '#5d5263', R: '#d9553b', G: '#3c9a5a'};
+
+function identityGradient(identity) {
+  const cols = (identity || '').split('').map(c => ID_COLORS[c]).filter(Boolean);
+  if (!cols.length) {
+    return 'linear-gradient(135deg, #8a8aa0, #4a4a5c)';
+  }
+  if (cols.length === 1) {
+    cols.push(cols[0]);
+  }
+  return `linear-gradient(135deg, ${cols.join(', ')})`;
 }
 
 function identityHtml(identity) {
@@ -91,22 +129,15 @@ export class Decks {
     </div>`;
     const box = this.root.querySelector('.mine');
     for (const d of mine) {
-      const tile = el(`<div class="deck-tile panel" data-key="${esc(d.key)}">
-        <div class="art"></div>
-        <div class="info"><b>${esc(d.name)}</b>
-          <div class="muted small">${d.format === 'commander' ? 'Commander' : 'Construit'} · ${d.count} cartes</div>
-          <div class="muted small">${esc((d.commanders || []).join(' & '))}</div>
-          <div>${identityHtml(d.identity)}</div></div>
-        <button class="btn small gold" data-play>Jouer</button></div>`);
-      tile.querySelector('.art').appendChild(d.image ? cardElement({image: d.image, name: d.name}) : cardElement(null));
-      box.appendChild(tile);
+      box.appendChild(deckTile(d, `<button class="btn small gold" data-play>Jouer</button>`,
+        `${d.format === 'commander' ? 'Commander' : 'Construit'} · ${d.count} cartes`));
     }
     const renderPrecons = (filter = '') => {
       const f = filter.toLowerCase();
       const list = this.root.querySelector('.precons');
-      list.innerHTML = this.data.precons.filter(p => !f || p.name.toLowerCase().includes(f)).slice(0, 80).map(p => `<div class="deck-tile panel" data-key="${esc(p.key)}">
-        <div class="info"><b>${esc(p.name)}</b><div>${identityHtml(p.identity)}</div></div>
-        <button class="btn small" data-copy>Copier</button></div>`).join('');
+      list.replaceChildren(...this.data.precons
+        .filter(p => !f || p.name.toLowerCase().includes(f) || (p.commanders || []).some(c => c.toLowerCase().includes(f)))
+        .slice(0, 80).map(p => deckTile(p, '<button class="btn small" data-copy>Copier</button>', 'Préconstruit')));
     };
     renderPrecons();
     this.root.querySelector('.precon-q').addEventListener('input', debounce(e => renderPrecons(e.target.value), 150));

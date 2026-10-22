@@ -43,8 +43,10 @@
 .slot.tapped > .mcard { --rot: 90deg; }
 .slot.attacking > .mcard { --lift: calc(var(--w) * -0.2); }
 .opp-field .slot.attacking > .mcard { --lift: calc(var(--w) * 0.2); }
-.slot.attached { margin-left: calc(var(--w) * -0.72) !important; z-index: 0; }
-.slot.attached > .mcard { --lift: calc(var(--w) * -0.16); filter: brightness(0.92); }
+/* Aura ou équipement : sous la carte hôte (placée après dans la rangée), presque alignée, son nom dépassant au-dessus. */
+.slot.attached { margin-right: calc(var(--w) * -0.88); }
+.slot.attached > .mcard { --lift: calc(var(--w) * -0.21 * var(--att-level, 1)); filter: brightness(0.9); }
+.row > .slot.attached + .slot { margin-left: 0; }
 .slot.stacked { margin-left: calc(var(--w) * -0.8) !important; }
 .slot.stacked.tapped { margin-left: calc(var(--h) * -0.8) !important; }
 .slot.leaving { pointer-events: none; }
@@ -237,6 +239,8 @@
   font-size: 12.5px; line-height: 1.35; max-height: 42vh; overflow: auto; white-space: pre-line; min-height: 0;
 }
 .prompt:empty { display: none; }
+.prompt-card { align-self: center; cursor: pointer; }
+.prompt-card .mcard { --w: min(110px, calc(var(--rail-r) * 0.6)); }
 .prompt.waiting { color: var(--muted); font-style: italic; }
 .btn-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .btn-row:empty { display: none; }

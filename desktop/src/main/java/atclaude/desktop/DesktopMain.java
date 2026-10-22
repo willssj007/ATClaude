@@ -96,6 +96,18 @@ public final class DesktopMain {
             exchange.getResponseHeaders().add("Content-Language", img.lang());
             reply(exchange, 200, ImageService.contentType(img.file()), Files.readAllBytes(img.file().toPath()));
         });
+        // Musiques et sons fournis avec Forge (res/music, res/sound).
+        final File res = new File(assets, "res").getCanonicalFile();
+        server.createContext("/audio/", exchange -> {
+            final String rel = exchange.getRequestURI().getPath().substring("/audio/".length());
+            final File file = new File(res, rel).getCanonicalFile();
+            if (!(rel.startsWith("sound/") || rel.startsWith("music/")) || !file.getPath().startsWith(res.getPath()) || !file.isFile()) {
+                reply(exchange, 404, "text/plain", new byte[0]);
+                return;
+            }
+            exchange.getResponseHeaders().add("Cache-Control", "max-age=604800");
+            reply(exchange, 200, "audio/mpeg", Files.readAllBytes(file.toPath()));
+        });
         server.createContext("/", exchange -> serveStatic(exchange, ui));
         server.start();
 

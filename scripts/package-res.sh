@@ -27,6 +27,11 @@ for f in "$SRC"/*.txt; do
   cp "$f" "$OUT/res/"
 done
 
+# Musiques (Kevin MacLeod, CC BY 3.0) et effets sonores fournis avec Forge.
+for dir in music sound; do
+  cp -r "$SRC/$dir" "$OUT/res/$dir"
+done
+
 # Langues : anglais (référence) et français.
 mkdir -p "$OUT/res/languages"
 cp "$SRC/languages/en-US.properties" "$SRC/languages/fr-FR.properties" "$SRC/languages/cardnames-fr-FR.txt" "$OUT/res/languages/"

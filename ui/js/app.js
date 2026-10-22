@@ -1,12 +1,14 @@
 // Contrôleur principal : chargement de Forge, navigation entre les écrans, cycle d'une partie.
 
+import {initAudio, refreshAudio, setMusicMode} from './audio.js';
 import {bridge} from './bridge.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
 import {Decks} from './decks.js';
-import {closeAllForgeDialogs, closeForgeDialog, handleForgeDialog} from './dialogs.js';
+import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} from './dialogs.js';
 import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
+import {announceTrophy, Trophies} from './trophies.js';
 import {$, $$, esc, prefs, toast} from './util.js';
 
 const screens = {};
@@ -22,6 +24,7 @@ function showScreen(name) {
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
   document.body.classList.toggle('in-game', name === 'game');
+  setMusicMode(name === 'game' ? 'match' : 'menus');
   $('#resume-game').classList.toggle('hidden', !inMatch || name === 'game');
   const screen = screens[name];
   if (screen && screen.show) {
@@ -39,12 +42,15 @@ async function getDecks(force = false) {
 // ------------------------------------------------------------------ parties
 
 async function startMatch(setup) {
+  if (inMatch && !(await confirmBox('Nouvelle partie ?', 'La partie en cours sera abandonnée.', {yes: 'Nouvelle partie', danger: true}))) {
+    return;
+  }
   lastSetup = setup;
   closeAllForgeDialogs();
   if (game) {
     game.destroy();
   }
-  game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup)});
+  game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup), onMenu: () => showScreen('home')});
   inMatch = true;
   showScreen('game');
   try {
@@ -54,6 +60,25 @@ async function startMatch(setup) {
     inMatch = false;
     toast(e.message, {title: 'Impossible de lancer la partie', error: true, duration: 8000});
     showScreen('lobby');
+  }
+}
+
+/** Reprend la partie sauvegardée (l'application avait été fermée en pleine partie). */
+async function resumeSaved() {
+  closeAllForgeDialogs();
+  if (game) {
+    game.destroy();
+  }
+  game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup || prefs.get('lastSetup')), onMenu: () => showScreen('home')});
+  game.pauseUntilResumed('Reprise de la partie sauvegardée…');
+  inMatch = true;
+  showScreen('game');
+  try {
+    await bridge.request('resumeSaved');
+  } catch (e) {
+    inMatch = false;
+    toast(e.message, {title: 'Impossible de reprendre la partie', error: true, duration: 8000});
+    showScreen('home');
   }
 }
 
@@ -88,7 +113,9 @@ function homeScreen() {
   return {
     async show() {
       const decks = ready ? await getDecks() : {decks: [], precons: []};
+      const saved = ready && !inMatch ? await bridge.request('savedGame').catch(() => null) : null;
       root.innerHTML = `<div class="page">
+        ${saved ? savedGameHtml(saved) : ''}
         <div class="hero">
           <img src="img/icon.svg" class="glow" alt="">
           <h1>Arcane Table</h1>
@@ -104,7 +131,8 @@ function homeScreen() {
           <div class="tile panel" data-go="lobby"><h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
           <div class="tile panel" data-go="decks"><h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
           <div class="tile panel" data-go="cards"><h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
-          <div class="tile panel" data-go="settings"><h3>Réglages</h3><p class="muted">Priorité, images, animations.</p></div>
+          <div class="tile panel" data-go="trophies"><h3>Trophées</h3><p class="muted">Séries de victoires, victoires alternatives, défis...</p></div>
+          <div class="tile panel" data-go="settings"><h3>Réglages</h3><p class="muted">Priorité, images, musique, sons.</p></div>
         </div>
       </div>`;
       root.onclick = (e) => {
@@ -114,12 +142,35 @@ function homeScreen() {
         }
         if (go.dataset.go === 'quick') {
           quickMatch();
+        } else if (go.dataset.go === 'resumeSaved') {
+          resumeSaved();
+        } else if (go.dataset.go === 'dropSaved') {
+          confirmBox('Abandonner la partie sauvegardée ?', 'Elle ne pourra plus être reprise.', {yes: 'Abandonner', danger: true}).then(async (yes) => {
+            if (yes) {
+              await bridge.request('deleteSaved').catch(() => {});
+              screens.home.show();
+            }
+          });
         } else {
           showScreen(go.dataset.go);
         }
       };
     },
   };
+}
+
+function savedGameHtml(s) {
+  const when = s.savedAt ? new Date(s.savedAt) : null;
+  const ago = when ? Math.max(0, Math.round((Date.now() - when.getTime()) / 60000)) : null;
+  const agoText = ago === null ? '' : ago < 1 ? 'à l\'instant' : ago < 60 ? `il y a ${ago} min` : ago < 1440 ? `il y a ${Math.round(ago / 60)} h` : `le ${when.toLocaleDateString('fr-FR')}`;
+  const players = (s.players || []).map(p => `${esc(p.name)} <b>${p.lost ? '✝' : p.life}</b>`).join(' · ');
+  return `<div class="saved-game panel">
+    <div class="sg-icon">⏳</div>
+    <div class="sg-info"><b>Partie en cours sauvegardée</b>
+      <div class="muted small">${s.format === 'constructed' ? 'Construit' : 'Commander'} · tour ${s.turn || 1}${s.active ? ` (${esc(s.active)})` : ''} · ${agoText}</div>
+      <div class="small">${players}</div></div>
+    <div class="sg-actions"><button class="btn small" data-go="dropSaved">Abandonner</button><button class="btn gold" data-go="resumeSaved">▶ Reprendre</button></div>
+  </div>`;
 }
 
 async function quickMatch() {
@@ -174,10 +225,14 @@ function settingsScreen() {
         <div class="row"><div><b>Langue des images</b><p class="muted small">En français quand Scryfall a une impression française de la carte, sinon en anglais.</p></div>
           <select data-pref-select="imageLang"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         ${row('animations', 'Animations', 'Déplacements de cartes, bannières de tour, effets de points de vie.')}
+        ${row('musicOn', 'Musique d\'ambiance', 'Musiques médiévales de Kevin MacLeod, dans les menus et en partie.')}
+        <div class="row"><div><b>Volume de la musique</b></div><input type="range" min="0" max="100" data-pref-range="musicVolume"></div>
+        ${row('sfxOn', 'Effets sonores', 'Cartes engagées, sorts, terrains, boutons...')}
+        <div class="row"><div><b>Volume des effets</b></div><input type="range" min="0" max="100" data-pref-range="sfxVolume"></div>
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
         <h2 style="margin-top:26px">À propos</h2>
-        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall.</p>
+        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques : Kevin MacLeod (incompetech.com), licence Creative Commons Attribution 3.0.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
       </div>`;
@@ -188,8 +243,16 @@ function settingsScreen() {
           reloadImages();
         });
       });
+      root.querySelectorAll('[data-pref-range]').forEach(r => {
+        r.value = Math.round(Number(prefs.get(r.dataset.prefRange)) * 100);
+        r.addEventListener('input', () => {
+          prefs.set(r.dataset.prefRange, Number(r.value) / 100);
+          refreshAudio();
+        });
+      });
       root.querySelectorAll('[data-pref]').forEach(i => i.addEventListener('change', () => {
         prefs.set(i.dataset.pref, i.checked);
+        refreshAudio();
         if (inMatch && (i.dataset.pref === 'holdPriority' || i.dataset.pref === 'autoPass')) {
           bridge.send('settings', {settings: {[i.dataset.pref]: i.checked}});
         }
@@ -219,7 +282,7 @@ function onReady(hello) {
   screens.lobby.setProfiles(hello && hello.aiProfiles);
   if (hello && hello.inMatch) {
     inMatch = true;
-    game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup || prefs.get('lastSetup'))});
+    game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup || prefs.get('lastSetup')), onMenu: () => showScreen('home')});
     showScreen('game');
   } else {
     showScreen(current === 'game' ? 'home' : current);
@@ -240,6 +303,7 @@ async function hello() {
 }
 
 function init() {
+  initAudio();
   screens.home = homeScreen();
   screens.lobby = new Lobby($('#screen-lobby'), {onStart: startMatch, getDecks: () => getDecks(true)});
   screens.decks = new Decks($('#screen-decks'), {onPlay: playDeck, onChanged: () => {
@@ -247,7 +311,9 @@ function init() {
   }});
   screens.cards = cardsScreen();
   screens.settings = settingsScreen();
+  screens.trophies = new Trophies($('#screen-trophies'));
 
+  $('#profile-btn').addEventListener('click', () => ready && showScreen('account'));
   $('#nav').addEventListener('click', (e) => {
     const b = e.target.closest('[data-screen]');
     if (b && ready) {
@@ -286,6 +352,8 @@ function init() {
   bridge.on('notice', (m) => toast(m.message, {title: m.title}));
   bridge.on('error', (m) => toast(m.message, {title: 'Erreur', error: true, duration: 6000}));
   bridge.on('gameOver', (m) => game && game.gameOver(m));
+  bridge.on('trophy', (m) => announceTrophy(m));
+  bridge.on('resumed', () => game && game.resumed());
   bridge.on('openUrl', (m) => bridge.openUrl(m.url));
   bridge.on('incorrectAction', () => {
     const p = document.querySelector('.prompt');

@@ -78,6 +78,13 @@ final class MatchSession {
     private volatile boolean closed;
 
     private JsonObject setup;
+    /** Le salon avec les decks complets, gardé dans la sauvegarde. */
+    private JsonObject savedSetup;
+    private final String sessionId = java.util.UUID.randomUUID().toString();
+    /** Reprise en cours : les questions d'avant la partie (jouer ou piocher, mulligan) sont répondues d'office. */
+    private volatile boolean resumePending;
+    private volatile String lastSaveKey = "";
+    private static final Set<PhaseType> SAVE_PHASES = EnumSet.of(PhaseType.UPKEEP, PhaseType.DRAW, PhaseType.MAIN1, PhaseType.MAIN2, PhaseType.END_OF_TURN);
 
     private MatchSession(final Bridge bridge, final BridgeGuiGame gui, final HostedMatch match) {
         this.bridge = bridge;
@@ -88,6 +95,15 @@ final class MatchSession {
     }
 
     static MatchSession start(final Bridge bridge, final Catalog catalog, final JsonObject setup) {
+        return start(bridge, catalog, setup, null);
+    }
+
+    /** Reprend une partie sauvegardée : mêmes joueurs et decks, puis l'état de la partie au début du premier tour. */
+    static MatchSession resume(final Bridge bridge, final Catalog catalog, final JsonObject save) {
+        return start(bridge, catalog, save.getAsJsonObject("setup"), save);
+    }
+
+    private static MatchSession start(final Bridge bridge, final Catalog catalog, final JsonObject setup, final JsonObject save) {
         if (!ForgeRuntime.isReady()) {
             throw new IllegalStateException("Forge est encore en cours de chargement.");
         }
@@ -100,9 +116,15 @@ final class MatchSession {
         final List<RegisteredPlayer> players = new ArrayList<>();
         RegisteredPlayer human = null;
         int aiIndex = 0;
+        // Le salon tel quel, avec chaque deck écrit en entier : la sauvegarde ne dépend plus des decks enregistrés.
+        final JsonObject resolved = setup.deepCopy();
+        final JsonArray resolvedSeats = new JsonArray();
         for (final JsonElement e : seats) {
             final JsonObject seat = e.getAsJsonObject();
             final Deck deck = deckFor(catalog, seat);
+            final JsonObject rs = seat.deepCopy();
+            rs.add("deck", Catalog.deckJson(deck, commander ? "commander" : "constructed"));
+            resolvedSeats.add(rs);
             final RegisteredPlayer rp = commander ? RegisteredPlayer.forCommander(deck) : new RegisteredPlayer(deck);
             final boolean ai = seat.has("ai") && seat.get("ai").getAsBoolean();
             final String name = str(seat, "name").isEmpty() ? (ai ? "IA " + (aiIndex + 1) : "Moi") : str(seat, "name");
@@ -126,11 +148,29 @@ final class MatchSession {
             throw new IllegalArgumentException("Il faut un joueur humain.");
         }
 
+        resolved.add("players", resolvedSeats);
+
         Texts.reset();
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
         final HostedMatch match = GuiBase.getInterface().hostMatch();
         final MatchSession session = new MatchSession(bridge, gui, match);
         session.setup = setup;
+        session.savedSetup = resolved;
+        if (save != null) {
+            // Début du premier tour (après les mulligans, acceptés d'office) : on remet l'état sauvegardé.
+            session.resumePending = true;
+            match.setStartGameHook(() -> {
+                try {
+                    SaveGame.apply(match.getGame(), save);
+                } catch (final RuntimeException ex) {
+                    ex.printStackTrace();
+                    bridge.sendEvent("error", m -> m.addProperty("message", "La partie sauvegardée n'a pas pu être reprise entièrement : " + ex.getMessage()));
+                }
+                session.resumePending = false;
+                bridge.sendEvent("resumed", m -> { });
+                gui.markDirty();
+            });
+        }
         gui.attach(session);
         match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
         final Set<GameType> variants = commander ? EnumSet.of(GameType.Commander) : null;
@@ -160,6 +200,8 @@ final class MatchSession {
     void close() {
         closed = true;
         timer.shutdownNow();
+        // Partie quittée pour une autre : sa sauvegarde ne sert plus.
+        SaveGame.delete(sessionId);
         try {
             final PlayerControllerHuman c = gui.controller();
             if (c != null && gui.getGameView() != null) {
@@ -352,7 +394,7 @@ final class MatchSession {
      * vient de mettre sur la pile est résolu sans s'arrêter, comme sur Arena : on passe la priorité.
      */
     void onPrompt() {
-        if (closed || holdPriority) {
+        if (closed) {
             return;
         }
         final PlayerControllerHuman c = gui.controller();
@@ -361,7 +403,14 @@ final class MatchSession {
             return;
         }
         final Input input = c.getInputQueue().getInput();
-        if (!(input instanceof InputPassPriority)) {
+        if (resumePending) {
+            answerBeforeResume(c, input);
+            return;
+        }
+        if (input instanceof InputPassPriority) {
+            maybeSave(c, input);
+        }
+        if (holdPriority || !(input instanceof InputPassPriority)) {
             return;
         }
         final StackItemView top = gv.peekStack();
@@ -377,11 +426,89 @@ final class MatchSession {
         }), 350, TimeUnit.MILLISECONDS);
     }
 
-    void afterStateSent() { }
+    /** Avant de reprendre une partie : on joue, on garde sa main, on se choisit pour commencer. */
+    private void answerBeforeResume(final PlayerControllerHuman c, final Input input) {
+        if (input == null) {
+            return;
+        }
+        timer.schedule(() -> bridge.runOnEdt(() -> {
+            if (closed || !resumePending || c.getInputQueue().getInput() != input) {
+                return;
+            }
+            if (input instanceof forge.gamemodes.match.input.InputSelectEntitiesFromList && gui.getCurrentPlayer() != null) {
+                c.selectPlayer(gui.getCurrentPlayer(), CLICK);
+            }
+            c.selectButtonOk();
+        }), 120, TimeUnit.MILLISECONDS);
+    }
+
+    /** Sauvegarde aux moments calmes : le joueur a la priorité, la pile est vide, hors combat. Une fois par phase. */
+    private void maybeSave(final PlayerControllerHuman c, final Input input) {
+        final Game game = game();
+        if (game == null || game.isGameOver() || !game.getStack().isEmpty()) {
+            return;
+        }
+        final PhaseType phase = game.getPhaseHandler().getPhase();
+        if (phase == null || !SAVE_PHASES.contains(phase) || game.getPhaseHandler().getPlayerTurn() == null) {
+            return;
+        }
+        // Même phase, mais la partie a changé (sort résolu, terrain joué...) : on sauvegarde de nouveau.
+        final StringBuilder key0 = new StringBuilder();
+        key0.append(game.getPhaseHandler().getTurn()).append(':').append(phase).append(':').append(game.getPhaseHandler().getPlayerTurn().getId());
+        for (final Player p : game.getPlayers()) {
+            key0.append('|').append(p.getLife()).append(',').append(p.getZone(ZoneType.Hand).size()).append(',')
+                    .append(p.getZone(ZoneType.Battlefield).size()).append(',').append(p.getZone(ZoneType.Graveyard).size()).append(',')
+                    .append(p.getZone(ZoneType.Library).size()).append(',').append(p.getTotalCommanderCast()).append(',')
+                    .append(p.getCardsIn(ZoneType.Battlefield).stream().filter(Card::isTapped).count());
+        }
+        final String key = key0.toString();
+        if (key.equals(lastSaveKey)) {
+            return;
+        }
+        lastSaveKey = key;
+        timer.schedule(() -> {
+            // Le fil de partie attend toujours la même décision : l'état ne bouge pas pendant la photo.
+            if (closed || c.getInputQueue().getInput() != input) {
+                lastSaveKey = "";
+                return;
+            }
+            try {
+                SaveGame.write(SaveGame.capture(game, savedSetup, sessionId));
+            } catch (final RuntimeException e) {
+                lastSaveKey = "";
+                System.err.println("Sauvegarde ratée : " + e);
+            }
+        }, 250, TimeUnit.MILLISECONDS);
+    }
+
+    /** Après chaque photo envoyée à l'interface : la partie a pu changer sans nouvelle invite (triche, sort résolu). */
+    void afterStateSent() {
+        if (closed || resumePending) {
+            return;
+        }
+        final PlayerControllerHuman c = gui.controller();
+        if (c == null) {
+            return;
+        }
+        final Input input = c.getInputQueue().getInput();
+        if (input instanceof InputPassPriority) {
+            try {
+                maybeSave(c, input);
+            } catch (final RuntimeException e) {
+                // Zones modifiées pendant la lecture : on réessaiera à la prochaine photo.
+                lastSaveKey = "";
+            }
+        }
+    }
 
     void onGameEvent(final GameEvent event) { }
 
     void onGameFinished() {
+        // Partie terminée : rien à reprendre.
+        SaveGame.delete(sessionId);
+        if (closed) {
+            return; // partie abandonnée pour en lancer une autre : l'écran de fin n'a pas lieu d'être
+        }
         bridge.sendEvent("gameOver", m -> {
             final GameView gv = gui.getGameView();
             final GameOutcome outcome = gv == null ? null : gv.getOutcome();

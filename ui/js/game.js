@@ -28,10 +28,11 @@ function faceSig(card) {
 }
 
 export class Game {
-  constructor(root, {onExit, onRematch}) {
+  constructor(root, {onExit, onRematch, onMenu}) {
     this.root = root;
     this.onExit = onExit;
     this.onRematch = onRematch;
+    this.onMenu = onMenu || onExit;
     this.state = null;
     this.pendingState = null;
     this.slots = new Map();
@@ -54,7 +55,24 @@ export class Game {
     this.slots.clear();
   }
 
+  /** Reprise d'une sauvegarde : on n'affiche rien avant que Forge ait remis la partie en place. */
+  pauseUntilResumed(text) {
+    this.paused = true;
+    this.showWaiting(text);
+  }
+
+  resumed() {
+    this.paused = false;
+    if (this.lastState) {
+      this.setState(this.lastState);
+    }
+  }
+
   setState(state) {
+    this.lastState = state;
+    if (this.paused) {
+      return;
+    }
     this.pendingState = state;
     if (!this.frame) {
       this.frame = requestAnimationFrame(() => {
@@ -328,6 +346,10 @@ export class Game {
         bridge.send('useMana', {color: mana.dataset.mana});
         return;
       }
+      const promptCard = e.target.closest('.prompt-card');
+      if (promptCard && promptCard._card) {
+        showZoom(promptCard._card, this.cardDetails(promptCard._card));
+      }
     });
 
     table.querySelector('.ok-btn').addEventListener('click', () => this.primary());
@@ -574,20 +596,24 @@ export class Game {
       const list = [];
       let prevLand = null;
       for (const card of cards) {
+        // Auras et équipements glissés sous leur hôte, décalés vers le haut : on lit leur nom au-dessus.
+        const atts = attachments.get(card.id) || [];
+        atts.forEach((a, k) => {
+          const s = this.slot('c' + a.id, a, used);
+          s.classList.add('attached');
+          s.classList.remove('stacked', 'attacking', 'has-attach');
+          s.style.setProperty('--att-level', String(atts.length - k));
+          list.push(s);
+        });
         const slot = this.slot('c' + card.id, card, used);
         slot.classList.toggle('attacking', combat.has(card.id));
         slot.classList.remove('attached');
+        slot.classList.toggle('has-attach', atts.length > 0);
         const stack = opts.stackLands && card.land && prevLand && prevLand.name === card.name && prevLand.tapped === card.tapped
-          && !card.counters && !attachments.has(card.id) && !card.selectable && !card.highlighted;
+          && !card.counters && !atts.length && !card.selectable && !card.highlighted;
         slot.classList.toggle('stacked', !!stack);
         prevLand = card.land ? card : null;
         list.push(slot);
-        for (const a of attachments.get(card.id) || []) {
-          const s = this.slot('c' + a.id, a, used);
-          s.classList.add('attached');
-          s.classList.remove('stacked', 'attacking');
-          list.push(s);
-        }
       }
       if (!opts.hand) {
         for (const slot of list) {
@@ -904,6 +930,22 @@ export class Game {
     }
     promptBox.textContent = message;
     promptBox.classList.toggle('waiting', waiting);
+    // Carte dont parle l'invite, quand elle n'est pas visible sur le plateau (regard d'une carte, etc.).
+    const info = p.cardInfo && !p.cardInfo.hidden && !['battlefield', 'hand'].includes(p.cardInfo.zone) ? p.cardInfo : null;
+    let thumb = this.table.querySelector('.prompt-card');
+    if (info) {
+      if (!thumb) {
+        thumb = el('<div class="prompt-card" title="Toucher pour agrandir"></div>');
+        promptBox.before(thumb);
+      }
+      if (thumb._sig !== faceSig(info)) {
+        thumb.replaceChildren(cardElement(info));
+        thumb._sig = faceSig(info);
+        thumb._card = info;
+      }
+    } else if (thumb) {
+      thumb.remove();
+    }
 
     const ok = this.table.querySelector('.ok-btn');
     const cancel = this.table.querySelector('.cancel-btn');
@@ -914,14 +956,16 @@ export class Game {
     ok.textContent = okLabel;
     ok.disabled = !p.okEnabled;
     ok.classList.toggle('hidden', !p.okEnabled && waiting);
-    cancel.textContent = p.cancelLabel || 'Annuler';
+    let cancelLabel = p.cancelLabel || 'Annuler';
+    if (p.input === 'InputAttack') {
+      // Forge propose « Frappe Alpha » (tout le monde attaque) ou « Rappeler » (plus personne n'attaque).
+      cancelLabel = /rappel/i.test(cancelLabel) ? '↺ Personne n\'attaque' : '⚔ Tout attaquer';
+    }
+    cancel.textContent = cancelLabel;
     cancel.classList.toggle('hidden', !p.cancelEnabled);
 
     const extra = this.table.querySelector('.extra');
     let html = '';
-    if (p.input === 'InputAttack') {
-      html += '<button class="btn small" data-act="alphaStrike">⚔ Tout attaquer</button>';
-    }
     if (p.input === 'InputPassPriority' || p.input === 'InputPayMana') {
       html += '<button class="btn small ghost" data-act="undo" title="Défaire la dernière action (engagement de mana...)">↶ Défaire</button>';
     }
@@ -1193,6 +1237,11 @@ export class Game {
           const card = this.cards.get(slot.dataset.key) || slot._card;
           if (card && (card.selectable || card.playable)) {
             bridge.send('card', {id: card.id});
+            if (!card.selectable) {
+              // Carte jouée depuis la zone (commandant, flashback...) : la fenêtre se ferme.
+              this.trayZone = null;
+              tray.remove();
+            }
           } else if (card) {
             showZoom(card, this.cardDetails(card));
           }
@@ -1294,8 +1343,9 @@ export class Game {
           <h3>Partie</h3>
           <div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn" data-menu="passTurn">Passer jusqu'à la fin du tour</button>
+            <button class="btn" data-menu="leave">Retour au menu (la partie est gardée)</button>
             <button class="btn danger" data-menu="concede">Abandonner la partie</button>
-            <button class="btn" data-menu="leave">Quitter vers le menu</button>
+            <p class="muted small">La partie est sauvegardée à chaque phase calme : si l'application se ferme, elle se reprend depuis l'accueil.</p>
           </div>
         </section>
       </div>`;
@@ -1317,10 +1367,12 @@ export class Game {
         this.closeDrawer();
       }
     });
-    drawer.querySelector('[data-menu="leave"]').addEventListener('click', async () => {
-      if (this.state.game.gameOver || await confirmBox('Quitter la partie ?', 'La partie en cours sera abandonnée.', {yes: 'Quitter', danger: true})) {
-        this.closeDrawer();
+    drawer.querySelector('[data-menu="leave"]').addEventListener('click', () => {
+      this.closeDrawer();
+      if (this.state.game.gameOver) {
         this.onExit();
+      } else {
+        this.onMenu();
       }
     });
   }

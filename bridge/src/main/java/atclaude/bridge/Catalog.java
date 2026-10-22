@@ -317,6 +317,17 @@ final class Catalog {
             }
         }
         result.add("decks", mine);
+        result.add("precons", precons());
+        return result;
+    }
+
+    private JsonArray preconCache;
+
+    /** Préconstruits Commander, avec leur commandant (nom et image) pour reconnaître chaque deck. Calculé une fois. */
+    private synchronized JsonArray precons() {
+        if (preconCache != null) {
+            return preconCache;
+        }
         final JsonArray precons = new JsonArray();
         for (final DeckProxy proxy : DeckProxy.getAllCommanderPreconDecks()) {
             final JsonObject o = new JsonObject();
@@ -324,10 +335,23 @@ final class Catalog {
             o.addProperty("name", proxy.getName());
             o.addProperty("format", "commander");
             o.addProperty("identity", GameSerializer.colors(proxy.getColorIdentity()));
+            try {
+                final Deck d = proxy.getDeck();
+                if (d != null && d.has(DeckSection.Commander) && d.get(DeckSection.Commander).countAll() > 0) {
+                    final JsonArray commanders = new JsonArray();
+                    for (final Map.Entry<PaperCard, Integer> e : d.get(DeckSection.Commander)) {
+                        commanders.add(translated(e.getKey().getName()));
+                    }
+                    o.add("commanders", commanders);
+                    o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getImageKey(false));
+                }
+            } catch (final RuntimeException e) {
+                // Deck illisible : la tuile reste sans illustration.
+            }
             precons.add(o);
         }
-        result.add("precons", precons);
-        return result;
+        preconCache = precons;
+        return precons;
     }
 
     /** Clé « commander:Nom », « constructed:Nom », « precon:Nom » ou « random ». */

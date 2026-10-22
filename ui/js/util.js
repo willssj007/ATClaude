@@ -93,6 +93,10 @@ export function debounce(fn, ms) {
 const DEFAULTS = {
   images: true,
   imageLang: 'fr',
+  musicOn: true,
+  musicVolume: 0.35,
+  sfxOn: true,
+  sfxVolume: 0.7,
   animations: true,
   holdPriority: false,
   autoPass: true,

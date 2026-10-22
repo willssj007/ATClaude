@@ -152,6 +152,25 @@ const handlers = {
         ok.classList.add('hidden');
       }
     }
+    if (d.others && d.others.length) {
+      // Recherche : le reste de la zone, pour savoir ce qu'on laisse (non choisissable).
+      const toggle = el(`<button class="btn small ghost others-toggle">${esc(d.othersTitle || 'Autres cartes')} (${d.others.length}) ▾</button>`);
+      const rest = el('<div class="choice-grid others hidden"></div>');
+      d.others.forEach(item => {
+        const card = item.card || item.paper;
+        const node = card ? cardElement(card) : el('<div class="mcard back"><div class="face"></div></div>');
+        node._card = card;
+        const pick = el('<div class="pick off"></div>');
+        pick.appendChild(node);
+        rest.appendChild(pick);
+      });
+      zoomable(rest);
+      toggle.addEventListener('click', () => {
+        rest.classList.toggle('hidden');
+        toggle.textContent = `${d.othersTitle || 'Autres cartes'} (${d.others.length}) ${rest.classList.contains('hidden') ? '▾' : '▴'}`;
+      });
+      s.body.append(toggle, rest);
+    }
     s.footer.appendChild(counter);
     if (min === 0) {
       const none = button(max === 1 ? 'Aucun' : 'Ne rien choisir');
@@ -296,6 +315,149 @@ const handlers = {
     ok.addEventListener('click', () => done([...chosen]));
     s.footer.append(reset, all, ok);
     render();
+  },
+
+  /** Regard / surveillance : glisser (ou toucher) les cartes entre le dessus et le dessous (ou le cimetière). */
+  arrange(d, s, done) {
+    const items = d.items || [];
+    const zones = {top: items.map((_, i) => i), moved: []};
+    s.back.querySelector('.modal').classList.add('arrange');
+    const hint = el('<div class="muted small arr-hint">Glisse les cartes d\'une zone à l\'autre, ou touche-les. Dessus, la carte de gauche sera piochée en premier.</div>');
+    const zoneEl = (key, label) => el(`<div class="arr-zone" data-zone="${key}"><div class="arr-label">${esc(label)}</div><div class="arr-cards"></div></div>`);
+    const topZ = zoneEl('top', d.topLabel || 'Dessus');
+    const movedZ = zoneEl('moved', d.movedLabel || 'Dessous');
+    movedZ.classList.toggle('grave', !!d.graveyard);
+    const nodes = items.map((item, i) => {
+      const n = el(`<div class="arr-card" data-i="${i}"></div>`);
+      const card = item.card || item.paper;
+      const c = cardElement(card);
+      c._card = card;
+      n.appendChild(c);
+      return n;
+    });
+    const render = () => {
+      for (const [key, z] of [['top', topZ], ['moved', movedZ]]) {
+        const box = z.querySelector('.arr-cards');
+        box.replaceChildren(...zones[key].map((i, pos) => {
+          const n = nodes[i];
+          n.querySelector('.arr-pos')?.remove();
+          if (key === 'top' && zones.top.length > 1) {
+            n.appendChild(el(`<div class="arr-pos">${pos + 1}</div>`));
+          }
+          return n;
+        }));
+        if (!zones[key].length) {
+          box.appendChild(el('<div class="arr-empty">Glisse une carte ici</div>'));
+        }
+      }
+    };
+    const move = (i, toKey, index) => {
+      for (const k of ['top', 'moved']) {
+        const p = zones[k].indexOf(i);
+        if (p >= 0) {
+          zones[k].splice(p, 1);
+        }
+      }
+      const list = zones[toKey];
+      list.splice(index === undefined ? list.length : Math.max(0, Math.min(index, list.length)), 0, i);
+      render();
+    };
+    const consumed = zoomable(s.body);
+    let drag = null;
+    const zoneAt = (x, y) => {
+      const hit = document.elementFromPoint(x, y);
+      return hit && hit.closest('.arr-zone');
+    };
+    const onMove = (e) => {
+      if (!drag || e.pointerId !== drag.id) {
+        return;
+      }
+      if (!drag.active) {
+        if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) {
+          return;
+        }
+        drag.active = true;
+        const r = drag.n.getBoundingClientRect();
+        drag.dx = drag.x - r.left;
+        drag.dy = drag.y - r.top;
+        drag.ghost = drag.n.cloneNode(true);
+        drag.ghost.classList.add('arr-ghost');
+        drag.ghost.style.width = r.width + 'px';
+        document.body.appendChild(drag.ghost);
+        drag.n.classList.add('dragging');
+      }
+      drag.ghost.style.left = (e.clientX - drag.dx) + 'px';
+      drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
+      const z = zoneAt(e.clientX, e.clientY);
+      [topZ, movedZ].forEach(x => x.classList.toggle('over', x === z));
+    };
+    const onUp = (e) => {
+      if (!drag || e.pointerId !== drag.id) {
+        return;
+      }
+      const {n, i, active, ghost} = drag;
+      drag = null;
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      [topZ, movedZ].forEach(x => x.classList.remove('over'));
+      if (ghost) {
+        ghost.remove();
+      }
+      n.classList.remove('dragging');
+      if (consumed()) {
+        return; // appui long : la carte a été agrandie
+      }
+      if (!active) {
+        move(i, zones.top.includes(i) ? 'moved' : 'top');
+        return;
+      }
+      const z = zoneAt(e.clientX, e.clientY);
+      if (!z) {
+        return;
+      }
+      // Place d'insertion : la première carte de la zone dont le centre est après le doigt (sens de lecture).
+      const key = z.dataset.zone;
+      const others = zones[key].filter(x => x !== i);
+      let index = others.length;
+      for (let k = 0; k < others.length; k++) {
+        const r = nodes[others[k]].getBoundingClientRect();
+        const before = e.clientY < r.top || (e.clientY <= r.bottom && e.clientX < r.left + r.width / 2);
+        if (before) {
+          index = k;
+          break;
+        }
+      }
+      zones[key] = others;
+      move(i, key, index);
+    };
+    s.body.addEventListener('pointerdown', (e) => {
+      const n = e.target.closest('.arr-card');
+      if (!n || drag) {
+        return;
+      }
+      drag = {n, i: Number(n.dataset.i), x: e.clientX, y: e.clientY, id: e.pointerId, active: false, ghost: null};
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
+    });
+    s.body.append(hint, topZ, movedZ);
+    render();
+    const allTop = button('Tout dessus');
+    allTop.addEventListener('click', () => {
+      zones.top = items.map((_, i) => i);
+      zones.moved = [];
+      render();
+    });
+    const allMoved = button(d.graveyard ? 'Tout au cimetière' : 'Tout dessous');
+    allMoved.addEventListener('click', () => {
+      zones.moved = [...zones.top, ...zones.moved];
+      zones.top = [];
+      render();
+    });
+    const ok = button('Valider', 'gold');
+    ok.addEventListener('click', () => done({top: [...zones.top], moved: [...zones.moved]}));
+    s.footer.append(allTop, allMoved, ok);
   },
 
   reveal(d, s, done) {
@@ -464,7 +626,7 @@ export function closeAllForgeDialogs() {
 
 function defaultTitle(kind) {
   return {choose: 'Faire un choix', option: 'Question', input: 'Saisie', integer: 'Choisir un nombre',
-    order: 'Choisir l\'ordre', reveal: 'Cartes révélées', assignDamage: 'Répartir les blessures', assignGeneric: 'Répartir'}[kind] || 'Choix';
+    order: 'Choisir l\'ordre', arrange: 'Regard', reveal: 'Cartes révélées', assignDamage: 'Répartir les blessures', assignGeneric: 'Répartir'}[kind] || 'Choix';
 }
 
 // ------------------------------------------------------------------ boîtes de l'interface

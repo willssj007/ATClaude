@@ -102,6 +102,12 @@ public final class ForgeRuntime {
             prefs.setPref(FPref.LOAD_CARD_SCRIPTS_LAZILY, "false");
             // Cartes jouables en surbrillance, comme sur Arena.
             prefs.setPref(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS, "true");
+            // Choix dans la bibliothèque, le cimetière, l'exil... par une fenêtre de choix : sinon Forge attend
+            // qu'on touche la carte dans une zone que le plateau ne montre pas (recherche dans la bibliothèque).
+            prefs.setPref(FPref.UI_SELECT_FROM_CARD_DISPLAYS, "false");
+            // Effets sonores : Forge choisit le son de chaque événement, l'interface le joue.
+            prefs.setPref(FPref.UI_ENABLE_SOUNDS, "true");
+            prefs.setPref(FPref.UI_ALT_SOUND_SYSTEM, "false");
             prefs.save();
             return null;
         });

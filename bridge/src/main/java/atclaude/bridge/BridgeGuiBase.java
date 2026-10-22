@@ -98,7 +98,11 @@ final class BridgeGuiBase implements IGuiBase {
 
     @Override
     public void showImageDialog(final ISkinImage image, final String message, final String title) {
-        dialogs.message(title, message);
+        // Forge s'en sert pour annoncer un trophée gagné.
+        bridge.sendEvent("trophy", m -> {
+            m.addProperty("title", title == null ? "" : title);
+            m.addProperty("message", message == null ? "" : message);
+        });
     }
 
     @Override
@@ -129,8 +133,8 @@ final class BridgeGuiBase implements IGuiBase {
         return dialogs.one(title, new ArrayList<>(list), null, true);
     }
 
-    @Override public boolean isSupportedAudioFormat(final File file) { return false; }
-    @Override public IAudioClip createAudioClip(final String filename) { return null; }
+    @Override public boolean isSupportedAudioFormat(final File file) { return file != null && file.getName().toLowerCase().matches(".*\\.(mp3|ogg|wav)$"); }
+    @Override public IAudioClip createAudioClip(final String filename) { return Audio.clip(bridge, filename); }
     @Override public IAudioMusic createAudioMusic(final String filename) { return null; }
     @Override public void startAltSoundSystem(final String filename, final boolean isSynchronized) { }
     @Override public void showSpellShop() { }

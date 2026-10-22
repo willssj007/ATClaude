@@ -48,6 +48,12 @@ OVERRIDES = {
     "lblLogSourceDealsNDamageOfTypeToDest": "{0} inflige {1} blessure(s) ({2}) à {3}{4}.",
     "lblSourceDealsNDamageToDest": "{0} inflige {1} blessure(s){2} à {3}.",
     "lblLogZoneChange": "{0} : {2} → {1}.",
+    "lblLogScryTopBottomLibrary": "%s regarde : %top carte(s) laissée(s) au-dessus de la bibliothèque, %bottom en dessous",
+    "lblLogScryTopLibrary": "%s regarde : %top carte(s) laissée(s) au-dessus de la bibliothèque",
+    "lblLogScryBottomLibrary": "%s regarde : %bottom carte(s) mise(s) en dessous de la bibliothèque",
+    "lblLogSurveiledToLibraryGraveyard": "{0} surveille : {1} carte(s) laissée(s) au-dessus de la bibliothèque, {2} au cimetière",
+    "lblLogSurveiledToLibrary": "{0} surveille : {1} carte(s) laissée(s) au-dessus de la bibliothèque",
+    "lblLogSurveiledToGraveyard": "{0} surveille : {1} carte(s) mise(s) au cimetière",
 }
 
 

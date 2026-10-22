@@ -184,11 +184,29 @@ public final class Bridge {
                 return catalog.validate(m.getAsJsonObject("deck"));
             case "randomCommanderDeck":
                 return catalog.randomCommanderDeck();
+            case "audioFiles":
+                return Audio.files();
+            case "trophies":
+                return Trophies.all();
             case "startMatch":
                 startMatch(m.getAsJsonObject("setup"));
                 return null;
             case "leaveMatch":
                 endSession();
+                return null;
+            case "savedGame":
+                return SaveGame.summary();
+            case "resumeSaved": {
+                final JsonObject save = SaveGame.read();
+                if (save == null) {
+                    throw new IllegalStateException("Aucune partie sauvegardée.");
+                }
+                endSession();
+                session = MatchSession.resume(this, catalog, save);
+                return null;
+            }
+            case "deleteSaved":
+                SaveGame.delete(null);
                 return null;
             default:
                 final MatchSession current = session;
