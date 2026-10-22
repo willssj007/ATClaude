@@ -1,0 +1,119 @@
+name: Builds Android et Windows
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      FORGE_DIR: ${{ github.workspace }}/../forge-src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Compiler Forge (règles, IA, cartes)
+        run: scripts/build-forge.sh "$FORGE_DIR"
+
+      - name: Compiler le pont
+        run: mvn -B -q install -DskipTests
+
+      - name: Préparer les ressources et l'interface
+        run: |
+          scripts/package-res.sh "$FORGE_DIR/forge-gui/res" "$RUNNER_TEMP/forge-assets" android/app/src/main/assets/res.zip
+          rm -rf android/app/src/main/assets/ui
+          cp -r ui android/app/src/main/assets/ui
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Construire l'APK
+        working-directory: android
+        run: gradle --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName=0.1.${{ github.run_number }}
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "ArcaneTable-0.1.${{ github.run_number }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcaneTable-apk
+          path: ArcaneTable-*.apk
+
+      - name: Préparer le paquet ordinateur
+        run: |
+          mkdir -p dist
+          cp desktop/target/desktop-0.1.0.jar dist/
+          cp -r desktop/target/lib dist/lib
+          cp -r "$RUNNER_TEMP/forge-assets" dist/forge
+          cp -r ui dist/ui
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-dist
+          path: dist
+
+      - name: Publier la dernière version
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest ArcaneTable-*.apk \
+            --title "Arcane Table — dernière version (build ${{ github.run_number }})" \
+            --notes "Construit automatiquement depuis le commit ${{ github.sha }}. Android : télécharge le fichier .apk sur le téléphone puis ouvre-le (autorise l'installation depuis cette source si Android le demande). Windows : télécharge le .zip (ajouté quelques minutes après l'APK), décompresse-le dans un dossier de ton choix, puis lance ArcaneTable.exe." \
+            --prerelease
+
+  windows:
+    needs: apk
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-dist
+          path: dist
+
+      - name: Application Windows portable (Java inclus)
+        shell: pwsh
+        run: |
+          jpackage --type app-image --input dist --main-jar desktop-0.1.0.jar --main-class atclaude.desktop.DesktopMain `
+            --name ArcaneTable --app-version 0.1.${{ github.run_number }} --vendor "Arcane Table" `
+            --java-options "-Xmx2g" --dest out
+          Compress-Archive -Path out/ArcaneTable -DestinationPath ArcaneTable-Windows-0.1.${{ github.run_number }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcaneTable-windows
+          path: ArcaneTable-Windows-*.zip
+
+      - name: Ajouter à la dernière version
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload apk-latest (Get-ChildItem ArcaneTable-Windows-*.zip).FullName --clobber --repo ${{ github.repository }}

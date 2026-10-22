@@ -28,7 +28,8 @@ import java.util.concurrent.TimeUnit;
  * Version ordinateur : Forge tourne dans ce processus et l'interface s'ouvre dans le navigateur,
  * sur http://127.0.0.1:PORT. Rien n'écoute en dehors de la machine.
  *
- * Options : --assets DOSSIER (contient res/), --data DOSSIER, --ui DOSSIER, --port N, --no-browser
+ * Options : --assets DOSSIER (contient res/), --data DOSSIER, --ui DOSSIER, --port N, --no-browser,
+ * --mobile (démarre Forge comme sur Android, pour tester ce chemin sur ordinateur), --no-window
  */
 public final class DesktopMain {
 
@@ -48,11 +49,14 @@ public final class DesktopMain {
     private DesktopMain() { }
 
     public static void main(final String[] args) throws IOException {
-        final String assets = option(args, "--assets", "forge");
+        // Par défaut, forge/ et ui/ sont à côté du jar : c'est la disposition du paquet Windows.
+        final File home = appHome();
+        final String assets = option(args, "--assets", new File(home, "forge").getPath());
         final String data = option(args, "--data", System.getProperty("user.home") + File.separator + ".atclaude");
-        final File ui = new File(option(args, "--ui", "ui"));
+        final File ui = new File(option(args, "--ui", new File(home, "ui").getPath()));
         final int port = Integer.parseInt(option(args, "--port", "8765"));
         final boolean openBrowser = !List.of(args).contains("--no-browser");
+        final boolean mobile = List.of(args).contains("--mobile");
 
         if (!new File(assets, "res").isDirectory()) {
             System.err.println("Ressources Forge introuvables : " + new File(assets, "res").getAbsolutePath());
@@ -94,13 +98,12 @@ public final class DesktopMain {
         server.start();
 
         final String url = "http://127.0.0.1:" + port + "/";
-        System.out.println("ATClaude : " + url);
-        if (openBrowser && Desktop.isDesktopSupported()) {
-            try {
-                Desktop.getDesktop().browse(URI.create(url));
-            } catch (final Exception e) {
-                System.out.println("Ouvre " + url + " dans ton navigateur.");
-            }
+        System.out.println("Arcane Table : " + url);
+        if (openBrowser) {
+            browse(url);
+        }
+        if (!java.awt.GraphicsEnvironment.isHeadless() && !List.of(args).contains("--no-window")) {
+            ControlWindow.show(url, DesktopMain::browse);
         }
 
         final ForgeRuntime.Paths paths = new ForgeRuntime.Paths(
@@ -109,7 +112,7 @@ public final class DesktopMain {
                 new File(data, "cache").getAbsolutePath());
         final Thread loader = new Thread(() -> {
             try {
-                ForgeRuntime.init(bridge, paths, true);
+                ForgeRuntime.init(bridge, paths, !mobile);
                 System.out.println("Forge prêt.");
             } catch (final Throwable e) {
                 e.printStackTrace();
@@ -183,6 +186,31 @@ public final class DesktopMain {
             }
         }
         return null;
+    }
+
+    static void browse(final String url) {
+        try {
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(URI.create(url));
+                return;
+            }
+        } catch (final Exception e) {
+            // on affiche l'adresse ci-dessous
+        }
+        System.out.println("Ouvre " + url + " dans ton navigateur.");
+    }
+
+    /** Dossier du jar (ou dossier courant si on lance depuis les classes compilées). */
+    private static File appHome() {
+        try {
+            final File jar = new File(DesktopMain.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (jar.isFile()) {
+                return jar.getParentFile();
+            }
+        } catch (final Exception e) {
+            // dossier courant
+        }
+        return new File(".");
     }
 
     private static String option(final String[] args, final String name, final String fallback) {

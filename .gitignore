@@ -1,7 +1,7 @@
 __pycache__/
 *.pyc
-data/cards.sqlite
-data/*.partial
+legacy/python-phase1/data/cards.sqlite
+legacy/python-phase1/data/*.partial
 *.json.gz
 all-cards*.json
 target/

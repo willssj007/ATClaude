@@ -254,6 +254,8 @@ final class Dialogs {
         final GameSerializer serializer = new GameSerializer(g);
         final JsonObject d = dialog("Répartir les blessures", "");
         d.add("attacker", serializer.card(attacker, g.getGameView()));
+        // Le joueur défenseur ne reçoit des blessures que si l'attaquant a le piétinement.
+        final boolean trample = attacker.getCurrentState() != null && attacker.getCurrentState().hasTrample();
         final JsonArray list = new JsonArray();
         for (final CardView b : blockers) {
             final JsonObject o = serializer.card(b, g.getGameView());
@@ -263,7 +265,7 @@ final class Dialogs {
         d.add("blockers", list);
         d.addProperty("damage", damage);
         d.addProperty("maySkip", maySkip);
-        if (defender != null) {
+        if (defender != null && trample) {
             d.addProperty("defender", defender.getId());
             d.addProperty("defenderName", defender.toString());
         }
@@ -285,7 +287,7 @@ final class Dialogs {
             final JsonElement v = map.get(String.valueOf(b.getId()));
             result.put(b, v == null ? 0 : v.getAsInt());
         }
-        if (defender != null && map.has("defender")) {
+        if (defender != null && trample && map.has("defender")) {
             // Forge attend la part du joueur défenseur sous la clé null.
             result.put(null, map.get("defender").getAsInt());
         }

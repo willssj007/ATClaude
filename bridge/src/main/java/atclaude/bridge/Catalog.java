@@ -637,18 +637,19 @@ final class Catalog {
     private static String moxfieldToText(final JsonObject root) {
         final StringBuilder sb = new StringBuilder();
         final JsonObject boards = root.has("boards") ? root.getAsJsonObject("boards") : root;
-        final Map<String, String> names = Map.of("commanders", "Commander", "mainboard", "Deck", "sideboard", "Sideboard", "companions", "Sideboard");
-        for (final Map.Entry<String, String> board : List.of(
-                Map.entry("commanders", "Commander"), Map.entry("mainboard", "Deck"),
-                Map.entry("companions", "Sideboard"), Map.entry("sideboard", "Sideboard"))) {
-            if (!boards.has(board.getKey()) || !boards.get(board.getKey()).isJsonObject()) {
+        // Section Moxfield, puis titre de section du format texte.
+        final String[][] sections = {
+            {"commanders", "Commander"}, {"mainboard", "Deck"}, {"companions", "Sideboard"}, {"sideboard", "Sideboard"},
+        };
+        for (final String[] board : sections) {
+            if (!boards.has(board[0]) || !boards.get(board[0]).isJsonObject()) {
                 continue;
             }
-            JsonObject cards = boards.getAsJsonObject(board.getKey());
+            JsonObject cards = boards.getAsJsonObject(board[0]);
             if (cards.has("cards") && cards.get("cards").isJsonObject()) {
                 cards = cards.getAsJsonObject("cards");
             }
-            sb.append(names.get(board.getKey())).append('\n');
+            sb.append(board[1]).append('\n');
             for (final Map.Entry<String, JsonElement> e : cards.entrySet()) {
                 final JsonObject entry = e.getValue().getAsJsonObject();
                 final int quantity = entry.has("quantity") ? entry.get("quantity").getAsInt() : 1;
@@ -670,7 +671,13 @@ final class Catalog {
             throw new IOException("HTTP " + code);
         }
         try (InputStream in = c.getInputStream()) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            final byte[] buffer = new byte[16 * 1024];
+            int n;
+            while ((n = in.read(buffer)) > 0) {
+                out.write(buffer, 0, n);
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
         }
     }
 

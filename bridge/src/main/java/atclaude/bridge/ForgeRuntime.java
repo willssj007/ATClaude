@@ -65,7 +65,9 @@ public final class ForgeRuntime {
             // Sur ordinateur, Forge lit ses dossiers dans forge.profile.properties, à côté de res/.
             writeProfile(assets, user, cache);
         } else {
-            // Hors ordinateur, Forge accepte ces deux propriétés (prévues pour iOS).
+            // Hors ordinateur, Forge accepte ces deux propriétés (prévues pour iOS). Un fichier de profil
+            // les remplacerait : on n'en laisse aucun dans le dossier des ressources.
+            new File(assets, "forge.profile.properties").delete();
             System.setProperty("forge.ios.userDir", user);
             System.setProperty("forge.ios.cacheDir", cache);
             GuiBase.setIsAndroid(true);
@@ -86,7 +88,7 @@ public final class ForgeRuntime {
 
         FModel.initialize(progress, prefs -> {
             prefs.setPref(FPref.UI_LANGUAGE, "fr-FR");
-            if (prefs.getPref(FPref.PLAYER_NAME).isBlank()) {
+            if (prefs.getPref(FPref.PLAYER_NAME).trim().isEmpty()) {
                 // Sans nom, Forge le demande au début de la première partie.
                 prefs.setPref(FPref.PLAYER_NAME, "Joueur");
             }

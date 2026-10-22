@@ -56,7 +56,7 @@ final class GameSerializer {
                 if (attempt >= 5) {
                     throw e;
                 }
-                Thread.onSpinWait();
+                Thread.yield();
             }
         }
     }
