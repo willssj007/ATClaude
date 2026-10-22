@@ -4,3 +4,6 @@ data/cards.sqlite
 data/*.partial
 *.json.gz
 all-cards*.json
+target/
+*.class
+forge.profile.properties
