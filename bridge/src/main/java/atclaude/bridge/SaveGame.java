@@ -124,7 +124,7 @@ final class SaveGame {
             final File f = file();
             f.getParentFile().mkdirs();
             final File tmp = new File(f.getPath() + ".tmp");
-            Files.writeString(tmp.toPath(), save.toString(), StandardCharsets.UTF_8);
+            Io.write(tmp, save.toString());
             Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (final IOException e) {
             System.err.println("Partie non sauvegardée : " + e.getMessage());
@@ -137,7 +137,7 @@ final class SaveGame {
             return null;
         }
         try {
-            final JsonObject o = JsonParser.parseString(Files.readString(f.toPath(), StandardCharsets.UTF_8)).getAsJsonObject();
+            final JsonObject o = JsonParser.parseString(Io.read(f)).getAsJsonObject();
             return o.has("state") && o.has("setup") ? o : null;
         } catch (final IOException | RuntimeException e) {
             return null;

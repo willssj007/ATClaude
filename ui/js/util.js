@@ -116,13 +116,44 @@ export const prefs = {
   set(key, value) {
     try {
       localStorage.setItem('at.' + key, JSON.stringify(value));
+      if (SYNCED.includes(key)) {
+        localStorage.setItem('at.prefsAt', String(Date.now()));
+      }
     } catch (e) {
       // stockage indisponible : la préférence ne durera que cette session
     }
   },
+  /** Réglages partagés entre appareils par la synchronisation du compte (pas la disposition de l'écran). */
+  synced() {
+    const values = {};
+    for (const k of SYNCED) {
+      values[k] = this.get(k);
+    }
+    let at = 0;
+    try {
+      at = Number(localStorage.getItem('at.prefsAt')) || 0;
+    } catch (e) {
+      at = 0;
+    }
+    return {values, at};
+  },
+  applySynced(values, at) {
+    try {
+      for (const k of SYNCED) {
+        if (values && k in values) {
+          localStorage.setItem('at.' + k, JSON.stringify(values[k]));
+        }
+      }
+      localStorage.setItem('at.prefsAt', String(at || Date.now()));
+    } catch (e) {
+      // stockage indisponible
+    }
+  },
 };
 
-const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
+const SYNCED = ['images', 'imageLang', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'lastSetup'];
+
+export const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
 
 export function avatarHtml(name, index, size = 44) {
   const letter = esc((name || '?').trim().charAt(0).toUpperCase());

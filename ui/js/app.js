@@ -1,5 +1,6 @@
 // Contrôleur principal : chargement de Forge, navigation entre les écrans, cycle d'une partie.
 
+import {AccountScreen, loadProfile, onProfile, syncNow} from './account.js';
 import {initAudio, refreshAudio, setMusicMode} from './audio.js';
 import {bridge} from './bridge.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
@@ -9,7 +10,7 @@ import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
 import {announceTrophy, Trophies} from './trophies.js';
-import {$, $$, esc, prefs, toast} from './util.js';
+import {$, $$, avatarHtml, esc, prefs, toast} from './util.js';
 
 const screens = {};
 let current = 'home';
@@ -273,11 +274,21 @@ function setLoading(text, percent) {
   }
 }
 
+/** Après une synchronisation : decks et réglages ont pu changer. */
+function afterSync() {
+  decksCache = null;
+  refreshAudio();
+  if (current !== 'game' && current !== 'account' && screens[current] && screens[current].show) {
+    screens[current].show();
+  }
+}
+
 function onReady(hello) {
   if (ready) {
     return;
   }
   ready = true;
+  loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
   $('#loading').classList.add('hidden');
   screens.lobby.setProfiles(hello && hello.aiProfiles);
   if (hello && hello.inMatch) {
@@ -312,6 +323,11 @@ function init() {
   screens.cards = cardsScreen();
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
+  screens.account = new AccountScreen($('#screen-account'), {onSynced: afterSync});
+  onProfile((p) => {
+    $('#profile-btn').innerHTML = `${avatarHtml(p.name, p.avatar, 28)}<span>${esc(p.name)}</span>${p.linked ? '<i title="Synchronisé">⟳</i>' : ''}`;
+    screens.lobby.playerName = p.name;
+  });
 
   $('#profile-btn').addEventListener('click', () => ready && showScreen('account'));
   $('#nav').addEventListener('click', (e) => {
@@ -351,7 +367,13 @@ function init() {
   bridge.on('dialogClosed', (m) => closeForgeDialog(m.id));
   bridge.on('notice', (m) => toast(m.message, {title: m.title}));
   bridge.on('error', (m) => toast(m.message, {title: 'Erreur', error: true, duration: 6000}));
-  bridge.on('gameOver', (m) => game && game.gameOver(m));
+  bridge.on('gameOver', (m) => {
+    if (game) {
+      game.gameOver(m);
+    }
+    // Trophées et decks à jour sur les autres appareils.
+    setTimeout(() => syncNow({auto: true, onDone: afterSync}), 1500);
+  });
   bridge.on('trophy', (m) => announceTrophy(m));
   bridge.on('resumed', () => game && game.resumed());
   bridge.on('openUrl', (m) => bridge.openUrl(m.url));

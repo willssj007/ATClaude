@@ -26,7 +26,7 @@ export class Lobby {
     const decks = await this.getDecks();
     this.decks = decks;
     if (!this.seats) {
-      this.seats = [{name: 'Moi', ai: false, deckKey: this.defaultDeck(true)}, {name: 'IA 1', ai: true, deckKey: 'random'}];
+      this.seats = [{name: this.playerName || 'Moi', ai: false, deckKey: this.defaultDeck(true)}, {name: 'IA 1', ai: true, deckKey: 'random'}];
     }
     this.render();
   }

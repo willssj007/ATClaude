@@ -44,6 +44,7 @@ public final class Bridge {
     private final Map<Integer, JsonObject> openDialogs = new ConcurrentHashMap<>();
     private final AtomicInteger dialogIds = new AtomicInteger();
     private final Catalog catalog = new Catalog();
+    private final Account account = new Account(catalog);
     private volatile MatchSession session;
 
     public Bridge(final Transport transport) {
@@ -131,8 +132,20 @@ public final class Bridge {
             answerDialog(message);
             return;
         }
+        if (NETWORK_REQUESTS.contains(type)) {
+            // Appels réseau (GitHub) : sur leur propre fil, pour ne pas figer la partie pendant l'attente.
+            network.execute(() -> dispatch(type, message));
+            return;
+        }
         runOnEdt(() -> dispatch(type, message));
     }
+
+    private static final java.util.Set<String> NETWORK_REQUESTS = java.util.Set.of("sync", "linkGithub");
+    private final java.util.concurrent.ExecutorService network = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        final Thread t = new Thread(r, "atclaude-net");
+        t.setDaemon(true);
+        return t;
+    });
 
     private void dispatch(final String type, final JsonObject message) {
         final JsonElement rid = message.get("rid");
@@ -171,11 +184,32 @@ public final class Bridge {
                 return catalog.listDecks();
             case "loadDeck":
                 return catalog.loadDeck(m.get("name").getAsString());
-            case "saveDeck":
-                return catalog.saveDeck(m.getAsJsonObject("deck"));
-            case "deleteDeck":
-                catalog.deleteDeck(m.get("name").getAsString());
+            case "saveDeck": {
+                final JsonObject deck = m.getAsJsonObject("deck");
+                final JsonElement saved = catalog.saveDeck(deck);
+                final String previous = deck.has("previousName") ? deck.get("previousName").getAsString() : "";
+                if (!previous.isEmpty() && deck.has("name") && !previous.equals(deck.get("name").getAsString())) {
+                    account.deckDeleted(deck.has("format") ? deck.get("format").getAsString() : "commander", previous);
+                }
+                return saved;
+            }
+            case "deleteDeck": {
+                final String key = m.get("name").getAsString();
+                catalog.deleteDeck(key);
+                account.deckDeleted(key.substring(0, key.indexOf(':')), key.substring(key.indexOf(':') + 1));
                 return null;
+            }
+            case "profile":
+                return account.profile();
+            case "updateProfile":
+                return account.updateProfile(m.getAsJsonObject("profile"));
+            case "linkGithub":
+                return account.link(m.has("token") ? m.get("token").getAsString() : "");
+            case "unlinkGithub":
+                return account.unlink();
+            case "sync":
+                return account.sync(m.has("prefs") && m.get("prefs").isJsonObject() ? m.getAsJsonObject("prefs") : new JsonObject(),
+                        m.has("prefsAt") ? m.get("prefsAt").getAsLong() : 0, session != null);
             case "parseDeck":
                 return catalog.parseDeckText(m.get("text").getAsString(), m.has("name") ? m.get("name").getAsString() : "");
             case "fetchMoxfield":

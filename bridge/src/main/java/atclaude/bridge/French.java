@@ -183,7 +183,7 @@ final class French {
         final StringBuilder sb = new StringBuilder();
         for (SpellAbility n = sa; n != null; n = n.getSubAbility()) {
             final String d = n.getDescription();
-            if (d != null && !d.isBlank()) {
+            if (d != null && !d.trim().isEmpty()) {
                 sb.append(sb.length() > 0 ? " " : "").append(d.trim());
             }
         }
