@@ -166,6 +166,7 @@ final class GameSerializer {
     JsonObject card(final CardView c, final GameView gv) {
         final JsonObject o = new JsonObject();
         o.addProperty("id", c.getId());
+        Texts.remember(c);
         final boolean canShow = gui.mayView(c);
         o.addProperty("hidden", !canShow);
         if (c.getController() != null) {
@@ -217,7 +218,7 @@ final class GameSerializer {
         final ManaCost cost = s.getManaCost();
         o.addProperty("cost", cost == null || cost.isNoCost() ? "" : cost.toString());
         o.addProperty("typeLine", CardDetailUtil.formatCardType(s, true));
-        o.addProperty("text", inGame ? plainText(CardDetailUtil.composeCardText(s, gv, true)) : "");
+        o.addProperty("text", inGame ? Texts.clean(plainText(CardDetailUtil.composeCardText(s, gv, true))) : "");
         o.addProperty("colors", colors(s.getColors()));
         o.addProperty("image", s.getImageKey());
         o.addProperty("set", s.getSetCode());
@@ -287,7 +288,9 @@ final class GameSerializer {
     private JsonObject stackItem(final StackItemView item) {
         final JsonObject o = new JsonObject();
         o.addProperty("id", item.getId());
-        o.addProperty("text", item.getText());
+        o.addProperty("text", French.stackText(gui.getGameView() == null ? null : gui.getGameView().getGame(), item));
+        // Texte de Forge, avec les cibles nommées : montré dans le détail (appui long).
+        o.addProperty("detail", Texts.clean(item.getText()));
         o.addProperty("ability", item.isAbility());
         o.addProperty("trigger", item.isTrigger());
         o.addProperty("selectable", gui.isSelectable(item));
@@ -344,9 +347,10 @@ final class GameSerializer {
         // Forge range le journal du plus récent au plus ancien.
         for (int i = 0; i < Math.min(LOG_SIZE, entries.size()); i++) {
             final GameLogEntry e = entries.get(i);
+            Texts.remember(e.sourceCard());
             final JsonObject o = new JsonObject();
             o.addProperty("kind", e.type().name());
-            o.addProperty("text", e.message());
+            o.addProperty("text", Texts.clean(French.logLine(e.message())));
             list.add(o);
         }
         return list;

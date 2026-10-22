@@ -92,7 +92,10 @@ public final class ForgeRuntime {
                 // Sans nom, Forge le demande au début de la première partie.
                 prefs.setPref(FPref.PLAYER_NAME, "Joueur");
             }
-            prefs.setPref(FPref.UI_CARD_DOWNLOAD_LANG, "fr-FR");
+            // Forge attend un code Scryfall (« fr ») et ne demande le français que si son propre cache le
+            // prouve ; son dossier d'images n'a pas de langue dans le chemin. On le garde donc en anglais :
+            // les images françaises passent par LocalizedImages, dans un dossier à part.
+            prefs.setPref(FPref.UI_CARD_DOWNLOAD_LANG, "en");
             prefs.setPref(FPref.DEV_MODE_ENABLED, "true");
             prefs.setPref(FPref.UI_ENABLE_AI_CHEATS, "false");
             prefs.setPref(FPref.MULLIGAN_RULE, "London");
@@ -102,6 +105,8 @@ public final class ForgeRuntime {
             prefs.save();
             return null;
         });
+        French.prebuildVariantMappings();
+        ImageService.onLateImage = key -> bridge.sendEvent("imageReady", m -> m.addProperty("key", key));
         status = "Prêt";
         ready = true;
         bridge.sendEvent("ready", m -> m.addProperty("version", version()));

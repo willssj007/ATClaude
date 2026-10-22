@@ -116,8 +116,11 @@ export const bridge = {
     }
   },
 
-  /** Adresse de l'image d'une carte, servie par le pont depuis le cache de Forge. */
-  imageUrl(key) {
-    return key ? 'cardimg?key=' + encodeURIComponent(key) : '';
+  /**
+   * Adresse de l'image d'une carte, servie par le pont : en français si Scryfall en a une, sinon en anglais.
+   * La langue fait partie de l'adresse pour que le cache du navigateur ne mélange pas les deux.
+   */
+  imageUrl(key, lang = 'fr') {
+    return key ? 'cardimg?key=' + encodeURIComponent(key) + '&lang=' + (lang === 'en' ? 'en' : 'fr') : '';
   },
 };

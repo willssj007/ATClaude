@@ -1,7 +1,7 @@
 // Contrôleur principal : chargement de Forge, navigation entre les écrans, cycle d'une partie.
 
 import {bridge} from './bridge.js';
-import {hideZoom, showZoom} from './cards.js';
+import {hideZoom, reloadImages, showZoom} from './cards.js';
 import {Decks} from './decks.js';
 import {closeAllForgeDialogs, closeForgeDialog, handleForgeDialog} from './dialogs.js';
 import {Game} from './game.js';
@@ -171,6 +171,8 @@ function settingsScreen() {
       root.innerHTML = `<div class="page settings">
         <h1>Réglages</h1>
         ${row('images', 'Images des cartes', 'Télécharge les images depuis Scryfall et les garde en cache sur l\'appareil.')}
+        <div class="row"><div><b>Langue des images</b><p class="muted small">En français quand Scryfall a une impression française de la carte, sinon en anglais.</p></div>
+          <select data-pref-select="imageLang"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         ${row('animations', 'Animations', 'Déplacements de cartes, bannières de tour, effets de points de vie.')}
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
@@ -179,6 +181,13 @@ function settingsScreen() {
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
       </div>`;
+      root.querySelectorAll('[data-pref-select]').forEach(sel => {
+        sel.value = prefs.get(sel.dataset.prefSelect);
+        sel.addEventListener('change', () => {
+          prefs.set(sel.dataset.prefSelect, sel.value);
+          reloadImages();
+        });
+      });
       root.querySelectorAll('[data-pref]').forEach(i => i.addEventListener('change', () => {
         prefs.set(i.dataset.pref, i.checked);
         if (inMatch && (i.dataset.pref === 'holdPriority' || i.dataset.pref === 'autoPass')) {

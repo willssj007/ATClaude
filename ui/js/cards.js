@@ -29,7 +29,7 @@ function frameHtml(card) {
 const missing = new Set();
 
 /** Charge l'image d'une carte dans l'élément, si les images sont activées. */
-export function loadImage(node, key) {
+export function loadImage(node, key, bust = '') {
   const img = node.querySelector('img.art');
   if (!img) {
     return;
@@ -38,27 +38,51 @@ export function loadImage(node, key) {
     node.classList.remove('has-img');
     img.removeAttribute('src');
     img.dataset.key = '';
+    img.dataset.src = '';
     return;
   }
-  if (img.dataset.key === key) {
+  const url = bridge.imageUrl(key, prefs.get('imageLang'));
+  if (img.dataset.src === url && !bust) {
     return;
   }
   img.dataset.key = key;
+  img.dataset.src = url;
   node.classList.remove('has-img');
   img.onload = () => {
-    if (img.dataset.key === key) {
+    if (img.dataset.src === url) {
       node.classList.add('has-img');
     }
   };
-  if (missing.has(key)) {
+  if (missing.has(url) && !bust) {
     return;
   }
   img.onerror = () => {
-    missing.add(key);
+    missing.add(url);
     node.classList.remove('has-img');
   };
-  img.src = bridge.imageUrl(key);
+  img.src = url + bust;
 }
+
+/** Recharge les images affichées (après un changement de langue des images). */
+export function reloadImages() {
+  missing.clear();
+  document.querySelectorAll('img.art').forEach(img => {
+    const node = img.closest('.mcard');
+    if (node && img.dataset.key) {
+      loadImage(node, img.dataset.key, '&v=' + Date.now());
+    }
+  });
+}
+
+// Une image d'abord servie en anglais (la version française était en cours de téléchargement) est prête.
+bridge.on('imageReady', ({key}) => {
+  document.querySelectorAll('img.art').forEach(img => {
+    const node = img.closest('.mcard');
+    if (node && img.dataset.key === key) {
+      loadImage(node, key, '&v=' + Date.now());
+    }
+  });
+});
 
 /** Carte face visible, pour le catalogue et les dialogues. */
 export function cardElement(card, extraClass = '') {
@@ -106,6 +130,7 @@ export function showZoom(card, extraHtml = '') {
     const back = cardElement(card.back);
     zoom.insertBefore(back, info);
   }
+  zoom.classList.toggle('two', !!card.back);
   zoom.classList.remove('hidden');
   zoomOpen = true;
 }
@@ -139,11 +164,14 @@ export function onLongPress(root, selector, handler) {
     }
   });
   root.addEventListener('pointerdown', (e) => {
+    // Nouveau geste : l'appui long précédent ne doit plus avaler de clic (le zoom a pu être fermé
+    // ailleurs, sans clic sur le plateau).
+    fired = false;
+    clearTimeout(timer);
     const target = e.target.closest(selector);
     if (!target || e.pointerType === 'mouse') {
       return;
     }
-    fired = false;
     start = {x: e.clientX, y: e.clientY};
     timer = setTimeout(() => {
       fired = true;

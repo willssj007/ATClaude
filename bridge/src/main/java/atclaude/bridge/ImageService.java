@@ -13,6 +13,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Images de cartes pour l'interface : servies depuis le cache de Forge, téléchargées depuis
@@ -36,7 +37,42 @@ public final class ImageService {
     });
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
 
+    /** Prévient l'interface qu'une image d'abord servie en anglais existe maintenant dans sa langue. */
+    static volatile Consumer<String> onLateImage = key -> { };
+
     private ImageService() { }
+
+    /**
+     * Image servie à l'interface : le fichier, sa langue réelle, et si le navigateur peut la garder
+     * (non quand l'anglais n'est qu'un remplaçant en attendant la version traduite).
+     */
+    public record Served(File file, String lang, boolean cacheable) { }
+
+    /**
+     * Image dans la langue demandée (« fr » : impression française sur Scryfall), sinon l'image anglaise
+     * de Forge. Null si aucune image n'est trouvée dans le délai.
+     */
+    public static Served image(final String imageKey, final String lang, final long timeoutMs) {
+        if (!ForgeRuntime.isReady() || imageKey == null || imageKey.isEmpty() || ImageKeys.HIDDEN_CARD.equals(imageKey)) {
+            return null;
+        }
+        final long deadline = System.currentTimeMillis() + timeoutMs;
+        boolean cacheable = true;
+        if (lang != null && LocalizedImages.SUPPORTED.contains(lang)) {
+            final LocalizedImages images = LocalizedImages.forLang(lang);
+            final LocalizedImages.Outcome o = images.get(imageKey, timeoutMs * 2 / 3);
+            if (o.file() != null) {
+                return new Served(o.file(), lang, true);
+            }
+            // Pas de version traduite : l'anglais est la bonne réponse. En attente ou en erreur : anglais provisoire.
+            cacheable = o.status() == LocalizedImages.Status.ABSENT;
+            if (o.status() == LocalizedImages.Status.PENDING) {
+                images.whenFound(imageKey, () -> onLateImage.accept(imageKey));
+            }
+        }
+        final File en = image(imageKey, Math.max(2_000, deadline - System.currentTimeMillis()));
+        return en == null ? null : new Served(en, "en", cacheable);
+    }
 
     static boolean isImageThread() {
         return Thread.currentThread() == imageThread;

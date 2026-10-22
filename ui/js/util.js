@@ -92,6 +92,7 @@ export function debounce(fn, ms) {
 /** Préférences locales de l'interface (le stockage peut être indisponible : on garde alors les valeurs par défaut). */
 const DEFAULTS = {
   images: true,
+  imageLang: 'fr',
   animations: true,
   holdPriority: false,
   autoPass: true,
@@ -150,6 +151,7 @@ const NOUNS = [
   [/\byou don't control\b/gi, 'que vous ne contrôlez pas'], [/\ban opponent controls\b/gi, 'qu\'un adversaire contrôle'], [/\bor\b/g, 'ou'],
 ];
 const PROMPTS = [
+  [/^Select any target\.?$/i, 'Choisissez n\'importe quelle cible'],
   [/^Select targets? for (.+)$/i, 'Choisissez les cibles de $1'],
   [/^Select (?:a |an )?target (.+)$/i, (m, what) => 'Choisissez la cible : ' + NOUNS.reduce((s, [r, t]) => s.replace(r, t), what)],
   [/^Select up to (\d+) target (.+)$/i, (m, n, what) => `Choisissez jusqu'à ${n} cible(s) : ` + NOUNS.reduce((s, [r, t]) => s.replace(r, t), what)],

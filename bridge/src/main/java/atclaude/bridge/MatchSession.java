@@ -126,6 +126,7 @@ final class MatchSession {
             throw new IllegalArgumentException("Il faut un joueur humain.");
         }
 
+        Texts.reset();
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
         final HostedMatch match = GuiBase.getInterface().hostMatch();
         final MatchSession session = new MatchSession(bridge, gui, match);

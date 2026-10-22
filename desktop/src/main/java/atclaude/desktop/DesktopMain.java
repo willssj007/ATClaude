@@ -86,13 +86,15 @@ public final class DesktopMain {
         });
         server.createContext("/cardimg", exchange -> {
             final String key = query(exchange.getRequestURI(), "key");
-            final File file = ImageService.image(key, 15_000);
-            if (file == null) {
+            final ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), 15_000);
+            if (img == null) {
                 reply(exchange, 404, "text/plain", new byte[0]);
                 return;
             }
-            exchange.getResponseHeaders().add("Cache-Control", "max-age=604800");
-            reply(exchange, 200, ImageService.contentType(file), Files.readAllBytes(file.toPath()));
+            // L'anglais servi en attendant la version française ne doit pas rester dans le cache du navigateur.
+            exchange.getResponseHeaders().add("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
+            exchange.getResponseHeaders().add("Content-Language", img.lang());
+            reply(exchange, 200, ImageService.contentType(img.file()), Files.readAllBytes(img.file().toPath()));
         });
         server.createContext("/", exchange -> serveStatic(exchange, ui));
         server.start();

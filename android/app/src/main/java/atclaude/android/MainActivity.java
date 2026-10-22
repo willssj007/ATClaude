@@ -9,7 +9,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.DisplayCutout;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -19,6 +21,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 
 import atclaude.bridge.Bridge;
 import atclaude.bridge.ForgeRuntime;
@@ -90,7 +93,23 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(true);
         web.addJavascriptInterface(new JsApi(), "AndroidBridge");
         web.setWebViewClient(new LocalClient());
-        setContentView(web);
+        // Barres système masquées, mais l'encoche de la caméra reste : la page s'arrête à son bord
+        // (sinon des cartes ou des boutons passent dessous en paysage).
+        final FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(0xFF0D0F1A);
+        root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                final DisplayCutout cutout = insets.getDisplayCutout();
+                if (cutout != null) {
+                    v.setPadding(cutout.getSafeInsetLeft(), cutout.getSafeInsetTop(), cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
+                } else {
+                    v.setPadding(0, 0, 0, 0);
+                }
+            }
+            return insets;
+        });
+        setContentView(root);
         hideSystemBars();
 
         if (bridge == null) {
@@ -187,7 +206,7 @@ public class MainActivity extends Activity {
             }
             final String path = url.getPath() == null || url.getPath().equals("/") ? "/index.html" : url.getPath();
             if (path.equals("/cardimg")) {
-                return cardImage(url.getQueryParameter("key"));
+                return cardImage(url.getQueryParameter("key"), url.getQueryParameter("lang"));
             }
             try {
                 final InputStream in = getAssets().open("ui" + path);
@@ -223,15 +242,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static WebResourceResponse cardImage(final String key) {
-        final File file = ImageService.image(key, 15_000);
-        if (file == null) {
+    private static WebResourceResponse cardImage(final String key, final String lang) {
+        final ImageService.Served img = ImageService.image(key, lang, 15_000);
+        if (img == null) {
             return notFound();
         }
         try {
+            final File file = img.file();
             final WebResourceResponse response = new WebResourceResponse(ImageService.contentType(file), null, new FileInputStream(file));
             final Map<String, String> headers = new HashMap<>();
-            headers.put("Cache-Control", "max-age=604800");
+            // L'anglais servi en attendant la version française ne doit pas rester dans le cache.
+            headers.put("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
             response.setResponseHeaders(headers);
             return response;
         } catch (final IOException e) {

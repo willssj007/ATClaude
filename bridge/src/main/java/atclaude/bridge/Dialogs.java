@@ -46,7 +46,7 @@ final class Dialogs {
         final GameView gv = g == null ? null : g.getGameView();
         for (final T choice : choices) {
             final JsonObject item = new JsonObject();
-            item.addProperty("label", label(choice, display));
+            item.addProperty("label", Texts.clean(label(choice, display)));
             if (choice instanceof CardView card && g != null) {
                 item.add("card", new GameSerializer(g).card(card, gv));
             } else if (choice instanceof PlayerView player) {
@@ -99,8 +99,8 @@ final class Dialogs {
 
     private static JsonObject dialog(final String title, final String message) {
         final JsonObject d = new JsonObject();
-        d.addProperty("title", title == null ? "" : title);
-        d.addProperty("message", message == null ? "" : message);
+        d.addProperty("title", Texts.clean(title));
+        d.addProperty("message", Texts.clean(message));
         return d;
     }
 
@@ -157,7 +157,7 @@ final class Dialogs {
         final JsonObject d = dialog(title, message);
         final JsonArray list = new JsonArray();
         for (final String o : options) {
-            list.add(o);
+            list.add(Texts.clean(o));
         }
         d.add("options", list);
         d.addProperty("default", defaultOption);
@@ -242,8 +242,8 @@ final class Dialogs {
 
     void message(final String title, final String message) {
         bridge.sendEvent("notice", m -> {
-            m.addProperty("title", title == null ? "" : title);
-            m.addProperty("message", message == null ? "" : message);
+            m.addProperty("title", Texts.clean(title));
+            m.addProperty("message", Texts.clean(message));
         });
     }
 
@@ -267,7 +267,7 @@ final class Dialogs {
         d.addProperty("maySkip", maySkip);
         if (defender != null && trample) {
             d.addProperty("defender", defender.getId());
-            d.addProperty("defenderName", defender.toString());
+            d.addProperty("defenderName", Texts.clean(defender.toString()));
         }
         final JsonElement answer = bridge.ask("assignDamage", d);
         final Map<CardView, Integer> result = new HashMap<>();
