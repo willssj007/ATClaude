@@ -33,8 +33,8 @@ import java.util.regex.Pattern;
 final class French {
 
     private static final Pattern ENGLISH = Pattern.compile("\\b(the|you|your|target|creature|creatures|this|card|cards|draws?|each|damage|until|"
-            + "end of turn|gains?|gets?|may|with|enters|whenever|when|dies|opponent|life|control|player|spell|counter|mana|adds?|tap|"
-            + "destroy|exile|return|put|deals|sacrifices?|discards?|searches|shuffles)\\b");
+            + "end of turn|gains?|gets?|may|with|enters|whenever|when|dies|opponent|life|control|player|spell|counter|adds?|tap|"
+            + "destroy|return|put|deals|sacrifices?|discards?|searches|shuffles)\\b"); // pas « mana » ni « exile » : aussi français
     private static final Pattern TARGETING = Pattern.compile("\\s*\\(Targeting: \\[*(.*?)\\]*\\)");
     private static final Pattern NULL_IMPORTANT = Pattern.compile("\\s*\\[[^\\[\\]:]+: null\\]");
     private static final Pattern ZONE_CHANGE = Pattern.compile("^(.*) was put into (\\w+) from (\\w+)\\.$");
@@ -89,6 +89,7 @@ final class French {
             return hit;
         }
         String out = null;
+        boolean failed = false;
         try {
             if (game != null) {
                 for (final SpellAbilityStackInstance si : game.getStack()) {
@@ -99,14 +100,17 @@ final class French {
                 }
             }
         } catch (final RuntimeException e) {
-            // La partie a changé pendant la lecture : on garde le texte de Forge.
+            // La partie a changé pendant la lecture : texte de Forge pour cette fois, on réessaiera.
             out = null;
+            failed = true;
         }
         if (out == null) {
             out = cleanTrigger(forge);
         }
         out = Texts.clean(out);
-        STACK_CACHE.put(key, out);
+        if (!failed) {
+            STACK_CACHE.put(key, out);
+        }
         final String targets = targets(item);
         RESOLVED.put(Texts.clean(forge), targets.isEmpty() ? out : out + " → " + targets);
         return out;

@@ -1,10 +1,8 @@
 package atclaude.bridge;
 
-import forge.card.CardStateName;
 import forge.game.Game;
 import forge.game.GameView;
 import forge.game.card.Card;
-import forge.game.card.CardState;
 import forge.game.card.CardView;
 import forge.game.card.CardView.CardStateView;
 import forge.util.CardTranslation;
@@ -50,6 +48,8 @@ final class Texts {
     private static final Map<String, String> ENGLISH = new ConcurrentHashMap<>();
     private static volatile Pattern englishPattern;
     private static volatile int englishPatternSize = -1;
+    /** Change à chaque nouveau motif : un texte nettoyé avec l'ancien n'entre pas dans le cache. */
+    private static volatile int patternVersion;
 
     private Texts() { }
 
@@ -64,12 +64,16 @@ final class Texts {
 
     /**
      * Retient les noms d'une carte, y compris ceux de ses autres faces. Ces noms servent seulement à
-     * reconnaître une carte déjà nommée par Forge : on peut donc retenir ceux d'une carte cachée.
+     * reconnaître une carte déjà nommée par Forge : on peut donc retenir ceux d'une carte cachée. Seuls
+     * les noms des cartes visibles servent à traduire un nom anglais écrit sans identifiant (sinon, le fait
+     * qu'un mot soit traduit trahirait la présence d'une carte cachée).
      */
     static void remember(final CardView c) {
         if (c == null || c.getId() <= 0) {
             return;
         }
+        final BridgeGuiGame gui = BridgeGuiGame.current();
+        final boolean visible = gui != null && gui.mayView(c) && !c.isFaceDown();
         final Set<String> names = KNOWN.computeIfAbsent(c.getId(), k -> ConcurrentHashMap.newKeySet());
         final int before = names.size();
         addName(names, c.getName());
@@ -78,12 +82,12 @@ final class Texts {
         addState(names, c.getAlternateState());
         addState(names, c.getLeftSplitState());
         addState(names, c.getRightSplitState());
-        if (names.size() != before) {
+        if (names.size() != before || visible) {
             for (final String n : new ArrayList<>(names)) {
                 final String fr = CardTranslation.getTranslatedName(n);
                 if (fr != null && !fr.isEmpty() && !fr.equals(n)) {
                     names.add(fr);
-                    if (n.length() >= 4) {
+                    if (visible && n.length() >= 4 && !ENGLISH.containsKey(n)) {
                         ENGLISH.put(n, fr);
                     }
                 }
@@ -114,12 +118,13 @@ final class Texts {
         if (cached != null) {
             return cached;
         }
+        final int version = patternVersion;
         final boolean[] unresolved = {false};
         String result = text.indexOf('(') < 0 ? text : replaceIds(text, unresolved);
         result = HIDDEN.matcher(result).replaceAll(FACE_DOWN);
         result = translateEnglish(result);
         result = LINE_START.matcher(result).replaceAll("Carte face cachée");
-        if (!unresolved[0]) {
+        if (!unresolved[0] && version == patternVersion) {
             // Un identifiant non reconnu (partie en cours de modification, carte pas encore vue) sera
             // retenté à la prochaine photo.
             CACHE.put(text, result);
@@ -141,9 +146,9 @@ final class Texts {
             final String hit = matchName(before, id, card);
             if (hit != null) {
                 out.append(before, 0, before.length() - hit.length()).append(display(gui, hit, card));
-            } else if (card != null && card.isFaceDown() && endsOutsideWord(before)) {
+            } else if (card != null && card.isFaceDown() && before.endsWith(" ")) {
                 // « … à  (12) » : Forge a écrit le nom vide d'une carte face cachée.
-                out.append(before.endsWith(" ") ? before : before + " ").append(FACE_DOWN);
+                out.append(before).append(FACE_DOWN);
             } else {
                 // Pas une carte (« Mana blanc (3) ») ou carte inconnue : texte laissé tel quel.
                 out.append(before).append(m.group());
@@ -171,12 +176,14 @@ final class Texts {
         final List<String> names = new ArrayList<>(KNOWN.getOrDefault(id, Collections.emptySet()));
         if (card != null) {
             try {
-                names.add(card.getName());
-                names.add(card.getDisplayName());
-                for (final CardStateName state : new ArrayList<>(card.getStates())) {
-                    final CardState s = card.getState(state);
-                    if (s != null) {
-                        names.add(s.getName());
+                // Lus dans la vue de la carte : getState() d'une carte vivante peut créer un état
+                // pendant que le fil de partie le modifie.
+                final CardView v = card.getView();
+                names.add(v.getName());
+                names.add(v.getOracleName());
+                for (final CardStateView st : new CardStateView[]{v.getCurrentState(), v.getAlternateState(), v.getLeftSplitState(), v.getRightSplitState()}) {
+                    if (st != null) {
+                        names.add(st.getName());
                     }
                 }
             } catch (final RuntimeException e) {
@@ -258,6 +265,7 @@ final class Texts {
             sb.append(")(?![\\p{L}\\p{N}])");
             englishPattern = Pattern.compile(sb.toString());
             englishPatternSize = size;
+            patternVersion++;
             // Les textes déjà nettoyés pouvaient contenir un nom anglais qu'on sait maintenant traduire.
             CACHE.clear();
         }

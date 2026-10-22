@@ -61,6 +61,9 @@ export class StackPanel {
 
   /** Position : celle choisie par l'utilisateur (fraction de l'écran), sinon à droite du plateau, centrée. */
   place() {
+    if (this.dragging) {
+      return; // une mise à jour de la partie pendant le glissement ne ramène pas la fenêtre en arrière
+    }
     const t = this.table.getBoundingClientRect();
     const a = this.anchor.getBoundingClientRect();
     const w = this.node.offsetWidth || SIZES[this.settings.size];
@@ -83,6 +86,7 @@ export class StackPanel {
       }
       const r = this.node.getBoundingClientRect();
       drag = {dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId};
+      this.dragging = true;
       head.setPointerCapture(e.pointerId);
       this.node.classList.add('dragging');
       e.preventDefault();
@@ -102,6 +106,7 @@ export class StackPanel {
         return;
       }
       drag = null;
+      this.dragging = false;
       this.node.classList.remove('dragging');
       const t = this.table.getBoundingClientRect();
       this.settings.x = parseFloat(this.node.style.left) / t.width;

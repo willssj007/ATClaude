@@ -58,19 +58,21 @@ public final class ImageService {
         }
         final long deadline = System.currentTimeMillis() + timeoutMs;
         boolean cacheable = true;
+        File en = null;
         if (lang != null && LocalizedImages.SUPPORTED.contains(lang)) {
-            final LocalizedImages images = LocalizedImages.forLang(lang);
-            final LocalizedImages.Outcome o = images.get(imageKey, timeoutMs * 2 / 3);
+            // L'image anglaise déjà en cache est servie tout de suite ; la française la remplacera si elle existe.
+            en = cached(imageKey);
+            final LocalizedImages.Outcome o = LocalizedImages.forLang(lang)
+                    .get(imageKey, en != null ? 0 : timeoutMs * 2 / 3, () -> onLateImage.accept(imageKey));
             if (o.file() != null) {
                 return new Served(o.file(), lang, true);
             }
             // Pas de version traduite : l'anglais est la bonne réponse. En attente ou en erreur : anglais provisoire.
             cacheable = o.status() == LocalizedImages.Status.ABSENT;
-            if (o.status() == LocalizedImages.Status.PENDING) {
-                images.whenFound(imageKey, () -> onLateImage.accept(imageKey));
-            }
         }
-        final File en = image(imageKey, Math.max(2_000, deadline - System.currentTimeMillis()));
+        if (en == null) {
+            en = image(imageKey, Math.max(2_000, deadline - System.currentTimeMillis()));
+        }
         return en == null ? null : new Served(en, "en", cacheable);
     }
 

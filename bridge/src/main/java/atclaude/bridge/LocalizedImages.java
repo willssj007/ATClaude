@@ -157,17 +157,31 @@ final class LocalizedImages {
         return new File(dir, fileKey + ".jpg");
     }
 
-    /** Image dans la langue de la clé d'image Forge donnée, en attendant au plus {@code timeoutMs}. */
-    Outcome get(final String imageKey, final long timeoutMs) {
+    /**
+     * Image dans la langue de la clé d'image Forge donnée, en attendant au plus {@code timeoutMs}.
+     * Si la recherche continue après ce délai, {@code onLate} sera appelé quand l'image sera trouvée.
+     */
+    Outcome get(final String imageKey, final long timeoutMs, final Runnable onLate) {
         final File f = file(ImageService.fileKey(imageKey));
         if (f.isFile() && f.length() > 0) {
             return new Outcome(Status.FOUND, f); // chemin rapide, sans toucher à la base de cartes
         }
-        final CardRef ref = CardRef.of(imageKey, lang);
-        return ref == null ? Outcome.ABSENT : get(ref, timeoutMs);
+        final CardRef ref = ref(imageKey);
+        return ref == null ? Outcome.ABSENT : get(ref, timeoutMs, onLate);
     }
 
-    Outcome get(final CardRef ref, final long timeoutMs) {
+    /** Null si la carte ne peut pas exister dans la langue, ou si Forge ne sait pas la situer chez Scryfall. */
+    private CardRef ref(final String imageKey) {
+        try {
+            final CardRef ref = CardRef.of(imageKey, lang);
+            return ref == null || ref.searchName() == null || ref.printPath() == null ? null : ref;
+        } catch (final RuntimeException e) {
+            // Impressions incomplètes (meld sans sa moitié, promo...) : on garde l'image anglaise.
+            return null;
+        }
+    }
+
+    Outcome get(final CardRef ref, final long timeoutMs, final Runnable onLate) {
         final File f = file(ref.fileKey());
         if (f.isFile() && f.length() > 0) {
             return new Outcome(Status.FOUND, f);
@@ -179,8 +193,17 @@ final class LocalizedImages {
         if (failedAt != null && System.currentTimeMillis() - failedAt < ERROR_RETRY_MS) {
             return Outcome.ERROR;
         }
+        final Task task = submit(ref, true);
+        if (onLate != null) {
+            // Branché avant l'attente : une image trouvée juste après le délai prévient quand même l'interface.
+            task.future.thenAccept(o -> {
+                if (o.status() == Status.FOUND) {
+                    onLate.run();
+                }
+            });
+        }
         try {
-            return submit(ref, true).future.get(timeoutMs, TimeUnit.MILLISECONDS);
+            return timeoutMs <= 0 && !task.future.isDone() ? Outcome.PENDING : task.future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (final TimeoutException e) {
             return Outcome.PENDING; // la recherche continue : la prochaine demande trouvera le fichier
         } catch (final InterruptedException e) {
@@ -191,22 +214,10 @@ final class LocalizedImages {
         }
     }
 
-    /** Lance {@code then} si l'image en cours de recherche finit par être trouvée (pour prévenir l'interface). */
-    void whenFound(final String imageKey, final Runnable then) {
-        final Task t = inflight.get(ImageService.fileKey(imageKey));
-        if (t != null) {
-            t.future.thenAccept(o -> {
-                if (o.status() == Status.FOUND) {
-                    then.run();
-                }
-            });
-        }
-    }
-
     /** Prépare en arrière-plan les images d'un deck (après les demandes de l'écran). */
     void prefetch(final Collection<String> imageKeys) {
         for (final String key : imageKeys) {
-            final CardRef ref = CardRef.of(key, lang);
+            final CardRef ref = ref(key);
             if (ref != null && !file(ref.fileKey()).isFile()) {
                 submit(ref, false);
             }

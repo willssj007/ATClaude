@@ -401,5 +401,6 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
   .me-panel { grid-area: me; }
   .hud-actions { grid-area: actions; padding: 6px; }
   .side-l { --zone-w: 44px; }
-  .opp-card .zones { display: none; }
+  /* La main repliée dépasse sous le plateau : mes infos et les boutons passent devant. */
+  .me-panel, .hud-actions { position: relative; z-index: 13; background: var(--bg); }
 }
