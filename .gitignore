@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/cards.sqlite
+data/*.partial
+*.json.gz
+all-cards*.json
