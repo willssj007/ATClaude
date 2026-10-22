@@ -206,6 +206,55 @@ final class French {
         return out.replace("(OPTIONAL) ", "");
     }
 
+    private static final Pattern PROMPT_HEAD = Pattern.compile("^(.+?) \\((\\d{1,7})\\) - (.+)$", Pattern.MULTILINE);
+
+    /**
+     * Invite de paiement ou de ciblage d'un sort : Forge commence par « Foudre (207) - Foudre deals 3 damage
+     * to IA 1. ». Pour un sort qui n'a qu'une façon d'être lancé, on remplace cette ligne par son texte français.
+     */
+    static String prompt(final String text) {
+        if (text == null || text.indexOf(" - ") < 0) {
+            return text;
+        }
+        final BridgeGuiGame gui = BridgeGuiGame.current();
+        final Game game = gui == null || gui.getGameView() == null ? null : gui.getGameView().getGame();
+        if (game == null) {
+            return text;
+        }
+        try {
+            final Matcher m = PROMPT_HEAD.matcher(text);
+            final StringBuilder out = new StringBuilder();
+            int last = 0;
+            while (m.find()) {
+                String line = m.group();
+                if (looksEnglish(m.group(3))) {
+                    final Card card = game.findById(Integer.parseInt(m.group(2)));
+                    SpellAbility only = null;
+                    int spells = 0;
+                    if (card != null) {
+                        for (final SpellAbility sa : card.getSpellAbilities()) {
+                            if (sa.isSpell() && !sa.isManaAbility()) {
+                                only = sa;
+                                spells++;
+                            }
+                        }
+                    }
+                    final String fr = spells == 1 ? fromAbility(only, line) : null;
+                    if (fr != null) {
+                        line = fr;
+                    }
+                }
+                out.append(text, last, m.start()).append(line);
+                last = m.end();
+            }
+            out.append(text, last, text.length());
+            return out.toString();
+        } catch (final RuntimeException e) {
+            // Partie modifiée pendant la lecture : invite laissée telle quelle.
+            return text;
+        }
+    }
+
     /** Lignes du journal que Forge écrit en anglais. */
     static String logLine(final String text) {
         if (text == null) {

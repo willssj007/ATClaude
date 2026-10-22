@@ -170,7 +170,7 @@ final class BridgeGuiGame extends AbstractGuiGame {
     @Override
     public void showPromptMessage(final PlayerView playerView, final String message, final CardView card) {
         cancelAwaitNextInput();
-        promptMessage = Texts.clean(message);
+        promptMessage = Texts.clean(French.prompt(message));
         promptCard = card;
         markDirty();
         final MatchSession s = session;
@@ -181,7 +181,7 @@ final class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public void showPromptMessageNoCancel(final PlayerView playerView, final String message) {
-        promptMessage = Texts.clean(message);
+        promptMessage = Texts.clean(French.prompt(message));
         promptCard = null;
         markDirty();
     }
