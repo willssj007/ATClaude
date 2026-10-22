@@ -217,7 +217,7 @@ final class GameSerializer {
         final ManaCost cost = s.getManaCost();
         o.addProperty("cost", cost == null || cost.isNoCost() ? "" : cost.toString());
         o.addProperty("typeLine", CardDetailUtil.formatCardType(s, true));
-        o.addProperty("text", inGame ? CardDetailUtil.composeCardText(s, gv, true) : "");
+        o.addProperty("text", inGame ? plainText(CardDetailUtil.composeCardText(s, gv, true)) : "");
         o.addProperty("colors", colors(s.getColors()));
         o.addProperty("image", s.getImageKey());
         o.addProperty("set", s.getSetCode());
@@ -239,6 +239,18 @@ final class GameSerializer {
         if (s.isBattle()) {
             o.addProperty("defense", s.getDefense());
         }
+    }
+
+    /** Forge met en forme le texte des cartes en HTML pour son interface Swing : on garde le texte brut. */
+    static String plainText(final String html) {
+        if (html == null) {
+            return "";
+        }
+        return html.replaceAll("(?i)<br\\s*/?>", "\n")
+                .replaceAll("<[^>]+>", "")
+                .replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+                .replaceAll("\n{3,}", "\n\n")
+                .trim();
     }
 
     static String translatedName(final CardStateView s) {

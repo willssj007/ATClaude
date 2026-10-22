@@ -46,7 +46,7 @@ final class BridgeGuiBase implements IGuiBase {
     @Override public void invokeInEdtNow(final Runnable runnable) { runnable.run(); }
     @Override public void invokeInEdtLater(final Runnable runnable) { bridge.runOnEdt(runnable); }
     @Override public void invokeInEdtAndWait(final Runnable proc) { bridge.runOnEdtAndWait(proc); }
-    @Override public boolean isGuiThread() { return bridge.isEdt(); }
+    @Override public boolean isGuiThread() { return bridge.isEdt() || ImageService.isImageThread(); }
 
     @Override
     public void runBackgroundTask(final String message, final Runnable task) {

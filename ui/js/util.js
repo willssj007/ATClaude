@@ -1,0 +1,172 @@
+// Petits outils partagés par tous les écrans.
+
+export function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
+
+export function $(selector, root = document) {
+  return root.querySelector(selector);
+}
+
+export function $$(selector, root = document) {
+  return Array.from(root.querySelectorAll(selector));
+}
+
+/** Crée un élément depuis du HTML. */
+export function el(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+const MANA_LETTERS = new Set(['W', 'U', 'B', 'R', 'G', 'C', 'S', 'X', 'Y', 'Z', 'T', 'Q', 'E']);
+const COLOR_VAR = {W: '--mana-W', U: '--mana-U', B: '--mana-B', R: '--mana-R', G: '--mana-G', C: '--mana-C'};
+
+/** Un symbole de mana : « W », « 3 », « W/U », « G/P », « T »... */
+export function symbol(sym) {
+  const s = String(sym).toUpperCase();
+  if (s.includes('/')) {
+    const [a, b] = s.split('/');
+    const v1 = COLOR_VAR[a] ? `var(${COLOR_VAR[a]})` : 'var(--mana-C)';
+    const v2 = b === 'P' ? '#c9c2d6' : (COLOR_VAR[b] ? `var(${COLOR_VAR[b]})` : 'var(--mana-C)');
+    const label = b === 'P' ? a + 'ᵠ' : (/^\d$/.test(a) ? a : '');
+    return `<span class="ms ms-hybrid" style="--h1:${v1};--h2:${v2}" title="${esc(s)}">${esc(label)}</span>`;
+  }
+  if (s === 'T') {
+    return '<span class="ms ms-T" title="Engager">↷</span>';
+  }
+  if (s === 'Q') {
+    return '<span class="ms ms-T" title="Dégager">↶</span>';
+  }
+  const cls = MANA_LETTERS.has(s) && 'WUBRG'.includes(s) ? `ms ms-${s}` : 'ms';
+  return `<span class="${cls}">${esc('WUBRG'.includes(s) ? '' : s)}</span>`;
+}
+
+/** Coût de mana en symboles. Accepte « {2}{W}{W} » comme « 2 W W ». */
+export function manaHtml(cost) {
+  if (!cost) {
+    return '';
+  }
+  const tokens = cost.includes('{') ? [...cost.matchAll(/\{([^}]+)\}/g)].map(m => m[1]) : cost.trim().split(/\s+/);
+  return `<span class="mana">${tokens.filter(Boolean).map(symbol).join('')}</span>`;
+}
+
+/** Texte de règles avec ses symboles de mana. */
+export function rulesHtml(text) {
+  return esc(text || '').replace(/\{([^}]+)\}/g, (_, s) => symbol(s));
+}
+
+/** Couleur principale d'une carte pour le cadre de secours. */
+export function frameClass(card) {
+  if (card.land) {
+    return 'c-L';
+  }
+  const colors = card.colors || '';
+  if (colors.length > 1) {
+    return 'c-M';
+  }
+  return colors ? 'c-' + colors : '';
+}
+
+let toastTimer = 0;
+
+export function toast(message, {title = '', error = false, duration = 3800} = {}) {
+  const box = document.getElementById('toasts');
+  const t = el(`<div class="toast${error ? ' error' : ''}">${title ? `<b>${esc(title)}</b>` : ''}${esc(message)}</div>`);
+  box.appendChild(t);
+  while (box.children.length > 4) {
+    box.firstElementChild.remove();
+  }
+  setTimeout(() => t.remove(), duration);
+  clearTimeout(toastTimer);
+}
+
+export function debounce(fn, ms) {
+  let t = 0;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/** Préférences locales de l'interface (le stockage peut être indisponible : on garde alors les valeurs par défaut). */
+const DEFAULTS = {
+  images: true,
+  animations: true,
+  holdPriority: false,
+  autoPass: true,
+  showEnglish: false,
+  lastSetup: null,
+};
+
+export const prefs = {
+  get(key) {
+    try {
+      const raw = localStorage.getItem('at.' + key);
+      return raw === null ? DEFAULTS[key] : JSON.parse(raw);
+    } catch (e) {
+      return DEFAULTS[key];
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem('at.' + key, JSON.stringify(value));
+    } catch (e) {
+      // stockage indisponible : la préférence ne durera que cette session
+    }
+  },
+};
+
+const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
+
+export function avatarHtml(name, index, size = 44) {
+  const letter = esc((name || '?').trim().charAt(0).toUpperCase());
+  const color = AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length];
+  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background:radial-gradient(circle at 30% 30%, ${color}, #141829)">${letter}</div>`;
+}
+
+export const PHASES = [
+  ['UNTAP', 'Dégagement', 'Dég.'],
+  ['UPKEEP', 'Entretien', 'Ent.'],
+  ['DRAW', 'Pioche', 'Pio.'],
+  ['MAIN1', 'Phase principale 1', 'P1'],
+  ['COMBAT_BEGIN', 'Début du combat', 'Déb.'],
+  ['COMBAT_DECLARE_ATTACKERS', 'Attaquants', 'Att.'],
+  ['COMBAT_DECLARE_BLOCKERS', 'Bloqueurs', 'Blo.'],
+  ['COMBAT_FIRST_STRIKE_DAMAGE', 'Initiative', 'Init.'],
+  ['COMBAT_DAMAGE', 'Blessures', 'Bles.'],
+  ['COMBAT_END', 'Fin du combat', 'Fin'],
+  ['MAIN2', 'Phase principale 2', 'P2'],
+  ['END_OF_TURN', 'Fin de tour', 'FdT'],
+  ['CLEANUP', 'Nettoyage', 'Net.'],
+];
+
+// Forge ne traduit pas toutes ses invites (surtout le ciblage) : on traduit les tournures courantes.
+const NOUNS = [
+  [/\bany target\b/gi, 'n\'importe quelle cible'], [/\bcreatures?\b/gi, 'créature'], [/\bplayers?\b/gi, 'joueur'],
+  [/\bopponents?\b/gi, 'adversaire'], [/\bpermanents?\b/gi, 'permanent'], [/\bartifacts?\b/gi, 'artefact'],
+  [/\benchantments?\b/gi, 'enchantement'], [/\blands?\b/gi, 'terrain'], [/\bspells?\b/gi, 'sort'],
+  [/\bcards?\b/gi, 'carte'], [/\bnonland\b/gi, 'non-terrain'], [/\bnontoken\b/gi, 'non-jeton'], [/\byou control\b/gi, 'que vous contrôlez'],
+  [/\byou don't control\b/gi, 'que vous ne contrôlez pas'], [/\ban opponent controls\b/gi, 'qu\'un adversaire contrôle'], [/\bor\b/g, 'ou'],
+];
+const PROMPTS = [
+  [/^Select targets? for (.+)$/i, 'Choisissez les cibles de $1'],
+  [/^Select (?:a |an )?target (.+)$/i, (m, what) => 'Choisissez la cible : ' + NOUNS.reduce((s, [r, t]) => s.replace(r, t), what)],
+  [/^Select up to (\d+) target (.+)$/i, (m, n, what) => `Choisissez jusqu'à ${n} cible(s) : ` + NOUNS.reduce((s, [r, t]) => s.replace(r, t), what)],
+  [/^Waiting for (.*?)\.*$/i, 'En attente de $1…'],
+  [/^Pay Mana Cost:?/i, 'Payez le coût de mana :'],
+  [/^Choose a card to discard/i, 'Choisissez une carte à défausser'],
+  [/^Declare attackers/i, 'Déclarez les attaquants'],
+  [/^Declare blockers/i, 'Déclarez les bloqueurs'],
+];
+
+export function translatePrompt(text) {
+  return String(text || '').split('\n').map(line => {
+    for (const [re, to] of PROMPTS) {
+      if (re.test(line)) {
+        return line.replace(re, to);
+      }
+    }
+    return line;
+  }).join('\n');
+}

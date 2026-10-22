@@ -200,7 +200,7 @@ final class Catalog {
             final JsonObject print = new JsonObject();
             print.addProperty("set", p.getEdition());
             print.addProperty("number", p.getCollectorNumber());
-            print.addProperty("image", p.getCardImageKey());
+            print.addProperty("image", p.getImageKey(false));
             prints.add(print);
         }
         o.add("prints", prints);
@@ -233,7 +233,7 @@ final class Catalog {
         }
         o.addProperty("colors", GameSerializer.colors(rules.getColor()));
         o.addProperty("identity", GameSerializer.colors(rules.getColorIdentity()));
-        o.addProperty("image", pc.getCardImageKey());
+        o.addProperty("image", pc.getImageKey(false));
         o.addProperty("set", pc.getEdition());
         o.addProperty("rarity", pc.getRarity() == null ? "" : pc.getRarity().name());
         o.addProperty("land", rules.getType().isLand());
@@ -309,7 +309,7 @@ final class Catalog {
                         commanders.add(translated(e.getKey().getName()));
                     }
                     if (d.get(DeckSection.Commander).countAll() > 0) {
-                        o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getCardImageKey());
+                        o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getImageKey(false));
                     }
                 }
                 o.add("commanders", commanders);
@@ -334,6 +334,9 @@ final class Catalog {
     Deck deckFromKey(final String key) {
         if ("random".equals(key)) {
             return DeckgenUtil.generateCommanderDeck(true, GameType.Commander);
+        }
+        if ("randomConstructed".equals(key)) {
+            return DeckgenUtil.getRandomColorDeck(true);
         }
         final int colon = key.indexOf(':');
         if (colon < 0) {

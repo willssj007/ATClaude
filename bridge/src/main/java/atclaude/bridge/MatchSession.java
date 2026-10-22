@@ -77,6 +77,8 @@ final class MatchSession {
     private final Set<Integer> seenStackItems = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
 
+    private JsonObject setup;
+
     private MatchSession(final Bridge bridge, final BridgeGuiGame gui, final HostedMatch match) {
         this.bridge = bridge;
         this.gui = gui;
@@ -107,7 +109,9 @@ final class MatchSession {
             final LobbyPlayer lobby;
             if (ai) {
                 aiIndex++;
-                lobby = GamePlayerUtil.createAiPlayer(name, aiIndex);
+                final String profile = str(seat, "profile");
+                lobby = profile.isEmpty() ? GamePlayerUtil.createAiPlayer(name, aiIndex)
+                        : GamePlayerUtil.createAiPlayer(name, aiIndex, profile);
             } else {
                 if (human != null) {
                     throw new IllegalArgumentException("Un seul joueur humain par partie.");
@@ -125,6 +129,7 @@ final class MatchSession {
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
         final HostedMatch match = GuiBase.getInterface().hostMatch();
         final MatchSession session = new MatchSession(bridge, gui, match);
+        session.setup = setup;
         gui.attach(session);
         match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
         final Set<GameType> variants = commander ? EnumSet.of(GameType.Commander) : null;
@@ -144,6 +149,11 @@ final class MatchSession {
         }
         final String key = str(seat, "deckKey");
         return catalog.deckFromKey(key.isEmpty() ? "random" : key);
+    }
+
+    /** Pour une revanche : le même salon, avec les mêmes decks. */
+    JsonObject setup() {
+        return setup;
     }
 
     void close() {
@@ -273,11 +283,14 @@ final class MatchSession {
         return !(mine ? myStops : theirStops).contains(phase);
     }
 
+    /** Forge lit ces réglages dans ses préférences globales ; le contrôleur est ensuite prévenu du changement. */
     private void applyYieldPrefs() {
+        final forge.localinstance.properties.ForgePreferences prefs = forge.model.FModel.getPreferences();
+        prefs.setPref(FPref.YIELD_AUTO_PASS_NO_ACTIONS, String.valueOf(autoPassNoActions));
+        prefs.setPref(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS, "true");
         final PlayerControllerHuman c = gui.controller();
         if (c != null) {
             c.setYieldPref(FPref.YIELD_AUTO_PASS_NO_ACTIONS, String.valueOf(autoPassNoActions));
-            c.setYieldPref(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS, "true");
         }
     }
 

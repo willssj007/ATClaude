@@ -192,6 +192,11 @@ public final class Bridge {
         o.addProperty("ready", ForgeRuntime.isReady());
         o.addProperty("status", ForgeRuntime.status());
         o.addProperty("inMatch", session != null);
+        if (ForgeRuntime.isReady()) {
+            final com.google.gson.JsonArray profiles = new com.google.gson.JsonArray();
+            forge.ai.AiProfileUtil.getProfilesDisplayList().forEach(profiles::add);
+            o.add("aiProfiles", profiles);
+        }
         if (session != null) {
             session.requestFullState();
         }

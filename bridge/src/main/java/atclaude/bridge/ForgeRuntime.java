@@ -95,6 +95,8 @@ public final class ForgeRuntime {
             prefs.setPref(FPref.UI_ENABLE_AI_CHEATS, "false");
             prefs.setPref(FPref.MULLIGAN_RULE, "London");
             prefs.setPref(FPref.LOAD_CARD_SCRIPTS_LAZILY, "false");
+            // Cartes jouables en surbrillance, comme sur Arena.
+            prefs.setPref(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS, "true");
             prefs.save();
             return null;
         });

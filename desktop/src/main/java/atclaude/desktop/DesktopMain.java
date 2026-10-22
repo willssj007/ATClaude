@@ -80,7 +80,7 @@ public final class DesktopMain {
             bridge.receive(body);
             reply(exchange, 204, "text/plain", null);
         });
-        server.createContext("/img", exchange -> {
+        server.createContext("/cardimg", exchange -> {
             final String key = query(exchange.getRequestURI(), "key");
             final File file = ImageService.image(key, 15_000);
             if (file == null) {
@@ -167,7 +167,7 @@ public final class DesktopMain {
 
     private static void reply(final HttpExchange exchange, final int code, final String type, final byte[] body) throws IOException {
         exchange.getResponseHeaders().add("Content-Type", type);
-        if (body == null) {
+        if (body == null || body.length == 0) {
             exchange.sendResponseHeaders(code, -1);
         } else {
             exchange.sendResponseHeaders(code, body.length);

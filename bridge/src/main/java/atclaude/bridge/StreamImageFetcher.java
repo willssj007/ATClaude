@@ -17,6 +17,7 @@ import java.nio.file.StandardCopyOption;
 /**
  * Télécharge les images de cartes dans le cache de Forge, en copiant les octets tels quels.
  * Même logique que le téléchargeur Swing de Forge, sans java.awt, qui n'existe pas sur Android.
+ * Les observateurs sont prévenus sur le fil des images, comme Forge l'exige.
  */
 final class StreamImageFetcher extends ImageFetcher {
 
@@ -26,7 +27,7 @@ final class StreamImageFetcher extends ImageFetcher {
             for (final String url : downloadUrls) {
                 try {
                     if (fetch(url, destPath)) {
-                        notifyObservers.run();
+                        ImageService.runOnImageThread(notifyObservers);
                         return;
                     }
                 } catch (final IOException e) {
@@ -34,7 +35,7 @@ final class StreamImageFetcher extends ImageFetcher {
                 }
             }
             // Aucun lien n'a marché : on prévient quand même, pour que les requêtes en attente se terminent.
-            notifyObservers.run();
+            ImageService.runOnImageThread(notifyObservers);
         };
     }
 
