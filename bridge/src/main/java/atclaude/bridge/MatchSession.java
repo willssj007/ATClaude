@@ -80,7 +80,7 @@ final class MatchSession {
     private JsonObject setup;
     /** Le salon avec les decks complets, gardé dans la sauvegarde. */
     private JsonObject savedSetup;
-    private final String sessionId = java.util.UUID.randomUUID().toString();
+    private String sessionId = java.util.UUID.randomUUID().toString();
     /** Reprise en cours : les questions d'avant la partie (jouer ou piocher, mulligan) sont répondues d'office. */
     private volatile boolean resumePending;
     private volatile String lastSaveKey = "";
@@ -148,7 +148,19 @@ final class MatchSession {
             throw new IllegalArgumentException("Il faut un joueur humain.");
         }
 
-        resolved.add("players", resolvedSeats);
+        // Ordre de Forge (humain d'abord, puis les autres dans l'ordre) : celui de ses joueurs inscrits.
+        final JsonArray ordered = new JsonArray();
+        for (final JsonElement rs : resolvedSeats) {
+            if (!(rs.getAsJsonObject().has("ai") && rs.getAsJsonObject().get("ai").getAsBoolean())) {
+                ordered.add(rs);
+            }
+        }
+        for (final JsonElement rs : resolvedSeats) {
+            if (rs.getAsJsonObject().has("ai") && rs.getAsJsonObject().get("ai").getAsBoolean()) {
+                ordered.add(rs);
+            }
+        }
+        resolved.add("players", ordered);
 
         Texts.reset();
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
@@ -157,11 +169,16 @@ final class MatchSession {
         session.setup = setup;
         session.savedSetup = resolved;
         if (save != null) {
+            // La partie reprise garde l'identité de la sauvegarde : l'abandonner efface bien celle-ci.
+            if (save.has("session")) {
+                session.sessionId = save.get("session").getAsString();
+            }
             // Début du premier tour (après les mulligans, acceptés d'office) : on remet l'état sauvegardé.
             session.resumePending = true;
             match.setStartGameHook(() -> {
                 try {
                     SaveGame.apply(match.getGame(), save);
+                    SaveGame.refreshViews(match.getGame());
                 } catch (final RuntimeException ex) {
                     ex.printStackTrace();
                     bridge.sendEvent("error", m -> m.addProperty("message", "La partie sauvegardée n'a pas pu être reprise entièrement : " + ex.getMessage()));
@@ -198,10 +215,13 @@ final class MatchSession {
     }
 
     void close() {
-        closed = true;
+        // Sous le verrou des sauvegardes : une photo en cours d'écriture ne ramène pas la partie abandonnée.
+        synchronized (SaveGame.class) {
+            closed = true;
+            // Partie quittée pour une autre : sa sauvegarde ne sert plus.
+            SaveGame.delete(sessionId);
+        }
         timer.shutdownNow();
-        // Partie quittée pour une autre : sa sauvegarde ne sert plus.
-        SaveGame.delete(sessionId);
         try {
             final PlayerControllerHuman c = gui.controller();
             if (c != null && gui.getGameView() != null) {
@@ -467,16 +487,24 @@ final class MatchSession {
         }
         lastSaveKey = key;
         timer.schedule(() -> {
-            // Le fil de partie attend toujours la même décision : l'état ne bouge pas pendant la photo.
-            if (closed || c.getInputQueue().getInput() != input) {
-                lastSaveKey = "";
-                return;
-            }
-            try {
-                SaveGame.write(SaveGame.capture(game, savedSetup, sessionId));
-            } catch (final RuntimeException e) {
-                lastSaveKey = "";
-                System.err.println("Sauvegarde ratée : " + e);
+            synchronized (SaveGame.class) {
+                // Le fil de partie attend toujours la même décision : l'état ne bouge pas pendant la photo.
+                if (closed || c.getInputQueue().getInput() != input) {
+                    lastSaveKey = "";
+                    return;
+                }
+                try {
+                    final JsonObject snapshot = SaveGame.capture(game, savedSetup, sessionId);
+                    // Le joueur a pu agir pendant la photo : elle peut être incohérente, on la jette.
+                    if (closed || c.getInputQueue().getInput() != input) {
+                        lastSaveKey = "";
+                        return;
+                    }
+                    SaveGame.write(snapshot);
+                } catch (final RuntimeException e) {
+                    lastSaveKey = "";
+                    System.err.println("Sauvegarde ratée : " + e);
+                }
             }
         }, 250, TimeUnit.MILLISECONDS);
     }

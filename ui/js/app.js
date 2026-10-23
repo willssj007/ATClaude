@@ -43,7 +43,8 @@ async function getDecks(force = false) {
 // ------------------------------------------------------------------ parties
 
 async function startMatch(setup) {
-  if (inMatch && !(await confirmBox('Nouvelle partie ?', 'La partie en cours sera abandonnée.', {yes: 'Nouvelle partie', danger: true}))) {
+  const running = inMatch && !(game && game.state && game.state.game && game.state.game.gameOver);
+  if (running && !(await confirmBox('Nouvelle partie ?', 'La partie en cours sera abandonnée.', {yes: 'Nouvelle partie', danger: true}))) {
     return;
   }
   lastSetup = setup;
@@ -76,6 +77,7 @@ async function resumeSaved() {
   showScreen('game');
   try {
     await bridge.request('resumeSaved');
+    bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
   } catch (e) {
     inMatch = false;
     toast(e.message, {title: 'Impossible de reprendre la partie', error: true, duration: 8000});
@@ -164,11 +166,11 @@ function savedGameHtml(s) {
   const when = s.savedAt ? new Date(s.savedAt) : null;
   const ago = when ? Math.max(0, Math.round((Date.now() - when.getTime()) / 60000)) : null;
   const agoText = ago === null ? '' : ago < 1 ? 'à l\'instant' : ago < 60 ? `il y a ${ago} min` : ago < 1440 ? `il y a ${Math.round(ago / 60)} h` : `le ${when.toLocaleDateString('fr-FR')}`;
-  const players = (s.players || []).map(p => `${esc(p.name)} <b>${p.lost ? '✝' : p.life}</b>`).join(' · ');
+  const players = (s.players || []).map(p => `${esc(p.name)} <b>${p.lost ? '✝' : Number(p.life) || 0}</b>`).join(' · ');
   return `<div class="saved-game panel">
     <div class="sg-icon">⏳</div>
     <div class="sg-info"><b>Partie en cours sauvegardée</b>
-      <div class="muted small">${s.format === 'constructed' ? 'Construit' : 'Commander'} · tour ${s.turn || 1}${s.active ? ` (${esc(s.active)})` : ''} · ${agoText}</div>
+      <div class="muted small">${s.format === 'constructed' ? 'Construit' : 'Commander'} · tour ${Number(s.turn) || 1}${s.active ? ` (${esc(s.active)})` : ''} · ${agoText}</div>
       <div class="small">${players}</div></div>
     <div class="sg-actions"><button class="btn small" data-go="dropSaved">Abandonner</button><button class="btn gold" data-go="resumeSaved">▶ Reprendre</button></div>
   </div>`;

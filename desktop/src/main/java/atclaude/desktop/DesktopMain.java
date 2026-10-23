@@ -71,44 +71,16 @@ public final class DesktopMain {
 
         final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.setExecutor(Executors.newCachedThreadPool());
-        server.createContext("/api/events", DesktopMain::events);
-        server.createContext("/api/send", exchange -> {
-            if (!"POST".equals(exchange.getRequestMethod())) {
-                reply(exchange, 405, "text/plain", new byte[0]);
-                return;
-            }
-            final String body;
-            try (InputStream in = exchange.getRequestBody()) {
-                body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            }
-            bridge.receive(body);
-            reply(exchange, 204, "text/plain", null);
-        });
-        server.createContext("/cardimg", exchange -> {
-            final String key = query(exchange.getRequestURI(), "key");
-            final ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), 15_000);
-            if (img == null) {
-                reply(exchange, 404, "text/plain", new byte[0]);
-                return;
-            }
-            // L'anglais servi en attendant la version française ne doit pas rester dans le cache du navigateur.
-            exchange.getResponseHeaders().add("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
-            exchange.getResponseHeaders().add("Content-Language", img.lang());
-            reply(exchange, 200, ImageService.contentType(img.file()), Files.readAllBytes(img.file().toPath()));
-        });
         // Musiques et sons fournis avec Forge (res/music, res/sound).
         final File res = new File(assets, "res").getCanonicalFile();
-        server.createContext("/audio/", exchange -> {
-            final String rel = exchange.getRequestURI().getPath().substring("/audio/".length());
-            final File file = new File(res, rel).getCanonicalFile();
-            if (!(rel.startsWith("sound/") || rel.startsWith("music/")) || !file.getPath().startsWith(res.getPath()) || !file.isFile()) {
-                reply(exchange, 404, "text/plain", new byte[0]);
-                return;
-            }
-            exchange.getResponseHeaders().add("Cache-Control", "max-age=604800");
-            reply(exchange, 200, "audio/mpeg", Files.readAllBytes(file.toPath()));
-        });
-        server.createContext("/", exchange -> serveStatic(exchange, ui));
+        // Seule l'interface servie ici peut parler au moteur : une page web quelconque ouverte dans le navigateur
+        // ne doit pas pouvoir envoyer de commandes (relier un compte, synchroniser, jouer...) au serveur local.
+        final com.sun.net.httpserver.Filter localOnly = new LocalOnly(port);
+        server.createContext("/api/events", DesktopMain::events).getFilters().add(localOnly);
+        server.createContext("/api/send", exchange -> send(exchange, bridge)).getFilters().add(localOnly);
+        server.createContext("/cardimg", DesktopMain::cardImage).getFilters().add(localOnly);
+        server.createContext("/audio/", exchange -> audio(exchange, res)).getFilters().add(localOnly);
+        server.createContext("/", exchange -> serveStatic(exchange, ui)).getFilters().add(localOnly);
         server.start();
 
         final String url = "http://127.0.0.1:" + port + "/";
@@ -159,13 +131,77 @@ public final class DesktopMain {
         }
     }
 
+    private static void send(final HttpExchange exchange, final Bridge bridge) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            reply(exchange, 405, "text/plain", new byte[0]);
+            return;
+        }
+        final String body;
+        try (InputStream in = exchange.getRequestBody()) {
+            body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        bridge.receive(body);
+        reply(exchange, 204, "text/plain", null);
+    }
+
+    private static void cardImage(final HttpExchange exchange) throws IOException {
+        final String key = query(exchange.getRequestURI(), "key");
+        final ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), 15_000);
+        if (img == null) {
+            reply(exchange, 404, "text/plain", new byte[0]);
+            return;
+        }
+        // L'anglais servi en attendant la version française ne doit pas rester dans le cache du navigateur.
+        exchange.getResponseHeaders().add("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
+        exchange.getResponseHeaders().add("Content-Language", img.lang());
+        reply(exchange, 200, ImageService.contentType(img.file()), Files.readAllBytes(img.file().toPath()));
+    }
+
+    private static void audio(final HttpExchange exchange, final File res) throws IOException {
+        final String rel = exchange.getRequestURI().getPath().substring("/audio/".length());
+        final File file = new File(res, rel).getCanonicalFile();
+        if (!(rel.startsWith("sound/") || rel.startsWith("music/")) || !file.getPath().startsWith(res.getPath() + File.separator) || !file.isFile()) {
+            reply(exchange, 404, "text/plain", new byte[0]);
+            return;
+        }
+        exchange.getResponseHeaders().add("Cache-Control", "max-age=604800");
+        reply(exchange, 200, "audio/mpeg", Files.readAllBytes(file.toPath()));
+    }
+
+    /** Refuse les requêtes qui ne viennent pas de l'interface locale (autre site, adresse détournée par DNS). */
+    private static final class LocalOnly extends com.sun.net.httpserver.Filter {
+        private final List<String> hosts;
+        private final List<String> origins;
+
+        LocalOnly(final int port) {
+            hosts = List.of("127.0.0.1:" + port, "localhost:" + port);
+            origins = List.of("http://127.0.0.1:" + port, "http://localhost:" + port);
+        }
+
+        @Override
+        public void doFilter(final HttpExchange exchange, final Chain chain) throws IOException {
+            final String host = exchange.getRequestHeaders().getFirst("Host");
+            final String origin = exchange.getRequestHeaders().getFirst("Origin");
+            if (host == null || !hosts.contains(host.toLowerCase()) || (origin != null && !origins.contains(origin.toLowerCase()))) {
+                reply(exchange, 403, "text/plain", "Interdit".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            chain.doFilter(exchange);
+        }
+
+        @Override
+        public String description() {
+            return "Requêtes de l'interface locale seulement";
+        }
+    }
+
     private static void serveStatic(final HttpExchange exchange, final File root) throws IOException {
         String path = URLDecoder.decode(exchange.getRequestURI().getPath(), StandardCharsets.UTF_8);
         if (path.endsWith("/")) {
             path += "index.html";
         }
         final File file = new File(root, path).getCanonicalFile();
-        if (!file.getPath().startsWith(root.getCanonicalPath()) || !file.isFile()) {
+        if (!file.getPath().startsWith(root.getCanonicalPath() + File.separator) || !file.isFile()) {
             reply(exchange, 404, "text/plain", "Introuvable".getBytes(StandardCharsets.UTF_8));
             return;
         }

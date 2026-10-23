@@ -274,7 +274,7 @@ public class MainActivity extends Activity {
         }
         try {
             final File file = new File(root, rel).getCanonicalFile();
-            if (!file.getPath().startsWith(root.getCanonicalPath()) || !file.isFile()) {
+            if (!file.getPath().startsWith(root.getCanonicalPath() + File.separator) || !file.isFile()) {
                 return notFound();
             }
             final WebResourceResponse response = new WebResourceResponse("audio/mpeg", null, new FileInputStream(file));

@@ -44,7 +44,7 @@ public final class Bridge {
     private final Map<Integer, JsonObject> openDialogs = new ConcurrentHashMap<>();
     private final AtomicInteger dialogIds = new AtomicInteger();
     private final Catalog catalog = new Catalog();
-    private final Account account = new Account(catalog);
+    private final Account account = new Account(this, catalog);
     private volatile MatchSession session;
 
     public Bridge(final Transport transport) {
@@ -71,6 +71,18 @@ public final class Bridge {
                 reportError(e);
             }
         });
+    }
+
+    /** Comme {@link #runOnEdtAndWait}, en relançant telle quelle l'erreur de la tâche (son message reste lisible). */
+    void callOnEdt(final Runnable task) {
+        try {
+            runOnEdtAndWait(task);
+        } catch (final RuntimeException e) {
+            if (e.getClass() == RuntimeException.class && e.getCause() instanceof RuntimeException) {
+                throw (RuntimeException) e.getCause();
+            }
+            throw e;
+        }
     }
 
     void runOnEdtAndWait(final Runnable task) {
@@ -209,7 +221,7 @@ public final class Bridge {
                 return account.unlink();
             case "sync":
                 return account.sync(m.has("prefs") && m.get("prefs").isJsonObject() ? m.getAsJsonObject("prefs") : new JsonObject(),
-                        m.has("prefsAt") ? m.get("prefsAt").getAsLong() : 0, session != null);
+                        m.has("prefsAt") ? m.get("prefsAt").getAsLong() : 0, () -> session != null);
             case "parseDeck":
                 return catalog.parseDeckText(m.get("text").getAsString(), m.has("name") ? m.get("name").getAsString() : "");
             case "fetchMoxfield":

@@ -7,12 +7,12 @@ import com.google.gson.JsonParser;
 import forge.game.Game;
 import forge.game.GameState;
 import forge.game.card.Card;
+import forge.game.phase.PhaseHandler;
 import forge.game.player.Player;
 import forge.localinstance.properties.ForgeConstants;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
@@ -33,7 +33,10 @@ final class SaveGame {
         return new File(ForgeConstants.USER_DIR, "atclaude-partie.json");
     }
 
-    /** Photo de la partie en cours. À appeler quand le fil de partie attend une décision du joueur. */
+    /**
+     * Photo de la partie en cours. À appeler quand le fil de partie attend une décision du joueur.
+     * {@code setup} liste les places dans l'ordre de Forge (humain d'abord), comme ses joueurs inscrits.
+     */
     static JsonObject capture(final Game game, final JsonObject setup, final String sessionId) {
         final GameState state = new GameState();
         state.initFromGame(game);
@@ -41,9 +44,20 @@ final class SaveGame {
         save.addProperty("version", 1);
         save.addProperty("session", sessionId);
         save.addProperty("savedAt", System.currentTimeMillis());
-        save.add("setup", setup);
-        save.addProperty("state", state.toString());
+        // Forge ne garde dans l'état que les joueurs encore en jeu : la reprise se fait sans les éliminés.
+        final List<Player> registered = game.getRegisteredPlayers();
         final List<Player> players = game.getPlayers();
+        final JsonObject still = setup.deepCopy();
+        final JsonArray seats = setup.getAsJsonArray("players");
+        final JsonArray kept = new JsonArray();
+        for (int i = 0; i < Math.min(seats.size(), registered.size()); i++) {
+            if (players.contains(registered.get(i))) {
+                kept.add(seats.get(i));
+            }
+        }
+        still.add("players", kept);
+        save.add("setup", still);
+        save.addProperty("state", state.toString());
         final JsonArray extras = new JsonArray();
         final JsonArray summary = new JsonArray();
         for (final Player p : players) {
@@ -66,10 +80,12 @@ final class SaveGame {
             }
             x.add("commanderDamage", damage);
             extras.add(x);
+        }
+        for (final Player p : registered) {
             final JsonObject s = new JsonObject();
             s.addProperty("name", p.getName());
             s.addProperty("life", p.getLife());
-            s.addProperty("lost", p.hasLost());
+            s.addProperty("lost", !players.contains(p));
             summary.add(s);
         }
         save.add("extras", extras);
@@ -106,6 +122,33 @@ final class SaveGame {
                 if (c != null) {
                     p.addCommanderDamage(c, o.get("damage").getAsInt());
                 }
+            }
+        }
+    }
+
+    /** Forge ne rafraîchit pas l'affichage après ces réglages (tour, commandants) : on le fait (méthodes internes des vues). */
+    static void refreshViews(final Game game) {
+        for (final String name : new String[]{"updateTurn", "updatePhase", "updatePlayerTurn"}) {
+            try {
+                final java.lang.reflect.Method m = game.getView().getClass().getDeclaredMethod(name, PhaseHandler.class);
+                m.setAccessible(true);
+                m.invoke(game.getView(), game.getPhaseHandler());
+            } catch (final ReflectiveOperationException | RuntimeException e) {
+                // Affichage seulement : le tour de la partie est le bon.
+            }
+        }
+        for (final Player p : game.getPlayers()) {
+            try {
+                final java.lang.reflect.Method dmg = p.getView().getClass().getDeclaredMethod("updateCommanderDamage", Player.class);
+                dmg.setAccessible(true);
+                dmg.invoke(p.getView(), p);
+                final java.lang.reflect.Method cast = p.getView().getClass().getDeclaredMethod("updateCommanderCast", Player.class, Card.class);
+                cast.setAccessible(true);
+                for (final Card c : p.getCommanders()) {
+                    cast.invoke(p.getView(), p, c);
+                }
+            } catch (final ReflectiveOperationException | RuntimeException e) {
+                // Affichage seulement : les règles (21 blessures, taxe) s'appliquent quand même.
             }
         }
     }
@@ -147,8 +190,38 @@ final class SaveGame {
     /** Efface la sauvegarde, seulement si elle vient de cette partie-là (une nouvelle partie a pu en écrire une). */
     static synchronized void delete(final String sessionId) {
         final JsonObject o = read();
-        if (o == null || sessionId == null || (o.has("session") && sessionId.equals(o.get("session").getAsString()))) {
+        if (o == null) {
+            return;
+        }
+        if (sessionId == null || (o.has("session") && sessionId.equals(o.get("session").getAsString()))) {
             file().delete();
+            // Retenu pour la synchronisation : une copie de cette partie sur un autre appareil ne revient pas.
+            markCleared(o.has("savedAt") ? o.get("savedAt").getAsLong() : System.currentTimeMillis());
+        }
+    }
+
+    private static File clearedFile() {
+        return new File(ForgeConstants.USER_DIR, "atclaude-partie-effacee.txt");
+    }
+
+    /** Date de la dernière sauvegarde effacée (partie finie ou abandonnée) : les copies plus anciennes sont périmées. */
+    static synchronized long clearedAt() {
+        try {
+            return clearedFile().isFile() ? Long.parseLong(Io.read(clearedFile()).trim()) : 0;
+        } catch (final IOException | RuntimeException e) {
+            return 0;
+        }
+    }
+
+    static synchronized void markCleared(final long at) {
+        if (at <= clearedAt()) {
+            return;
+        }
+        try {
+            clearedFile().getParentFile().mkdirs();
+            Io.write(clearedFile(), String.valueOf(at));
+        } catch (final IOException e) {
+            System.err.println("Date d'effacement non enregistrée : " + e.getMessage());
         }
     }
 

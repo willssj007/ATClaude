@@ -43,9 +43,11 @@ final class Account {
     private static final String GIST_FILE = "arcane-table.json";
     private static final String API = System.getProperty("atclaude.githubApi", "https://api.github.com/");
 
+    private final Bridge bridge;
     private final Catalog catalog;
 
-    Account(final Catalog catalog) {
+    Account(final Bridge bridge, final Catalog catalog) {
+        this.bridge = bridge;
         this.catalog = catalog;
     }
 
@@ -158,13 +160,20 @@ final class Account {
      * Fusionne ce qui est sur l'appareil et ce qui est sur GitHub, applique le résultat ici et le renvoie là-bas.
      * Renvoie les réglages de l'interface à appliquer et un résumé.
      */
-    JsonObject sync(final JsonObject uiPrefs, final long uiPrefsAt, final boolean inMatch) {
-        final JsonObject a = load();
-        final String token = str(a, "token", "");
+    JsonObject sync(final JsonObject uiPrefs, final long uiPrefsAt, final java.util.function.BooleanSupplier inMatch) {
+        // Ce qui touche aux fichiers de l'appareil (decks de Forge, compte) se fait sur le fil principal du pont,
+        // comme le reste ; seuls les appels à GitHub ont lieu sur ce fil réseau.
+        final JsonObject[] snapshot = new JsonObject[2];
+        bridge.callOnEdt(() -> {
+            snapshot[0] = load();
+            snapshot[1] = bundle(snapshot[0], uiPrefs, uiPrefsAt);
+        });
+        final String token = str(snapshot[0], "token", "");
         if (token.isEmpty()) {
             throw new IllegalStateException("Aucun compte GitHub relié.");
         }
-        final JsonObject local = bundle(a, uiPrefs, uiPrefsAt);
+        final boolean firstSync = !snapshot[0].has("lastSync") || snapshot[0].get("lastSync").getAsLong() == 0;
+        final JsonObject local = snapshot[1];
         JsonObject remote = null;
         final List<String> oldGists = new java.util.ArrayList<>();
         String newest = null;
@@ -195,8 +204,9 @@ final class Account {
                 }
             }
         }
-        final JsonObject merged = remote == null ? local : merge(local, remote);
-        final JsonObject report = applyLocally(a, merged, inMatch);
+        final JsonObject merged = merge(local, remote == null ? new JsonObject() : remote, firstSync, directions());
+        final JsonObject[] report = new JsonObject[1];
+        bridge.callOnEdt(() -> report[0] = applyLocally(merged, inMatch.getAsBoolean()));
 
         // Dépôt : un nouveau Gist (l'API ne permet de le modifier qu'avec PATCH, que Java ne sait pas toujours
         // envoyer), puis suppression des anciens.
@@ -216,11 +226,13 @@ final class Account {
                 System.err.println("Ancien Gist non supprimé : " + e.getMessage());
             }
         }
-        final JsonObject after = load();
-        after.addProperty("lastSync", System.currentTimeMillis());
-        store(after);
-        report.add("profile", profile());
-        return report;
+        bridge.callOnEdt(() -> {
+            final JsonObject after = load();
+            after.addProperty("lastSync", System.currentTimeMillis());
+            store(after);
+            report[0].add("profile", profile());
+        });
+        return report[0];
     }
 
     // ------------------------------------------------------------------ contenu synchronisé
@@ -271,11 +283,17 @@ final class Account {
         if (save != null) {
             b.add("save", save);
         }
+        b.addProperty("saveClearedAt", SaveGame.clearedAt());
         return b;
     }
 
-    /** Fusion : profil et réglages les plus récents, chaque deck dans sa version la plus récente, meilleurs trophées. */
-    static JsonObject merge(final JsonObject local, final JsonObject remote) {
+    /**
+     * Fusion : profil et réglages les plus récents, chaque deck dans sa version la plus récente (sauf s'il a été
+     * supprimé depuis), chaque trophée à son meilleur niveau, la partie en cours la plus récente encore valable.
+     * À la première synchronisation d'un appareil, ses decks ne sont jamais supprimés.
+     */
+    static JsonObject merge(final JsonObject local, final JsonObject remote, final boolean firstSync,
+                            final Map<String, Map<String, Boolean>> directions) {
         final JsonObject m = new JsonObject();
         m.addProperty("version", 1);
         m.add("profile", newer(local.getAsJsonObject("profile"), remote.getAsJsonObject("profile"), "at"));
@@ -291,6 +309,10 @@ final class Account {
                 }
             }
         }
+        final java.util.Set<String> localKeys = new java.util.HashSet<>();
+        for (final JsonElement e : array(local, "decks")) {
+            localKeys.add(str(e.getAsJsonObject(), "format", "") + ":" + str(e.getAsJsonObject(), "name", ""));
+        }
         final Map<String, JsonObject> decks = new LinkedHashMap<>();
         for (final JsonObject src : List.of(local, remote)) {
             for (final JsonElement e : array(src, "decks")) {
@@ -305,7 +327,8 @@ final class Account {
         final JsonArray outTombs = new JsonArray();
         for (final Map.Entry<String, JsonObject> e : decks.entrySet()) {
             final JsonObject t = tombs.get(e.getKey());
-            if (t == null || t.get("at").getAsLong() < e.getValue().get("mtime").getAsLong()) {
+            final boolean protectedLocal = firstSync && localKeys.contains(e.getKey());
+            if (t == null || protectedLocal || t.get("at").getAsLong() < e.getValue().get("mtime").getAsLong()) {
                 outDecks.add(e.getValue());
             }
         }
@@ -322,28 +345,122 @@ final class Account {
         final JsonObject ach = new JsonObject();
         final JsonObject la = local.has("achievements") ? local.getAsJsonObject("achievements") : new JsonObject();
         final JsonObject ra = remote.has("achievements") ? remote.getAsJsonObject("achievements") : new JsonObject();
-        for (final JsonObject src : List.of(la, ra)) {
-            for (final String k : src.keySet()) {
-                final String v = src.get(k).getAsString();
-                if (!ach.has(k) || count(v, "<a ") > count(ach.get(k).getAsString(), "<a ")) {
-                    ach.addProperty(k, v);
-                }
+        final java.util.Set<String> names = new java.util.TreeSet<>(la.keySet());
+        names.addAll(ra.keySet());
+        for (final String file : names) {
+            if (!file.matches("[A-Za-z0-9_\\-]+\\.xml")) {
+                continue;
             }
+            ach.addProperty(file, mergeAchievements(la.has(file) ? la.get(file).getAsString() : "",
+                    ra.has(file) ? ra.get(file).getAsString() : "", directions.getOrDefault(file, Map.of())));
         }
         m.add("achievements", ach);
 
+        final long cleared = Math.max(local.has("saveClearedAt") ? local.get("saveClearedAt").getAsLong() : 0,
+                remote.has("saveClearedAt") ? remote.get("saveClearedAt").getAsLong() : 0);
+        m.addProperty("saveClearedAt", cleared);
         final JsonObject ls = local.has("save") ? local.getAsJsonObject("save") : null;
         final JsonObject rs = remote.has("save") ? remote.getAsJsonObject("save") : null;
-        final JsonObject save = ls == null ? rs : rs == null ? ls : newer(ls, rs, "savedAt");
+        JsonObject save = ls == null ? rs : rs == null ? ls : newer(ls, rs, "savedAt");
+        if (save != null && save.has("savedAt") && save.get("savedAt").getAsLong() <= cleared) {
+            save = null; // partie finie ou abandonnée depuis
+        }
         if (save != null) {
             m.add("save", save);
         }
         return m;
     }
 
-    private JsonObject applyLocally(final JsonObject account, final JsonObject merged, final boolean inMatch) {
+    private static final java.util.regex.Pattern ENTRY = java.util.regex.Pattern.compile("<a\\s([^>]*?)/?>");
+    private static final java.util.regex.Pattern ATTR = java.util.regex.Pattern.compile("(\\w+)=\"([^\"]*)\"");
+
+    /**
+     * Fusionne deux fichiers de trophées de Forge entrée par entrée, en gardant le meilleur résultat de chacune
+     * (le plus grand ou le plus petit selon le trophée). Le fichier est réécrit à neuf : rien d'autre que des
+     * entrées valides n'en sort (contenu venu du Gist, donc pas digne de confiance).
+     */
+    static String mergeAchievements(final String a, final String b, final Map<String, Boolean> greater) {
+        final Map<String, long[]> best = new java.util.TreeMap<>();
+        for (final String xml : List.of(a, b)) {
+            final java.util.regex.Matcher m = ENTRY.matcher(xml);
+            while (m.find()) {
+                final Map<String, String> at = new HashMap<>();
+                final java.util.regex.Matcher am = ATTR.matcher(m.group(1));
+                while (am.find()) {
+                    at.put(am.group(1), am.group(2));
+                }
+                final String name = at.get("name");
+                if (name == null || !name.matches("[A-Za-z0-9 _'.,:\\-]{1,80}")) {
+                    continue;
+                }
+                final long value;
+                final long time;
+                final long current;
+                try {
+                    value = Long.parseLong(at.getOrDefault("best", "0"));
+                    time = Long.parseLong(at.getOrDefault("time", "0"));
+                    current = at.containsKey("current") ? Long.parseLong(at.get("current")) : -1;
+                } catch (final NumberFormatException e) {
+                    continue;
+                }
+                final long[] cur = best.get(name);
+                final boolean up = greater.getOrDefault(name, true);
+                if (cur == null || (up ? value > cur[0] : value < cur[0]) || (value == cur[0] && time > cur[1])) {
+                    // « current » : série en cours (trophées de séries de victoires), gardée avec le meilleur résultat.
+                    best.put(name, new long[]{value, time, current >= 0 ? current : cur == null ? -1 : cur[2]});
+                } else if (cur[2] < 0 && current >= 0) {
+                    cur[2] = current;
+                }
+            }
+        }
+        final StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><achievements>");
+        for (final Map.Entry<String, long[]> e : best.entrySet()) {
+            sb.append("<a best=\"").append(e.getValue()[0]).append('"');
+            if (e.getValue()[2] >= 0) {
+                sb.append(" current=\"").append(e.getValue()[2]).append('"');
+            }
+            sb.append(" name=\"").append(e.getKey().replace("'", "&apos;")).append("\" time=\"").append(e.getValue()[1]).append("\"/>");
+        }
+        return sb.append("</achievements>").toString();
+    }
+
+    /** Pour chaque fichier de trophées, si chaque trophée se gagne par le plus grand score (sinon le plus petit). */
+    private static Map<String, Map<String, Boolean>> directions() {
+        final Map<String, Map<String, Boolean>> out = new HashMap<>();
+        try {
+            final java.lang.reflect.Field file = forge.localinstance.achievements.AchievementCollection.class.getDeclaredField("filename");
+            file.setAccessible(true);
+            final java.lang.reflect.Field up = forge.localinstance.achievements.Achievement.class.getDeclaredField("checkGreaterThan");
+            up.setAccessible(true);
+            for (final forge.localinstance.achievements.AchievementCollection col : List.of(FModel.getAchievements(GameType.Constructed),
+                    ChallengeAchievements.instance, AltWinAchievements.instance, PlaneswalkerAchievements.instance, CardActivationAchievements.instance)) {
+                final Map<String, Boolean> map = new HashMap<>();
+                for (final forge.localinstance.achievements.Achievement ach : col) {
+                    map.put(ach.getKey(), up.getBoolean(ach));
+                }
+                out.put(new File((String) file.get(col)).getName(), map);
+            }
+        } catch (final ReflectiveOperationException | RuntimeException e) {
+            System.err.println("Sens des trophées inconnu, on garde le plus grand score : " + e);
+        }
+        return out;
+    }
+
+    private JsonObject applyLocally(final JsonObject merged, final boolean inMatch) {
         final JsonObject report = new JsonObject();
-        final JsonObject p = merged.getAsJsonObject("profile");
+        // Relu maintenant : un deck supprimé ou un pseudo changé pendant l'échange avec GitHub n'est pas perdu.
+        final JsonObject account = load();
+        final Map<String, Long> localTombs = new HashMap<>();
+        for (final JsonElement e : array(account, "deleted")) {
+            final JsonObject t = e.getAsJsonObject();
+            localTombs.merge(str(t, "format", "") + ":" + str(t, "name", ""), t.get("at").getAsLong(), Math::max);
+        }
+        final JsonObject freshProfile = new JsonObject();
+        freshProfile.addProperty("at", account.has("profileAt") ? account.get("profileAt").getAsLong() : 0);
+        JsonObject p = merged.getAsJsonObject("profile");
+        if (p != null && p.has("at") && freshProfile.get("at").getAsLong() > p.get("at").getAsLong()) {
+            p = null; // modifié ici pendant la synchronisation : la version locale reste
+        }
         if (p != null) {
             account.addProperty("name", str(p, "name", "Joueur"));
             account.addProperty("avatar", p.has("avatar") ? p.get("avatar").getAsInt() : 0);
@@ -352,7 +469,20 @@ final class Account {
             }
             account.addProperty("profileAt", p.has("at") ? p.get("at").getAsLong() : 0);
         }
-        account.add("deleted", array(merged, "deleted"));
+        final JsonArray tombs = new JsonArray();
+        final java.util.Set<String> seen = new java.util.HashSet<>();
+        for (final JsonElement e : array(merged, "deleted")) {
+            final JsonObject t = e.getAsJsonObject();
+            seen.add(str(t, "format", "") + ":" + str(t, "name", ""));
+            tombs.add(t);
+        }
+        for (final JsonElement e : array(account, "deleted")) {
+            final JsonObject t = e.getAsJsonObject();
+            if (seen.add(str(t, "format", "") + ":" + str(t, "name", ""))) {
+                tombs.add(t);
+            }
+        }
+        account.add("deleted", tombs);
         store(account);
 
         int added = 0;
@@ -360,14 +490,22 @@ final class Account {
         final Map<String, JsonObject> wanted = new HashMap<>();
         for (final JsonElement e : array(merged, "decks")) {
             final JsonObject d = e.getAsJsonObject();
-            wanted.put(str(d, "format", "") + ":" + str(d, "name", ""), d);
+            final String k = str(d, "format", "") + ":" + str(d, "name", "");
+            final Long deletedAt = localTombs.get(k);
+            if (deletedAt != null && deletedAt >= d.get("mtime").getAsLong()) {
+                continue; // supprimé ici pendant la synchronisation
+            }
+            wanted.put(k, d);
         }
         for (final String format : List.of("commander", "constructed")) {
             final IStorage<Deck> storage = storage(format);
             final Map<String, File> files = deckFiles(format);
             for (final Map.Entry<String, File> e : files.entrySet()) {
                 final String k = format + ":" + e.getKey();
-                if (!wanted.containsKey(k)) {
+                // Absent de la fusion : supprimé ailleurs. Sauf s'il vient d'être créé ou modifié ici pendant la
+                // synchronisation (plus récent que tout ce que la fusion connaît de lui).
+                final JsonObject known = known(merged, k);
+                if (!wanted.containsKey(k) && (known != null || deletedRemotely(merged, k, e.getValue().lastModified()))) {
                     storage.delete(e.getKey());
                     removed++;
                 }
@@ -428,6 +566,11 @@ final class Account {
             CardActivationAchievements.instance.load();
         }
 
+        SaveGame.markCleared(merged.has("saveClearedAt") ? merged.get("saveClearedAt").getAsLong() : 0);
+        final JsonObject current = SaveGame.read();
+        if (current != null && current.has("savedAt") && current.get("savedAt").getAsLong() <= SaveGame.clearedAt() && !inMatch) {
+            SaveGame.delete(null); // partie finie ou abandonnée sur un autre appareil
+        }
         // Partie en cours venue d'un autre appareil : reprenable ici (pas pendant une partie).
         if (!inMatch && merged.has("save")) {
             final JsonObject mine = SaveGame.read();
@@ -466,6 +609,28 @@ final class Account {
             }
         }
         return map;
+    }
+
+    /** La version d'un deck que connaît la fusion, ou null. */
+    private static JsonObject known(final JsonObject merged, final String key) {
+        for (final JsonElement e : array(merged, "decks")) {
+            final JsonObject d = e.getAsJsonObject();
+            if (key.equals(str(d, "format", "") + ":" + str(d, "name", ""))) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /** Une suppression enregistrée ailleurs, postérieure à la dernière modification locale du deck. */
+    private static boolean deletedRemotely(final JsonObject merged, final String key, final long localMtime) {
+        for (final JsonElement e : array(merged, "deleted")) {
+            final JsonObject t = e.getAsJsonObject();
+            if (key.equals(str(t, "format", "") + ":" + str(t, "name", "")) && t.get("at").getAsLong() >= localMtime) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static JsonObject newer(final JsonObject a, final JsonObject b, final String field) {

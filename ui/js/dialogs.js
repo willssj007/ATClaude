@@ -433,8 +433,8 @@ const handlers = {
     };
     s.body.addEventListener('pointerdown', (e) => {
       const n = e.target.closest('.arr-card');
-      if (!n || drag) {
-        return;
+      if (!n || drag || (e.pointerType === 'mouse' && e.button !== 0)) {
+        return; // clic droit : agrandir la carte, pas la déplacer
       }
       drag = {n, i: Number(n.dataset.i), x: e.clientX, y: e.clientY, id: e.pointerId, active: false, ghost: null};
       document.addEventListener('pointermove', onMove);
