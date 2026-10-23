@@ -1,5 +1,5 @@
 // Compte : pseudo et avatar, et synchronisation des decks, trophées, réglages et de la partie en cours
-// entre appareils, par un Gist privé sur le compte GitHub du joueur.
+// entre appareils, par un Gist secret sur le compte GitHub du joueur.
 
 import {bridge} from './bridge.js';
 import {customBox} from './dialogs.js';
@@ -104,7 +104,7 @@ export class AccountScreen {
           <p class="muted small">Dernière synchronisation : ${esc(last)}. Elle se fait aussi toute seule au démarrage et à la fin de chaque partie.</p>
           <div class="acc-actions"><button class="btn gold" data-sync>⟳ Synchroniser maintenant</button><button class="btn" data-unlink>Délier</button></div>
         </div>` : `<div class="panel acc-sync">
-          <p>Arcane Table n'a pas de serveur : pour retrouver tes decks et tes trophées sur ton téléphone et sur ton ordinateur, l'application les range dans un <b>Gist privé</b> de ton compte GitHub.</p>
+          <p>Arcane Table n'a pas de serveur : pour retrouver tes decks et tes trophées sur ton téléphone et sur ton ordinateur, l'application les range dans un <b>Gist secret</b> de ton compte GitHub (non listé : seul quelqu'un qui connaît son adresse peut le lire ; il ne contient ni le jeton ni mot de passe).</p>
           <ol class="small">
             <li>Crée un jeton GitHub avec seulement la case <b>gist</b> cochée : <a href="${TOKEN_URL}" data-ext>ouvrir la page GitHub</a>.</li>
             <li>Copie le jeton (il commence par <code>ghp_</code> ou <code>github_pat_</code>) et colle-le ici.</li>

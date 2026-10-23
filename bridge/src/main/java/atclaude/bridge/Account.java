@@ -32,7 +32,7 @@ import java.util.Map;
 /**
  * Compte du joueur : pseudo et avatar, et synchronisation entre appareils (téléphone, ordinateur).
  *
- * <p>Sans serveur à nous, la synchronisation passe par un Gist privé sur le compte GitHub du joueur :
+ * <p>Sans serveur à nous, la synchronisation passe par un Gist secret (non listé) sur le compte GitHub du joueur :
  * il donne un jeton GitHub limité aux Gists, et chaque appareil y dépose puis y relit un fichier avec
  * ses decks, ses trophées, ses réglages et la partie en cours. Les deux versions sont fusionnées : pour
  * chaque deck la plus récente gagne, un deck supprimé reste supprimé, les trophées gardent le meilleur.</p>
