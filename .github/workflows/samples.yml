@@ -1,0 +1,28 @@
+name: Echantillons EDHREC
+on:
+  push:
+    branches: [dev-samples]
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telecharger
+        run: |
+          mkdir out && cd out
+          UA="ArcaneTable/0.1 (+https://github.com/willssj007/ATClaude)"
+          get() { curl -sS -L -A "$2" -H 'Accept: application/json' -o "$1" -w "$1 %{http_code} %{size_download} %{content_type}\n" "$3" || echo "$1 FAIL"; }
+          get atraxa.json "$UA" https://json.edhrec.com/pages/commanders/atraxa-praetors-voice.json
+          get atraxa-java.json "Java/17.0.10" https://json.edhrec.com/pages/commanders/atraxa-praetors-voice.json
+          get atraxa-combos.json "$UA" https://json.edhrec.com/pages/combos/atraxa-praetors-voice.json
+          get partners.json "$UA" https://json.edhrec.com/pages/commanders/kraum-ludevics-opus-tymna-the-weaver.json
+          get partners-rev.json "$UA" https://json.edhrec.com/pages/commanders/tymna-the-weaver-kraum-ludevics-opus.json
+          get krenko.json "$UA" https://json.edhrec.com/pages/commanders/krenko-mob-boss.json
+          get krenko-combos.json "$UA" https://json.edhrec.com/pages/combos/krenko-mob-boss.json
+          get unknown.json "$UA" https://json.edhrec.com/pages/commanders/not-a-real-commander-xyz.json
+          get card.json "$UA" https://json.edhrec.com/pages/cards/sol-ring.json
+          get gc.json "$UA" "https://api.scryfall.com/cards/search?q=is%3Agamechanger&unique=cards"
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: samples
+          path: out
