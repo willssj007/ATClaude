@@ -6,7 +6,7 @@
 // position vers la nouvelle : la carte vole de la main à la pile, puis au champ de bataille.
 
 import {bridge} from './bridge.js';
-import {cardElement, showZoom, onLongPress} from './cards.js';
+import {cardElement, hoverCard, onLongPress, showZoom} from './cards.js';
 import {fillRewardCards, rewardHtml} from './career.js';
 import {confirmBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
@@ -60,6 +60,28 @@ const PLAYER_STATUSES = {
   'The Initiative': {icon: 'torch', label: 'Initiative : s\'aventure dans la Ville souterraine'},
   'City\'s Blessing': {icon: 'sun', label: 'Bénédiction de la cité'},
   'The Ring': {icon: 'ring', label: 'L\'Anneau l\'a tenté'},
+};
+// Petites icônes sur les cartes en jeu : mal d'invocation, capacités (y compris celles données par d'autres cartes).
+const CARD_STATUS = {
+  SICK: {icon: 'sleep', label: 'Mal d\'invocation : ne peut ni attaquer ni s\'engager ce tour'},
+  FLYING: {icon: 'wing', label: 'Vol'},
+  FIRST_STRIKE: {icon: 'sword', label: 'Initiative'},
+  DOUBLE_STRIKE: {icon: 'sword2', label: 'Double initiative'},
+  DEATHTOUCH: {icon: 'skull', label: 'Contact mortel'},
+  LIFELINK: {icon: 'heart', label: 'Lien de vie'},
+  VIGILANCE: {icon: 'eye', label: 'Vigilance'},
+  TRAMPLE: {icon: 'hoof', label: 'Piétinement'},
+  HASTE: {icon: 'bolt', label: 'Célérité'},
+  MENACE: {icon: 'horns', label: 'Menace'},
+  REACH: {icon: 'net', label: 'Portée'},
+  DEFENDER: {icon: 'wall', label: 'Défenseur'},
+  HEXPROOF: {icon: 'shield', label: 'Défense talismanique'},
+  SHROUD: {icon: 'shield', label: 'Linceul'},
+  WARD: {icon: 'ward', label: 'Garde'},
+  INDESTRUCTIBLE: {icon: 'gem2', label: 'Indestructible'},
+  INFECT: {icon: 'poison', label: 'Infection'},
+  PHASED_OUT: {icon: 'ghost', label: 'Hors phase'},
+  RING: {icon: 'ring', label: 'Porteur de l\'Anneau'},
 };
 const PLAYER_KEYWORDS = {Hexproof: 'Défense talismanique', Shroud: 'Linceul', 'Protection from everything': 'Protection contre tout'};
 // Panneaux de côté : largeur réglable (px), largeur du mode compact, réglage gardé sur l'appareil.
@@ -286,7 +308,7 @@ export class Game {
 
   /** À chaque nouveau tour d'un adversaire, on suit son plateau ; un adversaire éliminé cède la place. */
   updateFocus(state, me) {
-    const opponents = state.players.filter(p => p.id !== me.id);
+    const opponents = this.opponentsOf(state, me);
     if (!opponents.length) {
       return;
     }
@@ -319,10 +341,12 @@ export class Game {
     }
   }
 
+  /** Adversaires dans l'ordre du tour, sans les éliminés (leur place disparaît), sauf s'ils le sont tous (fin). */
   opponentsOf(state, me) {
     const idx = state.players.findIndex(p => p.id === me.id);
     const ordered = [...state.players.slice(idx + 1), ...state.players.slice(0, idx)];
-    return ordered;
+    const alive = ordered.filter(p => !p.lost);
+    return alive.length ? alive : ordered;
   }
 
   bindEvents(table) {
@@ -668,7 +692,8 @@ export class Game {
     if (!state.players || !state.players.length) {
       return;
     }
-    const key = state.players.map(p => p.id).join(',');
+    const me0 = state.players.find(p => p.me) || state.players[0];
+    const key = [me0.id, ...this.opponentsOf(state, me0).map(p => p.id)].join(',');
     if (key !== this.layoutKey) {
       this.build(state);
       this.layoutKey = key;
@@ -767,8 +792,9 @@ export class Game {
     place(table.querySelector('.me-half .back .lands'), mine.lands, {stackLands: true});
     const hand = table.querySelector('.hand');
     place(hand, me.zones.hand, {hand: true});
-    // Main dépliée d'office quand Forge demande d'y choisir des cartes (défausse, etc.).
-    const needed = me.zones.hand.some(c => c.selectable);
+    // Main dépliée d'office quand Forge demande d'y choisir des cartes (défausse, etc.), et pendant le choix
+    // de garder sa main ou de faire un mulligan : on voit bien les cartes ; elle se replie une fois décidé.
+    const needed = me.zones.hand.some(c => c.selectable) || (state.prompt && state.prompt.input === 'InputConfirmMulligan');
     if (needed !== !!this.handNeeded) {
       this.handNeeded = needed;
       this.handOpen = needed;
@@ -778,7 +804,7 @@ export class Game {
 
     // Adversaires : plateau suivi (vue « un seul ») ou tous côte à côte.
     this.updateFocus(state, me);
-    const view = state.players.length > 2 ? this.oppView() : 'all';
+    const view = this.opponentsOf(state, me).length > 1 ? this.oppView() : 'all';
     table.dataset.oppview = view;
     table.querySelectorAll('[data-set-view]').forEach(b => b.classList.toggle('on', b.dataset.setView === view));
     this.cardController = new Map();
@@ -947,6 +973,12 @@ export class Game {
     if (card.token && onField) {
       html += '<div class="b-token">Jeton</div>';
     }
+    if (onField) {
+      const status = [...(card.sick && card.creature ? ['SICK'] : []), ...(card.status || [])].filter(k => CARD_STATUS[k]);
+      if (status.length) {
+        html += `<div class="b-status">${status.map(k => `<span class="st st-${k.toLowerCase()}" title="${esc(CARD_STATUS[k].label)}">${icon(CARD_STATUS[k].icon)}</span>`).join('')}</div>`;
+      }
+    }
     return html;
   }
 
@@ -983,7 +1015,17 @@ export class Game {
       holder = el('<div class="holder" style="position:absolute;inset:0"></div>');
       pile.appendChild(holder);
     }
-    this.reconcile(holder, shown.map(c => this.slot('c' + c.id, c, used)));
+    const slots = shown.map(c => this.slot('c' + c.id, c, used));
+    // Une carte arrive dans la pile avec l'allure de sa zone d'avant (éventail de la main, engagée, attachée) :
+    // dans le cimetière, l'exil et la zone de commandement, elle est droite.
+    for (const s of slots) {
+      s.classList.remove('tapped', 'attached', 'attacking', 'blocking', 'stacked', 'has-attach', 'host-tapped', 'spread');
+      s.style.removeProperty('--att-level');
+      s.style.removeProperty('--spread-x');
+      s.firstElementChild.style.removeProperty('--fan');
+      s.firstElementChild.style.removeProperty('--arc');
+    }
+    this.reconcile(holder, slots);
     let count = pile.querySelector('.count');
     if (!count) {
       count = el('<div class="count"></div>');
@@ -1032,9 +1074,6 @@ export class Game {
       html += chip(`pc ${def.cls}${bump}${near}`, def.icon, def.max ? `${n}<small>/${def.max}</small>` : n, `${def.label} : ${n}${def.max ? ' (défaite à ' + def.max + ')' : ''}`);
     }
     this.prevCounters.set(p.id, counters);
-    for (const d of p.commanderDamage || []) {
-      html += chip(`cmd${d.damage >= 15 ? ' danger' : ''}`, 'swords', `${d.damage}<small>/21</small>`, `Blessures de commandant : ${d.name}`);
-    }
     for (const c of p.commanders || []) {
       if (c.casts > 0) {
         html += chip('tax', 'purse', `+${c.casts * 2}`, 'Taxe de commandant (mana en plus pour le relancer)');
@@ -1892,7 +1931,7 @@ export class Game {
           <div style="display:flex;gap:6px;margin-top:6px"><button class="btn small" data-mana-add="WWWWWUUUUUBBBBBRRRRRGGGGGCCCCC">+5 de chaque</button><input type="text" placeholder="ex. WWUG" class="mana-custom" style="flex:1"><button class="btn small" data-mana-custom>Ajouter</button></div>
         </section>
         <section><h3>Ajouter une carte</h3>
-          <div class="cheat-search"><input type="search" class="card-q" placeholder="Nom en français ou en anglais" style="width:100%"><div class="cheat-results"></div></div>
+          <div class="cheat-search"><input type="search" class="card-q" placeholder="Nom en français ou en anglais" style="width:100%"><div class="cheat-results"></div><div class="cheat-picked"></div></div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             <select class="card-zone"><option value="hand">Main</option><option value="battlefield">Champ de bataille</option><option value="library">Dessus de la bibliothèque</option><option value="graveyard">Cimetière</option><option value="exile">Exil</option></select>
             <input type="number" class="card-count" value="1" min="1" max="20" style="width:64px">
@@ -1947,6 +1986,9 @@ export class Game {
     });
     let picked = null;
     const results = drawer.querySelector('.cheat-results');
+    const pickedView = drawer.querySelector('.cheat-picked');
+    // La carte au survol de son nom (appui long sur mobile), et celle choisie sous la liste.
+    hoverCard(results, 'button', (b) => b._card);
     const q = drawer.querySelector('.card-q');
     q.addEventListener('input', debounce(async () => {
       const text = q.value.trim();
@@ -1958,14 +2000,17 @@ export class Game {
       results.innerHTML = '';
       for (const c of r.cards) {
         const b = el(`<button>${esc(c.nameFr)}${c.nameFr !== c.name ? ` <span class="muted small">${esc(c.name)}</span>` : ''} ${manaHtml(c.cost)}</button>`);
+        b._card = c;
         b.addEventListener('click', () => {
           picked = c.name;
           results.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+          pickedView.replaceChildren(cardElement(c));
         });
         results.appendChild(b);
       }
     }, 200));
-    drawer.addEventListener('click', (e) => {
+    // onclick et non addEventListener : le tiroir reste le même d'une ouverture à l'autre (un seul gestionnaire).
+    drawer.onclick = (e) => {
       const b = e.target.closest('button');
       if (!b) {
         return;
@@ -1999,11 +2044,11 @@ export class Game {
         }
       } else if (b.dataset.cheat) {
         cheat(b.dataset.cheat);
-        if (['tutor', 'addCounters', 'removeCounters', 'addToken', 'tapPermanents', 'untapPermanents', 'win'].includes(b.dataset.cheat)) {
+        if (['tutor', 'addCounters', 'removeCounters', 'addToken', 'tapPermanents', 'untapPermanents', 'win', 'endTurn'].includes(b.dataset.cheat)) {
           this.closeDrawer();
         }
       }
-    });
+    };
     drawer.querySelectorAll('[data-toggle]').forEach(i => i.addEventListener('change', () => cheat(i.dataset.toggle, {value: i.checked})));
     drawer.querySelectorAll('[data-control]').forEach(i => i.addEventListener('change', () => {
       bridge.send('cheat', {op: 'control', player: Number(i.dataset.control), value: i.checked});

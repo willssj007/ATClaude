@@ -97,6 +97,17 @@
 }
 .b-crown { position: absolute; left: 50%; top: -9%; transform: translateX(-50%); font-size: max(10px, calc(var(--w) * 0.16)); color: var(--gold); filter: drop-shadow(0 1px 2px #000); line-height: 0; }
 .b-crown .ic { width: 1.4em; height: 1.4em; fill: rgb(var(--gold-rgb) / 0.45); }
+/* Capacités et états : une colonne de petites icônes sur le bord droit de la carte (les marqueurs sont à gauche). */
+.b-status { position: absolute; right: 3%; top: 15%; display: flex; flex-direction: column; gap: 2px; max-height: 62%; overflow: hidden; }
+.b-status .st { display: grid; place-items: center; width: max(13px, calc(var(--w) * 0.17)); height: max(13px, calc(var(--w) * 0.17)); border-radius: 50%;
+  background: rgb(10 12 20 / 0.82); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18), 0 1px 3px rgb(0 0 0 / 0.6); color: #f2ead8; }
+.b-status .st .ic { width: 74%; height: 74%; stroke-width: 2; }
+.b-status .st-sick { color: #9fc8ff; }
+.b-status .st-deathtouch, .b-status .st-infect { color: #a8e08a; }
+.b-status .st-lifelink { color: #ffb0b0; }
+.b-status .st-indestructible, .b-status .st-ring { color: var(--gold); }
+.b-status .st-phased_out { color: #c8b8ff; }
+.mcard.sick .face::after { background: none; }
 .b-token { position: absolute; left: 4%; bottom: 4%; font-size: max(8px, calc(var(--w) * 0.1)); background: rgba(0, 0, 0, 0.7); padding: 0 4px; border-radius: 4px; color: #ddd; }
 
 /* ---------- Plateau commun ---------- */
@@ -438,6 +449,9 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 .cheat-results { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto; margin-top: 6px; }
 .cheat-results button { text-align: left; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); cursor: pointer; }
 .cheat-results button.on { border-color: var(--gold); background: rgb(var(--gold-rgb) / 0.12); }
+.cheat-picked { display: flex; justify-content: center; margin-top: 8px; }
+.cheat-picked:empty { display: none; }
+.cheat-picked .mcard { --w: 120px; }
 
 .zone-tray {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 15;
@@ -562,6 +576,24 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 :root[data-board-theme="library"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.3), rgb(6 7 12 / 0.5)), url("../img/themes/board-library.svg") center / cover no-repeat, #0b0d14; }
 :root[data-board-theme="arena"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.38), rgb(6 7 12 / 0.58)), url("../img/themes/board-arena.svg") center / cover no-repeat, #0b0d14; }
 :root[data-board-theme="swamp"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.2), rgb(6 7 12 / 0.4)), url("../img/themes/board-swamp.svg") center / cover no-repeat, #0b0d14; }
+:root[data-board-theme="vortex"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.22), rgb(6 7 12 / 0.42)), url("../img/themes/board-vortex.svg") center / cover no-repeat, #05040c; isolation: isolate; }
+:root[data-board-theme="celestial"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.3), rgb(6 7 12 / 0.5)), url("../img/themes/board-celestial.svg") center / cover no-repeat, #0c0a22; isolation: isolate; }
+/* Plateaux mythiques : la spirale du vortex et le cercle de runes tournent derrière les cartes. */
+:root[data-board-theme="vortex"] .table::before, :root[data-board-theme="vortex"] .table::after,
+:root[data-board-theme="celestial"] .table::before, :root[data-board-theme="celestial"] .table::after {
+  content: ""; position: absolute; left: 50%; top: 50%; z-index: -1; pointer-events: none; will-change: transform;
+  background: center / contain no-repeat;
+}
+:root[data-board-theme="vortex"] .table::before { width: 118vmax; height: 118vmax; background-image: url("../img/themes/fx-vortex.svg"); opacity: 0.6; translate: -50% -50%; animation: fx-spin 70s linear infinite; }
+:root[data-board-theme="vortex"] .table::after { width: 84vmax; height: 84vmax; background-image: url("../img/themes/fx-vortex.svg"); opacity: 0.4; translate: -50% -50%; animation: fx-spin 44s linear -10s infinite; }
+:root[data-board-theme="celestial"] .table::before { width: 96vmin; height: 96vmin; top: 58%; background-image: url("../img/themes/fx-runes.svg"); opacity: 0.36; transform: translate(-50%, -50%) scaleY(0.4); animation: fx-floor 90s linear infinite; }
+:root[data-board-theme="celestial"] .table::after { left: 0; top: 0; width: 100%; height: 100%; transform: none;
+  background: repeating-conic-gradient(from 160deg at 50% -12%, rgb(255 226 160 / 0.09) 0deg 3deg, transparent 3deg 10deg);
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 85%); mask-image: linear-gradient(180deg, #000, transparent 85%);
+  animation: fx-rays 7s ease-in-out infinite alternate; }
+@keyframes fx-rays { from { opacity: 0.45; } to { opacity: 1; } }
+:root[data-motion="off"] .table::before, :root[data-motion="off"] .table::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .table::before, .table::after { animation: none !important; } }
 :root[data-board-theme]:not([data-board-theme="classic"]) .side-l,
 :root[data-board-theme]:not([data-board-theme="classic"]) .side-r { background: rgb(7 8 14 / 0.62); }
 :root[data-board-theme]:not([data-board-theme="classic"]) .divider .turn-label,

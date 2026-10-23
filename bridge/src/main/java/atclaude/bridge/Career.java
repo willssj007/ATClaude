@@ -7,7 +7,6 @@ import com.google.gson.JsonParser;
 import forge.card.CardEdition;
 import forge.card.CardRarity;
 import forge.deck.Deck;
-import forge.deck.DeckProxy;
 import forge.deck.DeckSection;
 import forge.item.BoosterPack;
 import forge.item.PaperCard;
@@ -23,6 +22,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,9 +30,11 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * Mode Planeswalker : une carrière avec sa collection de cartes, ses decks, sa réserve de « mana » (la monnaie du jeu)
- * et ses boosters. On commence avec un préconstruit Commander tiré au hasard ; chaque duel gagné rapporte du mana,
- * quelques cartes du deck adverse (jamais une carte déjà possédée) et un booster ; 5 victoires d'affilée, 10 boosters.
+ * Mode Planeswalker : une carrière avec sa collection de cartes, ses decks, sa réserve de « mana » (la monnaie du jeu),
+ * ses boosters et ses jetons de rareté. On commence avec un préconstruit Commander de bracket 2, choisi ; chaque duel
+ * gagné rapporte du mana, quelques cartes du deck adverse (jamais une carte déjà possédée) et un booster ; 5 victoires
+ * d'affilée, 5 boosters et un nouveau préconstruit au choix. L'adversaire a le même bracket et une puissance proche du
+ * deck joué. Une carte reçue en double devient un jeton de sa rareté, qui achète une carte manquante de même rareté.
  *
  * Tout est décidé ici, pas dans l'interface : récompenses, achats, contenu des boosters et cartes autorisées dans les decks.
  * Le fichier suit le compte (synchronisation) : la version la plus récente gagne.
@@ -40,12 +42,14 @@ import java.util.Set;
 final class Career {
 
     static final int WIN_MANA = 100;
-    static final int BOOSTER_PRICE = 1000;
+    static final int BOOSTER_PRICE = 750;
     static final int CARDS_PER_WIN = 3;
     static final int STREAK_BONUS_EVERY = 5;
-    static final int STREAK_BONUS_BOOSTERS = 10;
+    static final int STREAK_BONUS_BOOSTERS = 5;
     static final int PACK_SIZE = 14;
     static final String KEY_PREFIX = "career:";
+    static final List<String> RARITIES = List.of("common", "uncommon", "rare", "mythic");
+    private static final List<String> COUNTERS = List.of("mana", "wins", "losses", "streak", "bestStreak", "opened", "mythics", "duels", "deckChoices");
 
     private static final Random RANDOM = new Random();
 
@@ -109,12 +113,12 @@ final class Career {
         return bool(load(), "started");
     }
 
-    /** Tout ce que l'interface affiche : mana, série, boosters, decks, prochain adversaire. */
+    /** Tout ce que l'interface affiche : mana, série, boosters, jetons, decks. */
     static synchronized JsonObject summary(final Catalog catalog) {
         final JsonObject c = load();
         final JsonObject o = new JsonObject();
         o.addProperty("started", bool(c, "started"));
-        for (final String k : List.of("mana", "wins", "losses", "streak", "bestStreak", "opened", "mythics", "duels")) {
+        for (final String k : COUNTERS) {
             o.addProperty(k, num(c, k));
         }
         o.addProperty("price", BOOSTER_PRICE);
@@ -129,6 +133,7 @@ final class Career {
         }
         o.addProperty("unique", coll.size());
         o.addProperty("cards", total);
+        o.add("wildcards", wildcards(c));
         final JsonArray boosters = new JsonArray();
         for (final JsonElement e : array(c, "boosters")) {
             final JsonObject b = e.getAsJsonObject().deepCopy();
@@ -138,65 +143,137 @@ final class Career {
         }
         o.add("boosters", boosters);
         o.add("decks", deckList(catalog, c));
-        if (bool(c, "started")) {
-            o.add("opponent", opponentInfo(catalog, opponent(c)));
-        }
         if (c.has("starter")) {
             o.addProperty("starter", str(c, "starter"));
         }
         return o;
     }
 
-    /** Début de carrière : un préconstruit Commander au hasard, ses cartes forment la collection. */
-    static synchronized JsonObject start(final Catalog catalog) {
+    /** Préconstruits proposés pour commencer : ceux de bracket 2, du moins puissant au plus puissant. */
+    static JsonArray startChoices() {
+        final List<Precons.Info> list = new ArrayList<>();
+        for (final Precons.Info i : Precons.all()) {
+            if (i.bracket() == 2) {
+                list.add(i);
+            }
+        }
+        list.sort(Comparator.comparingDouble(Precons.Info::power).thenComparing(Precons.Info::name));
+        final JsonArray a = new JsonArray();
+        list.forEach(i -> a.add(i.json()));
+        return a;
+    }
+
+    /** Début de carrière avec le préconstruit choisi (bracket 2) : ses cartes forment la collection. */
+    static synchronized JsonObject start(final Catalog catalog, final String preconKey) {
         final JsonObject c = load();
         if (bool(c, "started")) {
             return summary(catalog);
         }
-        final List<DeckProxy> precons = new ArrayList<>();
-        DeckProxy.getAllCommanderPreconDecks().forEach(precons::add);
-        Collections.shuffle(precons, RANDOM);
-        Deck deck = null;
-        String preconName = "";
-        for (final DeckProxy p : precons) {
-            try {
-                final Deck d = p.getDeck();
-                if (d != null && d.has(DeckSection.Commander) && d.get(DeckSection.Commander).countAll() > 0
-                        && forge.deck.DeckFormat.Commander.getDeckConformanceProblem(d) == null) {
-                    deck = d;
-                    preconName = p.getName();
-                    break;
-                }
-            } catch (final RuntimeException e) {
-                // deck illisible : on en prend un autre
-            }
-        }
-        if (deck == null) {
-            throw new IllegalStateException("Aucun deck préconstruit disponible pour commencer.");
+        final Precons.Info info = Precons.get(preconKey);
+        if (info == null || info.bracket() != 2) {
+            throw new IllegalArgumentException("Choisis un préconstruit de bracket 2 pour commencer.");
         }
         final JsonObject fresh = new JsonObject();
         fresh.addProperty("version", 1);
         fresh.addProperty("started", true);
         fresh.addProperty("startedAt", System.currentTimeMillis());
         fresh.addProperty("at", num(c, "at"));
-        for (final String k : List.of("mana", "wins", "losses", "streak", "bestStreak", "opened", "mythics", "duels")) {
+        for (final String k : COUNTERS) {
             fresh.addProperty(k, 0);
         }
-        final JsonObject coll = new JsonObject();
-        for (final Map.Entry<PaperCard, Integer> e : deck.getAllCardsInASinglePool(true, false)) {
-            add(coll, e.getKey().getName(), e.getValue());
-        }
-        fresh.add("collection", coll);
+        fresh.add("collection", new JsonObject());
         fresh.add("boosters", new JsonArray());
-        final String name = cleanName(preconName);
-        deck.setName(name);
-        final JsonArray decks = new JsonArray();
-        decks.add(compact(deck));
-        fresh.add("decks", decks);
-        fresh.addProperty("starter", name);
-        fresh.addProperty("opponent", randomOpponent("precon:" + preconName));
+        fresh.add("decks", new JsonArray());
+        fresh.add("precons", new JsonArray());
+        addPrecon(catalog, fresh, info);
+        fresh.addProperty("starter", info.name());
         save(fresh);
         return summary(catalog);
+    }
+
+    /** Préconstruits qu'on peut prendre avec un choix gagné (série de victoires) : tous ceux qu'on n'a pas encore. */
+    static synchronized JsonArray deckChoices() {
+        final Set<String> taken = new HashSet<>();
+        for (final JsonElement e : array(load(), "precons")) {
+            taken.add(e.getAsString());
+        }
+        final List<Precons.Info> list = new ArrayList<>();
+        for (final Precons.Info i : Precons.all()) {
+            if (!taken.contains(i.key())) {
+                list.add(i);
+            }
+        }
+        list.sort(Comparator.comparingInt(Precons.Info::bracket).thenComparingDouble(Precons.Info::power).thenComparing(Precons.Info::name));
+        final JsonArray a = new JsonArray();
+        list.forEach(i -> a.add(i.json()));
+        return a;
+    }
+
+    /** Prend un préconstruit avec un choix gagné : son deck et ses cartes (les doublons deviennent des jetons). */
+    static synchronized JsonObject chooseDeck(final Catalog catalog, final String preconKey) {
+        final JsonObject c = load();
+        if (!bool(c, "started") || num(c, "deckChoices") <= 0) {
+            throw new IllegalStateException("Pas de nouveau deck à choisir : gagne 5 duels d'affilée pour en obtenir un.");
+        }
+        final Precons.Info info = Precons.get(preconKey);
+        if (info == null) {
+            throw new IllegalArgumentException("Préconstruit introuvable.");
+        }
+        for (final JsonElement e : array(c, "precons")) {
+            if (e.getAsString().equals(preconKey)) {
+                throw new IllegalArgumentException("Tu as déjà ce deck.");
+            }
+        }
+        final JsonObject dupes = addPrecon(catalog, c, info);
+        c.addProperty("deckChoices", num(c, "deckChoices") - 1);
+        save(c);
+        final JsonObject o = summary(catalog);
+        o.add("dupes", dupes);
+        o.addProperty("chosen", KEY_PREFIX + uniqueDeckName(c, info.name(), true));
+        return o;
+    }
+
+    /** Ajoute un préconstruit à la carrière : le deck, et ses cartes à la collection (doublons → jetons). */
+    private static JsonObject addPrecon(final Catalog catalog, final JsonObject c, final Precons.Info info) {
+        final Deck deck = catalog.deckFromKey(info.key());
+        final JsonObject coll = collection(c);
+        final JsonObject wc = wildcards(c);
+        final JsonObject dupes = new JsonObject();
+        for (final Map.Entry<PaperCard, Integer> e : deck.getAllCardsInASinglePool(true, false)) {
+            final PaperCard pc = e.getKey();
+            for (int i = 0; i < e.getValue(); i++) {
+                if (!isBasic(pc) && coll.has(pc.getName())) {
+                    final String r = rarityKey(pc);
+                    wc.addProperty(r, wc.get(r).getAsInt() + 1);
+                    dupes.addProperty(r, (dupes.has(r) ? dupes.get(r).getAsInt() : 0) + 1);
+                } else {
+                    add(coll, pc.getName(), 1);
+                }
+            }
+        }
+        c.add("collection", coll);
+        c.add("wildcards", wc);
+        deck.setName(uniqueDeckName(c, info.name(), false));
+        final JsonArray decks = array(c, "decks");
+        final JsonObject compact = compact(deck);
+        compact.addProperty("from", info.key());
+        decks.add(compact);
+        c.add("decks", decks);
+        final JsonArray precons = array(c, "precons");
+        precons.add(info.key());
+        c.add("precons", precons);
+        return dupes;
+    }
+
+    private static String uniqueDeckName(final JsonObject c, final String base, final boolean existing) {
+        if (existing || findDeck(c, base) == null) {
+            return base;
+        }
+        for (int i = 2; ; i++) {
+            if (findDeck(c, base + " " + i) == null) {
+                return base + " " + i;
+            }
+        }
     }
 
     /** Efface la carrière (la remise à zéro se propage aux autres appareils par la synchronisation). */
@@ -208,7 +285,7 @@ final class Career {
         save(o);
     }
 
-    // ------------------------------------------------------------------ collection
+    // ------------------------------------------------------------------ collection et jetons
 
     private static JsonObject collection(final JsonObject c) {
         return c.has("collection") && c.get("collection").isJsonObject() ? c.getAsJsonObject("collection") : new JsonObject();
@@ -220,6 +297,30 @@ final class Career {
 
     static boolean isBasic(final PaperCard pc) {
         return pc.getRules().getType().isBasicLand();
+    }
+
+    /** Rareté d'une impression, pour les jetons : commune, peu commune, rare (spéciales comprises) ou mythique. */
+    static String rarityKey(final PaperCard pc) {
+        final CardRarity r = pc.getRarity();
+        if (r == CardRarity.MythicRare) {
+            return "mythic";
+        }
+        if (r == CardRarity.Rare || r == CardRarity.Special) {
+            return "rare";
+        }
+        if (r == CardRarity.Uncommon) {
+            return "uncommon";
+        }
+        return "common";
+    }
+
+    private static JsonObject wildcards(final JsonObject c) {
+        final JsonObject in = c.has("wildcards") && c.get("wildcards").isJsonObject() ? c.getAsJsonObject("wildcards") : new JsonObject();
+        final JsonObject out = new JsonObject();
+        for (final String r : RARITIES) {
+            out.addProperty(r, in.has(r) ? Math.max(0, in.get(r).getAsInt()) : 0);
+        }
+        return out;
     }
 
     /** Exemplaires possédés de chaque carte (nom anglais) ; les terrains de base sont illimités. */
@@ -249,6 +350,49 @@ final class Career {
         }
         return out;
     }
+
+    /** Achète une carte manquante avec un jeton de sa rareté (celle de l'impression choisie). */
+    static synchronized JsonObject buyCard(final Catalog catalog, final String name, final String set, final int art) {
+        final JsonObject c = load();
+        if (!bool(c, "started")) {
+            throw new IllegalStateException("Commence d'abord ta carrière de Planeswalker.");
+        }
+        PaperCard pc = null;
+        if (set != null && !set.isEmpty()) {
+            pc = art > 0 ? FModel.getMagicDb().getCommonCards().getCard(name, set, art) : FModel.getMagicDb().getCommonCards().getCard(name, set);
+        }
+        if (pc == null) {
+            pc = catalog.resolve(name);
+        }
+        if (pc == null) {
+            throw new IllegalArgumentException("Carte inconnue : " + name);
+        }
+        if (isBasic(pc)) {
+            throw new IllegalArgumentException("Les terrains de base sont illimités.");
+        }
+        final JsonObject coll = collection(c);
+        if (coll.has(pc.getName())) {
+            throw new IllegalArgumentException("Tu as déjà " + Catalog.translated(pc.getName()) + ".");
+        }
+        final String r = rarityKey(pc);
+        final JsonObject wc = wildcards(c);
+        if (wc.get(r).getAsInt() <= 0) {
+            throw new IllegalStateException("Il te faut un jeton " + RARITY_FR.get(r) + " (les cartes en double en donnent).");
+        }
+        wc.addProperty(r, wc.get(r).getAsInt() - 1);
+        add(coll, pc.getName(), 1);
+        c.add("wildcards", wc);
+        c.add("collection", coll);
+        save(c);
+        final JsonObject o = summary(catalog);
+        final JsonObject card = Catalog.paperJson(pc);
+        card.addProperty("owned", 1);
+        o.add("card", card);
+        o.addProperty("spent", r);
+        return o;
+    }
+
+    static final Map<String, String> RARITY_FR = Map.of("common", "commun", "uncommon", "peu commun", "rare", "rare", "mythic", "mythique");
 
     // ------------------------------------------------------------------ decks
 
@@ -347,18 +491,22 @@ final class Career {
         final List<String> lack = missing(deck);
         if (!lack.isEmpty()) {
             throw new IllegalArgumentException("Cartes absentes de ta collection : " + String.join(", ", lack.subList(0, Math.min(12, lack.size())))
-                    + (lack.size() > 12 ? "…" : "") + ". Gagne des duels ou ouvre des boosters pour les obtenir.");
+                    + (lack.size() > 12 ? "…" : "") + ". Gagne des duels, ouvre des boosters ou utilise tes jetons pour les obtenir.");
         }
         final String previous = str(json, "previousName");
-        final JsonArray decks = array(c, "decks");
+        final JsonObject before = findDeck(c, previous.isEmpty() ? deck.getName() : previous);
         final JsonArray out = new JsonArray();
-        for (final JsonElement e : decks) {
+        for (final JsonElement e : array(c, "decks")) {
             final String n = str(e.getAsJsonObject(), "name");
             if (!n.equals(deck.getName()) && !n.equals(previous)) {
                 out.add(e);
             }
         }
-        out.add(compact(deck));
+        final JsonObject compact = compact(deck);
+        if (before != null && before.has("from")) {
+            compact.add("from", before.get("from"));
+        }
+        out.add(compact);
         c.add("decks", out);
         save(c);
         final JsonObject o = new JsonObject();
@@ -381,63 +529,86 @@ final class Career {
         save(c);
     }
 
-    // ------------------------------------------------------------------ duels
+    // ------------------------------------------------------------------ adversaires
 
-    private static String opponent(final JsonObject c) {
-        final String o = str(c, "opponent");
-        return o.isEmpty() ? randomOpponent("") : o;
+    /** Empreinte du contenu d'un deck : un deck modifié reçoit un adversaire à sa nouvelle mesure. */
+    private static String signature(final Deck deck) {
+        final List<String> lines = new ArrayList<>();
+        for (final Map.Entry<PaperCard, Integer> e : deck.getAllCardsInASinglePool(true, false)) {
+            lines.add(e.getKey().getName() + "×" + e.getValue());
+        }
+        Collections.sort(lines);
+        return deck.getName() + "#" + Integer.toHexString(String.join("|", lines).hashCode());
     }
 
-    static synchronized String opponentKey() {
-        return opponent(load());
-    }
-
-    private static String randomOpponent(final String avoid) {
-        final List<DeckProxy> precons = new ArrayList<>();
-        DeckProxy.getAllCommanderPreconDecks().forEach(precons::add);
-        Collections.shuffle(precons, RANDOM);
-        for (final DeckProxy p : precons) {
-            final String key = "precon:" + p.getName();
-            if (!key.equals(avoid)) {
-                return key;
+    /**
+     * Adversaire du prochain duel avec ce deck : un préconstruit de même bracket et de puissance proche, tiré une fois
+     * par deck et gardé jusqu'à la fin du duel (changer de deck puis revenir ne relance pas le tirage).
+     */
+    static synchronized String opponentFor(final Catalog catalog, final String deckName) {
+        final JsonObject c = load();
+        final Deck deck = deck(catalog, deckName);
+        final String sig = signature(deck);
+        final JsonObject opponents = c.has("opponents") && c.get("opponents").isJsonObject() ? c.getAsJsonObject("opponents") : new JsonObject();
+        if (opponents.has(sig) && Precons.get(opponents.get(sig).getAsString()) != null) {
+            return opponents.get(sig).getAsString();
+        }
+        final double[] m = Precons.measure(deck);
+        final List<String> commanders = new ArrayList<>();
+        if (deck.has(DeckSection.Commander)) {
+            for (final PaperCard pc : deck.get(DeckSection.Commander).toFlatList()) {
+                commanders.add(pc.getName());
             }
         }
-        return "random";
+        final JsonObject from = findDeck(c, deckName);
+        final Precons.Info origin = from != null && from.has("from") ? Precons.get(str(from, "from")) : null;
+        final List<Precons.Info> pool = Precons.matching((int) m[0], m[1], commanders, origin == null ? deckName : origin.name());
+        final String key = pool.isEmpty() ? "random" : pool.get(RANDOM.nextInt(pool.size())).key();
+        opponents.addProperty(sig, key);
+        c.add("opponents", opponents);
+        save(c);
+        return key;
     }
 
-    private static JsonObject opponentInfo(final Catalog catalog, final String key) {
+    /** Le duel annoncé à l'écran : ton deck et son adversaire, avec leurs brackets et puissances. */
+    static synchronized JsonObject duelInfo(final Catalog catalog, final String deckName) {
+        final Deck deck = deck(catalog, deckName);
+        final double[] m = Precons.measure(deck);
         final JsonObject o = new JsonObject();
-        o.addProperty("key", key);
+        o.addProperty("bracket", (int) m[0]);
+        o.addProperty("power", m[1]);
+        final String key = opponentFor(catalog, deckName);
+        final Precons.Info info = Precons.get(key);
+        final JsonObject opp = info != null ? info.json() : new JsonObject();
+        opp.addProperty("key", key);
+        int unowned = 0;
         try {
-            final Deck d = catalog.deckFromKey(key);
-            o.addProperty("name", cleanName(d.getName()));
-            final JsonArray commanders = new JsonArray();
-            if (d.has(DeckSection.Commander) && d.get(DeckSection.Commander).countAll() > 0) {
-                for (final Map.Entry<PaperCard, Integer> e : d.get(DeckSection.Commander)) {
-                    commanders.add(Catalog.translated(e.getKey().getName()));
-                }
-                o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getImageKey(false));
-            }
-            o.add("commanders", commanders);
-            o.addProperty("identity", Catalog.identity(d));
-            int unowned = 0;
             final Map<String, Integer> owned = owned();
-            for (final PaperCard pc : d.getAllCardsInASinglePool(true, false).toFlatList()) {
+            for (final PaperCard pc : catalog.deckFromKey(key).getAllCardsInASinglePool(true, false).toFlatList()) {
                 if (!isBasic(pc) && owned.getOrDefault(pc.getName(), 0) == 0) {
                     unowned++;
                 }
             }
-            o.addProperty("unowned", unowned);
         } catch (final RuntimeException e) {
-            o.addProperty("name", key);
+            // deck adverse illisible : pas de décompte
         }
+        opp.addProperty("unowned", unowned);
+        o.add("opponent", opp);
         return o;
     }
 
+    /** Le préconstruit que la carrière a tiré pour ce deck est-il bien celui-là ? (lancement d'un duel) */
+    static synchronized boolean isOpponentFor(final Catalog catalog, final String deckName, final String key) {
+        return opponentFor(catalog, deckName).equals(key);
+    }
+
+    // ------------------------------------------------------------------ duels
+
     /**
      * Fin d'un duel de carrière (une seule fois par partie). Victoire : mana, cartes du deck adverse pas encore
-     * possédées, un booster d'une extension au hasard, et 10 boosters toutes les 5 victoires d'affilée.
-     * Défaite, égalité ou abandon : la série repart de zéro. Dans tous les cas, un nouvel adversaire attend.
+     * possédées, un booster d'une extension au hasard ; toutes les 5 victoires d'affilée, 5 boosters et un nouveau
+     * préconstruit au choix. Défaite, égalité ou abandon : la série repart de zéro. Dans tous les cas, de nouveaux
+     * adversaires attendent.
      */
     static synchronized JsonObject duelFinished(final String sessionId, final boolean won, final Deck opponentDeck) {
         final JsonObject c = load();
@@ -486,6 +657,8 @@ final class Career {
                     bonus.add(newBooster(boosters, randomSet()));
                 }
                 reward.add("bonus", bonus);
+                c.addProperty("deckChoices", num(c, "deckChoices") + 1);
+                reward.addProperty("deckChoice", true);
             }
             c.add("boosters", boosters);
             reward.addProperty("streak", streak);
@@ -495,7 +668,7 @@ final class Career {
             c.addProperty("streak", 0);
             reward.addProperty("streak", 0);
         }
-        c.addProperty("opponent", randomOpponent(str(c, "opponent")));
+        c.add("opponents", new JsonObject());
         save(c);
         reward.addProperty("manaTotal", num(c, "mana"));
         // Noms des extensions, pour l'écran de fin.
@@ -548,8 +721,14 @@ final class Career {
         return eds.get(RANDOM.nextInt(eds.size())).getCode();
     }
 
+    private static volatile JsonArray boosterSetList;
+
     static JsonArray boosterSets() {
-        final JsonArray a = new JsonArray();
+        JsonArray a = boosterSetList;
+        if (a != null) {
+            return a;
+        }
+        a = new JsonArray();
         for (final CardEdition ed : boosterEditions()) {
             final JsonObject o = new JsonObject();
             o.addProperty("code", ed.getCode());
@@ -557,10 +736,46 @@ final class Career {
             o.addProperty("year", ed.getDate() == null ? "" : String.valueOf(1900 + ed.getDate().getYear()));
             o.addProperty("type", ed.getType().name());
             o.addProperty("covers", Math.max(1, ed.getCntBoosterPictures()));
-            o.addProperty("art", BoosterArt.has(ed.getCode()));
+            // Visuel du vrai booster : listé par Forge, ou peut-être déjà publié sur son dépôt (essayé à la demande).
+            o.addProperty("art", true);
+            o.addProperty("listed", BoosterArt.has(ed.getCode()));
+            final String feature = featureImage(ed);
+            if (feature != null) {
+                o.addProperty("feature", feature);
+            }
             a.add(o);
         }
+        boosterSetList = a;
         return a;
+    }
+
+    /**
+     * Carte phare d'une extension, dont l'illustration orne le booster dessiné quand le vrai visuel manque :
+     * la première mythique légendaire (ou mythique, ou rare légendaire, ou rare) dans l'ordre de l'extension.
+     */
+    private static String featureImage(final CardEdition ed) {
+        PaperCard best = null;
+        int bestScore = -1;
+        for (final CardEdition.EditionEntry e : ed.getAllCardsInSet()) {
+            final CardRarity r = e.rarity();
+            final int base = r == CardRarity.MythicRare ? 2 : r == CardRarity.Rare ? 0 : -1;
+            if (base < 0) {
+                continue;
+            }
+            final PaperCard pc = FModel.getMagicDb().getCommonCards().getCard(e.name(), ed.getCode());
+            if (pc == null || pc.getRules().getType().isLand()) {
+                continue;
+            }
+            final int score = base + (pc.getRules().getType().isLegendary() ? 1 : 0);
+            if (score > bestScore) {
+                best = pc;
+                bestScore = score;
+                if (score == 3) {
+                    break;
+                }
+            }
+        }
+        return best == null ? null : best.getImageKey(false);
     }
 
     static synchronized JsonObject buy(final Catalog catalog, final String set) {
@@ -603,7 +818,8 @@ final class Career {
     /**
      * Ouvre un booster : son contenu suit le modèle de l'extension dans Forge (le vrai format : communes,
      * peu communes, rare ou mythique, cartes spéciales). Au-delà de 14 cartes, le terrain de base (puis une commune)
-     * reste dans le paquet. Les cartes vont dans la collection ; la rare (ou mythique) est révélée en dernier.
+     * reste dans le paquet. Les cartes nouvelles vont dans la collection, les doublons deviennent des jetons de leur
+     * rareté ; la rare (ou mythique) est révélée en dernier.
      */
     static synchronized JsonObject open(final String id) {
         final JsonObject c = load();
@@ -643,21 +859,28 @@ final class Career {
         final List<PaperCard> order = new ArrayList<>(cards);
         order.sort(Comparator.comparingInt((PaperCard pc) -> rarityRank(pc) + (pc.isFoil() ? 1 : 0)));
         final JsonObject coll = collection(c);
+        final JsonObject wc = wildcards(c);
         final JsonArray out = new JsonArray();
         int mythics = 0;
-        final Set<String> seen = new java.util.HashSet<>();
         for (final PaperCard pc : order) {
-            final boolean isNew = !coll.has(pc.getName()) && !isBasic(pc) && seen.add(pc.getName());
-            add(coll, pc.getName(), 1);
+            final boolean dupe = !isBasic(pc) && coll.has(pc.getName());
             final JsonObject card = Catalog.paperJson(pc);
             card.addProperty("foil", pc.isFoil());
-            card.addProperty("isNew", isNew);
+            card.addProperty("isNew", !dupe && !isBasic(pc));
+            if (dupe) {
+                final String r = rarityKey(pc);
+                wc.addProperty(r, wc.get(r).getAsInt() + 1);
+                card.addProperty("dupe", r);
+            } else {
+                add(coll, pc.getName(), 1);
+            }
             out.add(card);
             if (pc.getRarity() == CardRarity.MythicRare) {
                 mythics++;
             }
         }
         c.add("collection", coll);
+        c.add("wildcards", wc);
         c.add("boosters", rest);
         c.addProperty("opened", num(c, "opened") + 1);
         c.addProperty("mythics", num(c, "mythics") + mythics);
@@ -666,7 +889,49 @@ final class Career {
         o.addProperty("set", ed.getCode());
         o.addProperty("name", ed.getName());
         o.add("cards", out);
+        o.add("wildcards", wildcards(c));
         return o;
+    }
+
+    // ------------------------------------------------------------------ réglages avancés
+
+    /** Ajustements de la carrière (mana, boosters, jetons, série, deck au choix, nouveaux adversaires). */
+    static synchronized JsonObject adjust(final Catalog catalog, final JsonObject m) {
+        final JsonObject c = load();
+        if (!bool(c, "started")) {
+            throw new IllegalStateException("Commence d'abord ta carrière de Planeswalker.");
+        }
+        final String op = str(m, "op");
+        final int n = m.has("n") ? m.get("n").getAsInt() : 1;
+        switch (op) {
+            case "mana" -> c.addProperty("mana", Math.max(0, num(c, "mana") + n));
+            case "boosters" -> {
+                final JsonArray boosters = array(c, "boosters");
+                final String set = str(m, "set");
+                for (int i = 0; i < Math.min(100, Math.max(0, n)); i++) {
+                    newBooster(boosters, set.isEmpty() ? randomSet() : set);
+                }
+                c.add("boosters", boosters);
+            }
+            case "wildcards" -> {
+                final JsonObject wc = wildcards(c);
+                final String r = str(m, "rarity");
+                if (!RARITIES.contains(r)) {
+                    throw new IllegalArgumentException("Rareté inconnue.");
+                }
+                wc.addProperty(r, Math.max(0, wc.get(r).getAsInt() + n));
+                c.add("wildcards", wc);
+            }
+            case "streak" -> {
+                c.addProperty("streak", Math.max(0, n));
+                c.addProperty("bestStreak", Math.max(num(c, "bestStreak"), n));
+            }
+            case "deckChoice" -> c.addProperty("deckChoices", Math.max(0, num(c, "deckChoices") + n));
+            case "rerollOpponents" -> c.add("opponents", new JsonObject());
+            default -> throw new IllegalArgumentException("Réglage inconnu : " + op);
+        }
+        save(c);
+        return summary(catalog);
     }
 
     // ------------------------------------------------------------------ outils

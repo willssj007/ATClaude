@@ -189,7 +189,8 @@ public final class Bridge {
     private static final java.util.Set<String> CATALOG_REQUESTS = java.util.Set.of(
             "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
-            "clearStats", "audioFiles", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster");
+            "clearStats", "audioFiles", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster",
+            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerDuel", "careerBuyCard", "careerAdjust");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -330,12 +331,27 @@ public final class Bridge {
                     throw new IllegalStateException("Prix indisponibles (" + e.getMessage() + "). Il faut Internet pour les lire chez Scryfall.");
                 }
             case "clearStats":
-                Stats.clear();
+                Stats.clear(m.has("career") ? m.get("career").getAsBoolean() : null);
                 return null;
             case "career":
                 return Career.summary(catalog);
+            case "careerStartChoices":
+                return Career.startChoices();
             case "careerStart":
-                return Career.start(catalog);
+                return Career.start(catalog, m.get("key").getAsString());
+            case "careerDeckChoices":
+                return Career.deckChoices();
+            case "careerChooseDeck":
+                return Career.chooseDeck(catalog, m.get("key").getAsString());
+            case "careerDuel": {
+                final String deck = m.get("deck").getAsString();
+                return Career.duelInfo(catalog, deck.startsWith(Career.KEY_PREFIX) ? deck.substring(Career.KEY_PREFIX.length()) : deck);
+            }
+            case "careerBuyCard":
+                return Career.buyCard(catalog, m.get("name").getAsString(), m.has("set") ? m.get("set").getAsString() : "",
+                        m.has("art") ? m.get("art").getAsInt() : 0);
+            case "careerAdjust":
+                return Career.adjust(catalog, m);
             case "careerReset":
                 if (session != null && session.isCareer()) {
                     throw new IllegalStateException("Termine d'abord le duel en cours.");

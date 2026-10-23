@@ -55,6 +55,12 @@ final class Dialogs {
                 item.add("card", new GameSerializer(g).card(sa.getHostCard(), gv));
             } else if (choice instanceof PaperCard paper) {
                 item.add("paper", Catalog.paperJson(paper));
+            } else if (choice instanceof forge.card.CardRules rules) {
+                // Jetons de la triche : liste à filtrer, chaque ligne montre le jeton au survol.
+                final JsonObject token = Catalog.tokenJson(rules);
+                if (token != null) {
+                    item.add("preview", token);
+                }
             }
             list.add(item);
         }
@@ -97,9 +103,12 @@ final class Dialogs {
         return picked;
     }
 
+    /** Titres que la traduction française de Forge laisse en anglais. */
+    private static final Map<String, String> TITLES = Map.of("Name the token", "Choisir le jeton", "combien ?", "Combien ?");
+
     private static JsonObject dialog(final String title, final String message) {
         final JsonObject d = new JsonObject();
-        d.addProperty("title", Texts.clean(title));
+        d.addProperty("title", Texts.clean(title == null ? null : TITLES.getOrDefault(title, title)));
         d.addProperty("message", Texts.clean(message));
         return d;
     }
@@ -142,6 +151,10 @@ final class Dialogs {
         }
         d.addProperty("min", min);
         d.addProperty("max", max);
+        if (noneLabelNext != null) {
+            d.addProperty("noneLabel", noneLabelNext);
+            noneLabelNext = null;
+        }
         d.add("items", items(source, display));
         final JsonArray preselected = new JsonArray();
         if (selected != null) {
@@ -174,9 +187,18 @@ final class Dialogs {
     }
 
     <T> T one(final String title, final List<T> choices, final FSerializableFunction<T, String> display, final boolean optional) {
+        return one(title, choices, display, optional, null);
+    }
+
+    /** Un seul élément ; {@code noneLabel} nomme le bouton qui n'en choisit aucun (« Annuler » pour un sort qu'on lance). */
+    <T> T one(final String title, final List<T> choices, final FSerializableFunction<T, String> display, final boolean optional, final String noneLabel) {
+        noneLabelNext = noneLabel;
         final List<T> picked = choose(title, optional ? 0 : 1, 1, choices, null, display);
         return picked.isEmpty() ? null : picked.get(0);
     }
+
+    /** Libellé du bouton « aucun » du prochain choix (posé par {@link #one}). */
+    private String noneLabelNext;
 
     /** Renvoie l'indice de l'option choisie, ou -1 si le dialogue est fermé. */
     int option(final String title, final String message, final List<String> options, final int defaultOption, final CardView card) {
@@ -239,6 +261,15 @@ final class Dialogs {
      */
     <T> List<T> order(final String title, final String top, final int remainingMin, final int remainingMax,
                       final List<T> source, final List<T> dest) {
+        return order(title, top, remainingMin, remainingMax, source, dest, false).order();
+    }
+
+    /** Ordre choisi, et s'il faut le reprendre tout seul la prochaine fois (déclencheurs simultanés). */
+    record Ordered<T>(List<T> order, boolean remember) { }
+
+    /** Comme {@link #order}, avec en plus (si {@code rememberable}) le bouton « Dans cet ordre et s'en souvenir ». */
+    <T> Ordered<T> order(final String title, final String top, final int remainingMin, final int remainingMax,
+                         final List<T> source, final List<T> dest, final boolean rememberable) {
         final List<T> all = new ArrayList<>(source);
         if (dest != null) {
             all.addAll(dest);
@@ -248,16 +279,24 @@ final class Dialogs {
         d.addProperty("sourceCount", source.size());
         d.addProperty("remainingMin", remainingMin);
         d.addProperty("remainingMax", remainingMax);
+        d.addProperty("rememberable", rememberable);
         final JsonElement answer = bridge.ask("order", d);
-        final List<Integer> order = indices(answer);
-        if (order.isEmpty() && (answer == null || answer.isJsonNull())) {
+        JsonElement list = answer;
+        boolean remember = false;
+        if (answer != null && answer.isJsonObject()) {
+            final JsonObject a = answer.getAsJsonObject();
+            list = a.get("order");
+            remember = rememberable && a.has("remember") && a.get("remember").getAsBoolean();
+        }
+        final List<Integer> order = indices(list);
+        if (order.isEmpty() && (list == null || list.isJsonNull())) {
             final List<T> fallback = new ArrayList<>(dest == null ? List.of() : dest);
             if (remainingMax <= 0) {
                 fallback.addAll(source);
             }
-            return fallback;
+            return new Ordered<>(fallback, false);
         }
-        return pick(all, order);
+        return new Ordered<>(pick(all, order), remember);
     }
 
     /** Résultat du regard : cartes laissées dessus (la première sera piochée en premier) et cartes déplacées. */

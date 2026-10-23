@@ -125,13 +125,15 @@ final class Catalog {
         // Extension : les cartes imprimées dans ce set, montrées avec leur impression de ce set.
         final String setCode = str(q, "set");
         final java.util.Set<String> inSet = setCode.isEmpty() ? null : namesInSet(setCode);
-        // Mode Planeswalker : seulement les cartes de la collection (et les terrains de base).
-        final Map<String, Integer> owned = bool(q, "owned") ? Career.owned() : null;
+        // Mode Planeswalker : seulement les cartes de la collection (et les terrains de base) ; ownedInfo : toutes les
+        // cartes, avec le nombre d'exemplaires possédés (cartes manquantes, à acheter avec des jetons).
+        final boolean onlyOwned = bool(q, "owned");
+        final Map<String, Integer> owned = onlyOwned || bool(q, "ownedInfo") ? Career.owned() : null;
 
         final List<Entry> matches = new ArrayList<>();
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
-            if (owned != null && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
+            if (onlyOwned && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
             if (!text.isEmpty()) {
                 final boolean nameHit = e.searchName().contains(text);
                 if (!nameHit && !(inText && e.searchText().contains(text))) {
@@ -275,6 +277,49 @@ final class Catalog {
         o.addProperty("canBeCommander", DeckFormat.Commander.isLegalCommanderPredicate().test(pc));
         o.addProperty("commanderLegal", DeckFormat.Commander.isLegalCardPredicate().test(pc));
         o.addProperty("basic", rules.getType().isBasicLand());
+        return o;
+    }
+
+    private static volatile Map<CardRules, String> tokenScripts;
+
+    /** Aperçu d'un jeton (liste des jetons de la triche) : nom, type, texte, force et endurance, image ; null si ce n'en est pas un. */
+    static JsonObject tokenJson(final CardRules rules) {
+        Map<CardRules, String> scripts = tokenScripts;
+        final forge.token.TokenDb db = FModel.getMagicDb().getAllTokens();
+        if (scripts == null) {
+            scripts = new java.util.IdentityHashMap<>();
+            for (final Map.Entry<String, CardRules> e : db.getRules().entrySet()) {
+                scripts.putIfAbsent(e.getValue(), e.getKey());
+            }
+            tokenScripts = scripts;
+        }
+        if (!scripts.containsKey(rules)) {
+            return null;
+        }
+        final ICardFace main = rules.getMainPart();
+        final JsonObject o = new JsonObject();
+        final String name = rules.getName().replaceAll("\\s*Token$", "");
+        o.addProperty("name", name);
+        o.addProperty("nameFr", translated(name));
+        o.addProperty("cost", "");
+        final String typeEn = rules.getType().toString();
+        final String typeFr = CardTranslation.getTranslatedType(rules.getName(), typeEn);
+        o.addProperty("typeLine", typeFr == null || typeFr.isEmpty() ? typeEn : typeFr);
+        o.addProperty("text", rules.getOracleText());
+        if (main != null && rules.getType().isCreature()) {
+            o.addProperty("power", main.getPower());
+            o.addProperty("toughness", main.getToughness());
+        }
+        o.addProperty("colors", GameSerializer.colors(rules.getColor()));
+        try {
+            final String script = scripts.get(rules);
+            final forge.item.PaperToken token = script == null ? null : db.getToken(script);
+            if (token != null) {
+                o.addProperty("image", token.getImageKey(false));
+            }
+        } catch (final RuntimeException e) {
+            // jeton sans impression connue : le cadre dessiné suffit
+        }
         return o;
     }
 
@@ -693,6 +738,7 @@ final class Catalog {
         sections.put("main", new LinkedHashMap<>());
         sections.put("side", new LinkedHashMap<>());
         final JsonArray unknown = new JsonArray();
+        final Map<String, PaperCard> prints = new HashMap<>();
         String section = "main";
         String deckName = name;
         boolean blankAfterMain = false;
@@ -728,22 +774,34 @@ final class Catalog {
             }
             final boolean commanderTag = line.contains("*CMDR*");
             final String cardName = cleanName(m.group(2));
-            final PaperCard pc = resolve(cardName);
-            if (pc == null) {
+            final PaperCard base = resolve(cardName);
+            if (base == null) {
                 unknown.add(line);
                 continue;
             }
             if (commanderTag) {
                 target = "commander";
             }
-            sections.get(target).merge(pc.getName(), Integer.parseInt(m.group(1)), Integer::sum);
+            // L'impression indiquée (« (CMM) 400 ») : la bonne illustration, pas la plus récente.
+            final PaperCard pc = printingOf(base, m.group(2));
+            final String key = pc.getName() + PRINT_SEP + pc.getEdition() + PRINT_SEP + pc.getArtIndex();
+            prints.put(key, pc);
+            sections.get(target).merge(key, Integer.parseInt(m.group(1)), Integer::sum);
             if (blankAfterMain && target.equals("main")) {
                 blankAfterMain = false;
             }
         }
         // Sans section Commandant, une dernière ligne seule et légendaire après un blanc est le commandant (export MTGA).
         if (sections.get("commander").isEmpty()) {
-            guessCommander(text, sections);
+            guessCommander(text, sections, prints);
+        }
+        // Le deck prend le nom de son commandant (des deux, avec un partenaire).
+        final List<String> commanders = new ArrayList<>();
+        for (final String key : sections.get("commander").keySet()) {
+            commanders.add(translated(prints.get(key).getName()));
+        }
+        if (!commanders.isEmpty()) {
+            deckName = String.join(" & ", commanders);
         }
         final JsonObject deck = new JsonObject();
         deck.addProperty("name", deckName == null || deckName.isEmpty() ? "Deck importé" : deckName);
@@ -754,7 +812,7 @@ final class Catalog {
             for (final Map.Entry<String, Integer> e : s.getValue().entrySet()) {
                 final JsonObject line = new JsonObject();
                 line.addProperty("count", e.getValue());
-                line.add("card", paperJson(resolve(e.getKey())));
+                line.add("card", paperJson(prints.get(e.getKey())));
                 list.add(line);
             }
             out.add(s.getKey(), list);
@@ -766,7 +824,7 @@ final class Catalog {
         return result;
     }
 
-    private void guessCommander(final String text, final Map<String, Map<String, Integer>> sections) {
+    private void guessCommander(final String text, final Map<String, Map<String, Integer>> sections, final Map<String, PaperCard> prints) {
         final String[] blocks = text.trim().split("\\R\\s*\\R");
         if (blocks.length < 2) {
             return;
@@ -782,11 +840,14 @@ final class Catalog {
             if (!m.matches() || !"1".equals(m.group(1))) {
                 return;
             }
-            final PaperCard pc = resolve(cleanName(m.group(2)));
-            if (pc == null || !DeckFormat.Commander.isLegalCommanderPredicate().test(pc)) {
+            final PaperCard base = resolve(cleanName(m.group(2)));
+            if (base == null || !DeckFormat.Commander.isLegalCommanderPredicate().test(base)) {
                 return;
             }
-            names.add(pc.getName());
+            final PaperCard pc = printingOf(base, m.group(2));
+            final String key = pc.getName() + PRINT_SEP + pc.getEdition() + PRINT_SEP + pc.getArtIndex();
+            prints.put(key, pc);
+            names.add(key);
         }
         for (final String n : names) {
             final Map<String, Integer> main = sections.get("main");
@@ -796,6 +857,68 @@ final class Catalog {
             }
             sections.get("commander").put(n, 1);
         }
+    }
+
+    private static final String PRINT_SEP = "\u0001";
+    /** « Sol Ring (CMM) 400 *F* » : édition (code Scryfall) et numéro de collection. */
+    private static final Pattern PRINT = Pattern.compile("\\(([A-Za-z0-9]{2,6})\\)(?:\\s+([0-9A-Za-z★†\\-]+))?");
+    private static volatile Map<String, String> editionCodes;
+
+    /** Code d'édition de Forge pour un code Scryfall, Forge ou un alias (« cmm », « PLST »...). */
+    private static String editionCode(final String code) {
+        Map<String, String> codes = editionCodes;
+        if (codes == null) {
+            codes = new HashMap<>();
+            final Iterable<forge.card.CardEdition> editions = FModel.getMagicDb().getEditions();
+            // Par ordre de priorité : code de Forge, code Scryfall, puis anciens codes et alias.
+            for (final forge.card.CardEdition ed : editions) {
+                codes.put(ed.getCode().toLowerCase(Locale.ROOT), ed.getCode());
+            }
+            for (final forge.card.CardEdition ed : editions) {
+                try {
+                    codes.putIfAbsent(ed.getScryfallCode(), ed.getCode());
+                } catch (final RuntimeException e) {
+                    // édition sans code Scryfall
+                }
+            }
+            for (final forge.card.CardEdition ed : editions) {
+                for (final String c : new String[]{ed.getCode2(), ed.getAlias()}) {
+                    if (c != null && !c.isEmpty()) {
+                        codes.putIfAbsent(c.toLowerCase(Locale.ROOT), ed.getCode());
+                    }
+                }
+            }
+            editionCodes = codes;
+        }
+        return codes.get(code.toLowerCase(Locale.ROOT));
+    }
+
+    /** L'impression d'une carte désignée dans une ligne de liste (édition, numéro), sinon celle par défaut. */
+    private static PaperCard printingOf(final PaperCard base, final String text) {
+        final Matcher m = PRINT.matcher(text);
+        if (!m.find()) {
+            return base;
+        }
+        final String set = editionCode(m.group(1));
+        if (set == null) {
+            return base;
+        }
+        final forge.card.CardDb db = FModel.getMagicDb().getCommonCards();
+        // CardDb rend une autre impression quand celle-ci manque : on ne garde que la bonne édition.
+        PaperCard exact = m.group(2) == null ? null : db.getCard(base.getName(), set, m.group(2));
+        if (exact == null || !set.equals(exact.getEdition()) || !m.group(2).equalsIgnoreCase(exact.getCollectorNumber())) {
+            exact = db.getCard(base.getName(), set);
+        }
+        if (exact == null || !exact.getName().equals(base.getName()) || !set.equals(exact.getEdition())) {
+            return base;
+        }
+        try {
+            // Illustration voulue : les images (françaises comprises) suivront cette impression précise.
+            ArtChoices.choose(exact.getImageKey(false));
+        } catch (final RuntimeException e) {
+            // impression sans clé d'image : la carte reste importée
+        }
+        return exact;
     }
 
     /** « Sol Ring (C21) 263 *F* » devient « Sol Ring ». */
@@ -851,8 +974,17 @@ final class Catalog {
             for (final Map.Entry<String, JsonElement> e : cards.entrySet()) {
                 final JsonObject entry = e.getValue().getAsJsonObject();
                 final int quantity = entry.has("quantity") ? entry.get("quantity").getAsInt() : 1;
-                final String name = entry.has("card") ? entry.getAsJsonObject("card").get("name").getAsString() : e.getKey();
-                sb.append(quantity).append(' ').append(name).append('\n');
+                final JsonObject card = entry.has("card") && entry.get("card").isJsonObject() ? entry.getAsJsonObject("card") : null;
+                final String name = card != null ? card.get("name").getAsString() : e.getKey();
+                sb.append(quantity).append(' ').append(name);
+                // L'impression choisie sur Moxfield (édition Scryfall, numéro de collection).
+                if (card != null && card.has("set") && card.get("set").isJsonPrimitive()) {
+                    sb.append(" (").append(card.get("set").getAsString().toUpperCase(Locale.ROOT)).append(')');
+                    if (card.has("cn") && card.get("cn").isJsonPrimitive()) {
+                        sb.append(' ').append(card.get("cn").getAsString());
+                    }
+                }
+                sb.append('\n');
             }
         }
         return sb.toString();

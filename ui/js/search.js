@@ -3,8 +3,9 @@
 import {bridge} from './bridge.js';
 import {cardElement, onLongPress, showZoom} from './cards.js';
 import {customBox} from './dialogs.js';
-import {esc, el, debounce} from './util.js';
+import {esc, el, debounce, toast} from './util.js';
 import {icon} from './icons.js';
+import {RARITY_FR, rarityKey, setCareer, wildcardHtml} from './career.js';
 
 const TYPES = [
   ['creature', 'Créature'], ['instant', 'Éphémère'], ['sorcery', 'Rituel'], ['artifact', 'Artefact'],
@@ -71,8 +72,9 @@ export class SearchPanel {
    * @param options.addLabel si présent, un bouton « + » ajoute la carte (onAdd)
    * @param options.counts   fonction nom -> exemplaires déjà dans le deck
    */
-  constructor(root, {onPick, onAdd, counts, identityLock, owned = false} = {}) {
+  constructor(root, {onPick, onAdd, counts, identityLock, owned = false, onBought} = {}) {
     this.root = root;
+    this.onBought = onBought;
     // Mode Planeswalker : seulement les cartes de la collection, avec le nombre d'exemplaires possédés.
     this.owned = owned;
     this.onPick = onPick;
@@ -94,6 +96,7 @@ export class SearchPanel {
         <div class="search-bar main">
           <input type="search" class="q" placeholder="Nom de carte (français ou anglais)…">
           <button class="btn small filters-btn" title="Afficher ou masquer les filtres">${icon('filter')}<span>Filtres</span><b class="n"></b></button>
+          ${this.owned ? '<label class="check small missing-toggle" title="Montrer aussi les cartes que tu n\'as pas, à acheter avec un jeton de leur rareté"><input type="checkbox" class="missing"> Cartes manquantes</label>' : ''}
           <span class="muted small total"></span>
         </div>
         <div class="search-filters">
@@ -130,6 +133,13 @@ export class SearchPanel {
       this.query.text = e.target.value;
       run();
     });
+    const missing = r.querySelector('.missing');
+    if (missing) {
+      missing.addEventListener('change', (e) => {
+        this.showMissing = e.target.checked;
+        this.search(true);
+      });
+    }
     r.querySelector('.intext').addEventListener('change', (e) => {
       this.query.inText = e.target.checked;
       run();
@@ -199,6 +209,10 @@ export class SearchPanel {
       if (!cell) {
         return;
       }
+      if (e.target.closest('.buy')) {
+        this.buy(cell);
+        return;
+      }
       if (e.target.closest('.add')) {
         this.onAdd && this.onAdd(cell._card);
         this.refreshCounts();
@@ -222,7 +236,8 @@ export class SearchPanel {
       this.offset = 0;
     }
     this.loading = true;
-    const query = {...this.query, offset: this.offset, limit: PAGE, owned: this.owned || undefined};
+    const query = {...this.query, offset: this.offset, limit: PAGE, owned: (this.owned && !this.showMissing) || undefined,
+      ownedInfo: this.owned || undefined};
     const lock = this.identityLock();
     if (lock !== null && lock !== undefined) {
       query.colors = (lock || 'C').split('');
@@ -242,16 +257,7 @@ export class SearchPanel {
       this.total = result.total;
       this.offset += result.cards.length;
       for (const card of result.cards) {
-        const cell = el(`<div class="cell"></div>`);
-        cell._card = card;
-        cell.appendChild(cardElement(card));
-        if (card.owned > 0) {
-          cell.appendChild(el(`<div class="owned-n" title="Exemplaires dans ta collection">${icon('book')}${card.owned}</div>`));
-        }
-        if (this.onAdd) {
-          cell.appendChild(el('<button class="add" title="Ajouter au deck">+</button>'));
-        }
-        grid.appendChild(cell);
+        grid.appendChild(this.cell(card));
       }
       this.root.querySelector('.total').textContent = `${result.total.toLocaleString('fr-FR')} carte(s)${this.owned ? ' dans ta collection' : ''}`;
       this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : (result.total ? '' : 'Aucune carte ne correspond.');
@@ -260,6 +266,39 @@ export class SearchPanel {
       this.root.querySelector('.more').textContent = e.message;
     } finally {
       this.loading = false;
+    }
+  }
+
+  cell(card) {
+    const cell = el(`<div class="cell${card.owned === 0 ? ' unowned' : ''}"></div>`);
+    cell._card = card;
+    cell.appendChild(cardElement(card));
+    if (card.owned > 0) {
+      cell.appendChild(el(`<div class="owned-n" title="Exemplaires dans ta collection">${icon('book')}${card.owned}</div>`));
+    }
+    if (card.owned === 0) {
+      const r = rarityKey(card);
+      cell.appendChild(el(`<button class="buy" title="Acheter avec un jeton ${RARITY_FR[r]}">${wildcardHtml(r)}<span>Acheter</span></button>`));
+    } else if (this.onAdd) {
+      cell.appendChild(el('<button class="add" title="Ajouter au deck">+</button>'));
+    }
+    return cell;
+  }
+
+  /** Mode Planeswalker : achète la carte avec un jeton de sa rareté. */
+  async buy(cell) {
+    const card = cell._card;
+    try {
+      const r = await bridge.request('careerBuyCard', {name: card.name, set: card.set || '', art: card.art || 0});
+      setCareer(r);
+      toast(`${card.nameFr} rejoint ta collection (jeton ${RARITY_FR[r.spent]} dépensé).`);
+      card.owned = 1;
+      const fresh = this.cell(card);
+      cell.replaceWith(fresh);
+      this.refreshCounts();
+      this.onBought && this.onBought(card);
+    } catch (e) {
+      toast(e.message, {error: true});
     }
   }
 

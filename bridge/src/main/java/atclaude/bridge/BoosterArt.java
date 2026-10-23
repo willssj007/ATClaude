@@ -57,9 +57,16 @@ final class BoosterArt {
         return files().containsKey(code) || files().containsKey(code + "_1");
     }
 
-    /** Image du booster demandé, téléchargée au besoin ; null si elle n'existe pas ou si le réseau manque. */
+    /** Nom de fichier trouvé sur le dépôt pour une image absente de la liste de Forge (ou "" : aucun). */
+    private static final Map<String, String> PROBED = new ConcurrentHashMap<>();
+
+    /**
+     * Image du booster demandé, téléchargée au besoin ; null si elle n'existe pas ou si le réseau manque.
+     * Les extensions récentes manquent parfois à la liste de Forge alors que leur visuel est déjà sur son dépôt :
+     * on essaie alors les noms habituels (CODE.png, CODE.jpg, CODE_1.png...).
+     */
     static File file(final String key) {
-        String name = key.substring(PREFIX.length());
+        final String name = key.substring(PREFIX.length());
         if (!name.matches("[A-Za-z0-9_]{1,24}")) {
             return null;
         }
@@ -70,9 +77,28 @@ final class BoosterArt {
         if (file == null && name.contains("_")) {
             file = files().get(name.substring(0, name.lastIndexOf('_')));
         }
-        if (file == null) {
-            return null;
+        if (file != null) {
+            return fetch(file);
         }
+        final String probed = PROBED.get(name);
+        if (probed != null) {
+            return probed.isEmpty() ? null : fetch(probed);
+        }
+        for (final String candidate : new String[]{name + ".png", name + ".jpg", name + "_1.png", name + "_1.jpg"}) {
+            final File f = fetch(candidate);
+            if (f != null) {
+                PROBED.put(name, candidate);
+                return f;
+            }
+        }
+        // Rien sur le dépôt : on ne réessaie qu'au prochain lancement.
+        if (!FAILED.containsKey("probe:" + name)) {
+            PROBED.put(name, "");
+        }
+        return null;
+    }
+
+    private static File fetch(final String file) {
         final File dest = new File(ForgeConstants.CACHE_BOOSTER_PICS_DIR, file);
         if (dest.isFile() && dest.length() > 0) {
             return dest;
@@ -90,7 +116,6 @@ final class BoosterArt {
                 return dest;
             } catch (final IOException | RuntimeException e) {
                 FAILED.put(file, System.currentTimeMillis());
-                System.err.println("Visuel de booster indisponible (" + file + ") : " + e.getMessage());
                 return null;
             }
         }

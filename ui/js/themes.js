@@ -18,6 +18,9 @@ export const MENU_THEMES = [
   {key: 'abyss', name: 'Abysses', desc: 'Ruines englouties, méduses lumineuses et léviathan.', art: 'menu-abyss', colors: ['#04121a', '#3fc1c9', '#d8c07a'], unlock: {kind: 'streak', n: 3}},
   {key: 'desert', name: 'Dunes d\'or', desc: 'Pyramides et caravane sous le soleil couchant.', art: 'menu-desert', colors: ['#140b08', '#d8843a', '#e8b04a'], unlock: {kind: 'mythics', n: 1}},
   {key: 'necro', name: 'Nécropole', desc: 'Cathédrale gothique, corbeaux et lune verte.', art: 'menu-necro', colors: ['#060a08', '#7fc28a', '#c8d8a0'], unlock: {kind: 'lowLife', n: 1}},
+  // Mythiques : animées, et bien plus dures à obtenir.
+  {key: 'aurora', name: 'Aurore mythique', desc: 'Une aurore boréale qui ondule au-dessus du lac, sous les étoiles qui scintillent.', art: 'menu-aurora', colors: ['#03060f', '#59f5b0', '#bfe8ff'], unlock: {kind: 'streak', n: 10}, mythic: true},
+  {key: 'godforge', name: 'Forge des dieux', desc: 'L\'enclume des dieux au cœur du volcan : la lave luit et les braises s\'envolent.', art: 'menu-godforge', colors: ['#0a0504', '#ff8a2a', '#ffd27a'], unlock: {kind: 'wins', n: 100}, mythic: true},
 ];
 
 export const BOARD_THEMES = [
@@ -30,6 +33,8 @@ export const BOARD_THEMES = [
   {key: 'library', name: 'Bibliothèque arcanique', desc: 'Livres volants, runes et cercle magique au clair de lune.', art: 'board-library', unlock: {kind: 'opened', n: 10}},
   {key: 'arena', name: 'Colisée', desc: 'Le sable de l\'arène, les bannières et la foule des gradins.', art: 'board-arena', unlock: {kind: 'fastWin', n: 1}},
   {key: 'swamp', name: 'Marais des feux follets', desc: 'Mangroves tordues, nénuphars et lueurs sur l\'eau noire.', art: 'board-swamp', unlock: {kind: 'duelWins', n: 10}},
+  {key: 'vortex', name: 'Vortex du Néant', desc: 'Les bras d\'une galaxie tournent lentement autour d\'un trou noir.', art: 'board-vortex', unlock: {kind: 'mythics', n: 10}, mythic: true},
+  {key: 'celestial', name: 'Sanctuaire céleste', desc: 'Un temple au-dessus des nuages : un cercle de runes tourne sous les rayons du ciel.', art: 'board-celestial', unlock: {kind: 'duelWins', n: 50}, mythic: true},
 ];
 
 // Dos des cartes cachées et de la bibliothèque : celui de Magic par défaut, les autres gagnés avec les trophées.
@@ -46,6 +51,8 @@ export const BACK_THEMES = [
   {key: 'phoenix', name: 'Phénix', desc: 'L\'oiseau de feu qui renaît de ses cendres.', unlock: {kind: 'rainbowWin', n: 1}},
   {key: 'compass', name: 'Rose des vents', desc: 'La boussole des voyageurs entre les plans.', unlock: {kind: 'unique', n: 500}},
   {key: 'skull', name: 'Memento mori', desc: 'Crâne, os croisés et sablier.', unlock: {kind: 'monoWin', n: 1}},
+  {key: 'spark', name: 'Étincelle mythique', desc: 'L\'étincelle des Planeswalkers, parcourue d\'un reflet doré.', unlock: {kind: 'unique', n: 1500}, mythic: true},
+  {key: 'prism', name: 'Prisme', desc: 'Une gemme taillée aux reflets holographiques changeants.', unlock: {kind: 'win4', n: 10}, mythic: true},
 ];
 
 const KINDS = {
@@ -57,7 +64,7 @@ const KINDS = {
 const GOALS = {
   games: (n) => `Jouer ${n} partie${n > 1 ? 's' : ''}`,
   wins: (n) => `Gagner ${n} partie${n > 1 ? 's' : ''}`,
-  win4: () => 'Gagner une partie à 4 joueurs',
+  win4: (n) => n > 1 ? `Gagner ${n} parties à 4 joueurs` : 'Gagner une partie à 4 joueurs',
   dealt: (n) => `Infliger ${n} blessures en une partie`,
   trophies: (n) => `Obtenir ${n} trophée${n > 1 ? 's' : ''}`,
   // Défis
@@ -68,7 +75,7 @@ const GOALS = {
   duelWins: (n) => `Gagner ${n} duels Planeswalker`,
   streak: (n) => `Gagner ${n} duels Planeswalker d'affilée`,
   opened: (n) => `Ouvrir ${n} booster${n > 1 ? 's' : ''}`,
-  mythics: () => 'Trouver une carte mythique dans un booster',
+  mythics: (n) => n > 1 ? `Trouver ${n} cartes mythiques dans des boosters` : 'Trouver une carte mythique dans un booster',
   unique: (n) => `Posséder ${n} cartes différentes (Planeswalker)`,
 };
 
@@ -119,7 +126,7 @@ export async function challengesHtml() {
   const done = items.filter(i => i.done).length;
   return `<div class="trophy-head"><h2 style="margin:0">Défis</h2><div class="trophy-count"><b>${done}</b> / ${items.length} réussis</div></div>
     <p class="muted small">Chaque défi débloque une apparence (Réglages › Apparence). Les parties avec triche ne comptent pas.</p>
-    <div class="challenge-grid">${items.map(({kind, t, done: ok, have}) => `<div class="challenge panel${ok ? ' done' : ''}">
+    <div class="challenge-grid">${items.map(({kind, t, done: ok, have}) => `<div class="challenge panel${ok ? ' done' : ''}${t.mythic ? ' mythic' : ''}">
       <span class="ch-prev th-prev th-${kind}-${t.key}">${ok ? '' : `<span class="th-lock">${icon('lock')}</span>`}</span>
       <div class="ch-body"><b>${esc(GOALS[t.unlock.kind](t.unlock.n))}</b>
         <span class="muted small">${icon(KIND_ICONS[kind])} ${esc(KIND_LABELS[kind])} : « ${esc(t.name)} »</span>
@@ -129,7 +136,7 @@ export async function challengesHtml() {
 }
 
 export function isUnlocked(theme, p) {
-  return !theme.unlock || (p && (p[theme.unlock.kind] || 0) >= theme.unlock.n);
+  return !theme.unlock || prefs.get('themePreview') === true || (p && (p[theme.unlock.kind] || 0) >= theme.unlock.n);
 }
 
 function find(list, key) {
@@ -142,6 +149,32 @@ export function applyThemes() {
   for (const kind of Object.values(KINDS)) {
     root.dataset[kind.attr] = find(kind.list, prefs.get(kind.pref)).key;
   }
+  root.dataset.motion = prefs.get('animations') ? 'on' : 'off';
+  menuEffects(root.dataset.menuTheme);
+}
+
+/** Calque animé derrière les menus des apparences mythiques (voir app.css). */
+const MENU_FX = {
+  aurora: '<i class="mf-band b1"></i><i class="mf-band b2"></i><i class="mf-band b3"></i><i class="mf-stars s1"></i><i class="mf-stars s2"></i>',
+  godforge: '<i class="mf-glow"></i><i class="mf-embers e1"></i><i class="mf-embers e2"></i><i class="mf-embers e3"></i>',
+};
+
+function menuEffects(key) {
+  let layer = document.getElementById('menu-fx');
+  if (!MENU_FX[key]) {
+    layer && layer.remove();
+    return;
+  }
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'menu-fx';
+    layer.setAttribute('aria-hidden', 'true');
+    document.body.prepend(layer);
+  }
+  if (layer.dataset.fx !== key) {
+    layer.dataset.fx = key;
+    layer.innerHTML = MENU_FX[key];
+  }
 }
 
 function cardHtml(kind, t, p, current) {
@@ -149,8 +182,8 @@ function cardHtml(kind, t, p, current) {
   const goal = t.unlock ? GOALS[t.unlock.kind](t.unlock.n) : '';
   const have = t.unlock && p ? Math.min(p[t.unlock.kind] || 0, t.unlock.n) : 0;
   const swatches = kind === 'menu' ? `<span class="th-sw">${t.colors.map(c => `<i style="background:${c}"></i>`).join('')}</span>` : '';
-  return `<button class="theme-card${t.key === current ? ' on' : ''}${locked ? ' locked' : ''}" data-kind="${kind}" data-theme="${t.key}" aria-pressed="${t.key === current}">
-    <span class="th-prev th-${kind}-${t.key}">${swatches}${locked ? `<span class="th-lock">${icon('lock')}</span>` : ''}${t.key === current ? '<span class="th-on">Choisie</span>' : ''}</span>
+  return `<button class="theme-card${t.key === current ? ' on' : ''}${locked ? ' locked' : ''}${t.mythic ? ' mythic' : ''}" data-kind="${kind}" data-theme="${t.key}" aria-pressed="${t.key === current}">
+    <span class="th-prev th-${kind}-${t.key}">${swatches}${t.mythic ? '<span class="th-myth">Mythique</span>' : ''}${locked ? `<span class="th-lock">${icon('lock')}</span>` : ''}${t.key === current ? '<span class="th-on">Choisie</span>' : ''}</span>
     <span class="th-body"><b>${esc(t.name)}</b>
       <span class="muted small">${esc(t.desc)}</span>
       ${t.unlock ? `<span class="th-goal small${locked ? '' : ' done'}">${locked ? icon('lock') : icon('chalice')}${esc(goal)}${locked && t.unlock.n > 1 ? ` · ${have}/${t.unlock.n}` : ''}</span>

@@ -1,7 +1,7 @@
 // Dialogues : questions de Forge pendant la partie, et petites boîtes de l'interface.
 
 import {bridge} from './bridge.js';
-import {cardElement, showZoom, onLongPress} from './cards.js';
+import {cardElement, hoverCard, onLongPress, showZoom} from './cards.js';
 import {esc, el, debounce, rulesHtml} from './util.js';
 import {icon} from './icons.js';
 
@@ -110,6 +110,8 @@ const handlers = {
       s.body.appendChild(grid);
     } else {
       const list = el('<div class="choice-list"></div>');
+      // Jetons (triche) : chaque nom montre son jeton au survol, ou par appui long.
+      const consumed = items.some(i => i.preview) ? hoverCard(list, 'button', (b) => b._card) : null;
       const instant = min === 1 && max === 1;
       let filter = '';
       const render = () => {
@@ -124,8 +126,12 @@ const handlers = {
             return;
           }
           const b = el(`<button>${rulesHtml(item.label)}</button>`);
+          b._card = item.preview || null;
           b.classList.toggle('on', chosen.has(i));
           b.addEventListener('click', () => {
+            if (consumed && consumed()) {
+              return;
+            }
             if (instant) {
               done([i]);
               return;
@@ -174,7 +180,7 @@ const handlers = {
     }
     s.footer.appendChild(counter);
     if (min === 0) {
-      const none = button(max === 1 ? 'Aucun' : 'Ne rien choisir');
+      const none = button(d.noneLabel || (max === 1 ? 'Aucun' : 'Ne rien choisir'));
       none.addEventListener('click', () => done([]));
       s.footer.appendChild(none);
     }
@@ -315,6 +321,17 @@ const handlers = {
     });
     ok.addEventListener('click', () => done([...chosen]));
     s.footer.append(reset, all, ok);
+    if (d.rememberable) {
+      // Déclencheurs simultanés : le même ordre sera repris tout seul quand ils reviendront ensemble.
+      const keep = button('Dans cet ordre et s\'en souvenir', 'gold');
+      keep.addEventListener('click', () => done({order: [...chosen], remember: true}));
+      s.footer.append(keep);
+      const sync = () => {
+        keep.disabled = ok.disabled;
+      };
+      new MutationObserver(sync).observe(ok, {attributes: true, attributeFilter: ['disabled']});
+      ok.classList.remove('gold');
+    }
     render();
   },
 

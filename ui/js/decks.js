@@ -3,7 +3,7 @@
 import {bracketBadgeHtml, openAnalysis, openDeckStats, openEdhrec, summaryLineHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {cardElement, loadImage, showZoom, onLongPress} from './cards.js';
-import {isPlaneswalker} from './career.js';
+import {isPlaneswalker, loadCareer, wildcardsHtml} from './career.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {icon} from './icons.js';
 import {SearchPanel} from './search.js';
@@ -122,6 +122,11 @@ function deckText(deck) {
   return lines.join('\n');
 }
 
+/** « Kathrill, distorseur d'aspect », ou « Thrasios & Tymna » pour des partenaires. */
+function commanderNames(deck) {
+  return ((deck.sections && deck.sections.commander) || []).map(l => l.card.nameFr || l.card.name).join(' & ');
+}
+
 export class Decks {
   constructor(root, {onPlay, onChanged}) {
     this.root = root;
@@ -213,6 +218,8 @@ export class Decks {
     this.deck = deck;
     this.analysis = null;
     this.dirty = false;
+    // Un deck sans nom (ou nommé d'après son commandant) prend le nom de son commandant, et le suit.
+    this.autoName = !deck.name || deck.name === commanderNames(deck) ? deck.name || '' : null;
     this.root.innerHTML = `<div class="tabs-mobile seg"><button data-tab="left" class="on">Recherche</button><button data-tab="right">Deck</button></div>
       <div class="builder">
         <div class="left"></div>
@@ -320,11 +327,27 @@ export class Decks {
 
   changed() {
     this.dirty = true;
+    this.followCommander();
     this.renderDeck();
     this.loadPricesSoon();
     this.search && this.search.refreshCounts();
     this.validate();
     this.analyze();
+  }
+
+  /** Le nom suit le commandant tant qu'on ne l'a pas changé soi-même. */
+  followCommander() {
+    const d = this.deck;
+    const names = commanderNames(d);
+    if (this.autoName === null || !names || d.name !== this.autoName) {
+      return;
+    }
+    d.name = names;
+    this.autoName = names;
+    const input = this.root.querySelector('.deck-name');
+    if (input && input.value !== names) {
+      input.value = names;
+    }
   }
 
   loadPricesSoon = debounce(() => this.loadPrices(), 1200);
@@ -401,6 +424,7 @@ export class Decks {
         <button class="btn small" data-act="import">Importer</button>
         ${d.previousName ? '<button class="btn small danger" data-act="delete">Supprimer</button>' : ''}
       </div>
+      ${d.career ? '<div class="builder-wc" style="margin-bottom:6px"></div>' : ''}
       <div class="muted small">${d.career ? 'Planeswalker · ' : ''}${d.format === 'commander' ? 'Commander' : 'Construit'} · <b style="color:var(--text)">${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</div>
       <div class="deck-price"></div>
       <div class="analysis-slot">${summaryLineHtml(this.analysis)}</div>
@@ -414,6 +438,12 @@ export class Decks {
       ${groups.filter(([, list]) => list.length).map(([label, list]) => `<div class="deck-section"><h4>${label}<span>${list.reduce((a, l) => a + l.count, 0)}</span></h4>${list.map(l => row(l, 'main')).join('')}</div>`).join('')}
       ${s.side.length ? `<div class="deck-section"><h4>Réserve<span>${s.side.reduce((a, l) => a + l.count, 0)}</span></h4>${s.side.map(l => row(l, 'side')).join('')}</div>` : ''}
       ${s.main.length ? '' : '<p class="muted">Le deck est vide : ajoute des cartes avec le bouton + de la recherche.</p>'}`;
+    const wcSlot = right.querySelector('.builder-wc');
+    if (wcSlot) {
+      loadCareer().then(c => {
+        wcSlot.innerHTML = wildcardsHtml(c.wildcards);
+      }).catch(() => {});
+    }
     const slot = right.querySelector('.commander-slot');
     if (slot) {
       for (const l of s.commander) {

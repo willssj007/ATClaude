@@ -11,6 +11,7 @@ import forge.game.GameEntityView;
 import forge.game.GameLogEntry;
 import forge.game.GameView;
 import forge.game.card.CardView;
+import forge.game.keyword.Keyword;
 import forge.game.card.CardView.CardStateView;
 import forge.game.card.CounterEnumType;
 import forge.game.card.CounterType;
@@ -154,27 +155,15 @@ final class GameSerializer {
         for (final ZoneType zone : VISIBLE_ZONES) {
             final JsonArray cards = new JsonArray();
             for (final CardView c : copy(p.getCards(zone))) {
-                cards.add(card(c, gv));
+                if (zone != ZoneType.Command || !MatchSession.NO_COMMANDER_DAMAGE.equals(c.getName())) {
+                    cards.add(card(c, gv));
+                }
             }
             zones.add(zone.name().toLowerCase(), cards);
         }
         o.add("zones", zones);
 
-        // Blessures infligées à ce joueur par chaque commandant adverse, et taxe de ses propres commandants.
-        final JsonArray commanderDamage = new JsonArray();
-        for (final PlayerView other : gv.getPlayers()) {
-            for (final CardView commander : copy(other.getCommanders())) {
-                final int damage = p.getCommanderDamage(commander);
-                if (damage > 0) {
-                    final JsonObject d = new JsonObject();
-                    d.addProperty("commander", commander.getId());
-                    d.addProperty("name", translatedName(commander.getCurrentState()));
-                    d.addProperty("damage", damage);
-                    commanderDamage.add(d);
-                }
-            }
-        }
-        o.add("commanderDamage", commanderDamage);
+        // Taxe de ses commandants (les blessures de commandant ne comptent pas : règle désactivée, MatchSession).
         final JsonArray commanders = new JsonArray();
         for (final CardView commander : copy(p.getCommanders())) {
             final JsonObject c = new JsonObject();
@@ -231,7 +220,42 @@ final class GameSerializer {
         if (counters.size() > 0) {
             o.add("counters", counters);
         }
+        if (c.getZone() == ZoneType.Battlefield) {
+            final JsonArray status = status(c);
+            if (!status.isEmpty()) {
+                o.add("status", status);
+            }
+        }
         return o;
+    }
+
+    /** Capacités et états montrés en petites icônes sur une carte en jeu (vol, initiative, hors phase...). */
+    private static final Keyword[] SHOWN_KEYWORDS = {
+        Keyword.FLYING, Keyword.FIRST_STRIKE, Keyword.DOUBLE_STRIKE, Keyword.DEATHTOUCH, Keyword.LIFELINK, Keyword.VIGILANCE,
+        Keyword.TRAMPLE, Keyword.HASTE, Keyword.MENACE, Keyword.REACH, Keyword.DEFENDER, Keyword.HEXPROOF, Keyword.SHROUD,
+        Keyword.INDESTRUCTIBLE, Keyword.INFECT,
+    };
+
+    private static JsonArray status(final CardView c) {
+        final JsonArray a = new JsonArray();
+        if (c.isPhasedOut()) {
+            a.add("PHASED_OUT");
+        }
+        final CardStateView s = c.getCurrentState();
+        if (s != null && s.isCreature()) {
+            for (final Keyword k : SHOWN_KEYWORDS) {
+                if (s.hasKeyword(k)) {
+                    a.add(k.name());
+                }
+            }
+        }
+        if (s != null && s.hasWard()) {
+            a.add("WARD");
+        }
+        if (c.isRingBearer()) {
+            a.add("RING");
+        }
+        return a;
     }
 
     /** Caractéristiques visibles d'une face : nom, coût, type, texte, force et endurance. */

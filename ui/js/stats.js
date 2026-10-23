@@ -2,6 +2,7 @@
 // records, et détail par deck. Tout est calculé ici à partir de la liste des parties.
 
 import {bridge} from './bridge.js';
+import {isPlaneswalker} from './career.js';
 import {confirmBox} from './dialogs.js';
 import {esc, prefs, toast} from './util.js';
 
@@ -177,23 +178,26 @@ export class StatsScreen {
   }
 
   render() {
-    const all = this.games || [];
-    const games = all.filter(g => (this.format === 'all' || g.format === this.format) && (this.withCheats || !g.cheated));
+    // Chaque mode a ses statistiques : les duels de la carrière d'un côté, les parties libres de l'autre.
+    const pw = isPlaneswalker();
+    const all = (this.games || []).filter(g => !!g.career === pw);
+    const games = all.filter(g => pw || ((this.format === 'all' || g.format === this.format) && (this.withCheats || !g.cheated)));
     const cheated = all.filter(g => g.cheated).length;
+    const title = pw ? 'Statistiques Planeswalker' : 'Statistiques Sandbox';
     const s = summarize(games);
     const highlight = (title, d, value, image) => `<div class="hl panel">${image ? `<div class="hl-art" data-img="${esc(image)}"></div>` : ''}
         <div class="hl-body"><span class="k-label">${esc(title)}</span><b>${d ? esc(d) : '—'}</b><span class="muted small">${value ? esc(value) : ''}</span></div></div>`;
     const deckRows = [...s.decks.values()].sort((a, b) => b.games - a.games || b.last - a.last);
     this.root.innerHTML = `<div class="page stats-page">
       <div class="st-head">
-        <h1 style="margin:0;flex:1">Statistiques</h1>
-        <div class="seg" data-seg="format">
+        <h1 style="margin:0;flex:1">${title}</h1>
+        ${pw ? '' : `<div class="seg" data-seg="format">
           ${[['all', 'Tout'], ['commander', 'Commander'], ['constructed', 'Construit']].map(([v, l]) => `<button data-v="${v}" class="${this.format === v ? 'on' : ''}">${l}</button>`).join('')}
         </div>
-        <label class="check small"><input type="checkbox" data-cheats ${this.withCheats ? 'checked' : ''}> Avec triche${cheated ? ` (${cheated})` : ''}</label>
+        <label class="check small"><input type="checkbox" data-cheats ${this.withCheats ? 'checked' : ''}> Avec triche${cheated ? ` (${cheated})` : ''}</label>`}
       </div>
       ${!games.length ? `<div class="panel" style="padding:18px;margin-top:12px"><p>Aucune partie terminée${all.length ? ' pour ce filtre' : ''}.</p>
-        <p class="muted">Chaque partie finie (victoire, défaite ou abandon) est ajoutée ici, avec son deck, sa durée, les terrains posés et les blessures infligées et reçues. Avec un compte relié, l'historique suit sur tous tes appareils.</p></div>` : `
+        <p class="muted">${pw ? 'Chaque duel de ta carrière de Planeswalker' : 'Chaque partie finie du mode Sandbox'} (victoire, défaite ou abandon) est ajouté${pw ? '' : 'e'} ici, avec son deck, sa durée, les terrains posés et les blessures infligées et reçues. ${pw ? 'Les parties du mode Sandbox ont leurs propres statistiques.' : 'Les duels du mode Planeswalker ont leurs propres statistiques.'} Avec un compte relié, l'historique suit sur tous tes appareils.</p></div>` : `
       <div class="kpis">
         <div class="kpi panel hero"><span class="k-label">Taux de victoire</span><b class="k-value">${pct(s.wins, s.total)} %</b><span class="k-sub muted small">${s.wins} sur ${s.total} parties</span></div>
         ${kpi('Parties jouées', s.total)}
@@ -262,8 +266,8 @@ export class StatsScreen {
         return;
       }
       if (e.target.closest('[data-clear]')) {
-        if (await confirmBox('Effacer les statistiques ?', 'Tout l\'historique des parties sera supprimé, sur cet appareil et (après synchronisation) sur les autres.', {yes: 'Effacer', danger: true})) {
-          await bridge.request('clearStats');
+        if (await confirmBox(`Effacer les ${pw ? 'statistiques Planeswalker' : 'statistiques Sandbox'} ?`, `L'historique des parties du mode ${pw ? 'Planeswalker' : 'Sandbox'} sera supprimé, sur cet appareil et (après synchronisation) sur les autres. Celles de l'autre mode sont gardées.`, {yes: 'Effacer', danger: true})) {
+          await bridge.request('clearStats', {career: pw});
           toast('Statistiques effacées.');
           this.show();
         }

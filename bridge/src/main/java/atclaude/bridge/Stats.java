@@ -88,13 +88,34 @@ final class Stats {
         return merged.getAsJsonArray("games").size() - before.getAsJsonArray("games").size();
     }
 
-    /** Efface l'historique ; les parties d'avant ne reviennent pas par la synchronisation. */
-    static synchronized void clear() {
-        final JsonObject o = new JsonObject();
-        o.addProperty("version", 1);
-        o.add("games", new JsonArray());
-        o.addProperty("clearedAt", System.currentTimeMillis());
-        store(o);
+    /**
+     * Efface l'historique d'un mode (carrière Planeswalker ou Sandbox ; null : les deux). Les parties effacées ne
+     * reviennent pas par la synchronisation.
+     */
+    static synchronized void clear(final Boolean career) {
+        final JsonObject stats = load();
+        final long now = System.currentTimeMillis();
+        if (career == null) {
+            stats.add("games", new JsonArray());
+            stats.addProperty("clearedAt", now);
+        } else {
+            final JsonArray kept = new JsonArray();
+            for (final JsonElement e : stats.getAsJsonArray("games")) {
+                if (e.isJsonObject() && isCareer(e.getAsJsonObject()) != career) {
+                    kept.add(e);
+                }
+            }
+            stats.add("games", kept);
+            stats.addProperty(career ? CLEARED_CAREER : CLEARED_SANDBOX, now);
+        }
+        store(stats);
+    }
+
+    private static final String CLEARED_CAREER = "clearedAtCareer";
+    private static final String CLEARED_SANDBOX = "clearedAtSandbox";
+
+    private static boolean isCareer(final JsonObject g) {
+        return g.has("career") && g.get("career").isJsonPrimitive() && g.get("career").getAsBoolean();
     }
 
     /** Un deck renommé garde son historique. */
@@ -124,6 +145,8 @@ final class Stats {
      */
     static JsonObject merge(final JsonObject a, final JsonObject b) {
         final long cleared = Math.max(num(a, "clearedAt"), num(b, "clearedAt"));
+        final long clearedCareer = Math.max(cleared, Math.max(num(a, CLEARED_CAREER), num(b, CLEARED_CAREER)));
+        final long clearedSandbox = Math.max(cleared, Math.max(num(a, CLEARED_SANDBOX), num(b, CLEARED_SANDBOX)));
         final Map<String, JsonObject> byId = new LinkedHashMap<>();
         for (final JsonObject src : new JsonObject[]{a, b}) {
             if (src == null || !src.has("games") || !src.get("games").isJsonArray()) {
@@ -135,7 +158,7 @@ final class Stats {
                 }
                 final JsonObject g = e.getAsJsonObject();
                 final String id = str(g, "id");
-                if (id.isEmpty() || num(g, "at") <= cleared) {
+                if (id.isEmpty() || num(g, "at") <= (isCareer(g) ? clearedCareer : clearedSandbox)) {
                     continue;
                 }
                 byId.putIfAbsent(id, g);
@@ -151,6 +174,8 @@ final class Stats {
         m.addProperty("version", 1);
         m.add("games", out);
         m.addProperty("clearedAt", cleared);
+        m.addProperty(CLEARED_CAREER, clearedCareer);
+        m.addProperty(CLEARED_SANDBOX, clearedSandbox);
         return m;
     }
 

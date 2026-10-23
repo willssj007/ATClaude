@@ -5,7 +5,7 @@ import {initAudio, refreshAudio, setMusicMode} from './audio.js';
 import {bridge} from './bridge.js';
 import {BoostersScreen} from './boosters.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
-import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCareer} from './career.js';
+import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCareer, wildcardsHtml} from './career.js';
 import {Decks} from './decks.js';
 import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} from './dialogs.js';
 import {Game} from './game.js';
@@ -14,6 +14,7 @@ import {SearchPanel} from './search.js';
 import {enhanceSelects} from './select.js';
 import {icon} from './icons.js';
 import {StatsScreen} from './stats.js';
+import {openLedger} from './ledger.js';
 import {announceUnlocks, appearanceHtml, applyThemes, themeClicked} from './themes.js';
 import {announceTrophy, Trophies} from './trophies.js';
 import {$, $$, avatarHtml, debounce, esc, prefs, toast} from './util.js';
@@ -300,9 +301,17 @@ function cardsScreen() {
       // Mode Planeswalker : la collection (cartes possédées) ; mode Sandbox : toutes les cartes.
       const pw = isPlaneswalker();
       if (!panel) {
-        root.innerHTML = `<div class="page cards-page"><h1>${pw ? 'Collection' : 'Cartes'}</h1><div class="browser"></div></div>`;
+        root.innerHTML = `<div class="page cards-page"><div class="cards-head"><h1>${pw ? 'Collection' : 'Cartes'}</h1>${pw ? '<span class="cards-wc"></span>' : ''}</div><div class="browser"></div></div>`;
         const box = root.querySelector('.browser');
         panel = new SearchPanel(box, {onPick: (card) => showZoom(card, legalityHtml(card)), owned: pw});
+        if (pw) {
+          loadCareer().then(c => {
+            const wc = root.querySelector('.cards-wc');
+            if (wc) {
+              wc.innerHTML = wildcardsHtml(c.wildcards);
+            }
+          }).catch(() => {});
+        }
         panel.search(true);
       } else if (pw) {
         panel.search(true); // de nouvelles cartes ont pu arriver (duel, booster)
@@ -349,7 +358,7 @@ function settingsScreen() {
         <div class="row"><div><b>Volume des effets</b></div><input type="range" min="0" max="100" data-pref-range="sfxVolume"></div>
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
-        <h2 style="margin-top:26px">À propos</h2>
+        <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>
         <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques (fournies avec Forge, mode Aventure) : Vindsvept (licence Creative Commons Attribution 4.0), Brandon et Derek Fiechter, Logan Epic Canto. Icônes et illustrations des apparences : dessinées pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
@@ -371,6 +380,9 @@ function settingsScreen() {
       root.querySelectorAll('[data-pref]').forEach(i => i.addEventListener('change', () => {
         prefs.set(i.dataset.pref, i.checked);
         refreshAudio();
+        if (i.dataset.pref === 'animations') {
+          applyThemes();
+        }
         if (inMatch && (i.dataset.pref === 'holdPriority' || i.dataset.pref === 'autoPass')) {
           bridge.send('settings', {settings: {[i.dataset.pref]: i.checked}});
         }
@@ -382,6 +394,10 @@ function settingsScreen() {
         root.querySelector('.appearance').innerHTML = html;
       });
       root.onclick = (e) => {
+        if (e.target.closest('[data-a]') && isPlaneswalker()) {
+          openLedger();
+          return;
+        }
         themeClicked(e.target);
       };
     },
@@ -482,6 +498,9 @@ function init() {
   $('#mana-chip').addEventListener('click', () => ready && showScreen('boosters'));
   onCareer((c) => {
     $('#mana-chip').innerHTML = c.started ? manaAmount(c.mana) : `${icon('spark')}<b>Carrière</b>`;
+    document.querySelectorAll('.cards-wc, .builder-wc').forEach(n => {
+      n.innerHTML = wildcardsHtml(c.wildcards);
+    });
   });
   for (const b of $$('#nav button')) {
     b.innerHTML = `${icon(NAV_ICONS[b.dataset.screen])}<span>${b.textContent}</span>`;

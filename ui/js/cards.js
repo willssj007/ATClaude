@@ -197,3 +197,62 @@ export function onLongPress(root, selector, handler) {
     return was;
   };
 }
+
+/**
+ * Aperçu d'une carte au survol (souris) des éléments {@code selector} de {@code root} — listes de noms (triche,
+ * jetons) — et zoom par appui long (tactile). {@code cardOf(node)} donne la carte de l'élément.
+ */
+export function hoverCard(root, selector, cardOf) {
+  let tip = null;
+  let check = 0;
+  const hide = () => {
+    clearInterval(check);
+    tip && tip.remove();
+    tip = null;
+  };
+  root.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') {
+      return;
+    }
+    const node = e.target.closest(selector);
+    const card = node && root.contains(node) ? cardOf(node) : null;
+    if (!card) {
+      hide();
+      return;
+    }
+    if (tip && tip._node === node) {
+      return;
+    }
+    hide();
+    tip = el('<div class="hover-card"></div>');
+    tip._node = node;
+    tip.appendChild(cardElement(card));
+    document.body.appendChild(tip);
+    // À côté de la liste : à gauche s'il y a la place, sinon à droite.
+    const r = node.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    let x = r.left - w - 14;
+    if (x < 8) {
+      x = Math.min(innerWidth - w - 8, r.right + 14);
+    }
+    tip.style.left = `${Math.max(8, x)}px`;
+    tip.style.top = `${Math.min(Math.max(8, r.top + r.height / 2 - h / 2), innerHeight - h - 8)}px`;
+    // La liste peut disparaître sous la souris (dialogue fermé, résultats remplacés).
+    check = setInterval(() => !node.isConnected && hide(), 250);
+  });
+  root.addEventListener('pointerout', (e) => {
+    const to = e.relatedTarget;
+    if (!to || !to.closest || !to.closest(selector)) {
+      hide();
+    }
+  });
+  root.addEventListener('pointerdown', hide);
+  return onLongPress(root, selector, (node) => {
+    const card = cardOf(node);
+    if (card) {
+      hide();
+      showZoom(card);
+    }
+  });
+}

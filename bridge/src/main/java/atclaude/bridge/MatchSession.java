@@ -194,6 +194,9 @@ final class MatchSession {
             match.setStartGameHook(() -> {
                 try {
                     SaveGame.apply(match.getGame(), save);
+                    if (commander) {
+                        noCommanderDamageLoss(match.getGame());
+                    }
                     SaveGame.refreshViews(match.getGame());
                 } catch (final RuntimeException ex) {
                     ex.printStackTrace();
@@ -228,8 +231,40 @@ final class MatchSession {
                 session.markCheated(game);
             }
         }
+        if (commander && game != null) {
+            game.getAction().invoke(() -> noCommanderDamageLoss(game));
+        }
         session.applyYieldPrefs();
         return session;
+    }
+
+    /** Nom de l'effet invisible qui retire la défaite par 21 blessures de commandant (jamais montré). */
+    static final String NO_COMMANDER_DAMAGE = "Arcane Table: commander damage";
+
+    /**
+     * Règle maison, dans tous les modes : 21 blessures d'un même commandant ne font pas perdre. Forge n'a pas de
+     * réglage pour cela ; un effet dans la zone de commandement de chaque joueur remplace cette défaite (comme la
+     * carte Mine, Mine, Mine! le fait pour la bibliothèque vide). Sans effet si la partie en a déjà (reprise).
+     */
+    static void noCommanderDamageLoss(final Game game) {
+        for (final Player p : game.getPlayers()) {
+            boolean present = false;
+            for (final Card c : p.getCardsIn(ZoneType.Command)) {
+                present |= NO_COMMANDER_DAMAGE.equals(c.getName());
+            }
+            if (present) {
+                continue;
+            }
+            final Card eff = new Card(game.nextCardId(), game);
+            eff.setName(NO_COMMANDER_DAMAGE);
+            eff.setOwner(p);
+            eff.setGamePieceType(forge.card.GamePieceType.EFFECT);
+            eff.setGameTimestamp(game.getNextTimestamp());
+            eff.addReplacementEffect(forge.game.replacement.ReplacementHandler.parseReplacement(
+                    "Event$ GameLoss | ActiveZones$ Command | ValidPlayer$ You | ValidLoseReason$ CommanderDamage | Layer$ CantHappen"
+                            + " | Description$ No loss from commander damage.", eff, true));
+            game.getAction().moveTo(ZoneType.Command, eff, null, AbilityKey.newMap());
+        }
     }
 
     /**
@@ -267,7 +302,7 @@ final class MatchSession {
         final JsonObject them = new JsonObject();
         them.addProperty("name", "Adversaire");
         them.addProperty("ai", true);
-        them.addProperty("deckKey", Career.opponentKey());
+        them.addProperty("deckKey", Career.opponentFor(catalog, key.substring(Career.KEY_PREFIX.length())));
         final JsonArray fixed = new JsonArray();
         fixed.add(mine);
         fixed.add(them);
@@ -510,9 +545,13 @@ final class MatchSession {
         final forge.localinstance.properties.ForgePreferences prefs = forge.model.FModel.getPreferences();
         prefs.setPref(FPref.YIELD_AUTO_PASS_NO_ACTIONS, String.valueOf(autoPassNoActions));
         prefs.setPref(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS, "true");
+        // Forge marque une pause de 0,4 s à chaque objet de la pile qu'il passe pour nous : la pile défile
+        // lentement dès qu'il y a plusieurs déclencheurs. L'interface anime déjà chaque résolution.
+        prefs.setPref(FPref.YIELD_SKIP_RESOLVE_DELAY, "true");
         final PlayerControllerHuman c = gui.controller();
         if (c != null) {
             c.setYieldPref(FPref.YIELD_AUTO_PASS_NO_ACTIONS, String.valueOf(autoPassNoActions));
+            c.setYieldPref(FPref.YIELD_SKIP_RESOLVE_DELAY, "true");
         }
     }
 
@@ -567,7 +606,7 @@ final class MatchSession {
      * Appelé à chaque nouvelle invite. Sans « garder la priorité », un sort ou une capacité que l'on
      * vient de mettre sur la pile est résolu sans s'arrêter, comme sur Arena : on passe la priorité.
      */
-    void onPrompt() {
+    void onPrompt(final String message) {
         if (closed) {
             return;
         }
@@ -579,6 +618,38 @@ final class MatchSession {
         final Input input = c.getInputQueue().getInput();
         if (resumePending) {
             answerBeforeResume(c, input);
+            return;
+        }
+        if (input instanceof forge.gamemodes.match.input.InputPayMana && gui.takeCancelCast()) {
+            // Sort abandonné au choix de ses modes : on annule son paiement, Forge le remet en main.
+            timer.schedule(() -> bridge.runOnEdt(() -> {
+                if (!closed && c.getInputQueue().getInput() == input) {
+                    c.selectButtonCancel();
+                }
+            }), 30, TimeUnit.MILLISECONDS);
+            return;
+        }
+        if (input instanceof InputPassPriority) {
+            gui.takeCancelCast();
+            final Player ending = pendingEndTurn;
+            final Game game = game();
+            if (ending != null && game != null) {
+                pendingEndTurn = null;
+                bridge.runOnEdt(() -> {
+                    if (!closed && c.getInputQueue().getInput() == input) {
+                        endTurnNow(game, c, input, ending);
+                    }
+                });
+                return;
+            }
+        }
+        if (input instanceof forge.gamemodes.match.input.InputConfirm && message != null && cancelSearch().matcher(message).matches()) {
+            // « Aucun » dans une recherche : Forge demande encore s'il faut arrêter de chercher. C'est déjà répondu.
+            timer.schedule(() -> bridge.runOnEdt(() -> {
+                if (!closed && c.getInputQueue().getInput() == input) {
+                    c.selectButtonOk();
+                }
+            }), 30, TimeUnit.MILLISECONDS);
             return;
         }
         if (input instanceof InputPassPriority) {
@@ -600,7 +671,28 @@ final class MatchSession {
             if (!closed && c.getInputQueue().getInput() == input) {
                 c.selectButtonOk();
             }
-        }), 350, TimeUnit.MILLISECONDS);
+        }), 150, TimeUnit.MILLISECONDS);
+    }
+
+    private static volatile java.util.regex.Pattern cancelSearch;
+
+    /** « Annuler la recherche ? Jusqu'à 2 carte(s)... », dans la langue de Forge. */
+    private static java.util.regex.Pattern cancelSearch() {
+        java.util.regex.Pattern p = cancelSearch;
+        if (p == null) {
+            final String text = forge.util.Localizer.getInstance().getMessage("lblCancelSearchUpToSelectNumCards", "\u0001");
+            final StringBuilder re = new StringBuilder();
+            final String[] parts = text.split("\u0001", -1);
+            for (int i = 0; i < parts.length; i++) {
+                re.append(java.util.regex.Pattern.quote(parts[i].trim()));
+                if (i < parts.length - 1) {
+                    re.append("\\s*\\d+\\s*");
+                }
+            }
+            p = java.util.regex.Pattern.compile("\\s*" + re + "\\s*", java.util.regex.Pattern.DOTALL);
+            cancelSearch = p;
+        }
+        return p;
     }
 
     /** Avant de reprendre une partie : on joue, on garde sa main, on se choisit pour commencer. */
@@ -886,7 +978,19 @@ final class MatchSession {
                     n.addProperty("message", p.getName() + " passera son prochain tour.");
                 });
             }
-            case "endTurn" -> runScript(game, player(m), "DB$ EndTurn");
+            case "endTurn" -> {
+                final Input before = c.getInputQueue().getInput();
+                if (before instanceof forge.gamemodes.match.input.InputAttack) {
+                    // Pendant la déclaration des attaquants, Forge attend la réponse au milieu de son étape : on n'attaque
+                    // pas, et le tour se termine à la priorité suivante (onPrompt).
+                    pendingEndTurn = player(m);
+                    c.selectButtonOk();
+                } else if (before instanceof InputPassPriority) {
+                    endTurnNow(game, c, before, player(m));
+                } else {
+                    throw new IllegalStateException("Attends d'avoir la priorité pour terminer le tour.");
+                }
+            }
             case "untapAll" -> {
                 final Player p = player(m);
                 inGame(game, () -> {
@@ -941,15 +1045,40 @@ final class MatchSession {
     }
 
     /** Résout une capacité écrite dans le langage de script de Forge, comme si {@code player} l'activait. */
-    private void runScript(final Game game, final Player player, final String script) {
-        inGame(game, () -> {
-            final Card host = new Card(game.nextCardId(), game);
-            host.setOwner(player);
-            host.setName("Triche");
-            final SpellAbility sa = AbilityFactory.getAbility(script, host);
-            sa.setActivatingPlayer(player);
-            AbilityUtils.resolve(sa);
+    /** Triche « Terminer le tour » demandée pendant une étape qui ne pouvait pas s'interrompre. */
+    private volatile Player pendingEndTurn;
+
+    /**
+     * Termine le tour, sans attendre : l'étape de nettoyage peut demander de se défausser, et ce choix passe par le
+     * fil de l'interface. Une fois au nettoyage, on rend la priorité : la partie passe au tour suivant.
+     */
+    private void endTurnNow(final Game game, final PlayerControllerHuman c, final Input before, final Player p) {
+        game.getAction().invoke(() -> {
+            try {
+                resolveScript(game, p, "DB$ EndTurn");
+            } catch (final RuntimeException e) {
+                bridge.reportError(e);
+            }
+            bridge.runOnEdt(() -> {
+                if (!closed && c.getInputQueue().getInput() == before) {
+                    c.selectButtonOk();
+                }
+            });
+            gui.markDirty();
         });
+    }
+
+    private void runScript(final Game game, final Player player, final String script) {
+        inGame(game, () -> resolveScript(game, player, script));
+    }
+
+    private static void resolveScript(final Game game, final Player player, final String script) {
+        final Card host = new Card(game.nextCardId(), game);
+        host.setOwner(player);
+        host.setName("Triche");
+        final SpellAbility sa = AbilityFactory.getAbility(script, host);
+        sa.setActivatingPlayer(player);
+        AbilityUtils.resolve(sa);
     }
 
     /**

@@ -225,10 +225,16 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 :root[data-card-back="phoenix"] { --card-back: url("../img/backs/back-phoenix.svg"); }
 :root[data-card-back="compass"] { --card-back: url("../img/backs/back-compass.svg"); }
 :root[data-card-back="skull"] { --card-back: url("../img/backs/back-skull.svg"); }
+:root[data-card-back="spark"] { --card-back: url("../img/backs/back-spark.svg"); }
+:root[data-card-back="prism"] { --card-back: url("../img/backs/back-prism.svg"); }
 .mcard.back .face {
   background-color: #1a1008; background-image: var(--card-back);
   background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
 }
+
+/* Aperçu d'une carte au survol d'un nom (triche, jetons). */
+.hover-card { position: fixed; z-index: 90; pointer-events: none; animation: fade-in 0.12s ease; filter: drop-shadow(0 10px 24px rgb(0 0 0 / 0.6)); }
+.hover-card .mcard { --w: clamp(190px, 17vw, 260px); }
 
 /* ---------- Dialogues ---------- */
 
@@ -817,6 +823,55 @@ body.in-game #topbar { display: none; }
   --menu-art: url("../img/themes/menu-necro.svg"); --art-veil: 0.35;
 }
 
+:root[data-menu-theme="aurora"] {
+  --bg: #03060f; --bg-2: #07111e; --panel: rgba(8, 18, 30, 0.9); --panel-solid: #0a1626; --panel-2: #10223a;
+  --text: #e6f4f2; --muted: #8fb0b4;
+  --gold: #bfe8ff; --gold-2: #e6f8ff; --gold-rgb: 191 232 255; --accent: #59f5b0; --accent-rgb: 89 245 176;
+  --btn-gold-a: #d8f4ff; --btn-gold-b: #84c2e0; --btn-gold-text: #06141e;
+  --btn-primary-a: #6cf8bc; --btn-primary-b: #2aa878; --btn-primary-line: #a8ffd8;
+  --menu-art: url("../img/themes/menu-aurora.svg"); --art-veil: 0.3;
+}
+:root[data-menu-theme="godforge"] {
+  --bg: #0a0504; --bg-2: #140906; --panel: rgba(28, 14, 9, 0.9); --panel-solid: #1e0f0a; --panel-2: #2c160e;
+  --text: #f6ebe2; --muted: #bba08e;
+  --gold: #ffd27a; --gold-2: #ffe8b0; --gold-rgb: 255 210 122; --accent: #ff8a2a; --accent-rgb: 255 138 42;
+  --btn-gold-a: #ffe09a; --btn-gold-b: #e09a34; --btn-gold-text: #1e1006;
+  --btn-primary-a: #ff9a44; --btn-primary-b: #c4561a; --btn-primary-line: #ffc08a;
+  --menu-art: url("../img/themes/menu-godforge.svg"); --art-veil: 0.3;
+}
+
+/* Apparences mythiques : calque animé derrière les menus (transformations et opacité seulement, peu coûteuses). */
+#menu-fx { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+body.in-game #menu-fx { display: none; }
+#menu-fx i { position: absolute; display: block; will-change: transform, opacity; }
+.mf-band { left: -25%; width: 150%; height: 52%; top: -4%; mix-blend-mode: screen; }
+.mf-band.b1 { background: radial-gradient(48% 34% at 38% 62%, rgb(89 245 176 / 0.42), transparent 70%), radial-gradient(30% 26% at 70% 55%, rgb(63 214 200 / 0.3), transparent 70%); animation: mf-sway 17s ease-in-out infinite alternate; }
+.mf-band.b2 { background: radial-gradient(40% 30% at 60% 50%, rgb(125 255 196 / 0.32), transparent 70%), radial-gradient(26% 22% at 24% 46%, rgb(154 124 255 / 0.28), transparent 70%); animation: mf-sway 23s ease-in-out -7s infinite alternate-reverse; }
+.mf-band.b3 { top: 6%; background: radial-gradient(36% 22% at 50% 58%, rgb(180 140 255 / 0.24), transparent 70%); animation: mf-sway 29s ease-in-out -13s infinite alternate; }
+@keyframes mf-sway {
+  0% { transform: translateX(-7%) skewX(-14deg) scaleY(0.82); opacity: 0.45; }
+  50% { transform: translateX(2%) skewX(6deg) scaleY(1.08); opacity: 1; }
+  100% { transform: translateX(8%) skewX(14deg) scaleY(0.9); opacity: 0.6; }
+}
+.mf-stars { inset: 0 0 38% 0; background-image:
+  radial-gradient(1.6px 1.6px at 22px 34px, #fff, transparent), radial-gradient(1.2px 1.2px at 140px 90px, #dff6ff, transparent),
+  radial-gradient(1.8px 1.8px at 210px 18px, #fff, transparent), radial-gradient(1.1px 1.1px at 80px 150px, #cfe8ff, transparent); }
+.mf-stars.s1 { background-size: 260px 190px; animation: mf-twinkle 3.8s ease-in-out infinite alternate; }
+.mf-stars.s2 { background-size: 340px 230px; background-position: 120px 60px; animation: mf-twinkle 5.2s ease-in-out -2s infinite alternate; }
+@keyframes mf-twinkle { from { opacity: 0.15; } to { opacity: 0.95; } }
+:root[data-menu-theme="godforge"] #menu-fx { -webkit-mask-image: linear-gradient(to top, #000 15%, transparent 85%); mask-image: linear-gradient(to top, #000 15%, transparent 85%); }
+.mf-glow { left: 50%; bottom: -30vmax; width: 110vmax; height: 60vmax; margin-left: -55vmax; border-radius: 50%; background: radial-gradient(closest-side, rgb(255 150 50 / 0.5), rgb(255 90 20 / 0.16) 55%, transparent); animation: mf-pulse 3.4s ease-in-out infinite alternate; }
+@keyframes mf-pulse { from { opacity: 0.55; transform: scale(0.96); } to { opacity: 1; transform: scale(1.04); } }
+.mf-embers { left: 0; right: 0; top: 0; }
+.mf-embers.e1 { height: calc(100% + 1040px); background-image: radial-gradient(2.4px 2.4px at 30px 40px, #ffd27a, transparent), radial-gradient(1.8px 1.8px at 150px 170px, #ff9a3a, transparent), radial-gradient(1.4px 1.4px at 90px 230px, #ffe8b0, transparent); background-size: 220px 260px; animation: mf-rise1 13s linear infinite; }
+.mf-embers.e2 { height: calc(100% + 1360px); background-image: radial-gradient(3px 3px at 60px 80px, #ffb54a, transparent), radial-gradient(1.6px 1.6px at 230px 260px, #ff7a2a, transparent); background-size: 300px 340px; animation: mf-rise2 19s linear infinite; opacity: 0.8; }
+.mf-embers.e3 { height: calc(100% + 720px); background-image: radial-gradient(1.2px 1.2px at 40px 60px, #fff0c8, transparent), radial-gradient(1px 1px at 120px 120px, #ffc070, transparent); background-size: 160px 180px; animation: mf-rise3 9s linear infinite; opacity: 0.7; }
+@keyframes mf-rise1 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-40px, -1040px, 0); } }
+@keyframes mf-rise2 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(50px, -1360px, 0); } }
+@keyframes mf-rise3 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-20px, -720px, 0); } }
+:root[data-motion="off"] #menu-fx i { animation: none; }
+@media (prefers-reduced-motion: reduce) { #menu-fx i { animation: none; } }
+
 /* Choix des apparences (réglages). */
 .th-h { margin: 16px 0 8px; font-size: 15px; }
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
@@ -854,6 +909,41 @@ body.in-game #topbar { display: none; }
 .th-back-phoenix { background-image: url("../img/backs/back-phoenix.svg"); }
 .th-back-compass { background-image: url("../img/backs/back-compass.svg"); }
 .th-back-skull { background-image: url("../img/backs/back-skull.svg"); }
+.th-back-spark { background-image: url("../img/backs/back-spark.svg"); }
+.th-back-prism { background-image: url("../img/backs/back-prism.svg"); }
+.th-menu-aurora { background-image: url("../img/themes/menu-aurora.svg"); }
+.th-menu-godforge { background-image: url("../img/themes/menu-godforge.svg"); }
+
+/* Dos mythiques : un reflet qui passe (étincelle) ou des couleurs holographiques (prisme). */
+:root[data-card-back="spark"] .mcard.back .face::after, :root[data-card-back="prism"] .mcard.back .face::after,
+.th-back-spark::after, .th-back-prism::after {
+  content: ""; position: absolute; inset: -40%; pointer-events: none; will-change: transform;
+}
+:root[data-card-back="spark"] .mcard.back .face::after, .th-back-spark::after {
+  background: linear-gradient(115deg, transparent 42%, rgb(255 236 180 / 0.42) 50%, transparent 58%);
+  animation: cb-sheen 4.6s ease-in-out infinite;
+}
+:root[data-card-back="prism"] .mcard.back .face::after, .th-back-prism::after {
+  background: linear-gradient(120deg, transparent 18%, rgb(255 110 170 / 0.3) 32%, rgb(255 220 120 / 0.28) 42%, rgb(110 240 190 / 0.3) 52%, rgb(110 170 255 / 0.32) 62%, transparent 78%);
+  mix-blend-mode: color-dodge; animation: cb-holo 5.5s ease-in-out infinite alternate;
+}
+.th-back-spark::after, .th-back-prism::after { inset: 7% 22%; border-radius: 6px; overflow: hidden; }
+.th-prev[class*="th-back-"] { overflow: hidden; }
+@keyframes cb-sheen { 0% { transform: translateX(-46%); } 55%, 100% { transform: translateX(46%); } }
+@keyframes cb-holo { from { transform: translate(-22%, -10%) rotate(-6deg); } to { transform: translate(22%, 10%) rotate(6deg); } }
+:root[data-motion="off"] .mcard.back .face::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .mcard.back .face::after, .th-prev::after { animation: none !important; } }
+
+/* Cartes d'apparence mythiques : liseré irisé et pastille. */
+.theme-card.mythic, .challenge.mythic { position: relative; border-color: transparent; background:
+  linear-gradient(var(--panel-solid), var(--panel-solid)) padding-box,
+  conic-gradient(from var(--myth-a, 0deg), #ff8a3a, #ffd27a, #c07cff, #59f5b0, #ff8a3a) border-box; }
+@property --myth-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.theme-card.mythic:not(.locked), .challenge.mythic.done { animation: myth-border 6s linear infinite; }
+@keyframes myth-border { to { --myth-a: 360deg; } }
+.th-myth { position: absolute; left: 8px; top: 8px; z-index: 2; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; color: #1a0e04; background: linear-gradient(90deg, #ffb070, #ffe29a, #d8a8ff); box-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
+.challenge.mythic .th-myth { display: none; }
 .th-board-classic { background-image: radial-gradient(ellipse 60% 45% at 50% 50%, rgb(124 108 242 / 0.14), transparent 70%), linear-gradient(180deg, #121022 0%, #0f1424 50%, #0c1020 100%); }
 .th-menu-citadel { background-image: url("../img/themes/menu-citadel.svg"); }
 .th-menu-sylvan { background-image: url("../img/themes/menu-sylvan.svg"); }
@@ -872,6 +962,21 @@ body.in-game #topbar { display: none; }
 .th-board-library { background-image: url("../img/themes/board-library.svg"); }
 .th-board-arena { background-image: url("../img/themes/board-arena.svg"); }
 .th-board-swamp { background-image: url("../img/themes/board-swamp.svg"); }
+.th-board-vortex { background-image: url("../img/themes/board-vortex.svg"); }
+.th-board-celestial { background-image: url("../img/themes/board-celestial.svg"); }
+/* Aperçus animés des apparences mythiques. */
+.th-prev.th-board-vortex, .th-prev.th-board-celestial, .th-prev.th-menu-aurora, .th-prev.th-menu-godforge { overflow: hidden; }
+.th-board-vortex::after, .th-board-celestial::after, .th-menu-aurora::after, .th-menu-godforge::after {
+  content: ""; position: absolute; pointer-events: none; will-change: transform; background: center / contain no-repeat;
+}
+.th-board-vortex::after { left: 50%; top: 50%; width: 150%; aspect-ratio: 1; translate: -50% -50%; background-image: url("../img/themes/fx-vortex.svg"); opacity: 0.75; animation: fx-spin 30s linear infinite; }
+.th-board-celestial::after { left: 50%; top: 62%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%) scaleY(0.4); background-image: url("../img/themes/fx-runes.svg"); opacity: 0.6; animation: fx-floor 40s linear infinite; }
+.th-menu-aurora::after { left: -25%; top: -10%; width: 150%; height: 60%; background: radial-gradient(45% 35% at 40% 60%, rgb(89 245 176 / 0.45), transparent 70%); mix-blend-mode: screen; animation: mf-sway 9s ease-in-out infinite alternate; }
+.th-menu-godforge::after { left: 0; right: 0; top: 0; height: calc(100% + 260px); background: none; background-image: radial-gradient(1.6px 1.6px at 30px 40px, #ffd27a, transparent), radial-gradient(1.2px 1.2px at 120px 170px, #ff9a3a, transparent); background-size: 160px 130px; animation: mf-rise-prev 6s linear infinite; }
+@keyframes mf-rise-prev { to { transform: translateY(-260px); } }
+@keyframes fx-spin { from { rotate: 0deg; } to { rotate: 360deg; } }
+@keyframes fx-floor { from { transform: translate(-50%, -50%) scaleY(0.4) rotate(0deg); } to { transform: translate(-50%, -50%) scaleY(0.4) rotate(360deg); } }
+:root[data-motion="off"] .th-prev::after { animation: none; }
 
 /* Défis (écran Trophées) : l'apparence à gagner, l'objectif et la progression. */
 .challenges { margin: 8px 0 22px; }

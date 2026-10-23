@@ -211,7 +211,7 @@ final class BridgeGuiGame extends AbstractGuiGame {
         markDirty();
         final MatchSession s = session;
         if (s != null) {
-            s.onPrompt();
+            s.onPrompt(message);
         }
     }
 
@@ -306,7 +306,43 @@ final class BridgeGuiGame extends AbstractGuiGame {
         if (abilities.size() == 1) {
             return abilities.get(0);
         }
-        return dialogs.one("Choisir la capacité à jouer", abilities, null, true);
+        return dialogs.one("Choisir la capacité à jouer", abilities, null, true, "Annuler");
+    }
+
+    /** Le joueur a renoncé au sort en choisissant ses modes : le paiement qui suit est annulé (MatchSession). */
+    private volatile boolean cancelCast;
+
+    boolean takeCancelCast() {
+        final boolean was = cancelCast;
+        cancelCast = false;
+        return was;
+    }
+
+    /**
+     * Modes d'un sort qu'on lance (« Choisissez un — ») : on peut y renoncer. Forge ne sait pas annuler ici ; le sort
+     * part sans mode vers le paiement, que l'on annule aussitôt, et la carte revient en main.
+     */
+    @Override
+    public <T> T one(final String message, final List<T> choices, final FSerializableFunction<T, String> display) {
+        if (choices != null && choices.size() > 1 && castingModes(choices)) {
+            final T picked = dialogs.one(message, choices, display, true, "Annuler");
+            cancelCast = picked == null;
+            return picked;
+        }
+        return super.one(message, choices, display);
+    }
+
+    private static boolean castingModes(final List<?> choices) {
+        for (final Object o : choices) {
+            if (!(o instanceof SpellAbilityView sa) || sa.getHostCard() == null) {
+                return false;
+            }
+            final forge.game.zone.ZoneType zone = sa.getHostCard().getZone();
+            if (zone == null || zone == forge.game.zone.ZoneType.Battlefield || zone == forge.game.zone.ZoneType.Stack) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -390,7 +426,8 @@ final class BridgeGuiGame extends AbstractGuiGame {
             return new OrderResult<>(ordered, false);
         }
         pendingTopOrder = null;
-        return new OrderResult<>(dialogs.order(title, top, remainingObjectsMin, remainingObjectsMax, sourceChoices, destChoices), false);
+        final Dialogs.Ordered<T> o = dialogs.order(title, top, remainingObjectsMin, remainingObjectsMax, sourceChoices, destChoices, showRememberCheckbox);
+        return new OrderResult<>(o.order(), o.remember());
     }
 
     @Override
