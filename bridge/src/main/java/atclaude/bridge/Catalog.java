@@ -123,9 +123,13 @@ final class Catalog {
         final boolean commandersOnly = bool(q, "commandersOnly");
         final int offset = q.has("offset") ? q.get("offset").getAsInt() : 0;
         final int limit = q.has("limit") ? q.get("limit").getAsInt() : DEFAULT_LIMIT;
+        // Extension : les cartes imprimées dans ce set, montrées avec leur impression de ce set.
+        final String setCode = str(q, "set");
+        final java.util.Set<String> inSet = setCode.isEmpty() ? null : namesInSet(setCode);
 
         final List<Entry> matches = new ArrayList<>();
         for (final Entry e : index()) {
+            if (inSet != null && !inSet.contains(e.nameEn())) continue;
             if (!text.isEmpty()) {
                 final boolean nameHit = e.searchName().contains(text);
                 if (!nameHit && !(inText && e.searchText().contains(text))) {
@@ -148,10 +152,30 @@ final class Catalog {
         result.addProperty("total", matches.size());
         final JsonArray cards = new JsonArray();
         for (int i = offset; i < Math.min(matches.size(), offset + limit); i++) {
-            cards.add(paperJson(matches.get(i).card()));
+            PaperCard pc = matches.get(i).card();
+            if (inSet != null) {
+                final PaperCard print = FModel.getMagicDb().getCommonCards().getCard(pc.getName(), setCode);
+                pc = print != null ? print : pc;
+            }
+            cards.add(paperJson(pc));
         }
         result.add("cards", cards);
         return result;
+    }
+
+    private final Map<String, java.util.Set<String>> setNames = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private java.util.Set<String> namesInSet(final String code) {
+        return setNames.computeIfAbsent(code, c -> {
+            final java.util.Set<String> names = new java.util.HashSet<>();
+            final forge.card.CardEdition ed = FModel.getMagicDb().getEditions().get(c);
+            if (ed != null) {
+                for (final forge.card.CardEdition.EditionEntry entry : ed.getAllCardsInSet()) {
+                    names.add(entry.name());
+                }
+            }
+            return names;
+        });
     }
 
     private static int rank(final Entry e, final String text) {
@@ -235,6 +259,10 @@ final class Catalog {
         o.addProperty("identity", GameSerializer.colors(rules.getColorIdentity()));
         o.addProperty("image", pc.getImageKey(false));
         o.addProperty("set", pc.getEdition());
+        // Impression précise (édition, numéro d'illustration) : gardée dans le deck, choisie dans le deck builder.
+        o.addProperty("art", pc.getArtIndex());
+        o.addProperty("number", pc.getCollectorNumber());
+        o.addProperty("exactArt", ArtChoices.isChosen(pc.getCardImageKey()));
         o.addProperty("rarity", pc.getRarity() == null ? "" : pc.getRarity().name());
         o.addProperty("land", rules.getType().isLand());
         o.addProperty("creature", rules.getType().isCreature());
@@ -444,7 +472,7 @@ final class Catalog {
                 final String name = line.has("name") ? line.get("name").getAsString()
                         : line.getAsJsonObject("card").get("name").getAsString();
                 final int count = line.has("count") ? line.get("count").getAsInt() : 1;
-                final PaperCard pc = resolve(name);
+                final PaperCard pc = printing(line, name);
                 if (pc == null) {
                     unknown.add(name);
                     continue;
@@ -453,6 +481,79 @@ final class Catalog {
             }
         }
         return deck;
+    }
+
+    /** L'impression demandée par une ligne de deck (édition et illustration de sa carte), sinon celle par défaut. */
+    private PaperCard printing(final JsonObject line, final String name) {
+        final JsonObject card = line.has("card") && line.get("card").isJsonObject() ? line.getAsJsonObject("card") : null;
+        if (card != null && card.has("set") && !card.get("set").isJsonNull()) {
+            final String set = card.get("set").getAsString();
+            final int art = card.has("art") ? card.get("art").getAsInt() : 0;
+            final PaperCard exact = art > 0 ? FModel.getMagicDb().getCommonCards().getCard(name, set, art)
+                    : FModel.getMagicDb().getCommonCards().getCard(name, set);
+            if (exact != null) {
+                return exact;
+            }
+        }
+        return resolve(name);
+    }
+
+    /** Toutes les impressions d'une carte, les plus récentes d'abord, pour choisir son illustration. */
+    JsonElement prints(final String rawName) {
+        final PaperCard pc = resolve(rawName);
+        if (pc == null) {
+            throw new IllegalArgumentException("Carte inconnue : " + rawName);
+        }
+        final forge.card.CardEdition.Collection editions = FModel.getMagicDb().getEditions();
+        final List<PaperCard> all = new ArrayList<>(FModel.getMagicDb().getCommonCards().getAllCards(pc.getName()));
+        final Map<String, java.util.Date> dates = new HashMap<>();
+        for (final PaperCard p : all) {
+            final forge.card.CardEdition ed = editions.get(p.getEdition());
+            dates.put(p.getEdition(), ed == null || ed.getDate() == null ? new java.util.Date(0) : ed.getDate());
+        }
+        all.sort(Comparator.comparing((PaperCard p) -> dates.get(p.getEdition())).reversed()
+                .thenComparing(PaperCard::getArtIndex));
+        final JsonArray list = new JsonArray();
+        for (final PaperCard p : all) {
+            final JsonObject o = paperJson(p);
+            final forge.card.CardEdition ed = editions.get(p.getEdition());
+            o.addProperty("setName", ed == null ? p.getEdition() : ed.getName());
+            o.addProperty("year", ed == null || ed.getDate() == null ? "" : String.valueOf(1900 + ed.getDate().getYear()));
+            list.add(o);
+        }
+        final JsonObject result = new JsonObject();
+        result.addProperty("name", pc.getName());
+        result.add("prints", list);
+        return result;
+    }
+
+    private volatile JsonArray editionList;
+
+    /** Extensions qui ont des cartes, les plus récentes d'abord (filtre de la recherche). */
+    JsonElement editions() {
+        JsonArray list = editionList;
+        if (list != null) {
+            return list;
+        }
+        final List<forge.card.CardEdition> eds = new ArrayList<>();
+        for (final forge.card.CardEdition ed : FModel.getMagicDb().getEditions()) {
+            if (ed.getType() != forge.card.CardEdition.Type.CUSTOM_SET && !ed.getAllCardsInSet().isEmpty()) {
+                eds.add(ed);
+            }
+        }
+        eds.sort(Comparator.comparing((forge.card.CardEdition ed) -> ed.getDate() == null ? new java.util.Date(0) : ed.getDate()).reversed());
+        list = new JsonArray();
+        for (final forge.card.CardEdition ed : eds) {
+            final JsonObject o = new JsonObject();
+            o.addProperty("code", ed.getCode());
+            o.addProperty("name", ed.getName());
+            o.addProperty("year", ed.getDate() == null ? "" : String.valueOf(1900 + ed.getDate().getYear()));
+            o.addProperty("type", ed.getType().name());
+            o.addProperty("count", ed.getAllCardsInSet().size());
+            list.add(o);
+        }
+        editionList = list;
+        return list;
     }
 
     JsonElement saveDeck(final JsonObject json) {

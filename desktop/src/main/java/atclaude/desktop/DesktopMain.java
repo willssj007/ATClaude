@@ -146,7 +146,7 @@ public final class DesktopMain {
 
     private static void cardImage(final HttpExchange exchange) throws IOException {
         final String key = query(exchange.getRequestURI(), "key");
-        final ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), 15_000);
+        final ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), 15_000, "1".equals(query(exchange.getRequestURI(), "exact")));
         if (img == null) {
             reply(exchange, 404, "text/plain", new byte[0]);
             return;

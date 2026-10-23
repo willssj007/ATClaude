@@ -42,6 +42,7 @@ final class French {
     private static final Pattern ZONE_CHANGE_FR = Pattern.compile("^(.*) : ([A-Z]\\w+) → ([A-Z]\\w+)\\.$");
     private static final Pattern MANA = Pattern.compile("\\{T\\}: Add ((?:\\{[^}]+\\})+)\\.");
     private static final Pattern TARGET_LIST = Pattern.compile("ciblant \\[+(.*?)\\]+");
+    private static final Pattern DISCARDS = Pattern.compile("^(.+?) discards (.+)\\.$");
 
     /** Texte de Forge d'un élément de pile (nettoyé) → texte français avec ses cibles, pour la ligne « résolu » du journal. */
     private static final Map<String, String> RESOLVED = Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
@@ -275,6 +276,10 @@ final class French {
             out = z.group(1) + " : " + zone(z.group(3)) + " → " + zone(z.group(2)) + ".";
         } else if (zf.matches()) {
             out = zf.group(1) + " : " + zone(zf.group(2)) + " → " + zone(zf.group(3)) + ".";
+        }
+        final Matcher d = DISCARDS.matcher(out);
+        if (d.matches()) {
+            out = d.group(1) + " défausse " + d.group(2) + ".";
         }
         out = MANA.matcher(out).replaceAll("{T} : Ajoutez $1.");
         out = TARGET_LIST.matcher(out).replaceAll("ciblant $1");

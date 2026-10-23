@@ -41,7 +41,8 @@ export function loadImage(node, key, bust = '') {
     img.dataset.src = '';
     return;
   }
-  const url = bridge.imageUrl(key, prefs.get('imageLang'));
+  // Illustration choisie dans le deck builder : cette impression précise, jamais une autre impression traduite.
+  const url = bridge.imageUrl(key, prefs.get('imageLang')) + (node.dataset.exact === '1' ? '&exact=1' : '');
   if (img.dataset.src === url && !bust) {
     return;
   }
@@ -91,6 +92,9 @@ export function cardElement(card, extraClass = '') {
   }
   const node = el(`<div class="mcard ${extraClass}"><div class="face"><img class="art" alt="" draggable="false">${frameHtml(card)}</div></div>`);
   node.title = card.nameFr || card.name || '';
+  if (card.exactArt) {
+    node.dataset.exact = '1';
+  }
   loadImage(node, card.image);
   return node;
 }

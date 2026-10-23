@@ -897,6 +897,11 @@ final class MatchSession {
         game.getAction().invoke(() -> {
             try {
                 change.run();
+                // Forge calcule les cartes jouables au début de chaque priorité : après une triche (carte ajoutée,
+                // mana...), on les recalcule pour que la surbrillance suive tout de suite.
+                if (c.getInputQueue().getInput() instanceof forge.gamemodes.match.input.InputPassPriority) {
+                    gui.setWeaklySelectable(forge.ai.AvailableActions.collectActionable(c.getPlayer(), 400));
+                }
             } catch (final RuntimeException e) {
                 bridge.reportError(e);
             } finally {

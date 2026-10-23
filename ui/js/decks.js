@@ -2,10 +2,16 @@
 
 import {bracketBadgeHtml, openAnalysis, openDeckStats, openEdhrec, summaryLineHtml} from './analysis.js';
 import {bridge} from './bridge.js';
-import {cardElement, showZoom, onLongPress} from './cards.js';
+import {cardElement, loadImage, showZoom, onLongPress} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
+import {icon} from './icons.js';
 import {SearchPanel} from './search.js';
 import {esc, el, manaHtml, prefs, toast, debounce} from './util.js';
+
+/** Clé de prix d'une carte : son impression (nom, édition, numéro). */
+function priceKey(card) {
+  return `${card.name}|${card.set || ''}|${card.number || ''}`;
+}
 
 const GROUPS = [
   ['Créatures', c => c.creature],
@@ -217,8 +223,11 @@ export class Decks {
       left.classList.toggle('mobile-hidden', b.dataset.tab !== 'left');
       right.classList.toggle('mobile-hidden', b.dataset.tab !== 'right');
     });
+    this.prices = new Map();
+    this.priceError = '';
     this.renderDeck();
     this.analyze();
+    this.loadPrices();
     this.search.search(true);
   }
 
@@ -292,10 +301,13 @@ export class Decks {
   changed() {
     this.dirty = true;
     this.renderDeck();
+    this.loadPricesSoon();
     this.search && this.search.refreshCounts();
     this.validate();
     this.analyze();
   }
+
+  loadPricesSoon = debounce(() => this.loadPrices(), 1200);
 
   analyze = debounce(async () => {
     const deck = this.deck;
@@ -351,7 +363,8 @@ export class Decks {
     }
     const row = (l, section) => `<div class="deck-row" data-name="${esc(l.card.name)}" data-section="${section}">
       <span class="qty">${l.count}</span><span class="nm" title="${esc(l.card.name)}">${esc(l.card.nameFr)}</span>${manaHtml(l.card.cost)}
-      <span class="acts">${section === 'main' && d.format === 'commander' && l.card.canBeCommander ? '<button data-act="cmd" title="Définir comme commandant">♛</button>' : ''}
+      <button class="price" data-pk="${esc(priceKey(l.card))}" title="Prix Cardmarket (toucher : ouvrir la page Cardmarket)"></button>
+      <span class="acts"><button data-act="art" title="Choisir l'illustration (impression)">${icon('brush')}</button>${section === 'main' && d.format === 'commander' && l.card.canBeCommander ? '<button data-act="cmd" title="Définir comme commandant">♛</button>' : ''}
       <button data-act="minus" title="Retirer">−</button><button data-act="plus" title="Ajouter">+</button></span></div>`;
     right.innerHTML = `
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
@@ -369,6 +382,7 @@ export class Decks {
         ${d.previousName ? '<button class="btn small danger" data-act="delete">Supprimer</button>' : ''}
       </div>
       <div class="muted small">${d.format === 'commander' ? 'Commander' : 'Construit'} · <b style="color:var(--text)">${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</div>
+      <div class="deck-price"></div>
       <div class="analysis-slot">${summaryLineHtml(this.analysis)}</div>
       <div class="problems ok">Vérification…</div>
       ${d.format === 'commander' ? `<div class="deck-section"><h4>Commandant</h4>
@@ -387,7 +401,8 @@ export class Decks {
         const c = cardElement(l.card);
         c._card = l.card;
         wrap.appendChild(c);
-        wrap.appendChild(el('<button class="btn small ghost" data-act="uncmd">Retirer</button>'));
+        wrap.appendChild(el(`<button class="price" data-pk="${esc(priceKey(l.card))}" title="Prix Cardmarket (toucher : ouvrir la page Cardmarket)"></button>`));
+        wrap.appendChild(el(`<div style="display:flex;gap:4px"><button class="btn small ghost" data-act="cmdart" title="Choisir l'illustration du commandant">${icon('brush')}</button><button class="btn small ghost" data-act="uncmd">Retirer</button></div>`));
         slot.appendChild(wrap);
       }
     }
@@ -399,8 +414,19 @@ export class Decks {
       const card = node._card || this.lineCard(node.dataset.name);
       card && showZoom(card);
     });
+    this.showPrices();
     right.onclick = async (e) => {
       if (consumed()) {
+        return;
+      }
+      const priceBtn = e.target.closest('.price');
+      if (priceBtn) {
+        const p = this.prices && this.prices.get(priceBtn.dataset.pk);
+        if (p && p.url) {
+          bridge.openUrl(p.url);
+        } else {
+          toast(this.priceError || 'Pas de prix Cardmarket pour cette carte.');
+        }
         return;
       }
       const act = e.target.closest('[data-act]');
@@ -413,8 +439,14 @@ export class Decks {
           this.remove(rowEl.dataset.name, rowEl.dataset.section);
         } else if (a === 'cmd') {
           this.setCommander(rowEl.dataset.name);
+        } else if (a === 'art') {
+          this.pickArt(rowEl.dataset.name);
+        } else if (a === 'cmdart') {
+          this.pickArt(act.closest('[data-cmd]').dataset.cmd);
         } else if (a === 'uncmd') {
           this.unsetCommander(act.closest('[data-cmd]').dataset.cmd);
+        } else if (a === 'prices') {
+          this.loadPrices(true);
         } else if (a === 'save') {
           await this.save();
         } else if (a === 'play') {
@@ -459,6 +491,150 @@ export class Decks {
       }
     };
     this.validate();
+  }
+
+  /** Prix Cardmarket (en euros, via Scryfall) de toutes les cartes du deck ; les déjà connus ne sont pas redemandés. */
+  async loadPrices(force = false) {
+    const lines = [...this.deck.sections.commander, ...this.deck.sections.main, ...this.deck.sections.side];
+    if (!lines.length) {
+      this.prices = new Map();
+      this.showPrices();
+      return;
+    }
+    const seq = (this.priceSeq = (this.priceSeq || 0) + 1);
+    const known = this.prices || new Map();
+    if (!force && lines.every(l => known.has(priceKey(l.card)))) {
+      this.showPrices();
+      return;
+    }
+    this.pricesLoading = true;
+    this.showPrices();
+    try {
+      const r = await bridge.request('deckPrices', {cards: lines.map(l => ({name: l.card.name, set: l.card.set || '', number: l.card.number || '', count: l.count}))});
+      if (seq !== this.priceSeq) {
+        return;
+      }
+      const map = new Map(known);
+      for (const [k, v] of Object.entries(r.cards || {})) {
+        map.set(k, v);
+      }
+      this.prices = map;
+      this.priceError = '';
+    } catch (err) {
+      if (seq === this.priceSeq) {
+        this.priceError = err.message;
+      }
+    } finally {
+      if (seq === this.priceSeq) {
+        this.pricesLoading = false;
+        this.showPrices();
+      }
+    }
+  }
+
+  /** Met les prix connus dans le panneau du deck (lignes, commandant, total) sans le redessiner. */
+  showPrices() {
+    const right = this.root.querySelector('.builder .right');
+    if (!right) {
+      return;
+    }
+    const prices = this.prices || new Map();
+    const euro = (v) => Number(v).toLocaleString('fr-FR', {style: 'currency', currency: 'EUR'});
+    for (const b of right.querySelectorAll('.price')) {
+      const p = prices.get(b.dataset.pk);
+      b.classList.toggle('approx', !!(p && p.approx));
+      b.classList.toggle('none', !(p && p.eur));
+      b.textContent = p && p.eur ? (p.approx ? '≈ ' : '') + euro(p.eur) : (this.pricesLoading ? '…' : '—');
+      b.title = p && p.eur ? `${euro(p.eur)} sur Cardmarket${p.approx ? ' (prix d\'une autre impression)' : ''}${p.foil ? ` · foil ${euro(p.foil)}` : ''} — toucher pour ouvrir la page`
+        : 'Pas de prix Cardmarket pour cette carte';
+    }
+    let total = 0;
+    let missing = 0;
+    let approx = 0;
+    for (const l of [...this.deck.sections.commander, ...this.deck.sections.main, ...this.deck.sections.side]) {
+      const p = prices.get(priceKey(l.card));
+      if (p && p.eur) {
+        total += l.count * Number(p.eur);
+        approx += p.approx ? l.count : 0;
+      } else {
+        missing += l.count;
+      }
+    }
+    const box = right.querySelector('.deck-price');
+    if (box) {
+      box.innerHTML = this.priceError && !prices.size
+        ? `<span class="muted small">${esc(this.priceError)}</span> <button class="btn small ghost" data-act="prices">Réessayer</button>`
+        : `<span class="dp-label">Prix du deck</span> <b>${this.pricesLoading && !prices.size ? '…' : euro(total)}</b>
+          <span class="muted small">Cardmarket via Scryfall${missing ? ` · ${missing} carte${missing > 1 ? 's' : ''} sans prix` : ''}${approx ? ` · ${approx} estimée${approx > 1 ? 's' : ''} d'après une autre impression` : ''}</span>
+          <button class="btn small ghost" data-act="prices" title="Relire les prix (gardés une journée)">Actualiser</button>`;
+    }
+  }
+
+  /** Choix de l'illustration : toutes les impressions de la carte, les plus récentes d'abord. */
+  pickArt(name) {
+    const current = this.lineCard(name);
+    if (!current) {
+      return;
+    }
+    customBox(`Illustration — ${current.nameFr || current.name}`, async (body, footer, close) => {
+      body.innerHTML = '<p class="muted">Recherche des impressions…</p>';
+      let data;
+      try {
+        data = await bridge.request('prints', {name});
+      } catch (err) {
+        body.innerHTML = `<p class="muted">${esc(err.message)}</p>`;
+        return;
+      }
+      const prints = data.prints || [];
+      body.innerHTML = `<p class="muted small">${prints.length} impression${prints.length > 1 ? 's' : ''}. Touche celle que tu veux : elle sera utilisée dans le deck et en partie (en français quand cette impression existe en français).</p>
+        <div class="card-grid art-grid"></div>`;
+      const grid = body.querySelector('.art-grid');
+      // Les images se chargent quand elles arrivent à l'écran : certaines cartes ont plus de cent impressions.
+      const seen = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            seen.unobserve(entry.target);
+            loadImage(entry.target.querySelector('.mcard'), entry.target._print.image);
+          }
+        }
+      }, {root: body, rootMargin: '200px'});
+      for (const p of prints) {
+        const print = {...p, exactArt: true};
+        const cell = el(`<div class="cell art-cell${p.set === current.set && p.art === current.art ? ' on' : ''}" title="${esc(p.setName)}"></div>`);
+        cell.appendChild(cardElement({...print, image: ''}));
+        cell.querySelector('.mcard').dataset.exact = '1';
+        cell.appendChild(el(`<div class="art-meta small"><b>${esc(p.setName)}</b><span class="muted">${esc(p.set)} · ${esc(p.number || '')}${p.year ? ' · ' + esc(p.year) : ''}</span></div>`));
+        cell._print = print;
+        grid.appendChild(cell);
+        seen.observe(cell);
+      }
+      grid.addEventListener('click', async (e) => {
+        const cell = e.target.closest('.art-cell');
+        if (!cell) {
+          return;
+        }
+        const print = cell._print;
+        try {
+          await bridge.request('chooseArt', {image: print.image});
+        } catch (err) {
+          toast(err.message, {error: true});
+          return;
+        }
+        for (const list of Object.values(this.deck.sections)) {
+          for (const l of list) {
+            if (l.card.name === name) {
+              l.card = print;
+            }
+          }
+        }
+        close();
+        this.changed();
+        toast(`Illustration : ${print.setName}.`);
+      });
+      const cancel = el('<button class="btn">Fermer</button>');
+      cancel.addEventListener('click', close);
+      footer.appendChild(cancel);
+    }, {full: true});
   }
 
   lineCard(name) {

@@ -40,7 +40,7 @@ final class GameSerializer {
         MagicColor.WHITE, MagicColor.BLUE, MagicColor.BLACK, MagicColor.RED, MagicColor.GREEN, MagicColor.COLORLESS
     };
     private static final String[] MANA_LETTERS = {"W", "U", "B", "R", "G", "C"};
-    private static final int LOG_SIZE = 40;
+    private static final int LOG_SIZE = 120;
 
     private final BridgeGuiGame gui;
 
@@ -138,6 +138,16 @@ final class GameSerializer {
         o.add("mana", mana);
 
         o.addProperty("library", p.getZoneSize(ZoneType.Library));
+        // Dessus de la bibliothèque quand un effet permet de le regarder (Coursier de Kruphix, Futur aperçu...) :
+        // les premières cartes visibles, dans l'ordre (la première est celle du dessus).
+        final JsonArray top = new JsonArray();
+        for (final CardView c : copy(p.getCards(ZoneType.Library))) {
+            if (top.size() >= 3 || !gui.mayView(c)) {
+                break;
+            }
+            top.add(card(c, gv));
+        }
+        o.add("libraryTop", top);
         o.addProperty("handSize", p.getZoneSize(ZoneType.Hand));
         final JsonObject zones = new JsonObject();
         for (final ZoneType zone : VISIBLE_ZONES) {
@@ -356,13 +366,35 @@ final class GameSerializer {
             return list;
         }
         final List<GameLogEntry> entries = new ArrayList<>(gv.getGameLog().getLogEntries(null));
-        // Forge range le journal du plus récent au plus ancien.
-        for (int i = 0; i < Math.min(LOG_SIZE, entries.size()); i++) {
+        // Forge range le journal du plus récent au plus ancien. Les étapes (pioche, combat...) ne sont pas reprises :
+        // la barre des phases les montre déjà, et elles noieraient les actions.
+        for (int i = 0; i < entries.size() && list.size() < LOG_SIZE; i++) {
             final GameLogEntry e = entries.get(i);
+            if (e.type() == forge.game.GameLogEntryType.PHASE) {
+                continue;
+            }
             Texts.remember(e.sourceCard());
             final JsonObject o = new JsonObject();
             o.addProperty("kind", e.type().name());
-            o.addProperty("text", Texts.clean(French.logLine(e.message())));
+            final String text = Texts.clean(French.logLine(e.message()));
+            o.addProperty("text", text);
+            // La carte en cause, pour l'agrandir depuis le journal : seulement si le texte la nomme déjà
+            // (une carte face cachée ou non révélée ne doit rien dévoiler de plus).
+            final CardView src = e.sourceCard();
+            if (src != null && !src.isFaceDown() && src.getCurrentState() != null) {
+                final String nameFr = translatedName(src.getCurrentState());
+                final String nameEn = src.getCurrentState().getName();
+                if (text.contains(nameFr) || text.contains(nameEn)) {
+                    final JsonObject c = new JsonObject();
+                    c.addProperty("id", src.getId());
+                    c.addProperty("name", nameFr);
+                    c.addProperty("image", src.getCurrentState().getImageKey());
+                    if (src.getController() != null) {
+                        c.addProperty("controller", src.getController().getId());
+                    }
+                    o.add("card", c);
+                }
+            }
             list.add(o);
         }
         return list;

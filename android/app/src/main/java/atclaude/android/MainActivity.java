@@ -278,7 +278,7 @@ public class MainActivity extends Activity {
             }
             final String path = url.getPath() == null || url.getPath().equals("/") ? "/index.html" : url.getPath();
             if (path.equals("/cardimg")) {
-                return cardImage(url.getQueryParameter("key"), url.getQueryParameter("lang"));
+                return cardImage(url.getQueryParameter("key"), url.getQueryParameter("lang"), "1".equals(url.getQueryParameter("exact")));
             }
             if (path.startsWith("/audio/")) {
                 return audio(path.substring("/audio/".length()));
@@ -317,8 +317,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static WebResourceResponse cardImage(final String key, final String lang) {
-        final ImageService.Served img = ImageService.image(key, lang, 15_000);
+    private static WebResourceResponse cardImage(final String key, final String lang, final boolean exact) {
+        final ImageService.Served img = ImageService.image(key, lang, 15_000, exact);
         if (img == null) {
             return notFound();
         }

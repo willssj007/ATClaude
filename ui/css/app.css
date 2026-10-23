@@ -173,13 +173,19 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 .frame.c-M { background: linear-gradient(160deg, #f2dc97, #c59a3a); }
 .frame.c-L { background: linear-gradient(160deg, #d7c7a8, #8a7457); }
 
-/* Dos de carte. */
+/* Dos de carte : celui de l'apparence choisie (Réglages › Apparence). Le dos Magic est téléchargé une fois depuis
+   Scryfall ; en attendant (ou sans réseau), un dos brun dessiné le remplace. */
+:root { --card-back: url("../cardimg?key=back%3Amagic&lang=en"), url("../img/backs/back-classic.svg"); }
+:root[data-card-back="arcane"] { --card-back: url("../img/backs/back-arcane.svg"); }
+:root[data-card-back="grimoire"] { --card-back: url("../img/backs/back-grimoire.svg"); }
+:root[data-card-back="sylvan"] { --card-back: url("../img/backs/back-sylvan.svg"); }
+:root[data-card-back="frost"] { --card-back: url("../img/backs/back-frost.svg"); }
+:root[data-card-back="heraldic"] { --card-back: url("../img/backs/back-heraldic.svg"); }
+:root[data-card-back="dragon"] { --card-back: url("../img/backs/back-dragon.svg"); }
+:root[data-card-back="astral"] { --card-back: url("../img/backs/back-astral.svg"); }
 .mcard.back .face {
-  background:
-    radial-gradient(circle at 50% 50%, rgb(var(--gold-rgb) / 0.55) 0 14%, transparent 15%),
-    radial-gradient(circle at 50% 50%, transparent 0 26%, rgb(var(--gold-rgb) / 0.35) 27% 29%, transparent 30%),
-    linear-gradient(135deg, #3a2a6b, #1c1640 55%, #2a1f52);
-  border: calc(var(--w) * 0.04) solid #120e24;
+  background-color: #1a1008; background-image: var(--card-back);
+  background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
 }
 
 /* ---------- Dialogues ---------- */
@@ -360,6 +366,12 @@ body.in-game #topbar { display: none; }
 .search-head:not(.folded) .filters-btn { border-color: var(--gold); color: var(--gold-2); }
 .search-head.folded .search-filters { display: none; }
 .search-filters .search-bar { margin-bottom: 8px; }
+.set-btn { max-width: 100%; }
+.set-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ed-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 55vh; overflow: auto; }
+.ed-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgb(255 255 255 / 0.03); cursor: pointer; color: var(--text); }
+.ed-item:hover { border-color: var(--line-strong); }
+.ed-item.on { border-color: var(--gold); background: rgb(var(--gold-rgb) / 0.12); }
 .browser .results, .builder .results { flex: 1; min-height: 0; overflow: auto; padding: 2px; overscroll-behavior: contain; }
 @media (max-width: 520px) { .search-head .total { display: none; } .filters-btn span { display: none; } }
 .color-filter { display: inline-flex; gap: 4px; }
@@ -409,6 +421,24 @@ body.in-game #topbar { display: none; }
 .curve .bar i { position: absolute; top: -16px; left: 0; right: 0; text-align: center; font-size: 11px; font-style: normal; }
 .problems { margin: 10px 0; padding: 10px; border-radius: 10px; background: rgba(239, 90, 90, 0.1); border: 1px solid rgba(239, 90, 90, 0.35); white-space: pre-line; font-size: 13px; }
 .problems.ok { background: rgba(76, 195, 138, 0.1); border-color: rgba(76, 195, 138, 0.4); }
+/* Prix Cardmarket. */
+.deck-row .price, .commander-slot .price { flex: none; min-width: 52px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums;
+  color: var(--gold-2); background: none; border: none; padding: 0 2px; cursor: pointer; }
+.deck-row .price.none, .commander-slot .price.none { color: var(--muted); }
+.deck-row .price.approx, .commander-slot .price.approx { color: #d9c89a; font-style: italic; }
+.deck-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+  background: rgb(var(--gold-rgb) / 0.08); border: 1px solid rgb(var(--gold-rgb) / 0.28); }
+.deck-price .dp-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.deck-price b { font-size: 18px; color: var(--gold-2); font-variant-numeric: tabular-nums; }
+.deck-price .btn { margin-left: auto; }
+.deck-row .acts button .ic { width: 15px; height: 15px; vertical-align: -3px; }
+/* Choix de l'illustration. */
+.art-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.art-cell { display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-radius: 10px; padding: 4px; border: 2px solid transparent; }
+.art-cell:hover { border-color: var(--line-strong); }
+.art-cell.on { border-color: var(--gold); background: rgb(var(--gold-rgb) / 0.1); }
+.art-meta { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.art-meta b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tabs-mobile { display: none; }
 .settings { max-width: 760px; }
 .settings .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -743,6 +773,16 @@ body.in-game #topbar { display: none; }
 .th-meter { display: block; height: 5px; border-radius: 3px; background: rgb(255 255 255 / 0.08); overflow: hidden; margin-top: 2px; }
 .th-meter i { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
 .th-menu-arcane { background-image: radial-gradient(120% 90% at 20% -10%, rgb(124 108 242 / 0.35), transparent 60%), radial-gradient(90% 70% at 100% 110%, rgb(226 182 92 / 0.2), transparent 60%); background-color: #0d0f1a; }
+.theme-grid.backs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.th-prev[class*="th-back-"] { background-color: #0b0d17; background-size: auto 86%; background-position: center; background-repeat: no-repeat; }
+.th-back-magic { background-image: url("../cardimg?key=back%3Amagic&lang=en"), url("../img/backs/back-classic.svg"); }
+.th-back-arcane { background-image: url("../img/backs/back-arcane.svg"); }
+.th-back-grimoire { background-image: url("../img/backs/back-grimoire.svg"); }
+.th-back-sylvan { background-image: url("../img/backs/back-sylvan.svg"); }
+.th-back-frost { background-image: url("../img/backs/back-frost.svg"); }
+.th-back-heraldic { background-image: url("../img/backs/back-heraldic.svg"); }
+.th-back-dragon { background-image: url("../img/backs/back-dragon.svg"); }
+.th-back-astral { background-image: url("../img/backs/back-astral.svg"); }
 .th-board-classic { background-image: radial-gradient(ellipse 60% 45% at 50% 50%, rgb(124 108 242 / 0.14), transparent 70%), linear-gradient(180deg, #121022 0%, #0f1424 50%, #0c1020 100%); }
 .th-menu-citadel { background-image: url("../img/themes/menu-citadel.svg"); }
 .th-menu-sylvan { background-image: url("../img/themes/menu-sylvan.svg"); }

@@ -53,8 +53,17 @@ public final class ImageService {
      * de Forge. Null si aucune image n'est trouvée dans le délai.
      */
     public static Served image(final String imageKey, final String lang, final long timeoutMs) {
+        return image(imageKey, lang, timeoutMs, false);
+    }
+
+    /** {@code exact} : cette impression précise (choix d'illustration), jamais une autre impression traduite. */
+    public static Served image(final String imageKey, final String lang, final long timeoutMs, final boolean exact) {
         if (!ForgeRuntime.isReady() || imageKey == null || imageKey.isEmpty() || ImageKeys.HIDDEN_CARD.equals(imageKey)) {
             return null;
+        }
+        if (imageKey.startsWith(CardBacks.PREFIX)) {
+            final File back = CardBacks.file(imageKey);
+            return back == null ? null : new Served(back, "en", true);
         }
         final long deadline = System.currentTimeMillis() + timeoutMs;
         boolean cacheable = true;
@@ -66,7 +75,7 @@ public final class ImageService {
             // Sinon on laisse un court instant à la recherche française ; si elle traîne, l'anglaise est téléchargée
             // pour patienter (la française la remplacera dès qu'elle sera là).
             final LocalizedImages.Outcome o = LocalizedImages.forLang(lang)
-                    .get(imageKey, en != null ? 0 : Math.min(1_500, timeoutMs / 3), () -> onLateImage.accept(imageKey));
+                    .get(imageKey, en != null ? 0 : Math.min(1_500, timeoutMs / 3), () -> onLateImage.accept(imageKey), exact);
             if (o.file() != null) {
                 return new Served(o.file(), lang, true);
             }

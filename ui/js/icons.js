@@ -72,6 +72,14 @@ const PATHS = {
   portrait: '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3.2"/><path d="M7 18.8c.8-2.8 2.8-4.2 5-4.2s4.2 1.4 5 4.2"/>',
   // Apparence : palette.
   palette: '<path d="M12 3a9 9 0 0 0 0 18c1.2 0 1.9-1 1.4-2-.6-1.3.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4C21 7.4 17 3 12 3z"/><circle class="f" cx="7.6" cy="11" r="1.3"/><circle class="f" cx="10" cy="7" r="1.3"/><circle class="f" cx="14.6" cy="7" r="1.3"/>',
+  // Illustration d'une carte : pinceau.
+  brush: '<path d="M20.5 3.5c-3.6 1.8-8 6-10.2 9.4l1.8 1.8c3.4-2.2 7.6-6.6 9.4-10.2-.3-.4-.6-.7-1-1z"/><path d="M9.6 13.6c-2.2.2-3.6 1.6-3.8 3.6-.1 1.2-.8 2.2-2.3 2.8 2.6 1 5.6.6 7.1-.9 1-1 1.2-2.4.8-3.6"/>',
+  // Points de vie : cœur.
+  heart: '<path d="M12 20.5s-7.6-4.6-8.9-9.6C2.2 7.4 4.4 4.6 7.4 4.6c2 0 3.6 1.2 4.6 2.8 1-1.6 2.6-2.8 4.6-2.8 3 0 5.2 2.8 4.3 6.3-1.3 5-8.9 9.6-8.9 9.6z"/>',
+  // Terrain : montagnes.
+  mountain: '<path d="M2.5 19.5 9 8l3.6 6.2L15 10.4l6.5 9.1z"/><path d="M7.4 10.8 9 12.3l1.6-1.5" opacity=".7"/>',
+  // Mana : gemme taillée.
+  gem: '<path d="M6.2 4.5h11.6l3.7 5L12 20.5 2.5 9.5z"/><path d="M2.5 9.5h19M9 4.5l-2 5 5 11 5-11-2-5" opacity=".7"/>',
   // Filtres de recherche : entonnoir.
   filter: '<path d="M3.6 4.6h16.8l-6.4 7.6v5.6l-4 2v-7.6z"/>',
   // Bibliothèque à défiler, divers : flèches.

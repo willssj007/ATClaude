@@ -70,7 +70,16 @@ final class LocalizedImages {
     }
 
     /** Une face de carte telle que Scryfall la connaît. */
-    record CardRef(String fileKey, String set, String printPath, boolean back, String searchName) {
+    record CardRef(String fileKey, String set, String printPath, boolean back, String searchName, boolean exactOnly) {
+
+        CardRef exact() {
+            return exactOnly ? this : new CardRef(fileKey, set, printPath, back, searchName, true);
+        }
+
+        /** Une recherche exacte et une recherche libre de la même face sont deux tâches distinctes. */
+        String taskKey() {
+            return exactOnly ? fileKey + "#exact" : fileKey;
+        }
 
         /** Null pour ce qui ne peut pas exister dans la langue : jetons, cartes perso, faces Alchemy... */
         static CardRef of(final String imageKey, final String lang) {
@@ -109,7 +118,8 @@ final class LocalizedImages {
                     set,
                     q < 0 ? path : path.substring(0, q),           // « tdc/45/fr »
                     path.contains("face=back"),                     // verso d'une carte double
-                    searchName);
+                    searchName,
+                    false);
         }
     }
 
@@ -135,6 +145,8 @@ final class LocalizedImages {
     private final Map<String, Long> absent = new ConcurrentHashMap<>();
     /** Nom de carte (+ face) → image trouvée par la recherche, réutilisée pour ses autres impressions (persisté). */
     private final Map<String, String> named = new ConcurrentHashMap<>();
+    /** Fichiers trouvés dans une autre impression de la langue (illustration différente) : écartés pour une impression choisie. */
+    private final Set<String> fallback = ConcurrentHashMap.newKeySet();
     /** Face → date de la dernière erreur passagère (en mémoire seulement). */
     private final Map<String, Long> errors = new ConcurrentHashMap<>();
     private final Map<String, Task> inflight = new ConcurrentHashMap<>();
@@ -169,12 +181,22 @@ final class LocalizedImages {
      * Si la recherche continue après ce délai, {@code onLate} sera appelé quand l'image sera trouvée.
      */
     Outcome get(final String imageKey, final long timeoutMs, final Runnable onLate) {
-        final File f = file(ImageService.fileKey(imageKey));
-        if (f.isFile() && f.length() > 0) {
+        return get(imageKey, timeoutMs, onLate, false);
+    }
+
+    /**
+     * {@code exact} : l'impression elle-même et rien d'autre (illustration choisie dans le deck builder) ;
+     * sans version dans la langue, la réponse est « absente » et l'image anglaise de cette impression la remplace.
+     */
+    Outcome get(final String imageKey, final long timeoutMs, final Runnable onLate, final boolean exactRequested) {
+        final String fileKey = ImageService.fileKey(imageKey);
+        final boolean exact = exactRequested || ArtChoices.isChosen(fileKey);
+        final File f = file(fileKey);
+        if (f.isFile() && f.length() > 0 && !(exact && fallback.contains(fileKey))) {
             return new Outcome(Status.FOUND, f); // chemin rapide, sans toucher à la base de cartes
         }
         final CardRef ref = ref(imageKey);
-        return ref == null ? Outcome.ABSENT : get(ref, timeoutMs, onLate);
+        return ref == null ? Outcome.ABSENT : get(exact ? ref.exact() : ref, timeoutMs, onLate);
     }
 
     /** Null si la carte ne peut pas exister dans la langue, ou si Forge ne sait pas la situer chez Scryfall. */
@@ -190,10 +212,10 @@ final class LocalizedImages {
 
     Outcome get(final CardRef ref, final long timeoutMs, final Runnable onLate) {
         final File f = file(ref.fileKey());
-        if (f.isFile() && f.length() > 0) {
+        if (f.isFile() && f.length() > 0 && !(ref.exactOnly() && fallback.contains(ref.fileKey()))) {
             return new Outcome(Status.FOUND, f);
         }
-        if (isAbsent(printKey(ref)) && isAbsent(nameKey(ref)) && !named.containsKey(nameKey(ref))) {
+        if (isAbsent(printKey(ref)) && (ref.exactOnly() || isAbsent(nameKey(ref)) && !named.containsKey(nameKey(ref)))) {
             return Outcome.ABSENT;
         }
         final Long failedAt = errors.get(ref.fileKey());
@@ -226,15 +248,18 @@ final class LocalizedImages {
      * attend au plus {@code timeoutMs} et renvoie le résultat.
      */
     Outcome prefetch(final String imageKey, final long timeoutMs) {
-        final File f = file(ImageService.fileKey(imageKey));
-        if (f.isFile() && f.length() > 0) {
+        final String fileKey = ImageService.fileKey(imageKey);
+        final boolean exact = ArtChoices.isChosen(fileKey);
+        final File f = file(fileKey);
+        if (f.isFile() && f.length() > 0 && !(exact && fallback.contains(fileKey))) {
             return new Outcome(Status.FOUND, f);
         }
-        final CardRef ref = ref(imageKey);
+        CardRef ref = ref(imageKey);
         if (ref == null) {
             return Outcome.ABSENT;
         }
-        if (isAbsent(printKey(ref)) && isAbsent(nameKey(ref)) && !named.containsKey(nameKey(ref))) {
+        ref = exact ? ref.exact() : ref;
+        if (isAbsent(printKey(ref)) && (ref.exactOnly() || isAbsent(nameKey(ref)) && !named.containsKey(nameKey(ref)))) {
             return Outcome.ABSENT;
         }
         try {
@@ -272,14 +297,14 @@ final class LocalizedImages {
                 e.printStackTrace();
                 o = Outcome.ERROR;
             }
-            inflight.remove(ref.fileKey(), this);
+            inflight.remove(ref.taskKey(), this);
             future.complete(o);
         }
     }
 
     private Task submit(final CardRef ref, final boolean urgent) {
         final Task created = new Task(ref);
-        final Task existing = inflight.putIfAbsent(ref.fileKey(), created);
+        final Task existing = inflight.putIfAbsent(ref.taskKey(), created);
         final Task task = existing != null ? existing : created;
         if (urgent) {
             queue.offerFirst(task); // une préparation en attente passe devant ; le doublon sera ignoré
@@ -313,7 +338,7 @@ final class LocalizedImages {
 
     private Outcome resolve(final CardRef ref) {
         final File dest = file(ref.fileKey());
-        if (dest.isFile() && dest.length() > 0) {
+        if (dest.isFile() && dest.length() > 0 && !(ref.exactOnly() && fallback.contains(ref.fileKey()))) {
             return new Outcome(Status.FOUND, dest);
         }
         try {
@@ -327,18 +352,27 @@ final class LocalizedImages {
                     markAbsent(printKey);
                 }
             }
+            if (url != null) {
+                download(url, dest);
+                errors.remove(ref.fileKey());
+                if (fallback.remove(ref.fileKey())) {
+                    saveIndex();
+                }
+                return new Outcome(Status.FOUND, dest);
+            }
+            if (ref.exactOnly()) {
+                return Outcome.ABSENT; // impression choisie : pas d'autre illustration à sa place
+            }
             // 2. N'importe quelle impression de la carte dans la langue (la plus récente, de préférence du même set).
-            if (url == null) {
-                final String nameKey = nameKey(ref);
-                url = named.get(nameKey);
-                if (url == null && !isAbsent(nameKey)) {
-                    url = searchAnyPrint(ref);
-                    if (url == null) {
-                        markAbsent(nameKey);
-                    } else {
-                        named.put(nameKey, url);
-                        saveIndex();
-                    }
+            final String nameKey = nameKey(ref);
+            url = named.get(nameKey);
+            if (url == null && !isAbsent(nameKey)) {
+                url = searchAnyPrint(ref);
+                if (url == null) {
+                    markAbsent(nameKey);
+                } else {
+                    named.put(nameKey, url);
+                    saveIndex();
                 }
             }
             if (url == null) {
@@ -346,6 +380,8 @@ final class LocalizedImages {
             }
             download(url, dest);
             errors.remove(ref.fileKey());
+            fallback.add(ref.fileKey());
+            saveIndex();
             return new Outcome(Status.FOUND, dest);
         } catch (final IOException e) {
             errors.put(ref.fileKey(), System.currentTimeMillis());
@@ -497,6 +533,9 @@ final class LocalizedImages {
             if (o.has("named")) {
                 o.getAsJsonObject("named").entrySet().forEach(e -> named.put(e.getKey(), e.getValue().getAsString()));
             }
+            if (o.has("fallback")) {
+                o.getAsJsonArray("fallback").forEach(e -> fallback.add(e.getAsString()));
+            }
         } catch (final IOException | RuntimeException e) {
             System.err.println("Index des images " + lang + " illisible, on repart de zéro : " + e.getMessage());
         }
@@ -510,6 +549,9 @@ final class LocalizedImages {
         named.forEach(n::addProperty);
         o.add("absent", a);
         o.add("named", n);
+        final com.google.gson.JsonArray fb = new com.google.gson.JsonArray();
+        fallback.forEach(fb::add);
+        o.add("fallback", fb);
         try {
             dir.mkdirs();
             final File tmp = new File(dir, "_index.json.tmp");

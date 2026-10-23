@@ -2,6 +2,7 @@
 
 import {bridge} from './bridge.js';
 import {cardElement, onLongPress, showZoom} from './cards.js';
+import {customBox} from './dialogs.js';
 import {esc, el, debounce} from './util.js';
 import {icon} from './icons.js';
 
@@ -10,6 +11,59 @@ const TYPES = [
   ['enchantment', 'Enchantement'], ['planeswalker', 'Planeswalker'], ['land', 'Terrain'], ['battle', 'Bataille'], ['legendary', 'Légendaire'],
 ];
 const PAGE = 60;
+const SET_TYPES = {CORE: 'Édition de base', EXPANSION: 'Extension', COMMANDER: 'Commander', DRAFT: 'Draft', REPRINT: 'Réédition',
+  STARTER: 'Initiation', DUEL_DECK: 'Duel Decks', BOXED_SET: 'Coffret', PROMO: 'Promo', ONLINE: 'En ligne', COLLECTOR_EDITION: 'Collector',
+  MULTIPLAYER: 'Multijoueur', FUNNY: 'Humoristique', OTHER: 'Autre'};
+let editions = null;
+
+async function loadEditions() {
+  if (!editions) {
+    editions = await bridge.request('editions');
+  }
+  return editions;
+}
+
+/** Liste des extensions, avec recherche par nom ou code ; renvoie l'extension choisie, ou null. */
+function pickEdition(current) {
+  return new Promise((resolve) => {
+    let answered = false;
+    const box = customBox('Extension', async (body, footer, close) => {
+      body.innerHTML = '<input type="search" class="ed-q" placeholder="Nom ou code de l\'extension (ex. Bloomburrow, MH3)…" style="width:100%"><div class="ed-list"><p class="muted">Chargement…</p></div>';
+      const list = body.querySelector('.ed-list');
+      const all = await loadEditions();
+      const render = (text) => {
+        const t = text.trim().toLowerCase();
+        const hits = all.filter(e => !t || e.name.toLowerCase().includes(t) || e.code.toLowerCase().startsWith(t));
+        // Code exact, puis noms qui commencent par le texte, puis le reste (du plus récent au plus ancien).
+        const rank = (e) => !t ? 0 : e.code.toLowerCase() === t ? 0 : e.name.toLowerCase().startsWith(t) ? 1 : 2;
+        const shown = hits.map((e, i) => [e, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([e]) => e).slice(0, 250);
+        list.innerHTML = shown.map(e => `<button class="ed-item${current && current.code === e.code ? ' on' : ''}" data-code="${esc(e.code)}">
+          <b>${esc(e.name)}</b><span class="muted small">${esc(e.code)} · ${esc(e.year)} · ${esc(SET_TYPES[e.type] || e.type)} · ${e.count} cartes</span></button>`).join('')
+          || '<p class="muted">Aucune extension ne correspond.</p>';
+      };
+      render('');
+      const q = body.querySelector('.ed-q');
+      q.addEventListener('input', () => render(q.value));
+      setTimeout(() => q.focus(), 50);
+      list.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-code]');
+        if (b) {
+          answered = true;
+          resolve(all.find(x => x.code === b.dataset.code));
+          close();
+        }
+      });
+      const any = el('<button class="btn">Toutes les extensions</button>');
+      any.addEventListener('click', () => {
+        answered = true;
+        resolve({code: '', name: ''});
+        close();
+      });
+      footer.appendChild(any);
+    }, {narrow: true});
+    box.back.addEventListener('click', (e) => e.target === box.back && !answered && resolve(null));
+  });
+}
 
 export class SearchPanel {
   /**
@@ -51,6 +105,7 @@ export class SearchPanel {
             <input type="number" class="cmin" placeholder="VM ≥" title="Valeur de mana minimale" min="0" style="width:76px">
             <input type="number" class="cmax" placeholder="VM ≤" title="Valeur de mana maximale" min="0" style="width:76px">
           </div>
+          <div class="search-bar"><button class="btn small set-btn" title="N'afficher que les cartes d'une extension">${icon('book')}<span>Extension : toutes</span></button></div>
           <div class="search-bar chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}</div>
           <div class="search-bar">
             <label class="check small"><input type="checkbox" class="intext"> Chercher aussi dans le texte</label>
@@ -96,6 +151,18 @@ export class SearchPanel {
     r.querySelector('.cmdonly').addEventListener('change', (e) => {
       this.query.commandersOnly = e.target.checked;
       run();
+    });
+    r.querySelector('.set-btn').addEventListener('click', async () => {
+      const ed = await pickEdition(this.edition);
+      if (!ed) {
+        return;
+      }
+      this.edition = ed.code ? ed : null;
+      this.query.set = ed.code || undefined;
+      r.querySelector('.set-btn span').textContent = ed.code ? `Extension : ${ed.name}` : 'Extension : toutes';
+      r.querySelector('.set-btn').classList.toggle('on', !!ed.code);
+      this.countFilters();
+      this.search(true);
     });
     r.querySelector('.color-filter').addEventListener('click', (e) => {
       const c = e.target.closest('[data-color]');
@@ -195,7 +262,7 @@ export class SearchPanel {
   countFilters() {
     const q = this.query;
     const n = (q.colors.length ? 1 : 0) + q.types.length + (q.cmcMin !== undefined ? 1 : 0) + (q.cmcMax !== undefined ? 1 : 0)
-      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0);
+      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.set ? 1 : 0);
     this.root.querySelector('.filters-btn .n').textContent = n ? String(n) : '';
   }
 

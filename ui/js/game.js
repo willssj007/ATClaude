@@ -10,7 +10,7 @@ import {cardElement, showZoom, onLongPress} from './cards.js';
 import {confirmBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
 import {icon} from './icons.js';
-import {esc, el, manaHtml, avatarHtml, ownPhotoUrl, cutoutRects, PHASES, prefs, toast, debounce, translatePrompt} from './util.js';
+import {esc, el, manaHtml, avatarHtml, ownPhotoUrl, cutoutRects, PHASES, prefs, rulesHtml, toast, debounce, translatePrompt} from './util.js';
 
 const COUNTER_LABELS = {P1P1: '+1/+1', M1M1: '−1/−1', LOYALTY: 'Loyauté', CHARGE: 'Charge', LORE: 'Histoire', DEFENSE: 'Défense', SHIELD: 'Bouclier', STUN: 'Étourdi', OIL: 'Huile', TIME: 'Temps'};
 const MANA_ORDER = ['W', 'U', 'B', 'R', 'G', 'C'];
@@ -21,6 +21,37 @@ const PLAYER_COUNTERS = {
   EXPERIENCE: {icon: 'experience', label: 'Expérience', cls: 'exp'},
   RAD: {icon: 'rad', label: 'Radiation', cls: 'rad'},
   TICKET: {icon: 'ticket', label: 'Tickets', cls: 'ticket'},
+};
+// Journal : icône et teinte de chaque sorte d'entrée de Forge.
+const LOG_KINDS = {
+  TURN: {icon: 'banner', cls: 'turn', label: 'Tour'},
+  PHASE: {icon: 'hourglass', cls: 'phase', label: 'Étape'},
+  MULLIGAN: {icon: 'cards', cls: 'info', label: 'Mulligan'},
+  ZONE_CHANGE: {icon: 'cards', cls: 'zone', label: 'Déplacement de carte'},
+  DISCARD: {icon: 'graveyard', cls: 'zone', label: 'Défausse'},
+  PLAYER_CONTROL: {icon: 'puppet', cls: 'info', label: 'Contrôle'},
+  DAMAGE: {icon: 'swords', cls: 'damage', label: 'Blessures'},
+  LIFE: {icon: 'heart', cls: 'life', label: 'Points de vie'},
+  LAND: {icon: 'mountain', cls: 'land', label: 'Terrain joué'},
+  COMBAT: {icon: 'shield', cls: 'combat', label: 'Combat'},
+  STACK_ADD: {icon: 'wand', cls: 'cast', label: 'Sort ou capacité lancé'},
+  STACK_RESOLVE: {icon: 'scroll', cls: 'resolve', label: 'Résolution'},
+  EFFECT_REPLACED: {icon: 'shield', cls: 'info', label: 'Effet de remplacement'},
+  MANA: {icon: 'gem', cls: 'mana', label: 'Mana'},
+  INFORMATION: {icon: 'eye', cls: 'info', label: 'Information'},
+  GAME_OUTCOME: {icon: 'crown', cls: 'outcome', label: 'Fin de partie'},
+  MATCH_RESULTS: {icon: 'chalice', cls: 'outcome', label: 'Résultat'},
+  ANTE: {icon: 'purse', cls: 'info', label: 'Ante'},
+  DRAFT: {icon: 'cards', cls: 'info', label: 'Draft'},
+};
+const ZONE_WORDS = [[/cimeti[eè]re|graveyard/i, 'graveyard'], [/exil/i, 'exile'], [/biblioth[eè]que|library/i, 'library'],
+  [/\bmain\b|hand/i, 'hand'], [/champ de bataille|battlefield/i, 'castle'], [/commandement|command/i, 'crown']];
+const LOG_FILTER_LABELS = {all: 'Tout', spells: 'Sorts', combat: 'Combat', life: 'Vie', cards: 'Cartes'};
+const LOG_FILTERS = {
+  spells: ['STACK_ADD', 'STACK_RESOLVE', 'LAND', 'EFFECT_REPLACED'],
+  combat: ['COMBAT', 'DAMAGE'],
+  life: ['LIFE', 'DAMAGE'],
+  cards: ['ZONE_CHANGE', 'DISCARD', 'LAND', 'MULLIGAN'],
 };
 // Statuts posés par Forge dans la zone de commandement sous forme d'« effets ».
 const PLAYER_STATUSES = {
@@ -351,8 +382,9 @@ export class Game {
         this.openZone(Number(handOf.dataset.handOf), 'hand');
         return;
       }
-      if (e.target.closest('.me-panel .stat.lib')) {
-        this.openZone(0, 'library');
+      const lib = e.target.closest('.stat.lib');
+      if (lib) {
+        this.openZone(Number(lib.dataset.pid), 'library');
         return;
       }
       const pile = e.target.closest('.pile');
@@ -947,7 +979,11 @@ export class Game {
     } else if (!isMe) {
       html += chip('', 'hand', p.handSize, 'Cartes en main');
     }
-    html += chip('lib', 'library', p.library, 'Bibliothèque', ' data-zone="library"');
+    // Bibliothèque : œil quand le dessus est visible, en surbrillance quand on peut le jouer (Futur aperçu...).
+    const top = p.libraryTop || [];
+    const libPlayable = top.some(c => c.playable || c.selectable);
+    html += chip(`lib${top.length ? ' seen' : ''}${libPlayable ? ' playable' : ''}`, 'library', top.length ? `${p.library}${icon('eye')}` : p.library,
+      top.length ? `Bibliothèque : le dessus est visible${libPlayable ? ' et jouable' : ''} (touche pour la voir)` : 'Bibliothèque (touche pour la voir)', ` data-zone="library" data-pid="${p.id}"`);
     // Marqueurs du joueur, mis en valeur quand leur nombre change.
     const prev = (this.prevCounters || (this.prevCounters = new Map())).get(p.id) || {};
     const counters = p.counters || {};
@@ -1460,10 +1496,6 @@ export class Game {
   }
 
   openZone(pid, zone) {
-    if (zone === 'library') {
-      toast('Ta bibliothèque est cachée. Le menu de triche permet d\'y chercher une carte.');
-      return;
-    }
     this.trayZone = {pid, zone};
     this.refreshTray(true);
   }
@@ -1505,13 +1537,13 @@ export class Game {
       return;
     }
     const player = state.players.find(pl => pl.id === this.trayZone.pid);
-    const cards = player ? player.zones[this.trayZone.zone] : [];
+    const cards = (player && player.zones[this.trayZone.zone]) || [];
     if (this.trayZone.auto && !cards.some(c => c.selectable || (this.trayZone.zone === 'hand' && c.playable)) && !force) {
       this.trayZone = null;
       tray && tray.remove();
       return;
     }
-    const names = {graveyard: 'Cimetière', exile: 'Exil', command: 'Zone de commandement', hand: 'Main'};
+    const names = {graveyard: 'Cimetière', exile: 'Exil', command: 'Zone de commandement', hand: 'Main', library: 'Bibliothèque'};
     if (!tray) {
       tray = el('<div class="zone-tray"><header><h2></h2><button class="btn small">Fermer</button></header><div class="cards"></div></div>');
       tray.querySelector('header .btn').addEventListener('click', () => {
@@ -1537,6 +1569,12 @@ export class Game {
       });
       this.table.appendChild(tray);
     }
+    tray.classList.toggle('library', this.trayZone.zone === 'library');
+    if (this.trayZone.zone === 'library') {
+      tray.querySelector('h2').textContent = `${names.library} — ${player ? player.name : ''} (${player ? player.library : 0})`;
+      this.renderLibrary(tray.querySelector('.cards'), player);
+      return;
+    }
     tray.querySelector('h2').textContent = `${names[this.trayZone.zone] || ''} — ${player ? player.name : ''} (${cards.length})`;
     const box = tray.querySelector('.cards');
     box.replaceChildren(...[...cards].reverse().map(c => {
@@ -1552,6 +1590,51 @@ export class Game {
     if (!cards.length) {
       box.appendChild(el('<div class="muted">Vide.</div>'));
     }
+  }
+
+  /**
+   * Bibliothèque en pile : une carte de dos par paquet de quelques cartes, légèrement décalées pour l'épaisseur.
+   * Le dessus est retourné quand un effet permet de le regarder ; touché, il se joue s'il est jouable, sinon il s'agrandit.
+   */
+  renderLibrary(box, player) {
+    const count = player ? player.library : 0;
+    const top = (player && player.libraryTop) || [];
+    const layers = Math.min(28, Math.ceil(count / 3));
+    const sig = `${count}|${top.map(c => `${c.id}${c.playable ? 'p' : ''}${c.selectable ? 's' : ''}`).join(',')}|${prefs.get('cardBack')}`;
+    if (box._sig === sig) {
+      return;
+    }
+    box._sig = sig;
+    const pile = el(`<div class="lib-pile" style="--layers:${layers}"></div>`);
+    for (let i = 0; i < layers; i++) {
+      const layer = cardElement(null, 'lib-layer');
+      layer.style.setProperty('--i', String(i));
+      pile.appendChild(layer);
+    }
+    const playable = top.length && (top[0].playable || top[0].selectable);
+    if (top.length) {
+      const s = el('<div class="slot lib-top"></div>');
+      const inner = cardElement(top[0]);
+      inner.classList.toggle('playable', !!playable);
+      s.appendChild(inner);
+      s._card = top[0];
+      s.style.setProperty('--i', String(layers));
+      pile.appendChild(s);
+    }
+    if (!count) {
+      pile.appendChild(el('<div class="muted lib-empty">Bibliothèque vide.</div>'));
+    }
+    const mine = player && (player.me || player.controlledByMe);
+    const info = el(`<div class="lib-info">
+      <div class="lib-count"><b>${count}</b> carte${count > 1 ? 's' : ''}</div>
+      <p class="muted small">${top.length
+        ? `Le dessus est visible${top.length > 1 ? ` (${top.length} cartes, la première est sur le dessus)` : ''}${playable ? ' et tu peux le jouer : touche-le.' : ' : touche-le pour l\'agrandir.'}`
+        : mine ? 'Les cartes sont cachées. Quand un effet te permet de regarder le dessus (Coursier de Kruphix, Futur aperçu, Vizir de la ménagerie...), il apparaît ici, retourné.'
+          : 'Les cartes sont cachées.'}</p>
+      ${top.length > 1 ? `<div class="lib-next">${top.slice(1).map((c, i) => `<span class="chip">${i + 2}. ${esc(c.name)}</span>`).join('')}</div>` : ''}
+    </div>`);
+    box.replaceChildren(el('<div class="lib-view"></div>'));
+    box.firstChild.append(pile, info);
   }
 
   // ------------------------------------------------------------------ tiroirs : journal, triche, menu
@@ -1598,12 +1681,100 @@ export class Game {
     this.table && this.table.querySelector('[data-drawer]').classList.remove('open');
   }
 
+  /**
+   * Journal : regroupé par tour (le plus récent en haut), une icône et une couleur par sorte d'action,
+   * les joueurs en gras, les cartes en lien (touche : agrandir), filtres en haut.
+   */
   renderLog() {
     const box = this.table.querySelector('[data-drawer] .log');
     if (!box || !this.state) {
       return;
     }
-    box.innerHTML = this.state.log.map(e => `<div class="log-entry k-${esc(e.kind)}">${esc(e.text)}</div>`).join('') || '<div class="muted">Rien pour l\'instant.</div>';
+    const log = this.state.log || [];
+    const filter = this.logFilter || 'all';
+    const sig = `${filter}|${log.length}|${log.length ? log[0].text : ''}`;
+    if (box._sig === sig) {
+      return;
+    }
+    box._sig = sig;
+    const players = [...this.state.players].sort((a, b) => b.name.length - a.name.length);
+    const format = (e, i) => {
+      let html = rulesHtml(e.text);
+      // Les noms des joueurs, puis la carte en cause, mis en valeur (une seule fois chacun).
+      const marks = [];
+      for (const p of players) {
+        const n = esc(p.name);
+        if (n && html.includes(n)) {
+          html = html.split(n).join(`\u0001${marks.length}\u0002`);
+          marks.push(`<b class="who${p.me ? ' me' : ''}">${n}</b>`);
+        }
+      }
+      if (e.card && e.card.name) {
+        const n = esc(e.card.name);
+        const at = html.indexOf(n);
+        if (at >= 0) {
+          html = html.slice(0, at) + `\u0001${marks.length}\u0002` + html.slice(at + n.length);
+          marks.push(`<button class="cn" data-log-card="${i}">${n}</button>`);
+        }
+      }
+      return html.replace(/\u0001(\d+)\u0002/g, (_, k) => marks[Number(k)]);
+    };
+    const kindOf = (e) => {
+      const k = LOG_KINDS[e.kind] || LOG_KINDS.INFORMATION;
+      if (e.kind === 'ZONE_CHANGE' || e.kind === 'DISCARD') {
+        const zone = ZONE_WORDS.find(([re]) => re.test(e.text));
+        return zone ? {...k, icon: zone[1]} : k;
+      }
+      if (e.kind === 'LIFE') {
+        return {...k, cls: /perd|loses/i.test(e.text) ? 'life loss' : 'life gain'};
+      }
+      return k;
+    };
+    // Du plus récent au plus ancien : chaque entrée « tour » ferme le groupe des actions de ce tour.
+    const groups = [];
+    let items = [];
+    log.forEach((e, i) => {
+      if (e.kind === 'TURN') {
+        groups.push({head: e, items});
+        items = [];
+      } else {
+        items.push([e, i]);
+      }
+    });
+    if (items.length) {
+      groups.push({head: null, items});
+    }
+    const shown = (e) => filter === 'all' || (LOG_FILTERS[filter] || []).includes(e.kind);
+    const groupHtml = (g) => {
+      const rows = g.items.filter(([e]) => shown(e)).map(([e, i]) => {
+        const k = kindOf(e);
+        return `<div class="log-entry k-${esc(e.kind)} ${k.cls}"><span class="log-ic" title="${esc(k.label)}">${icon(k.icon)}</span><span class="log-text">${format(e, i)}</span></div>`;
+      }).join('');
+      if (!rows && filter !== 'all') {
+        return '';
+      }
+      const title = g.head ? format(g.head, -1) : 'Début de partie';
+      return `<section class="log-turn"><h4>${icon(g.head ? 'banner' : 'cards')}<span>${title}</span></h4>${rows || '<div class="muted small log-none">Aucune action.</div>'}</section>`;
+    };
+    const chips = Object.entries(LOG_FILTER_LABELS).map(([k, label]) => `<button class="chip${k === filter ? ' on' : ''}" data-log-filter="${k}">${label}</button>`).join('');
+    box.innerHTML = `<div class="log-filters">${chips}</div>${groups.map(groupHtml).join('') || '<div class="muted">Rien pour l\'instant.</div>'}`;
+    if (!box._bound) {
+      box._bound = true;
+      box.addEventListener('click', (ev) => {
+        const f = ev.target.closest('[data-log-filter]');
+        if (f) {
+          this.logFilter = f.dataset.logFilter;
+          this.renderLog();
+          return;
+        }
+        const c = ev.target.closest('[data-log-card]');
+        const entry = c && (this.state.log || [])[Number(c.dataset.logCard)];
+        if (entry && entry.card) {
+          const known = this.cards.get('c' + entry.card.id);
+          showZoom(known || {name: entry.card.name, nameFr: entry.card.name, image: entry.card.image});
+        }
+      });
+    }
   }
 
   renderMenu(drawer) {

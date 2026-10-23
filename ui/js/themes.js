@@ -1,4 +1,4 @@
-// Apparences : palette et décor des menus, décor du plateau de jeu.
+// Apparences : palette et décor des menus, décor du plateau de jeu, dos des cartes.
 // Certaines se débloquent en jouant : parties jouées ou gagnées (sans triche, comme les trophées de Forge),
 // record de blessures infligées, trophées obtenus.
 
@@ -25,6 +25,24 @@ export const BOARD_THEMES = [
   {key: 'dragon', name: 'Antre du dragon', desc: 'Un dragon perché devant la caverne, une rivière de lave, son trésor.', art: 'board-dragon', unlock: {kind: 'dealt', n: 60}},
   {key: 'ether', name: 'Plan éthéré', desc: 'Îles flottantes et cercle arcanique entre les nébuleuses.', art: 'board-ether', unlock: {kind: 'trophies', n: 10}},
 ];
+
+// Dos des cartes cachées et de la bibliothèque : celui de Magic par défaut, les autres gagnés avec les trophées.
+export const BACK_THEMES = [
+  {key: 'magic', name: 'Magic', desc: 'Le dos des cartes Magic (téléchargé une fois depuis Scryfall).'},
+  {key: 'arcane', name: 'Arcane', desc: 'Étoile d\'or sur nuit violette, le dos d\'origine de l\'application.'},
+  {key: 'grimoire', name: 'Grimoire', desc: 'Cuir patiné, sceau runique et fermoir doré.', unlock: {kind: 'trophies', n: 1}},
+  {key: 'sylvan', name: 'Arbre-monde', desc: 'Arbre de vie cerclé d\'or, bordure de lierre.', unlock: {kind: 'trophies', n: 3}},
+  {key: 'frost', name: 'Cristal de givre', desc: 'Flocon de glace sur fond de cristal.', unlock: {kind: 'trophies', n: 6}},
+  {key: 'heraldic', name: 'Blason', desc: 'Écu couronné sur champ de fleurs de lys.', unlock: {kind: 'trophies', n: 10}},
+  {key: 'dragon', name: 'Œil du dragon', desc: 'Un œil de braise au milieu des écailles.', unlock: {kind: 'trophies', n: 15}},
+  {key: 'astral', name: 'Lune astrale', desc: 'Croissant de lune, constellations et cercle d\'or.', unlock: {kind: 'trophies', n: 25}},
+];
+
+const KINDS = {
+  menu: {list: MENU_THEMES, pref: 'menuTheme', attr: 'menuTheme'},
+  board: {list: BOARD_THEMES, pref: 'boardTheme', attr: 'boardTheme'},
+  back: {list: BACK_THEMES, pref: 'cardBack', attr: 'cardBack'},
+};
 
 const GOALS = {
   games: (n) => `Jouer ${n} parties`,
@@ -58,8 +76,9 @@ function find(list, key) {
 /** Applique les apparences choisies (attributs lus par les feuilles de style). */
 export function applyThemes() {
   const root = document.documentElement;
-  root.dataset.menuTheme = find(MENU_THEMES, prefs.get('menuTheme')).key;
-  root.dataset.boardTheme = find(BOARD_THEMES, prefs.get('boardTheme')).key;
+  for (const kind of Object.values(KINDS)) {
+    root.dataset[kind.attr] = find(kind.list, prefs.get(kind.pref)).key;
+  }
 }
 
 function cardHtml(kind, t, p, current) {
@@ -80,14 +99,15 @@ function cardHtml(kind, t, p, current) {
 /** Section « Apparence » des réglages. */
 export async function appearanceHtml() {
   const p = await progress();
-  const menu = find(MENU_THEMES, prefs.get('menuTheme')).key;
-  const board = find(BOARD_THEMES, prefs.get('boardTheme')).key;
+  const grid = (kind) => {
+    const current = find(KINDS[kind].list, prefs.get(KINDS[kind].pref)).key;
+    return `<div class="theme-grid${kind === 'back' ? ' backs' : ''}">${KINDS[kind].list.map(t => cardHtml(kind, t, p, current)).join('')}</div>`;
+  };
   return `<h2>Apparence</h2>
     <p class="muted small">Les apparences avec un cadenas se débloquent en jouant : parties jouées ou gagnées sans triche, records, trophées.</p>
-    <h3 class="th-h">Menus et interface</h3>
-    <div class="theme-grid">${MENU_THEMES.map(t => cardHtml('menu', t, p, menu)).join('')}</div>
-    <h3 class="th-h">Plateau de jeu</h3>
-    <div class="theme-grid">${BOARD_THEMES.map(t => cardHtml('board', t, p, board)).join('')}</div>`;
+    <h3 class="th-h">Menus et interface</h3>${grid('menu')}
+    <h3 class="th-h">Plateau de jeu</h3>${grid('board')}
+    <h3 class="th-h">Dos des cartes</h3>${grid('back')}`;
 }
 
 /** Clic sur une carte d'apparence : la choisit si elle est débloquée. Renvoie vrai si le clic la concernait. */
@@ -96,14 +116,13 @@ export async function themeClicked(target) {
   if (!card) {
     return false;
   }
-  const kind = card.dataset.kind;
-  const list = kind === 'menu' ? MENU_THEMES : BOARD_THEMES;
-  const theme = find(list, card.dataset.theme);
+  const kind = KINDS[card.dataset.kind];
+  const theme = find(kind.list, card.dataset.theme);
   if (!isUnlocked(theme, await progress())) {
     toast(`${GOALS[theme.unlock.kind](theme.unlock.n)} pour débloquer « ${theme.name} » (parties sans triche).`, {title: 'Apparence verrouillée'});
     return true;
   }
-  prefs.set(kind === 'menu' ? 'menuTheme' : 'boardTheme', theme.key);
+  prefs.set(kind.pref, theme.key);
   applyThemes();
   const grid = card.parentElement;
   grid.querySelectorAll('.theme-card').forEach(c => {
@@ -123,9 +142,17 @@ export async function themeClicked(target) {
 /** Après une partie ou un trophée : annonce les apparences qui viennent de se débloquer. */
 export async function announceUnlocks() {
   const p = await progress();
-  const unlocked = [...MENU_THEMES, ...BOARD_THEMES].filter(t => t.unlock && isUnlocked(t, p));
+  const unlocked = [];
+  const keys = [];
+  for (const [name, kind] of Object.entries(KINDS)) {
+    for (const t of kind.list) {
+      if (t.unlock && isUnlocked(t, p)) {
+        unlocked.push(t);
+        keys.push(name + ':' + t.key);
+      }
+    }
+  }
   const known = prefs.get('themesKnown');
-  const keys = unlocked.map(t => (MENU_THEMES.includes(t) ? 'menu:' : 'board:') + t.key);
   if (Array.isArray(known)) {
     const fresh = unlocked.filter((t, i) => !known.includes(keys[i]));
     if (fresh.length === 1) {

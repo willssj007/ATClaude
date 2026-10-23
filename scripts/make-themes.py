@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Illustrations des apparences (ui/img/themes/*.svg), dessinées en SVG.
+"""Illustrations des apparences (ui/img/themes/*.svg) et dos de cartes (ui/img/backs/*.svg), dessinés en SVG.
 
 Plateaux (board-*.svg, 1600x900) : l'horizon passe dans la moitié adverse, le sol sous mes cartes reste
 sombre et peu chargé pour que les cartes restent lisibles ; le détail est sur l'horizon et dans les coins.
@@ -565,6 +565,161 @@ def menu_astral():
     return menu('#070616', '#0b0a22', '#1c1648', ''.join(b))
 
 
+
+# ---------------------------------------------------------------------------------------------- dos de cartes
+
+BW, BH = 630, 880
+
+
+def back(defs, field, body, frame='#d9b45e', border='#0b0910', emblem=''):
+    """Dos de carte : bord noir, fond du thème, double filet doré, ornements d'angle, emblème au centre."""
+    corner = (f'<path d="M58,118 L58,58 L118,58" fill="none" stroke="{frame}" stroke-width="4"/>'
+              f'<path d="M58,58 m14,0 q10,18 0,30 q-10,-12 -14,-30 M58,58 m0,14 q18,10 30,0 q-12,-10 -30,-14" fill="{frame}" opacity=".85"/>'
+              f'<circle cx="86" cy="86" r="5" fill="{frame}"/>')
+    corners = ''.join(f'<g transform="{t}">{corner}</g>' for t in
+                      ['', f'translate({BW} 0) scale(-1 1)', f'translate(0 {BH}) scale(1 -1)', f'translate({BW} {BH}) scale(-1 -1)'])
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {BW} {BH}"><defs>{defs}</defs>'
+            f'<rect width="{BW}" height="{BH}" rx="34" fill="{border}"/>'
+            f'<rect x="22" y="22" width="{BW - 44}" height="{BH - 44}" rx="18" fill="{field}"/>{body}'
+            f'<rect x="44" y="44" width="{BW - 88}" height="{BH - 88}" rx="12" fill="none" stroke="{frame}" stroke-width="5" opacity=".9"/>'
+            f'<rect x="60" y="60" width="{BW - 120}" height="{BH - 120}" rx="8" fill="none" stroke="{frame}" stroke-width="1.6" opacity=".6"/>'
+            f'{corners}{emblem}</svg>')
+
+
+def rgrad(id_, inner, outer, cx='.5', cy='.5', r='.7'):
+    return f'<radialGradient id="{id_}" cx="{cx}" cy="{cy}" r="{r}"><stop offset="0" stop-color="{inner}"/><stop offset="1" stop-color="{outer}"/></radialGradient>'
+
+
+GOLD = ('<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6d78f"/>'
+        '<stop offset=".55" stop-color="#d9a441"/><stop offset="1" stop-color="#8a5f22"/></linearGradient>')
+
+
+def back_arcane():
+    star = (f'<g transform="translate(315 440)"><circle r="150" fill="none" stroke="url(#gold)" stroke-width="7" opacity=".7"/>'
+            '<circle r="118" fill="none" stroke="url(#gold)" stroke-width="2" opacity=".5"/>'
+            '<path d="M0,-200 L60,0 L0,200 L-60,0 Z" fill="url(#gold)"/><path d="M0,-160 L38,0 L0,160 L-38,0 Z" fill="#1c1640" opacity=".55"/>'
+            '<path d="M-190,0 L0,-38 L190,0 L0,38 Z" fill="url(#gold)" opacity=".9"/><circle r="22" fill="#fff4d6"/></g>')
+    rnd = random.Random(201)
+    sparks = ''.join(f'<circle cx="{f(rnd.uniform(80, 550))}" cy="{f(rnd.uniform(80, 800))}" r="{f(rnd.uniform(1, 2.6))}" fill="#e8dcff" opacity="{f(rnd.uniform(.2, .7))}"/>' for _ in range(60))
+    return back(GOLD + rgrad('fld', '#4a3a92', '#120e2a'), 'url(#fld)', sparks, emblem=star)
+
+
+def back_classic():
+    """Remplaçant du dos Magic quand l'image n'est pas encore téléchargée : brun, ovale, sans logo."""
+    body = ('<ellipse cx="315" cy="440" rx="230" ry="330" fill="url(#oval)"/>'
+            '<ellipse cx="315" cy="440" rx="230" ry="330" fill="none" stroke="#2a1608" stroke-width="10"/>'
+            '<ellipse cx="315" cy="440" rx="160" ry="250" fill="none" stroke="#e8a24a" stroke-width="3" opacity=".45"/>')
+    defs = rgrad('fld', '#6a4022', '#2a170b') + rgrad('oval', '#d58a3a', '#7a3e14')
+    return back(defs, 'url(#fld)', body, frame='#3a2210', border='#120a05')
+
+
+def back_grimoire():
+    rnd = random.Random(203)
+    grain = ''.join(f'<ellipse cx="{f(rnd.uniform(30, 600))}" cy="{f(rnd.uniform(30, 850))}" rx="{f(rnd.uniform(4, 16))}" ry="{f(rnd.uniform(2, 8))}" '
+                    f'fill="{rnd.choice(["#2a170c", "#6a4428"])}" opacity="{f(rnd.uniform(.12, .3))}"/>' for _ in range(260))
+    body = grain + ('<rect x="450" y="22" width="90" height="836" fill="#2e1a0e" opacity=".7"/>'
+                    '<rect x="456" y="22" width="78" height="836" fill="none" stroke="#c9973d" stroke-width="2" stroke-dasharray="10 8" opacity=".6"/>'
+                    '<rect x="430" y="390" width="130" height="100" rx="12" fill="url(#gold)"/><rect x="452" y="412" width="86" height="56" rx="8" fill="#3a2414"/>'
+                    '<circle cx="495" cy="440" r="12" fill="url(#gold)"/>')
+    emblem = ('<g transform="translate(250 440)"><circle r="120" fill="none" stroke="url(#gold)" stroke-width="6"/>'
+              '<circle r="96" fill="none" stroke="url(#gold)" stroke-width="2" stroke-dasharray="4 10"/>'
+              '<path d="M0,-82 L82,0 L0,82 L-82,0 Z M0,-46 L46,0 L0,46 L-46,0 Z" fill="none" stroke="url(#gold)" stroke-width="5"/>'
+              '<circle cx="0" cy="-82" r="7" fill="url(#gold)"/><circle cx="82" cy="0" r="7" fill="url(#gold)"/><circle cx="0" cy="82" r="7" fill="url(#gold)"/><circle cx="-82" cy="0" r="7" fill="url(#gold)"/>'
+              '<circle r="16" fill="url(#gold)"/></g>')
+    return back(GOLD + rgrad('fld', '#6e4426', '#2e1a0c'), 'url(#fld)', body, frame='#c9973d', emblem=emblem)
+
+
+def back_sylvan():
+    rnd = random.Random(205)
+    leaves = []
+    # Lierre le long du cadre.
+    for i in range(46):
+        t = i / 46
+        per = 2 * (542 + 792)
+        d = t * per
+        if d < 542:
+            x, y, a = 44 + d, 44, 0
+        elif d < 542 + 792:
+            x, y, a = 586, 44 + d - 542, 90
+        elif d < 2 * 542 + 792:
+            x, y, a = 586 - (d - 542 - 792), 836, 180
+        else:
+            x, y, a = 44, 836 - (d - 2 * 542 - 792), 270
+        a += rnd.uniform(-40, 40)
+        leaves.append(f'<path d="M0,0 q10,-14 22,0 q-12,12 -22,0 Z" transform="translate({f(x)} {f(y)}) rotate({f(a)})" fill="#6fbf6a" opacity=".85"/>')
+    tree = ('<g transform="translate(315 470)" stroke="url(#gold)" stroke-linecap="round" fill="none">'
+            '<circle r="170" stroke-width="6"/><path d="M0,150 L0,-30" stroke-width="16"/>'
+            '<path d="M0,-10 C-40,-40 -70,-60 -110,-70 M0,-10 C40,-40 70,-60 110,-70 M0,-30 C-20,-80 -30,-110 -60,-140 M0,-30 C20,-80 30,-110 60,-140 M0,-40 L0,-150" stroke-width="7"/>'
+            '<path d="M0,150 C-30,160 -60,150 -90,165 M0,150 C30,160 60,150 90,165 M0,140 C-15,155 -20,165 -40,175 M0,140 C15,155 20,165 40,175" stroke-width="5"/></g>')
+    canopy = ''.join(f'<circle cx="{f(315 + rnd.gauss(0, 70))}" cy="{f(360 + rnd.gauss(0, 40))}" r="{f(rnd.uniform(6, 12))}" fill="#8fd48a" opacity=".55"/>' for _ in range(40))
+    return back(GOLD + rgrad('fld', '#1f5a34', '#08180e'), 'url(#fld)', canopy, frame='#d9b45e', emblem=''.join(leaves) + tree)
+
+
+def back_frost():
+    arm = ('<path d="M0,0 L0,-180" stroke-width="10"/><path d="M0,-60 L-36,-96 M0,-60 L36,-96 M0,-110 L-28,-138 M0,-110 L28,-138 M0,-150 L-16,-166 M0,-150 L16,-166" stroke-width="7"/>')
+    flake = '<g transform="translate(315 440)" stroke="#f2fbff" stroke-linecap="round" fill="none">' + ''.join(f'<g transform="rotate({k * 60})">{arm}</g>' for k in range(6)) + '<circle r="26" fill="#e6f6ff" stroke="none"/></g>'
+    rnd = random.Random(207)
+    facets = ''.join(f'<path d="M{f(x)},{f(y)} l{f(rnd.uniform(-90, 90))},{f(rnd.uniform(-120, 120))} l{f(rnd.uniform(-90, 90))},{f(rnd.uniform(-90, 90))} Z" fill="#ffffff" opacity="{f(rnd.uniform(.04, .12))}"/>'
+                     for x, y in [(rnd.uniform(40, 590), rnd.uniform(40, 840)) for _ in range(40)])
+    glow = '<circle cx="315" cy="440" r="210" fill="#bfe8ff" opacity=".18" filter="url(#bk)"/>'
+    defs = rgrad('fld', '#5fa6c8', '#0e2a40') + '<filter id="bk" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30"/></filter>'
+    return back(defs, 'url(#fld)', facets + glow, frame='#e6f4fb', border='#081420', emblem=flake)
+
+
+def back_heraldic():
+    defs = (GOLD + rgrad('fld', '#8a1c2c', '#2a060c')
+            + '<pattern id="lys" width="70" height="70" patternUnits="userSpaceOnUse"><path d="M35,16 C40,24 42,30 35,40 C28,30 30,24 35,16 Z '
+              'M35,40 C28,36 22,38 20,44 C25,41 30,41 35,45 Z M35,40 C42,36 48,38 50,44 C45,41 40,41 35,45 Z M29,47 L41,47 L41,50 L29,50 Z M35,50 L32,57 L38,57 Z" fill="#e6c06a"/></pattern>')
+    body = '<rect x="22" y="22" width="586" height="836" rx="18" fill="url(#lys)" opacity=".22"/>'
+    shield = ('<g transform="translate(315 470)"><path d="M-150,-170 L150,-170 L150,10 C150,110 70,170 0,200 C-70,170 -150,110 -150,10 Z" fill="#5c1622" stroke="url(#gold)" stroke-width="10"/>'
+              '<path d="M-150,-40 L0,40 L150,-40" fill="none" stroke="url(#gold)" stroke-width="22"/>'
+              '<path d="M0,-130 C14,-108 18,-92 0,-66 C-18,-92 -14,-108 0,-130 Z M0,-66 C-20,-78 -38,-72 -42,-56 C-30,-64 -16,-64 0,-54 Z M0,-66 C20,-78 38,-72 42,-56 C30,-64 16,-64 0,-54 Z" fill="url(#gold)"/>'
+              '<path d="M-90,-250 L-90,-200 L90,-200 L90,-250 L55,-222 L30,-262 L0,-226 L-30,-262 L-55,-222 Z" fill="url(#gold)"/>'
+              '<circle cx="0" cy="-262" r="8" fill="url(#gold)"/><circle cx="-90" cy="-252" r="7" fill="url(#gold)"/><circle cx="90" cy="-252" r="7" fill="url(#gold)"/></g>')
+    return back(defs, 'url(#fld)', body, frame='#e6c06a', emblem=shield)
+
+
+def back_dragon():
+    rows = []
+    for r in range(0, 30):
+        y = 30 + r * 30
+        off = 0 if r % 2 else 22
+        for c in range(-1, 15):
+            x = 22 + c * 44 + off
+            rows.append(f'M{x - 22},{y} q22,30 44,0')
+    scales = f'<path d="{" ".join(rows)}" fill="none" stroke="#5a140c" stroke-width="3" opacity=".8"/>'
+    eye = ('<g transform="translate(315 440)"><ellipse rx="210" ry="120" fill="#ff7a1a" opacity=".35" filter="url(#bk)"/>'
+           '<path d="M-200,0 C-110,-120 110,-120 200,0 C110,120 -110,120 -200,0 Z" fill="url(#iris)" stroke="#1a0604" stroke-width="10"/>'
+           '<path d="M0,-96 C26,-40 26,40 0,96 C-26,40 -26,-40 0,-96 Z" fill="#0a0202"/>'
+           '<ellipse cx="-50" cy="-40" rx="22" ry="12" fill="#fff6d8" opacity=".55"/></g>')
+    defs = (rgrad('fld', '#4a0e08', '#120302') + rgrad('iris', '#ffe27a', '#d8460e', r='.6')
+            + '<filter id="bk" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="26"/></filter>')
+    return back(defs, 'url(#fld)', f'<g clip-path="url(#fclip)">{scales}</g>', frame='#d9883a', emblem=eye).replace(
+        '</defs>', '<clipPath id="fclip"><rect x="22" y="22" width="586" height="836" rx="18"/></clipPath></defs>', 1)
+
+
+def back_astral():
+    rnd = random.Random(211)
+    stars_ = ''.join(f'<circle cx="{f(rnd.uniform(30, 600))}" cy="{f(rnd.uniform(30, 850))}" r="{f(rnd.uniform(.8, 2.6))}" fill="#fff" opacity="{f(rnd.uniform(.3, .95))}"/>' for _ in range(160))
+    const = '<path d="M110,170 L170,140 L230,180 L260,150 M420,720 L470,690 L520,730 L500,780 M120,700 L160,740 L210,720" stroke="#c4b8ff" stroke-width="1.6" fill="none" opacity=".6"/>'
+    ring = ''.join(f'<circle cx="{f(315 + math.cos(k / 12 * math.tau) * 190)}" cy="{f(440 + math.sin(k / 12 * math.tau) * 190)}" r="{9 if k % 3 == 0 else 5}" fill="url(#gold)"/>' for k in range(12))
+    moon = ('<g transform="translate(315 440)"><circle r="190" fill="none" stroke="url(#gold)" stroke-width="3" opacity=".7"/>'
+            '<circle r="150" fill="none" stroke="url(#gold)" stroke-width="1.5" stroke-dasharray="3 9" opacity=".6"/>'
+            '<circle r="110" fill="#f2ecd8"/><circle cx="44" cy="-26" r="104" fill="#151240"/></g>')
+    return back(GOLD + rgrad('fld', '#2a2470', '#070618'), 'url(#fld)', stars_ + const, frame='#d9b45e', emblem=moon + ring)
+
+
+BACKS = {
+    'back-classic.svg': back_classic,
+    'back-arcane.svg': back_arcane,
+    'back-grimoire.svg': back_grimoire,
+    'back-sylvan.svg': back_sylvan,
+    'back-frost.svg': back_frost,
+    'back-heraldic.svg': back_heraldic,
+    'back-dragon.svg': back_dragon,
+    'back-astral.svg': back_astral,
+}
+
 FILES = {
     'board-battlefield.svg': board_battlefield,
     'board-forest.svg': board_forest,
@@ -580,9 +735,11 @@ FILES = {
 }
 
 if __name__ == '__main__':
-    os.makedirs(OUT, exist_ok=True)
-    for name, fn in FILES.items():
-        data = fn()
-        with open(os.path.join(OUT, name), 'w', encoding='utf-8') as fh:
-            fh.write(data)
-        print(f'{name}: {len(data) // 1024} Ko')
+    backs_dir = os.path.join(OUT, '..', 'backs')
+    for folder, table in ((OUT, FILES), (backs_dir, BACKS)):
+        os.makedirs(folder, exist_ok=True)
+        for name, fn in table.items():
+            data = fn()
+            with open(os.path.join(folder, name), 'w', encoding='utf-8') as fh:
+                fh.write(data)
+            print(f'{name}: {len(data) // 1024} Ko')

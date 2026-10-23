@@ -145,6 +145,15 @@ public final class Bridge {
             answerDialog(message);
             return;
         }
+        if ("hello".equals(type)) {
+            // Lecture seule : jamais en attente derrière un dialogue ouvert depuis l'EDT (page rechargée pendant une question).
+            dispatch(type, message);
+            return;
+        }
+        if ("leaveMatch".equals(type)) {
+            // Un dialogue ouvert depuis l'EDT (choix d'une capacité) le bloque : on le ferme d'abord, l'EDT repart.
+            cancelDialogs();
+        }
         if (NETWORK_REQUESTS.contains(type)) {
             // Appels réseau (GitHub) : sur leur propre fil, pour ne pas figer la partie pendant l'attente.
             network.execute(() -> dispatch(type, message));
@@ -155,7 +164,7 @@ public final class Bridge {
             analyzer.execute(() -> dispatch(type, message));
             return;
         }
-        if ("edhrec".equals(type)) {
+        if ("edhrec".equals(type) || "deckPrices".equals(type)) {
             // Lecture d'EDHREC : à part, pour ne pas attendre derrière une synchronisation.
             web.execute(() -> dispatch(type, message));
             return;
@@ -215,6 +224,13 @@ public final class Bridge {
                 return catalog.search(m.getAsJsonObject("query"));
             case "cardInfo":
                 return catalog.cardInfo(m.get("name").getAsString());
+            case "prints":
+                return catalog.prints(m.get("name").getAsString());
+            case "chooseArt":
+                ArtChoices.choose(m.get("image").getAsString());
+                return null;
+            case "editions":
+                return catalog.editions();
             case "listDecks":
                 return catalog.listDecks();
             case "loadDeck":
@@ -276,6 +292,12 @@ public final class Bridge {
                 callOnEdt(() -> out[0] = Edhrec.present(catalog, raw));
                 return out[0];
             }
+            case "deckPrices":
+                try {
+                    return Prices.forCards(m.getAsJsonArray("cards"));
+                } catch (final java.io.IOException e) {
+                    throw new IllegalStateException("Prix indisponibles (" + e.getMessage() + "). Il faut Internet pour les lire chez Scryfall.");
+                }
             case "clearStats":
                 Stats.clear();
                 return null;
