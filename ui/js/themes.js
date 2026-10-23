@@ -45,11 +45,11 @@ const KINDS = {
 };
 
 const GOALS = {
-  games: (n) => `Jouer ${n} parties`,
-  wins: (n) => `Gagner ${n} parties`,
+  games: (n) => `Jouer ${n} partie${n > 1 ? 's' : ''}`,
+  wins: (n) => `Gagner ${n} partie${n > 1 ? 's' : ''}`,
   win4: () => 'Gagner une partie à 4 joueurs',
   dealt: (n) => `Infliger ${n} blessures en une partie`,
-  trophies: (n) => `Obtenir ${n} trophées`,
+  trophies: (n) => `Obtenir ${n} trophée${n > 1 ? 's' : ''}`,
 };
 
 /** Où en est le joueur pour chaque condition (parties avec triche exclues). */

@@ -87,6 +87,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
+      # Avant le téléchargement : la récupération du dépôt vide le dossier de travail.
+      - uses: actions/checkout@v4
+
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -98,13 +101,27 @@ jobs:
           name: desktop-dist
           path: dist
 
-      - name: Application Windows portable (Java inclus)
+      - name: Moteur (Forge et Java inclus)
         shell: pwsh
         run: |
           jpackage --type app-image --input dist --main-jar desktop-0.1.0.jar --main-class atclaude.desktop.DesktopMain `
-            --name ArcaneTable --app-version 0.1.${{ github.run_number }} --vendor "Arcane Table" `
-            --java-options "-Xmx2g" --dest out
-          Compress-Archive -Path out/ArcaneTable -DestinationPath ArcaneTable-Windows-0.1.${{ github.run_number }}.zip
+            --name ArcaneTableMoteur --app-version 0.1.${{ github.run_number }} --vendor "Arcane Table" `
+            --icon windows/ArcaneTable.ico --java-options "-Xmx2g" --dest out
+
+      - name: Fenêtre de l'application (WebView2)
+        shell: pwsh
+        run: dotnet build windows/ArcaneTable.csproj -c Release -o out/fenetre -p:Version=0.1.${{ github.run_number }}
+
+      - name: Assembler le paquet
+        shell: pwsh
+        run: |
+          # ArcaneTable.exe (la fenêtre) à la racine, le moteur dans moteur/.
+          New-Item -ItemType Directory -Force -Path pack/ArcaneTable | Out-Null
+          Get-ChildItem out/fenetre -Exclude *.pdb | Copy-Item -Destination pack/ArcaneTable -Recurse
+          Copy-Item out/fenetre/runtimes/win-x64/native/WebView2Loader.dll pack/ArcaneTable/
+          Move-Item out/ArcaneTableMoteur pack/ArcaneTable/moteur
+          if (-not (Test-Path pack/ArcaneTable/moteur/ArcaneTableMoteur.exe)) { throw "moteur absent du paquet" }
+          Compress-Archive -Path pack/ArcaneTable -DestinationPath ArcaneTable-Windows-0.1.${{ github.run_number }}.zip
 
       - uses: actions/upload-artifact@v4
         with:

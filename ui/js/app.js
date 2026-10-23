@@ -376,6 +376,11 @@ function init() {
     if (e.key === 'Escape') {
       hideZoom();
     }
+    // Application Windows : F11 passe la fenêtre en plein écran (un navigateur garde cette touche pour lui).
+    if (e.key === 'F11' && !bridge.android && document.fullscreenEnabled) {
+      e.preventDefault();
+      (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+    }
   });
 
   bridge.on('connection', (m) => {
