@@ -1,0 +1,15 @@
+total 1072
+drwxr-xr-x 2 runner runner   4096 Oct 23 07:25 .
+drwxr-xr-x 5 runner runner   4096 Oct 23 07:25 ..
+-rw-r--r-- 1 runner runner 113450 Oct 23 07:25 atraxa-combos.json
+-rw-r--r-- 1 runner runner 122717 Oct 23 07:25 atraxa-java.json
+-rw-r--r-- 1 runner runner 122717 Oct 23 07:25 atraxa.json
+-rw-r--r-- 1 runner runner 132757 Oct 23 07:25 card.json
+-rw-r--r-- 1 runner runner    547 Oct 23 07:25 codes.txt
+-rw-r--r-- 1 runner runner 275775 Oct 23 07:25 gc.json
+-rw-r--r-- 1 runner runner 110032 Oct 23 07:25 krenko-combos.json
+-rw-r--r-- 1 runner runner  98462 Oct 23 07:25 krenko.json
+-rw-r--r-- 1 runner runner      0 Oct 23 07:25 listing.txt
+-rw-r--r-- 1 runner runner     63 Oct 23 07:25 partners-rev.json
+-rw-r--r-- 1 runner runner  88597 Oct 23 07:25 partners.json
+-rw-r--r-- 1 runner runner    111 Oct 23 07:25 unknown.json

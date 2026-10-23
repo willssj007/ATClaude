@@ -1,0 +1,10 @@
+atraxa.json 200 122717 application/json; charset=utf-8
+atraxa-java.json 200 122717 application/json; charset=utf-8
+atraxa-combos.json 200 113450 application/json; charset=utf-8
+partners.json 200 88597 application/json; charset=utf-8
+partners-rev.json 200 63 application/json; charset=utf-8
+krenko.json 200 98462 application/json; charset=utf-8
+krenko-combos.json 200 110032 application/json; charset=utf-8
+unknown.json 403 111 application/xml
+card.json 200 132757 application/json; charset=utf-8
+gc.json 200 275775 application/json; charset=utf-8
