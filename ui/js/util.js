@@ -103,6 +103,9 @@ const DEFAULTS = {
   autoPass: true,
   showEnglish: false,
   lastSetup: null,
+  menuTheme: 'arcane',
+  boardTheme: 'classic',
+  themesKnown: null,
   statsWithCheats: true,
 };
 
@@ -153,7 +156,7 @@ export const prefs = {
   },
 };
 
-const SYNCED = ['images', 'imageLang', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'lastSetup'];
+const SYNCED = ['images', 'imageLang', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'lastSetup', 'menuTheme', 'boardTheme'];
 
 export const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
 

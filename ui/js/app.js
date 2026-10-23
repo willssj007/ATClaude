@@ -11,8 +11,9 @@ import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
 import {icon} from './icons.js';
 import {StatsScreen} from './stats.js';
+import {announceUnlocks, appearanceHtml, applyThemes, themeClicked} from './themes.js';
 import {announceTrophy, Trophies} from './trophies.js';
-import {$, $$, avatarHtml, esc, prefs, toast} from './util.js';
+import {$, $$, avatarHtml, debounce, esc, prefs, toast} from './util.js';
 
 const screens = {};
 let current = 'home';
@@ -131,7 +132,7 @@ function homeScreen() {
       root.innerHTML = `<div class="page">
         ${saved ? savedGameHtml(saved) : ''}
         <div class="hero">
-          <img src="img/icon.svg" class="glow" alt="">
+          <span class="glow" aria-hidden="true"></span>
           <h1>Arcane Table</h1>
           <p>Magic: The Gathering contre l'IA, avec le moteur de règles Forge : toutes les cartes, en français, et un deck builder pensé pour le Commander.</p>
           <div class="actions">
@@ -147,7 +148,7 @@ function homeScreen() {
           <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
           <div class="tile panel" data-go="stats">${icon('banner', 'tile-ic')}<h3>Statistiques</h3><p class="muted">Victoires, decks les plus joués, records de blessures...</p></div>
           <div class="tile panel" data-go="trophies">${icon('chalice', 'tile-ic')}<h3>Trophées</h3><p class="muted">Séries de victoires, victoires alternatives, défis...</p></div>
-          <div class="tile panel" data-go="settings">${icon('gear', 'tile-ic')}<h3>Réglages</h3><p class="muted">Priorité, images, musique, sons.</p></div>
+          <div class="tile panel" data-go="settings">${icon('gear', 'tile-ic')}<h3>Réglages</h3><p class="muted">Apparence, priorité, images, musique, sons.</p></div>
         </div>
       </div>`;
       root.onclick = (e) => {
@@ -237,6 +238,8 @@ function settingsScreen() {
         <input type="checkbox" data-pref="${key}" ${prefs.get(key) ? 'checked' : ''}></div>`;
       root.innerHTML = `<div class="page settings">
         <h1>Réglages</h1>
+        <div class="appearance"><p class="muted small">Apparences…</p></div>
+        <h2 style="margin-top:26px">Jeu</h2>
         ${row('images', 'Images des cartes', 'Télécharge les images depuis Scryfall et les garde en cache sur l\'appareil.')}
         <div class="row"><div><b>Langue des images</b><p class="muted small">En français quand Scryfall a une impression française de la carte, sinon en anglais.</p></div>
           <select data-pref-select="imageLang"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
@@ -248,7 +251,7 @@ function settingsScreen() {
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
         <h2 style="margin-top:26px">À propos</h2>
-        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques : Kevin MacLeod (incompetech.com), licence Creative Commons Attribution 3.0.</p>
+        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques : Kevin MacLeod (incompetech.com), licence Creative Commons Attribution 3.0. Icônes et illustrations des apparences : dessinées pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
       </div>`;
@@ -276,6 +279,12 @@ function settingsScreen() {
       bridge.request('hello').then(h => {
         root.querySelector('.version').textContent = 'Version de Forge : ' + h.version;
       });
+      appearanceHtml().then((html) => {
+        root.querySelector('.appearance').innerHTML = html;
+      });
+      root.onclick = (e) => {
+        themeClicked(e.target);
+      };
     },
   };
 }
@@ -293,6 +302,7 @@ function setLoading(text, percent) {
 function afterSync() {
   decksCache = null;
   refreshAudio();
+  applyThemes();
   if (current !== 'game' && current !== 'account' && screens[current] && screens[current].show) {
     screens[current].show();
   }
@@ -304,6 +314,7 @@ function onReady(hello) {
   }
   ready = true;
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
+  checkUnlocks();
   $('#loading').classList.add('hidden');
   screens.lobby.setProfiles(hello && hello.aiProfiles);
   if (hello && hello.inMatch) {
@@ -328,7 +339,11 @@ async function hello() {
   }
 }
 
+/** Apparences débloquées par la dernière partie ou le dernier trophée (les deux arrivent ensemble). */
+const checkUnlocks = debounce(() => announceUnlocks().catch(() => {}), 1500);
+
 function init() {
+  applyThemes();
   initAudio();
   screens.home = homeScreen();
   screens.lobby = new Lobby($('#screen-lobby'), {onStart: startMatch, getDecks: () => getDecks(true)});
@@ -394,8 +409,12 @@ function init() {
     // Trophées et decks à jour sur les autres appareils.
     setTimeout(() => syncNow({auto: true, onDone: afterSync}), 1500);
   });
-  bridge.on('trophy', (m) => announceTrophy(m));
+  bridge.on('trophy', (m) => {
+    announceTrophy(m);
+    checkUnlocks();
+  });
   bridge.on('statsChanged', () => {
+    checkUnlocks();
     if (current === 'stats') {
       screens.stats.show();
     }

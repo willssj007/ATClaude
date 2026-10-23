@@ -1086,7 +1086,7 @@ export class Game {
     const width = slots[0] ? slots[0].offsetWidth || 80 : 80;
     const avail = hand.clientWidth || 600;
     const natural = width * n;
-    const scroll = n > 1 && hand.classList.contains('open') && (avail - natural) / (n - 1) < -width * 0.4;
+    const scroll = n > 1 && hand.classList.contains('open') && (avail - natural) / (n - 1) < -width * 0.45;
     if (scroll !== hand.classList.contains('scroll')) {
       hand.classList.toggle('scroll', scroll);
       hand.parentElement.classList.toggle('scrolling', scroll);
