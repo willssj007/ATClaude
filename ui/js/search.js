@@ -3,6 +3,7 @@
 import {bridge} from './bridge.js';
 import {cardElement, onLongPress, showZoom} from './cards.js';
 import {esc, el, debounce} from './util.js';
+import {icon} from './icons.js';
 
 const TYPES = [
   ['creature', 'Créature'], ['instant', 'Éphémère'], ['sorcery', 'Rituel'], ['artifact', 'Artefact'],
@@ -31,29 +32,43 @@ export class SearchPanel {
   }
 
   build() {
-    this.root.innerHTML = `<div class="search-bar">
-        <input type="search" class="q" placeholder="Nom de carte (français ou anglais)…">
-        <label class="check small"><input type="checkbox" class="intext"> dans le texte</label>
-      </div>
-      <div class="search-bar">
-        <div class="color-filter">${['W', 'U', 'B', 'R', 'G', 'C'].map(c => `<span class="ms ${c === 'C' ? '' : 'ms-' + c}" data-color="${c}" title="${c}">${c === 'C' ? '◇' : ''}</span>`).join('')}</div>
-        <select class="mode">
-          <option value="any">Au moins une de ces couleurs</option>
-          <option value="identity">Dans cette identité</option>
-          <option value="exact">Exactement ces couleurs</option>
-        </select>
-        <input type="number" class="cmin" placeholder="VM ≥" title="Valeur de mana minimale" min="0" style="width:76px">
-        <input type="number" class="cmax" placeholder="VM ≤" title="Valeur de mana maximale" min="0" style="width:76px">
-      </div>
-      <div class="search-bar chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}</div>
-      <div class="search-bar">
-        <label class="check small"><input type="checkbox" class="legal"> Légales en Commander</label>
-        <label class="check small"><input type="checkbox" class="cmdonly"> Peuvent être commandant</label>
-        <span class="muted small total" style="margin-left:auto"></span>
+    // En-tête fixe (le nom et le bouton des filtres) : seules les cartes défilent dessous.
+    // Les filtres se replient sur les écrans bas ; le bouton dit combien sont actifs.
+    this.root.innerHTML = `<div class="search-head">
+        <div class="search-bar main">
+          <input type="search" class="q" placeholder="Nom de carte (français ou anglais)…">
+          <button class="btn small filters-btn" title="Afficher ou masquer les filtres">${icon('filter')}<span>Filtres</span><b class="n"></b></button>
+          <span class="muted small total"></span>
+        </div>
+        <div class="search-filters">
+          <div class="search-bar">
+            <div class="color-filter">${['W', 'U', 'B', 'R', 'G', 'C'].map(c => `<span class="ms ${c === 'C' ? '' : 'ms-' + c}" data-color="${c}" title="${c}">${c === 'C' ? '◇' : ''}</span>`).join('')}</div>
+            <select class="mode">
+              <option value="any">Au moins une de ces couleurs</option>
+              <option value="identity">Dans cette identité</option>
+              <option value="exact">Exactement ces couleurs</option>
+            </select>
+            <input type="number" class="cmin" placeholder="VM ≥" title="Valeur de mana minimale" min="0" style="width:76px">
+            <input type="number" class="cmax" placeholder="VM ≤" title="Valeur de mana maximale" min="0" style="width:76px">
+          </div>
+          <div class="search-bar chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}</div>
+          <div class="search-bar">
+            <label class="check small"><input type="checkbox" class="intext"> Chercher aussi dans le texte</label>
+            <label class="check small"><input type="checkbox" class="legal"> Légales en Commander</label>
+            <label class="check small"><input type="checkbox" class="cmdonly"> Peuvent être commandant</label>
+          </div>
+        </div>
       </div>
       <div class="results"><div class="card-grid"></div><div class="more muted small" style="text-align:center;padding:14px"></div></div>`;
     const r = this.root;
-    const run = debounce(() => this.search(true), 220);
+    const head = r.querySelector('.search-head');
+    const short = window.matchMedia('(max-height: 620px), (max-width: 640px)');
+    head.classList.toggle('folded', short.matches);
+    r.querySelector('.filters-btn').addEventListener('click', () => head.classList.toggle('folded'));
+    const run = debounce(() => {
+      this.countFilters();
+      this.search(true);
+    }, 220);
     r.querySelector('.q').addEventListener('input', (e) => {
       this.query.text = e.target.value;
       run();
@@ -174,6 +189,14 @@ export class SearchPanel {
     } finally {
       this.loading = false;
     }
+  }
+
+  /** Nombre de filtres actifs, affiché sur le bouton quand ils sont repliés. */
+  countFilters() {
+    const q = this.query;
+    const n = (q.colors.length ? 1 : 0) + q.types.length + (q.cmcMin !== undefined ? 1 : 0) + (q.cmcMax !== undefined ? 1 : 0)
+      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0);
+    this.root.querySelector('.filters-btn .n').textContent = n ? String(n) : '';
   }
 
   refreshCounts() {

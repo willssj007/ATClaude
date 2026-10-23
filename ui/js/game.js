@@ -9,14 +9,32 @@ import {bridge} from './bridge.js';
 import {cardElement, showZoom, onLongPress} from './cards.js';
 import {confirmBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
-import {esc, el, manaHtml, avatarHtml, cutoutRects, PHASES, prefs, toast, debounce, translatePrompt} from './util.js';
+import {icon} from './icons.js';
+import {esc, el, manaHtml, avatarHtml, ownPhotoUrl, cutoutRects, PHASES, prefs, toast, debounce, translatePrompt} from './util.js';
 
 const COUNTER_LABELS = {P1P1: '+1/+1', M1M1: '−1/−1', LOYALTY: 'Loyauté', CHARGE: 'Charge', LORE: 'Histoire', DEFENSE: 'Défense', SHIELD: 'Bouclier', STUN: 'Étourdi', OIL: 'Huile', TIME: 'Temps'};
 const MANA_ORDER = ['W', 'U', 'B', 'R', 'G', 'C'];
-// Panneau de gauche : largeur réglable (px), et largeur du mode compact.
-const RAIL_MIN = 78;
-const RAIL_MAX = 300;
-const RAIL_COMPACT = 86;
+// Marqueurs que peut avoir un joueur (noms de Forge) : icône, libellé, seuil de défaite éventuel.
+const PLAYER_COUNTERS = {
+  POISON: {icon: 'poison', label: 'Poison', cls: 'poison', max: 10},
+  ENERGY: {icon: 'energy', label: 'Énergie', cls: 'energy'},
+  EXPERIENCE: {icon: 'experience', label: 'Expérience', cls: 'exp'},
+  RAD: {icon: 'rad', label: 'Radiation', cls: 'rad'},
+  TICKET: {icon: 'ticket', label: 'Tickets', cls: 'ticket'},
+};
+// Statuts posés par Forge dans la zone de commandement sous forme d'« effets ».
+const PLAYER_STATUSES = {
+  'The Monarch': {icon: 'crown', label: 'Monarque : pioche une carte de plus à sa fin de tour'},
+  'The Initiative': {icon: 'torch', label: 'Initiative : s\'aventure dans la Ville souterraine'},
+  'City\'s Blessing': {icon: 'sun', label: 'Bénédiction de la cité'},
+  'The Ring': {icon: 'ring', label: 'L\'Anneau l\'a tenté'},
+};
+const PLAYER_KEYWORDS = {Hexproof: 'Défense talismanique', Shroud: 'Linceul', 'Protection from everything': 'Protection contre tout'};
+// Panneaux de côté : largeur réglable (px), largeur du mode compact, réglage gardé sur l'appareil.
+const RAILS = {
+  l: {min: 78, max: 300, compact: 86, pref: 'railWidth', side: '.side-l'},
+  r: {min: 112, max: 360, compact: 124, pref: 'railWidthR', side: '.side-r'},
+};
 
 function counterLabel(name) {
   return COUNTER_LABELS[name] || name.charAt(0) + name.slice(1).toLowerCase();
@@ -115,19 +133,19 @@ export class Game {
     this.root.innerHTML = '';
     const table = el(`<div class="table" data-opponents="${opponents.length}">
       <div class="side-l">
-        <div class="rail-grip" title="Glisser pour élargir ou rétrécir ce panneau · toucher : compact ou normal"></div>
+        <div class="rail-grip l" title="Glisser pour élargir ou rétrécir ce panneau · toucher : compact ou normal"></div>
         <div class="opps">${opponents.length > 1 ? `<div class="opp-view seg" title="Plateaux adverses : un seul à la fois ou tous ensemble">
           <button data-set-view="focus">Un</button><button data-set-view="all">Tous</button></div>` : ''}</div>
         <div class="me-panel">
           <div class="line">
-            <div class="player-hit" data-pid="${me.id}">${avatarHtml(me.name, 0, 34)}<div class="life"></div></div>
+            <div class="player-hit" data-pid="${me.id}">${avatarHtml(me.name, 0, 34, ownPhotoUrl())}<div class="life"></div></div>
             <div class="mana-pool"></div>
           </div>
           <div class="stats"></div>
           <div class="zones">
-            <div class="pile" data-zone="graveyard" data-pid="${me.id}"><div class="label">Cimet.</div></div>
-            <div class="pile" data-zone="exile" data-pid="${me.id}"><div class="label">Exil</div></div>
-            <div class="pile command" data-zone="command" data-pid="${me.id}"><div class="label">Cmdt</div></div>
+            <div class="pile" data-zone="graveyard" data-pid="${me.id}"><div class="label">${icon('graveyard')}<span>Cimet.</span></div></div>
+            <div class="pile" data-zone="exile" data-pid="${me.id}"><div class="label">${icon('exile')}<span>Exil</span></div></div>
+            <div class="pile command" data-zone="command" data-pid="${me.id}"><div class="label">${icon('crown')}<span>Cmdt</span></div></div>
           </div>
         </div>
       </div>
@@ -140,13 +158,16 @@ export class Game {
           <div class="row front"></div>
           <div class="row back"><div class="nonlands row"></div><div class="spacer"></div><div class="lands row"></div></div>
         </div>
-        <div class="hand-band"><div class="hand"></div></div>
+        <div class="hand-band"><div class="hand"></div>
+          <div class="hand-scroller"><button class="btn small ghost" data-hs="-1" title="Cartes précédentes">${icon('chevronLeft')}</button><input type="range" min="0" max="1000" value="0" aria-label="Faire défiler la main"><button class="btn small ghost" data-hs="1" title="Cartes suivantes">${icon('chevronRight')}</button></div>
+        </div>
       </div>
       <div class="side-r">
+        <div class="rail-grip r" title="Glisser pour élargir ou rétrécir ce panneau · toucher : compact ou normal"></div>
         <div class="toolbar">
-          <button class="btn small" data-open="cheat" title="Menu de triche">✨<span class="lbl"> Triche</span></button>
-          <button class="btn small" data-open="log" title="Journal de la partie">📜</button>
-          <button class="btn small" data-open="menu" title="Menu">☰</button>
+          <button class="btn small" data-open="cheat" title="Menu de triche">${icon('wand')}<span class="lbl"> Triche</span></button>
+          <button class="btn small" data-open="log" title="Journal de la partie">${icon('scroll')}</button>
+          <button class="btn small" data-open="menu" title="Menu">${icon('menu')}</button>
         </div>
         <div class="hud-actions">
           <div class="prompt"></div>
@@ -175,9 +196,9 @@ export class Game {
         </div>
         <div class="stats"></div>
         <div class="zones">
-          <div class="pile" data-zone="graveyard" data-pid="${p.id}"><div class="label">Cimet.</div></div>
-          <div class="pile" data-zone="exile" data-pid="${p.id}"><div class="label">Exil</div></div>
-          <div class="pile command" data-zone="command" data-pid="${p.id}"><div class="label">Cmdt</div></div>
+          <div class="pile" data-zone="graveyard" data-pid="${p.id}"><div class="label">${icon('graveyard')}<span>Cimet.</span></div></div>
+          <div class="pile" data-zone="exile" data-pid="${p.id}"><div class="label">${icon('exile')}<span>Exil</span></div></div>
+          <div class="pile command" data-zone="command" data-pid="${p.id}"><div class="label">${icon('crown')}<span>Cmdt</span></div></div>
         </div>
       </div>`));
       half.appendChild(el(`<div class="opp-field" data-pid="${p.id}">
@@ -189,7 +210,8 @@ export class Game {
     this.root.appendChild(table);
     this.table = table;
     this.board = table.querySelector('.board');
-    this.applyRail(prefs.get('railWidth'));
+    this.applyRail('l', prefs.get(RAILS.l.pref));
+    this.applyRail('r', prefs.get(RAILS.r.pref));
     this.slots.clear();
     this.handOpen = false;
     this.applySplit(this.split());
@@ -286,8 +308,10 @@ export class Game {
       this.pointerType = e.pointerType || 'mouse';
     }, true);
     this.bindHandSwipe(table.querySelector('.hand'));
+    this.bindHandScroller(table.querySelector('.hand'), table.querySelector('.hand-scroller'));
     this.bindDivider(table.querySelector('.divider'));
-    this.bindRailGrip(table);
+    this.bindRailGrip(table, 'l');
+    this.bindRailGrip(table, 'r');
 
     table.addEventListener('click', (e) => {
       if (consumed()) {
@@ -303,7 +327,7 @@ export class Game {
         this.stackItemClicked(Number(stackItem.dataset.sid), stackItem);
         return;
       }
-      if (e.target.closest('.drawer, .stack-panel, .stack-pill')) {
+      if (e.target.closest('.drawer, .stack-panel, .stack-pill, .hand-scroller')) {
         return;
       }
       const view = e.target.closest('[data-set-view]');
@@ -485,6 +509,31 @@ export class Game {
         e.stopPropagation();
       }
     }, true);
+  }
+
+  /** Main en défilement : curseur et flèches au-dessus des cartes, molette de la souris à l'horizontale. */
+  bindHandScroller(hand, scroller) {
+    const range = scroller.querySelector('input');
+    const max = () => Math.max(0, hand.scrollWidth - hand.clientWidth);
+    hand.addEventListener('scroll', () => {
+      range.value = max() ? Math.round(hand.scrollLeft / max() * 1000) : 0;
+    }, {passive: true});
+    range.addEventListener('input', () => {
+      hand.scrollLeft = Number(range.value) / 1000 * max();
+    });
+    scroller.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-hs]');
+      const slot = hand.querySelector(':scope > .slot');
+      if (b && slot) {
+        hand.scrollBy({left: Number(b.dataset.hs) * slot.offsetWidth * 2.5, behavior: 'smooth'});
+      }
+    });
+    hand.addEventListener('wheel', (e) => {
+      if (hand.classList.contains('scroll') && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        hand.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    }, {passive: false});
   }
 
   /** La ligne du milieu se glisse pour donner plus de place à un côté ; double-touche pour revenir au milieu. */
@@ -826,7 +875,7 @@ export class Game {
       html += `<div class="b-damage">${card.damage}</div>`;
     }
     if (card.commander) {
-      html += '<div class="b-crown">👑</div>';
+      html += `<div class="b-crown">${icon('crown')}</div>`;
     }
     if (card.token && onField) {
       html += '<div class="b-token">Jeton</div>';
@@ -891,25 +940,43 @@ export class Game {
     life.classList.toggle('low', p.life <= 10);
     const stats = box.querySelector('.stats');
     let html = '';
+    const chip = (cls, ic, value, title, extra = '') => `<span class="stat ${cls}" title="${esc(title)}"${extra}>${icon(ic)}${value === '' ? '' : `<b>${value}</b>`}</span>`;
     if (!isMe && p.controlledByMe) {
-      html += `<span class="stat ctrl" title="Tu contrôles ce joueur">🎮</span><span class="stat hand-of" data-hand-of="${p.id}" title="Ouvrir sa main">✋ <b>${p.handSize}</b> ▸</span>`;
+      html += chip('ctrl', 'puppet', '', 'Tu contrôles ce joueur');
+      html += chip('hand-of', 'hand', p.handSize, 'Ouvrir sa main', ` data-hand-of="${p.id}"`);
     } else if (!isMe) {
-      html += `<span class="stat" title="Cartes en main">✋ <b>${p.handSize}</b></span>`;
+      html += chip('', 'hand', p.handSize, 'Cartes en main');
     }
-    html += `<span class="stat lib" data-zone="library" title="Bibliothèque">📚 <b>${p.library}</b></span>`;
-    if (p.poison) {
-      html += `<span class="stat poison" title="Poison">☠ <b>${p.poison}</b></span>`;
+    html += chip('lib', 'library', p.library, 'Bibliothèque', ' data-zone="library"');
+    // Marqueurs du joueur, mis en valeur quand leur nombre change.
+    const prev = (this.prevCounters || (this.prevCounters = new Map())).get(p.id) || {};
+    const counters = p.counters || {};
+    for (const [name, n] of Object.entries(counters)) {
+      if (!n) {
+        continue;
+      }
+      const def = PLAYER_COUNTERS[name.toUpperCase()] || {icon: 'token', label: name, cls: 'other'};
+      const bump = prev[name] !== undefined && prev[name] !== n ? ' bump' : '';
+      const near = def.max && n >= def.max - 3 ? ' danger' : '';
+      html += chip(`pc ${def.cls}${bump}${near}`, def.icon, def.max ? `${n}<small>/${def.max}</small>` : n, `${def.label} : ${n}${def.max ? ' (défaite à ' + def.max + ')' : ''}`);
     }
-    if (p.energy) {
-      html += `<span class="stat" title="Énergie">⚡ <b>${p.energy}</b></span>`;
-    }
+    this.prevCounters.set(p.id, counters);
     for (const d of p.commanderDamage || []) {
-      html += `<span class="stat cmd" title="Blessures de commandant : ${esc(d.name)}">⚔ <b>${d.damage}</b>/21</span>`;
+      html += chip(`cmd${d.damage >= 15 ? ' danger' : ''}`, 'swords', `${d.damage}<small>/21</small>`, `Blessures de commandant : ${d.name}`);
     }
     for (const c of p.commanders || []) {
       if (c.casts > 0) {
-        html += `<span class="stat" title="Taxe de commandant">Taxe <b>+${c.casts * 2}</b></span>`;
+        html += chip('tax', 'purse', `+${c.casts * 2}`, 'Taxe de commandant (mana en plus pour le relancer)');
       }
+    }
+    for (const c of p.zones.command || []) {
+      const status = PLAYER_STATUSES[c.oracleName];
+      if (status) {
+        html += chip('status', status.icon, '', status.label);
+      }
+    }
+    if ((p.keywords || []).length) {
+      html += chip('status', 'shield', '', (p.keywords || []).map(k => PLAYER_KEYWORDS[k] || k).join(', '));
     }
     if (stats._html !== html) {
       stats.innerHTML = html;
@@ -951,7 +1018,7 @@ export class Game {
       // Forge répète tour, phase et pile, déjà affichés sur la ligne du milieu : on dit plutôt quoi faire.
       const active = state.players.find(pl => pl.id === state.game.activePlayer);
       const ruled = state.players.find(pl => pl.controlledByMe && pl.priority);
-      message = ruled ? `Tu joues pour ${ruled.name} : ${state.stack.length ? 'réponds avec ses cartes ou laisse résoudre.' : 'joue une de ses cartes (✋ sur sa fiche) ou passe.'}`
+      message = ruled ? `Tu joues pour ${ruled.name} : ${state.stack.length ? 'réponds avec ses cartes ou laisse résoudre.' : 'joue une de ses cartes (main sur sa fiche) ou passe.'}`
         : state.stack.length ? 'Un sort est sur la pile : réponds ou laisse-le se résoudre.'
         : state.game.activePlayer === me.id ? 'À toi : joue une carte ou passe.'
           : `Tour de ${active ? active.name : 'l\'adversaire'} : tu peux répondre ou passer.`;
@@ -987,18 +1054,21 @@ export class Game {
     ok.textContent = okLabel;
     ok.disabled = !p.okEnabled;
     ok.classList.toggle('hidden', !p.okEnabled && waiting);
-    let cancelLabel = p.cancelLabel || 'Annuler';
+    let cancelHtml = esc(p.cancelLabel || 'Annuler');
     if (p.input === 'InputAttack') {
       // Forge propose « Frappe Alpha » (tout le monde attaque) ou « Rappeler » (plus personne n'attaque).
-      cancelLabel = /rappel/i.test(cancelLabel) ? '↺ Personne n\'attaque' : '⚔ Tout attaquer';
+      cancelHtml = /rappel/i.test(p.cancelLabel || '') ? `${icon('undo')} Personne n'attaque` : `${icon('swords')} Tout attaquer`;
     }
-    cancel.textContent = cancelLabel;
+    if (cancel._html !== cancelHtml) {
+      cancel.innerHTML = cancelHtml;
+      cancel._html = cancelHtml;
+    }
     cancel.classList.toggle('hidden', !p.cancelEnabled);
 
     const extra = this.table.querySelector('.extra');
     let html = '';
     if (p.input === 'InputPassPriority' || p.input === 'InputPayMana') {
-      html += '<button class="btn small ghost" data-act="undo" title="Défaire la dernière action (engagement de mana...)">↶ Défaire</button>';
+      html += `<button class="btn small ghost" data-act="undo" title="Défaire la dernière action (engagement de mana...)">${icon('undo')} Défaire</button>`;
     }
     if (extra._html !== html) {
       extra.innerHTML = html;
@@ -1007,14 +1077,33 @@ export class Game {
     this.table.querySelector('.hold').classList.toggle('on', !!(state.settings && state.settings.holdPriority));
   }
 
+  /**
+   * Éventail de la main. Dépliée, si les cartes devaient trop se chevaucher (moins de 60 % visibles),
+   * elles s'affichent en entier sur une rangée qu'on fait défiler (doigt, curseur, flèches).
+   */
   fanHand(hand, n) {
-    if (!n) {
-      return;
-    }
     const slots = [...hand.querySelectorAll(':scope > .slot')];
     const width = slots[0] ? slots[0].offsetWidth || 80 : 80;
     const avail = hand.clientWidth || 600;
     const natural = width * n;
+    const scroll = n > 1 && hand.classList.contains('open') && (avail - natural) / (n - 1) < -width * 0.4;
+    if (scroll !== hand.classList.contains('scroll')) {
+      hand.classList.toggle('scroll', scroll);
+      hand.parentElement.classList.toggle('scrolling', scroll);
+      hand.scrollLeft = 0;
+    }
+    if (!n) {
+      return;
+    }
+    if (scroll) {
+      hand.style.setProperty('--hand-overlap', '6px');
+      for (const slot of slots) {
+        slot.firstElementChild.style.removeProperty('--fan');
+        slot.firstElementChild.style.removeProperty('--arc');
+      }
+      hand.dispatchEvent(new Event('scroll'));
+      return;
+    }
     let overlap = -width * 0.06;
     if (natural + overlap * (n - 1) > avail) {
       overlap = Math.max(-width * 0.8, (avail - natural) / (n - 1));
@@ -1141,19 +1230,20 @@ export class Game {
     });
   }
 
-  /** Largeur du panneau de gauche (null : largeur normale, selon l'écran). */
-  applyRail(width) {
+  /** Largeur d'un panneau de côté, 'l' ou 'r' (null : largeur normale, selon l'écran). */
+  applyRail(which, width) {
     if (width) {
-      this.table.style.setProperty('--rail-l', Math.round(width) + 'px');
+      this.table.style.setProperty('--rail-' + which, Math.round(width) + 'px');
     } else {
-      this.table.style.removeProperty('--rail-l');
+      this.table.style.removeProperty('--rail-' + which);
     }
   }
 
-  /** Poignée du panneau de gauche : on la glisse pour régler sa largeur ; un toucher passe en compact ou revient. */
-  bindRailGrip(table) {
-    const grip = table.querySelector('.rail-grip');
-    const side = table.querySelector('.side-l');
+  /** Poignée d'un panneau de côté : on la glisse pour régler sa largeur ; un toucher passe en compact ou revient. */
+  bindRailGrip(table, which) {
+    const rail = RAILS[which];
+    const grip = table.querySelector('.rail-grip.' + which);
+    const side = table.querySelector(rail.side);
     if (!grip || !side) {
       return;
     }
@@ -1162,7 +1252,8 @@ export class Game {
       e.preventDefault();
       e.stopPropagation();
       grip.setPointerCapture(e.pointerId);
-      drag = {id: e.pointerId, x: e.clientX, left: side.getBoundingClientRect().left, moved: false, width: null};
+      const box = side.getBoundingClientRect();
+      drag = {id: e.pointerId, x: e.clientX, left: box.left, right: box.right, moved: false, width: null};
       grip.classList.add('dragging');
     });
     grip.addEventListener('pointermove', (e) => {
@@ -1173,8 +1264,9 @@ export class Game {
         drag.moved = true;
       }
       if (drag.moved) {
-        drag.width = Math.max(RAIL_MIN, Math.min(RAIL_MAX, e.clientX - drag.left + 6));
-        this.applyRail(drag.width);
+        const width = which === 'l' ? e.clientX - drag.left + 6 : drag.right - e.clientX + 6;
+        drag.width = Math.max(rail.min, Math.min(rail.max, width));
+        this.applyRail(which, drag.width);
         this.afterResize();
       }
     });
@@ -1184,12 +1276,12 @@ export class Game {
       }
       grip.classList.remove('dragging');
       if (drag.moved && drag.width) {
-        prefs.set('railWidth', Math.round(drag.width));
+        prefs.set(rail.pref, Math.round(drag.width));
       } else {
         // Toucher : compact, ou retour à la largeur normale.
-        const compact = side.getBoundingClientRect().width > RAIL_COMPACT + 8;
-        prefs.set('railWidth', compact ? RAIL_COMPACT : null);
-        this.applyRail(compact ? RAIL_COMPACT : null);
+        const compact = side.getBoundingClientRect().width > rail.compact + 8;
+        prefs.set(rail.pref, compact ? rail.compact : null);
+        this.applyRail(which, compact ? rail.compact : null);
       }
       drag = null;
       this.afterResize();
@@ -1581,7 +1673,7 @@ export class Game {
     }
     const players = state.players.map(p => `<span class="chip${p.id === this.cheatTarget ? ' on' : ''}" data-target="${p.id}">${esc(p.name)}</span>`).join('');
     const opponent = state.players.find(p => !p.me && !p.lost);
-    drawer.innerHTML = `<header><h2>✨ Triche</h2><button class="btn small close">✕</button></header>
+    drawer.innerHTML = `<header><h2>${icon('wand')} Triche</h2><button class="btn small close">✕</button></header>
       <div class="content">
         <p class="muted small">Disponible quand tu as la main (priorité ou choix). Agit sur le joueur choisi.</p>
         <section><h3>Joueur</h3><div class="chips targets">${players}</div></section>
@@ -1602,8 +1694,13 @@ export class Game {
           <div class="grid-btns"><button class="btn" data-life="-5">−5</button><button class="btn" data-life="-1">−1</button><button class="btn" data-life="1">+1</button><button class="btn" data-life="5">+5</button><button class="btn" data-life="10">+10</button><button class="btn" data-life="20">+20</button></div>
           <div style="display:flex;gap:6px;margin-top:6px"><input type="number" class="life-set" placeholder="Fixer à…" style="flex:1"><button class="btn small" data-life-set>Fixer</button></div>
         </section>
+        <section><h3>Marqueurs du joueur</h3>
+          <div class="pc-cheat">${Object.entries(PLAYER_COUNTERS).map(([key, def]) => {
+            return `<div class="pc-row ${def.cls}">${icon(def.icon)}<span>${def.label}</span><button class="btn small" data-pc="${key}" data-d="-1">−1</button><button class="btn small" data-pc="${key}" data-d="1">+1</button><button class="btn small" data-pc="${key}" data-d="${def.max ? 3 : 5}">+${def.max ? 3 : 5}</button></div>`;
+          }).join('')}</div>
+        </section>
         <section><h3>Contrôler un adversaire</h3>
-          <p class="muted small">Tu prends toutes ses décisions (sorts, attaques, choix) comme avec Mindslaver, jusqu'à ce que tu le rendes. Sa main s'ouvre depuis sa fiche (✋).</p>
+          <p class="muted small">Tu prends toutes ses décisions (sorts, attaques, choix) comme avec Mindslaver, jusqu'à ce que tu le rendes. Sa main s'ouvre depuis sa fiche (icône de main).</p>
           <div style="display:flex;flex-direction:column;gap:6px">${state.players.filter(p => !p.me && !p.lost).map(p => `<label class="check"><input type="checkbox" data-control="${p.id}" ${p.controlledByMe ? 'checked' : ''}> Contrôler ${esc(p.name)}</label>`).join('') || '<span class="muted small">Aucun adversaire en jeu.</span>'}</div>
         </section>
         <section><h3>Tour</h3>
@@ -1674,6 +1771,8 @@ export class Game {
         }
         cheat('addCard', {name: picked, zone: drawer.querySelector('.card-zone').value, count: Number(drawer.querySelector('.card-count').value) || 1});
         toast(`Ajout de ${picked}.`);
+      } else if (b.dataset.pc) {
+        cheat('playerCounter', {counter: b.dataset.pc, delta: Number(b.dataset.d)});
       } else if (b.dataset.draw) {
         cheat('draw', {count: Number(b.dataset.draw)});
       } else if (b.dataset.life) {

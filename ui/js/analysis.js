@@ -51,7 +51,7 @@ export function openAnalysis(deck, a) {
       const target = r.min === 0 && r.max >= 99 ? '' : r.max >= 99 ? `${r.min}+ conseillé` : `${r.min}–${r.max} conseillé`;
       return `<div class="role ${state}" data-role="${esc(r.key)}">
         <div class="role-head"><b>${esc(r.label)}</b><span class="role-n">${r.count}</span><span class="muted small">${target}</span>
-          ${state === 'low' ? '<span class="role-flag">⚠ peu</span>' : state === 'high' ? '<span class="role-flag">beaucoup</span>' : ''}</div>
+          ${state === 'low' ? '<span class="role-flag">peu</span>' : state === 'high' ? '<span class="role-flag">beaucoup</span>' : ''}</div>
         <div class="role-meter">${r.min > 0 || r.max < 99 ? `<i class="zone" style="left:${(100 * r.min) / scale}%;width:${(100 * (Math.min(r.max, scale) - r.min)) / scale}%"></i>` : ''}<i class="val" style="width:${(100 * Math.min(r.count, scale)) / scale}%"></i></div>
         <div class="role-cards small muted hidden">${r.cards.length ? r.cards.map(esc).join(', ') : 'Aucune carte.'}</div>
       </div>`;

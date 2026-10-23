@@ -3,6 +3,7 @@
 import {bridge} from './bridge.js';
 import {cardElement, showZoom, onLongPress} from './cards.js';
 import {esc, el, debounce, rulesHtml} from './util.js';
+import {icon} from './icons.js';
 
 const root = () => document.getElementById('dialogs');
 const open = new Map();
@@ -10,7 +11,7 @@ const open = new Map();
 function shell({title, message = '', narrow = false, peekable = true, full = false}) {
   const back = el(`<div class="modal-back${full ? ' full' : ''}">
     <div class="modal${narrow ? ' narrow' : ''}${full ? ' full' : ''}">
-      <header><h2>${esc(title || 'Choix')}</h2>${peekable ? '<button class="btn small ghost peek-btn" title="Voir le plateau">👁 Plateau</button>' : ''}</header>
+      <header><h2>${esc(title || 'Choix')}</h2>${peekable ? `<button class="btn small ghost peek-btn" title="Voir le plateau">${icon('eye')} Plateau</button>` : ''}</header>
       <div class="body">${message ? `<div class="message">${esc(message)}</div>` : ''}</div>
       <footer></footer>
     </div>
@@ -19,7 +20,7 @@ function shell({title, message = '', narrow = false, peekable = true, full = fal
   if (peek) {
     peek.addEventListener('click', () => {
       back.classList.toggle('peek');
-      peek.textContent = back.classList.contains('peek') ? '▲ Revenir au choix' : '👁 Plateau';
+      peek.innerHTML = back.classList.contains('peek') ? '▲ Revenir au choix' : `${icon('eye')} Plateau`;
     });
   }
   root().appendChild(back);
@@ -323,9 +324,9 @@ const handlers = {
     const zones = {top: items.map((_, i) => i), moved: []};
     s.back.querySelector('.modal').classList.add('arrange');
     const hint = el('<div class="muted small arr-hint">Glisse les cartes d\'une zone à l\'autre, ou touche-les. Dessus, la carte de gauche sera piochée en premier.</div>');
-    const zoneEl = (key, label) => el(`<div class="arr-zone" data-zone="${key}"><div class="arr-label">${esc(label)}</div><div class="arr-cards"></div></div>`);
-    const topZ = zoneEl('top', d.topLabel || 'Dessus');
-    const movedZ = zoneEl('moved', d.movedLabel || 'Dessous');
+    const zoneEl = (key, label, ic) => el(`<div class="arr-zone" data-zone="${key}"><div class="arr-label">${icon(ic)}${esc(label)}</div><div class="arr-cards"></div></div>`);
+    const topZ = zoneEl('top', d.topLabel || 'Dessus', 'library');
+    const movedZ = zoneEl('moved', d.movedLabel || 'Dessous', d.graveyard ? 'graveyard' : 'library');
     movedZ.classList.toggle('grave', !!d.graveyard);
     const nodes = items.map((item, i) => {
       const n = el(`<div class="arr-card" data-i="${i}"></div>`);

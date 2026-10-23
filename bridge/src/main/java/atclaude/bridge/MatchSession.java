@@ -14,6 +14,7 @@ import forge.game.ability.AbilityKey;
 import forge.game.ability.AbilityUtils;
 import forge.game.card.Card;
 import forge.game.card.CardView;
+import forge.game.card.CounterEnumType;
 import forge.game.event.GameEvent;
 import forge.game.phase.PhaseType;
 import forge.game.player.Player;
@@ -790,6 +791,20 @@ final class MatchSession {
                 final Player p = player(m);
                 final int value = m.has("value") ? m.get("value").getAsInt() : p.getLife() + m.get("delta").getAsInt();
                 inGame(game, () -> p.setLife(Math.max(0, value), null));
+            }
+            case "playerCounter" -> {
+                final Player p = player(m);
+                final CounterEnumType type = switch (str(m, "counter")) {
+                    case "POISON" -> CounterEnumType.POISON;
+                    case "ENERGY" -> CounterEnumType.ENERGY;
+                    case "EXPERIENCE" -> CounterEnumType.EXPERIENCE;
+                    case "RAD" -> CounterEnumType.RAD;
+                    case "TICKET" -> CounterEnumType.TICKET;
+                    default -> throw new IllegalArgumentException("Marqueur inconnu : " + str(m, "counter"));
+                };
+                final int delta = m.get("delta").getAsInt();
+                // setCounters déclenche les mêmes événements que le jeu (poison : défaite à 10 au prochain contrôle).
+                inGame(game, () -> p.setCounters(type, Math.max(0, p.getCounters(type) + delta), null, true));
             }
             case "skipTurn" -> {
                 final Player p = player(m);

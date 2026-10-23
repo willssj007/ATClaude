@@ -53,7 +53,8 @@ export function manaHtml(cost) {
 
 /** Texte de règles avec ses symboles de mana. */
 export function rulesHtml(text) {
-  return esc(text || '').replace(/\{([^}]+)\}/g, (_, s) => symbol(s));
+  // Certains scripts de Forge gardent « \n » en toutes lettres pour les retours à la ligne.
+  return esc(String(text || '').replace(/\\n/g, '\n')).replace(/\{([^}]+)\}/g, (_, s) => symbol(s));
 }
 
 /** Couleur principale d'une carte pour le cadre de secours. */
@@ -156,7 +157,23 @@ const SYNCED = ['images', 'imageLang', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVo
 
 export const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
 
-export function avatarHtml(name, index, size = 44) {
+// Photo de profil du joueur de cet appareil (data URL), tenue à jour par l'écran du compte.
+let ownPhoto = '';
+const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+
+export function setOwnPhoto(photo) {
+  ownPhoto = photo && PHOTO_RE.test(photo) ? photo : '';
+}
+
+export function ownPhotoUrl() {
+  return ownPhoto;
+}
+
+/** Pastille d'un joueur : sa photo si elle est donnée, sinon son initiale sur une couleur. */
+export function avatarHtml(name, index, size = 44, photo = '') {
+  if (photo && PHOTO_RE.test(photo)) {
+    return `<div class="avatar photo" style="width:${size}px;height:${size}px;background-image:url('${photo}')" title="${esc(name || '')}"></div>`;
+  }
   const letter = esc((name || '?').trim().charAt(0).toUpperCase());
   const color = AVATAR_COLORS[Math.abs(index) % AVATAR_COLORS.length];
   return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background:radial-gradient(circle at 30% 30%, ${color}, #141829)">${letter}</div>`;

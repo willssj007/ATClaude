@@ -3,6 +3,7 @@
 import {bridge} from './bridge.js';
 import {sfx} from './audio.js';
 import {esc, el} from './util.js';
+import {icon} from './icons.js';
 
 const LEVELS = {common: 'Bronze', uncommon: 'Argent', rare: 'Or', mythic: 'Mythique', special: 'Spécial'};
 
@@ -34,8 +35,8 @@ export class Trophies {
 
   trophyHtml(t) {
     const tiers = (t.tiers || []).map(x => `<li class="${x.earned ? 'on' : ''}" data-l="${x.key}"><span class="dot"></span><b>${esc(x.label)}</b> ${esc(x.desc)}</li>`).join('');
-    return `<div class="trophy panel${t.level ? ' earned' : ''}" data-level="${esc(t.level)}">
-      <div class="cup" title="${esc(LEVELS[t.level] || 'Pas encore obtenu')}">🏆</div>
+    return `<div class="trophy panel${t.level ? ' earned' : ''}" data-level="${esc(t.level || "")}">
+      <div class="cup" title="${esc(LEVELS[t.level] || 'Pas encore obtenu')}">${icon('chalice')}</div>
       <div class="t-body">
         <b>${esc(t.name)}</b>
         ${t.desc ? `<div class="muted small">${esc(t.desc)}</div>` : ''}
@@ -50,7 +51,7 @@ export class Trophies {
 export function announceTrophy({title, message}) {
   const lines = String(message || '').split('\n');
   const box = el(`<div class="trophy-pop">
-    <div class="cup">🏆</div>
+    <div class="cup">${icon('chalice')}</div>
     <div><div class="t-title">${esc(title || 'Trophée obtenu')}</div>
       <b>${esc(lines[0] || '')}</b>
       <div class="small">${esc(lines.slice(1).join(' '))}</div></div>

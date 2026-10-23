@@ -111,6 +111,15 @@ final class GameSerializer {
         o.addProperty("life", p.getLife());
         o.addProperty("poison", p.getCounters(CounterEnumType.POISON));
         o.addProperty("energy", p.getCounters(CounterEnumType.ENERGY));
+        // Tous les marqueurs du joueur (poison, énergie, expérience, radiation, tickets...) et ses mots-clés.
+        o.add("counters", counters(p.getCounters()));
+        final JsonArray keywords = new JsonArray();
+        if (p.getKeywords() != null) {
+            for (final forge.game.keyword.KeywordView k : copy(p.getKeywords().getValues())) {
+                keywords.add(k.title());
+            }
+        }
+        o.add("keywords", keywords);
         o.addProperty("lost", p.getHasLost());
         o.addProperty("priority", p.getHasPriority());
         o.addProperty("avatar", p.getAvatarIndex());

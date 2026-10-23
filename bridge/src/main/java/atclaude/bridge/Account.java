@@ -93,6 +93,7 @@ final class Account {
         final JsonObject o = new JsonObject();
         o.addProperty("name", str(a, "name", "Joueur"));
         o.addProperty("avatar", a.has("avatar") ? a.get("avatar").getAsInt() : 0);
+        o.addProperty("photo", photo(a));
         o.addProperty("createdAt", a.has("createdAt") ? a.get("createdAt").getAsLong() : 0);
         o.addProperty("linked", !str(a, "token", "").isEmpty());
         o.addProperty("login", str(a, "login", ""));
@@ -114,9 +115,50 @@ final class Account {
         if (m.has("avatar")) {
             a.addProperty("avatar", m.get("avatar").getAsInt());
         }
+        if (m.has("photo")) {
+            final String photo = m.get("photo").isJsonNull() ? "" : m.get("photo").getAsString();
+            if (!photo.isEmpty() && !validPhoto(photo)) {
+                throw new IllegalArgumentException("Photo refusée : il faut une image JPEG, PNG ou WebP de moins de 200 Ko.");
+            }
+            setPhoto(a, photo);
+        }
         a.addProperty("profileAt", System.currentTimeMillis());
         store(a);
         return profile();
+    }
+
+    /** Photo de profil : petite image carrée (data URL), choisie dans la galerie et réduite par l'interface. */
+    private static final int PHOTO_MAX = 280_000;
+
+    static boolean validPhoto(final String s) {
+        final int comma = s.indexOf(',');
+        if (s.length() > PHOTO_MAX || comma < 0) {
+            return false;
+        }
+        final String head = s.substring(0, comma);
+        if (!head.equals("data:image/jpeg;base64") && !head.equals("data:image/png;base64") && !head.equals("data:image/webp;base64")) {
+            return false;
+        }
+        for (int i = comma + 1; i < s.length(); i++) {
+            final char c = s.charAt(i);
+            if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '+' || c == '/' || c == '=')) {
+                return false;
+            }
+        }
+        return comma + 1 < s.length();
+    }
+
+    private static String photo(final JsonObject o) {
+        final String photo = str(o, "photo", "");
+        return validPhoto(photo) ? photo : "";
+    }
+
+    private static void setPhoto(final JsonObject o, final String photo) {
+        if (photo.isEmpty() || !validPhoto(photo)) {
+            o.remove("photo");
+        } else {
+            o.addProperty("photo", photo);
+        }
     }
 
     /** Un deck supprimé : la synchronisation le supprimera aussi sur les autres appareils. */
@@ -243,6 +285,7 @@ final class Account {
         final JsonObject p = new JsonObject();
         p.addProperty("name", str(account, "name", "Joueur"));
         p.addProperty("avatar", account.has("avatar") ? account.get("avatar").getAsInt() : 0);
+        p.addProperty("photo", photo(account));
         p.addProperty("createdAt", account.has("createdAt") ? account.get("createdAt").getAsLong() : 0);
         p.addProperty("at", account.has("profileAt") ? account.get("profileAt").getAsLong() : 0);
         b.add("profile", p);
@@ -467,6 +510,7 @@ final class Account {
         if (p != null) {
             account.addProperty("name", str(p, "name", "Joueur"));
             account.addProperty("avatar", p.has("avatar") ? p.get("avatar").getAsInt() : 0);
+            setPhoto(account, photo(p));
             if (p.has("createdAt") && p.get("createdAt").getAsLong() > 0) {
                 account.addProperty("createdAt", p.get("createdAt").getAsLong());
             }

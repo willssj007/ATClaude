@@ -9,6 +9,7 @@ import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} f
 import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
+import {icon} from './icons.js';
 import {StatsScreen} from './stats.js';
 import {announceTrophy, Trophies} from './trophies.js';
 import {$, $$, avatarHtml, esc, prefs, toast} from './util.js';
@@ -135,18 +136,18 @@ function homeScreen() {
           <p>Magic: The Gathering contre l'IA, avec le moteur de règles Forge : toutes les cartes, en français, et un deck builder pensé pour le Commander.</p>
           <div class="actions">
             ${inMatch ? '<button class="btn gold" data-go="game">Reprendre la partie</button>' : ''}
-            <button class="btn gold" data-go="quick">⚡ Partie rapide</button>
+            <button class="btn gold" data-go="quick">${icon('swords')} Partie rapide</button>
             <button class="btn primary" data-go="lobby">Créer un salon</button>
             <button class="btn" data-go="decks">Mes decks</button>
           </div>
         </div>
         <div class="tiles">
-          <div class="tile panel" data-go="lobby"><h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
-          <div class="tile panel" data-go="decks"><h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
-          <div class="tile panel" data-go="cards"><h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
-          <div class="tile panel" data-go="stats"><h3>Statistiques</h3><p class="muted">Victoires, decks les plus joués, records de blessures...</p></div>
-          <div class="tile panel" data-go="trophies"><h3>Trophées</h3><p class="muted">Séries de victoires, victoires alternatives, défis...</p></div>
-          <div class="tile panel" data-go="settings"><h3>Réglages</h3><p class="muted">Priorité, images, musique, sons.</p></div>
+          <div class="tile panel" data-go="lobby">${icon('swords', 'tile-ic')}<h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
+          <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
+          <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
+          <div class="tile panel" data-go="stats">${icon('banner', 'tile-ic')}<h3>Statistiques</h3><p class="muted">Victoires, decks les plus joués, records de blessures...</p></div>
+          <div class="tile panel" data-go="trophies">${icon('chalice', 'tile-ic')}<h3>Trophées</h3><p class="muted">Séries de victoires, victoires alternatives, défis...</p></div>
+          <div class="tile panel" data-go="settings">${icon('gear', 'tile-ic')}<h3>Réglages</h3><p class="muted">Priorité, images, musique, sons.</p></div>
         </div>
       </div>`;
       root.onclick = (e) => {
@@ -177,15 +178,17 @@ function savedGameHtml(s) {
   const when = s.savedAt ? new Date(s.savedAt) : null;
   const ago = when ? Math.max(0, Math.round((Date.now() - when.getTime()) / 60000)) : null;
   const agoText = ago === null ? '' : ago < 1 ? 'à l\'instant' : ago < 60 ? `il y a ${ago} min` : ago < 1440 ? `il y a ${Math.round(ago / 60)} h` : `le ${when.toLocaleDateString('fr-FR')}`;
-  const players = (s.players || []).map(p => `${esc(p.name)} <b>${p.lost ? '✝' : Number(p.life) || 0}</b>`).join(' · ');
+  const players = (s.players || []).map(p => `${esc(p.name)} <b>${p.lost ? icon('skull') : Number(p.life) || 0}</b>`).join(' · ');
   return `<div class="saved-game panel">
-    <div class="sg-icon">⏳</div>
+    <div class="sg-icon">${icon('hourglass')}</div>
     <div class="sg-info"><b>Partie en cours sauvegardée</b>
       <div class="muted small">${s.format === 'constructed' ? 'Construit' : 'Commander'} · tour ${Number(s.turn) || 1}${s.active ? ` (${esc(s.active)})` : ''} · ${agoText}</div>
       <div class="small">${players}</div></div>
     <div class="sg-actions"><button class="btn small" data-go="dropSaved">Abandonner</button><button class="btn gold" data-go="resumeSaved">▶ Reprendre</button></div>
   </div>`;
 }
+
+const NAV_ICONS = {home: 'castle', lobby: 'swords', decks: 'cards', cards: 'book', stats: 'banner', trophies: 'chalice', settings: 'gear'};
 
 async function quickMatch() {
   const setup = prefs.get('lastSetup');
@@ -205,10 +208,9 @@ function cardsScreen() {
   return {
     show() {
       if (!panel) {
-        root.innerHTML = '<div class="page" style="height:100%;display:flex;flex-direction:column"><h1>Cartes</h1><div class="browser" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>';
+        root.innerHTML = '<div class="page cards-page"><h1>Cartes</h1><div class="browser"></div></div>';
         const box = root.querySelector('.browser');
         panel = new SearchPanel(box, {onPick: (card) => showZoom(card, legalityHtml(card))});
-        box.querySelector('.results').style.cssText = 'flex:1;overflow:auto';
         panel.search(true);
       }
     },
@@ -339,11 +341,15 @@ function init() {
   screens.stats = new StatsScreen($('#screen-stats'));
   screens.account = new AccountScreen($('#screen-account'), {onSynced: afterSync});
   onProfile((p) => {
-    $('#profile-btn').innerHTML = `${avatarHtml(p.name, p.avatar, 28)}<span>${esc(p.name)}</span>${p.linked ? '<i title="Synchronisé">⟳</i>' : ''}`;
+    $('#profile-btn').innerHTML = `${avatarHtml(p.name, p.avatar, 28, p.photo)}<span>${esc(p.name)}</span>${p.linked ? '<i title="Synchronisé">⟳</i>' : ''}`;
     screens.lobby.playerName = p.name;
   });
 
   $('#profile-btn').addEventListener('click', () => ready && showScreen('account'));
+  for (const b of $$('#nav button')) {
+    b.innerHTML = `${icon(NAV_ICONS[b.dataset.screen])}<span>${b.textContent}</span>`;
+    b.title = b.textContent;
+  }
   $('#nav').addEventListener('click', (e) => {
     const b = e.target.closest('[data-screen]');
     if (b && ready) {

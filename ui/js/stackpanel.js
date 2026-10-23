@@ -2,6 +2,7 @@
 // et réglable (taille, opacité, mode compact, ouverture automatique). Réglages gardés sur l'appareil.
 
 import {el, prefs} from './util.js';
+import {icon} from './icons.js';
 
 const DEFAULTS = {x: null, y: null, size: null, opacity: 1, compact: false, autoOpen: true, minimized: false};
 const SIZES = {s: 200, m: 260, l: 340};
@@ -27,7 +28,7 @@ export class StackPanel {
       <header class="sp-head" title="Glisser pour déplacer la pile">
         <span class="sp-grip">⠿</span>
         <span class="sp-title">Pile</span>
-        <button class="sp-btn" data-sp="settings" title="Réglages de la pile">⚙</button>
+        <button class="sp-btn" data-sp="settings" title="Réglages de la pile">${icon('gear')}</button>
         <button class="sp-btn" data-sp="min" title="Masquer la pile (la pastille « Pile » la rouvre)">—</button>
       </header>
       <div class="sp-settings hidden"></div>

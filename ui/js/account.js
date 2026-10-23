@@ -3,7 +3,8 @@
 
 import {bridge} from './bridge.js';
 import {customBox} from './dialogs.js';
-import {AVATAR_COLORS, avatarHtml, el, esc, prefs, toast} from './util.js';
+import {icon} from './icons.js';
+import {AVATAR_COLORS, avatarHtml, el, esc, prefs, setOwnPhoto, toast} from './util.js';
 
 const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=Arcane%20Table';
 let profile = null;
@@ -18,6 +19,7 @@ export function onProfile(fn) {
 
 function setProfile(p) {
   profile = p;
+  setOwnPhoto(p && p.photo);
   listeners.forEach(fn => fn(p));
 }
 
@@ -32,6 +34,134 @@ export async function loadProfile() {
     // Forge pas encore prêt
   }
   return profile;
+}
+
+/**
+ * Photo de profil : choisie dans la galerie (ou un fichier sur ordinateur), recadrée en carré
+ * dans un cercle qu'on peut déplacer et agrandir, puis réduite à 256 px (JPEG, quelques dizaines de Ko).
+ * À appeler pendant le toucher (le sélecteur de fichiers ne s'ouvre que sur un geste).
+ */
+export function pickPhoto() {
+  return new Promise((resolve) => {
+    const input = el('<input type="file" accept="image/*" style="display:none">');
+    document.body.appendChild(input);
+    input.addEventListener('cancel', () => {
+      input.remove();
+      resolve(null);
+    });
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const src = downscale(img, 1024);
+        URL.revokeObjectURL(url);
+        cropDialog(src, resolve);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        toast('Cette image ne peut pas être lue.', {error: true});
+        resolve(null);
+      };
+      img.src = url;
+    });
+    input.click();
+  });
+}
+
+/** Copie réduite (petit côté à {@code max} px au plus) : le recadrage reste fluide avec les photos de 12 Mpx. */
+function downscale(img, max) {
+  const k = Math.min(1, max / Math.min(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * k));
+  c.height = Math.max(1, Math.round(img.naturalHeight * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
+function cropDialog(src, done) {
+  const OUT = 256;
+  let answered = false;
+  const answer = (value) => {
+    if (!answered) {
+      answered = true;
+      done(value);
+    }
+  };
+  const box = customBox('Recadrer la photo', (body, footer, close) => {
+    body.innerHTML = `<div class="crop">
+      <div class="crop-view"><canvas width="${OUT}" height="${OUT}"></canvas></div>
+      <div class="crop-side">
+        <label class="crop-zoom"><span class="muted small">Zoom</span><input type="range" min="100" max="400" value="100"></label>
+        <p class="muted small">Glisse la photo pour la placer dans le cercle.</p>
+      </div>
+    </div>`;
+    const canvas = body.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const view = body.querySelector('.crop-view');
+    const zoom = body.querySelector('input');
+    // Échelle de départ : le petit côté de la photo remplit le cercle ; (cx, cy) : centre du cadrage dans la photo.
+    const base = OUT / Math.min(src.width, src.height);
+    let scale = base;
+    let cx = src.width / 2;
+    let cy = src.height / 2;
+    const draw = () => {
+      const half = OUT / 2 / scale;
+      cx = Math.min(Math.max(cx, half), src.width - half);
+      cy = Math.min(Math.max(cy, half), src.height - half);
+      ctx.fillStyle = '#0b0d17';
+      ctx.fillRect(0, 0, OUT, OUT);
+      ctx.drawImage(src, OUT / 2 - cx * scale, OUT / 2 - cy * scale, src.width * scale, src.height * scale);
+    };
+    draw();
+    zoom.addEventListener('input', () => {
+      scale = base * Number(zoom.value) / 100;
+      draw();
+    });
+    let drag = null;
+    view.addEventListener('pointerdown', (e) => {
+      drag = {id: e.pointerId, x: e.clientX, y: e.clientY, cx, cy};
+      view.setPointerCapture(e.pointerId);
+    });
+    view.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) {
+        return;
+      }
+      const k = OUT / view.clientWidth / scale;
+      cx = drag.cx - (e.clientX - drag.x) * k;
+      cy = drag.cy - (e.clientY - drag.y) * k;
+      draw();
+    });
+    const end = () => {
+      drag = null;
+    };
+    view.addEventListener('pointerup', end);
+    view.addEventListener('pointercancel', end);
+    view.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      zoom.value = String(Math.min(400, Math.max(100, Number(zoom.value) - e.deltaY * 0.25)));
+      zoom.dispatchEvent(new Event('input'));
+    }, {passive: false});
+    const cancel = el('<button class="btn">Annuler</button>');
+    const ok = el('<button class="btn gold">Utiliser cette photo</button>');
+    cancel.addEventListener('click', () => {
+      close();
+      answer(null);
+    });
+    ok.addEventListener('click', () => {
+      const data = canvas.toDataURL('image/jpeg', 0.86);
+      close();
+      answer(data);
+    });
+    footer.append(cancel, ok);
+  }, {narrow: true});
+  // Fermée en touchant à côté : pas de photo.
+  box.back.addEventListener('click', (e) => e.target === box.back && answer(null));
 }
 
 /** Synchronise avec GitHub ; silencieux en cas d'échec si auto (démarrage, fin de partie). */
@@ -94,11 +224,15 @@ export class AccountScreen {
     this.root.innerHTML = `<div class="page account">
       <h1>Mon compte</h1>
       <div class="acc-card panel">
-        <div class="acc-avatar">${avatarHtml(p.name, p.avatar, 72)}</div>
+        <div class="acc-avatar">${avatarHtml(p.name, p.avatar, 72, p.photo)}</div>
         <div class="acc-main">
           <label class="muted small">Pseudo (ton nom en partie)</label>
           <div class="acc-name"><input type="text" maxlength="24" value="${esc(p.name)}" class="acc-name-input"><button class="btn small" data-save-name>Enregistrer</button></div>
-          <div class="acc-colors">${AVATAR_COLORS.map((c, i) => `<button class="acc-color${i === p.avatar ? ' on' : ''}" data-avatar="${i}" style="background:${c}" title="Couleur ${i + 1}"></button>`).join('')}</div>
+          <div class="acc-photo">
+            <button class="btn small" data-photo>${icon('portrait')}${p.photo ? 'Changer la photo' : 'Photo depuis la galerie'}</button>
+            ${p.photo ? '<button class="btn small ghost" data-photo-remove>Retirer la photo</button>' : ''}
+          </div>
+          <div class="acc-colors" title="Couleur de la pastille quand il n'y a pas de photo">${AVATAR_COLORS.map((c, i) => `<button class="acc-color${i === p.avatar ? ' on' : ''}" data-avatar="${i}" style="background:${c}" title="Couleur ${i + 1}"></button>`).join('')}</div>
           <div class="muted small">${since ? `Compte créé le ${since} · ` : ''}${p.decks} deck(s)${trophies ? ` · ${trophies.earned} trophée(s)` : ''}</div>
         </div>
       </div>
@@ -130,6 +264,20 @@ export class AccountScreen {
       } else if (b.hasAttribute('data-save-name')) {
         setProfile(await bridge.request('updateProfile', {profile: {name: this.root.querySelector('.acc-name-input').value}}));
         toast('Pseudo enregistré.');
+        this.show();
+      } else if (b.hasAttribute('data-photo')) {
+        const photo = await pickPhoto();
+        if (photo) {
+          try {
+            setProfile(await bridge.request('updateProfile', {profile: {photo}}));
+            toast('Photo de profil enregistrée.');
+          } catch (err) {
+            toast(err.message, {error: true});
+          }
+          this.show();
+        }
+      } else if (b.hasAttribute('data-photo-remove')) {
+        setProfile(await bridge.request('updateProfile', {profile: {photo: ''}}));
         this.show();
       } else if (b.dataset.avatar !== undefined) {
         setProfile(await bridge.request('updateProfile', {profile: {avatar: Number(b.dataset.avatar)}}));

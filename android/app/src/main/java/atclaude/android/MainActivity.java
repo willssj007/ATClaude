@@ -2,6 +2,7 @@ package atclaude.android;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -16,6 +17,8 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -76,6 +79,9 @@ public class MainActivity extends Activity {
     private boolean pageReady;
     private boolean flushPosted;
     private WebView web;
+    /** Choix d'une photo (profil) : réponse attendue par la page. */
+    private static final int PICK_IMAGE = 41;
+    private ValueCallback<Uri[]> filePick;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -95,6 +101,26 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(true);
         web.addJavascriptInterface(new JsApi(), "AndroidBridge");
         web.setWebViewClient(new LocalClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            // <input type="file"> de la page : la galerie (ou le sélecteur de photos du système).
+            @Override
+            public boolean onShowFileChooser(final WebView view, final ValueCallback<Uri[]> callback, final FileChooserParams params) {
+                if (filePick != null) {
+                    filePick.onReceiveValue(null);
+                }
+                filePick = callback;
+                final Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("image/*");
+                try {
+                    startActivityForResult(Intent.createChooser(pick, "Choisir une photo"), PICK_IMAGE);
+                    return true;
+                } catch (final ActivityNotFoundException e) {
+                    filePick = null;
+                    return false;
+                }
+            }
+        });
         // Barres système masquées, la page va jusqu'aux bords de l'écran, encoche de la caméra comprise :
         // elle reçoit la position de l'encoche et n'écarte que ce qui tomberait dessous.
         final FrameLayout root = new FrameLayout(this);
@@ -207,6 +233,18 @@ public class MainActivity extends Activity {
             return "{}";
         }
         return o.toString();
+    }
+
+    @Override
+    protected void onActivityResult(final int requestCode, final int resultCode, final Intent data) {
+        if (requestCode == PICK_IMAGE) {
+            if (filePick != null) {
+                filePick.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+                filePick = null;
+            }
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     private static final class JsApi {

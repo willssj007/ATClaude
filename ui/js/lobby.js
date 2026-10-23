@@ -3,7 +3,7 @@
 import {bracketBadgeHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {confirmBox} from './dialogs.js';
-import {esc, el, prefs, toast, avatarHtml} from './util.js';
+import {esc, el, prefs, toast, avatarHtml, ownPhotoUrl} from './util.js';
 
 const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless: 'Agressive', Experimental: 'Expérimentale'};
 const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
@@ -65,9 +65,9 @@ export class Lobby {
     const opt = (key, label) => `<option value="${esc(key)}"${key === selected ? ' selected' : ''}>${esc(label)}</option>`;
     let html = '';
     if (this.format === 'commander') {
-      html += opt('random', '🎲 Deck aléatoire (généré par Forge)');
+      html += opt('random', '✦ Deck aléatoire (généré par Forge)');
     } else {
-      html += opt('randomConstructed', '🎲 Deck aléatoire (généré par Forge)');
+      html += opt('randomConstructed', '✦ Deck aléatoire (généré par Forge)');
     }
     if (mine.length) {
       html += `<optgroup label="Mes decks">${mine.map(d => opt(d.key, d.name + (d.commanders && d.commanders.length ? ' — ' + d.commanders.join(' & ') : ''))).join('')}</optgroup>`;
@@ -86,7 +86,7 @@ export class Lobby {
     this.seats.length = this.count;
     const profiles = this.profiles.length ? this.profiles : ['Default'];
     const seatHtml = this.seats.map((s, i) => `<div class="seat" data-i="${i}">
-      ${avatarHtml(s.name, i, 44)}
+      ${avatarHtml(s.name, i, 44, s.ai ? '' : ownPhotoUrl())}
       <div class="fields">
         <input type="text" data-f="name" value="${esc(s.name)}" maxlength="24" placeholder="Nom">
         ${s.ai ? `<select data-f="profile">${profiles.map(p => `<option value="${esc(p)}"${p === s.profile ? ' selected' : ''}>IA ${esc(PROFILE_LABELS[p] || p)}</option>`).join('')}</select>`
