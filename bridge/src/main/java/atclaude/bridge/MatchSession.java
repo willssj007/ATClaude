@@ -89,6 +89,8 @@ final class MatchSession {
     private volatile GameTracker tracker;
     private volatile boolean recorded;
     private boolean commanderFormat;
+    /** Duel du mode Planeswalker : pas de triche, récompenses à la fin. */
+    private boolean career;
     private static final Set<PhaseType> SAVE_PHASES = EnumSet.of(PhaseType.UPKEEP, PhaseType.DRAW, PhaseType.MAIN1, PhaseType.MAIN2, PhaseType.END_OF_TURN);
 
     private MatchSession(final Bridge bridge, final BridgeGuiGame gui, final HostedMatch match) {
@@ -112,7 +114,11 @@ final class MatchSession {
         if (!ForgeRuntime.isReady()) {
             throw new IllegalStateException("Forge est encore en cours de chargement.");
         }
-        final boolean commander = !"constructed".equals(str(setup, "format"));
+        final boolean career = setup.has("career") && setup.get("career").getAsBoolean();
+        if (career && save == null) {
+            careerSetup(catalog, setup);
+        }
+        final boolean commander = career || !"constructed".equals(str(setup, "format"));
         final GameType type = commander ? GameType.Commander : GameType.Constructed;
         final JsonArray seats = setup.getAsJsonArray("players");
         if (seats == null || seats.size() < 2 || seats.size() > 4) {
@@ -121,7 +127,7 @@ final class MatchSession {
         final List<RegisteredPlayer> players = new ArrayList<>();
         RegisteredPlayer human = null;
         // Mulligans gratuits choisis dans le salon (absent : règle de Forge).
-        final int freeMulligans = setup.has("mulligans") ? setup.get("mulligans").getAsInt() : Mulligans.FORGE_DEFAULT;
+        final int freeMulligans = !career && setup.has("mulligans") ? setup.get("mulligans").getAsInt() : Mulligans.FORGE_DEFAULT;
         int aiIndex = 0;
         // Le salon tel quel, avec chaque deck écrit en entier : la sauvegarde ne dépend plus des decks enregistrés.
         final JsonObject resolved = setup.deepCopy();
@@ -175,6 +181,7 @@ final class MatchSession {
         final HostedMatch match = GuiBase.getInterface().hostMatch();
         final MatchSession session = new MatchSession(bridge, gui, match);
         session.commanderFormat = commander;
+        session.career = career;
         session.setup = setup;
         session.savedSetup = resolved;
         if (save != null) {
@@ -216,9 +223,61 @@ final class MatchSession {
             }
             session.tracker = t;
             game.subscribeToEvents(t);
+            if (t.cheated) {
+                // Partie reprise après une triche : ses contrôleurs sont neufs, la marque est reposée.
+                session.markCheated(game);
+            }
         }
         session.applyYieldPrefs();
         return session;
+    }
+
+    /**
+     * Duel de carrière : le joueur prend un de ses decks (cartes possédées seulement), l'adversaire est celui que
+     * la carrière a tiré. Rien de ce que l'interface envoie d'autre ne compte (règles de mulligan, autres places).
+     */
+    private static void careerSetup(final Catalog catalog, final JsonObject setup) {
+        if (!Career.started()) {
+            throw new IllegalStateException("Commence d'abord ta carrière de Planeswalker.");
+        }
+        final JsonArray seats = setup.getAsJsonArray("players");
+        JsonObject me = null;
+        for (final JsonElement e : seats == null ? new JsonArray() : seats) {
+            if (!(e.getAsJsonObject().has("ai") && e.getAsJsonObject().get("ai").getAsBoolean())) {
+                me = e.getAsJsonObject();
+            }
+        }
+        final String key = me == null ? "" : str(me, "deckKey");
+        if (!key.startsWith(Career.KEY_PREFIX)) {
+            throw new IllegalArgumentException("En mode Planeswalker, on joue avec un deck de sa collection.");
+        }
+        final Deck deck = Career.deck(catalog, key.substring(Career.KEY_PREFIX.length()));
+        final String problem = forge.deck.DeckFormat.Commander.getDeckConformanceProblem(deck);
+        if (problem != null) {
+            throw new IllegalArgumentException("Ce deck n'est pas prêt pour un duel Commander : " + problem);
+        }
+        final List<String> missing = Career.missing(deck);
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException("Cartes absentes de ta collection : " + String.join(", ", missing));
+        }
+        final JsonObject mine = new JsonObject();
+        mine.addProperty("name", str(me, "name"));
+        mine.addProperty("ai", false);
+        mine.addProperty("deckKey", key);
+        final JsonObject them = new JsonObject();
+        them.addProperty("name", "Adversaire");
+        them.addProperty("ai", true);
+        them.addProperty("deckKey", Career.opponentKey());
+        final JsonArray fixed = new JsonArray();
+        fixed.add(mine);
+        fixed.add(them);
+        setup.add("players", fixed);
+        setup.addProperty("format", "commander");
+        setup.remove("mulligans");
+    }
+
+    boolean isCareer() {
+        return career;
     }
 
     private static Player humanPlayer(final Game game) {
@@ -707,8 +766,21 @@ final class MatchSession {
             opponents.add(o);
         }
         g.add("opponents", opponents);
+        g.addProperty("career", career);
         Stats.add(g);
         bridge.sendEvent("statsChanged", m -> { });
+        if (career && !t.cheated) {
+            Deck opponentDeck = null;
+            for (final Player p : game.getRegisteredPlayers()) {
+                if (p != me && opponentDeck == null) {
+                    opponentDeck = p.getRegisteredPlayer().getDeck();
+                }
+            }
+            final JsonObject reward = Career.duelFinished(sessionId, won, opponentDeck);
+            if (reward != null) {
+                bridge.sendEvent("careerReward", m -> m.add("reward", reward));
+            }
+        }
     }
 
     /** Nom, commandants (anglais et français), couleurs et image d'un deck. */
@@ -735,13 +807,13 @@ final class MatchSession {
     // ------------------------------------------------------------------ triche
 
     private void cheat(final PlayerControllerHuman c, final JsonObject m) {
-        final String op = str(m, "op");
-        final GameTracker t = tracker;
-        if (t != null) {
-            t.cheated = true;
+        if (career) {
+            throw new IllegalStateException("La triche est désactivée en mode Planeswalker.");
         }
-        final IDevModeCheats dev = c.cheat();
+        final String op = str(m, "op");
         final Game game = game();
+        markCheated(game);
+        final IDevModeCheats dev = c.cheat();
         switch (op) {
             case "mana" -> {
                 final Player p = player(m);
@@ -885,6 +957,29 @@ final class MatchSession {
      * partie doit être en attente du joueur (priorité ou choix) : sinon les deux fils modifieraient
      * la partie en même temps.
      */
+    /**
+     * Partie avec triche : aucun trophée (Forge les refuse au contrôleur humain qui a triché). La marque va sur
+     * tous les contrôleurs humains, y compris celui d'un adversaire qu'on contrôle et celui du joueur d'origine.
+     */
+    void markCheated(final Game game) {
+        final GameTracker t = tracker;
+        if (t != null) {
+            t.cheated = true;
+        }
+        if (game == null) {
+            return;
+        }
+        for (final Player p : game.getPlayers()) {
+            if (p.getController() instanceof PlayerControllerHuman human) {
+                human.cheat();
+            }
+        }
+        final PlayerControllerHuman local = gui.controller();
+        if (local != null) {
+            local.cheat();
+        }
+    }
+
     private void inGame(final Game game, final Runnable change) {
         if (game == null) {
             throw new IllegalStateException("Aucune partie.");

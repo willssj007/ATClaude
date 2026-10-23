@@ -70,6 +70,12 @@ final class BridgeGuiGame extends AbstractGuiGame {
         this.dialogs = new Dialogs(bridge, () -> this);
     }
 
+    /** Duel du mode Planeswalker (pas de menu de triche). */
+    boolean career() {
+        final MatchSession s = session;
+        return s != null && s.isCareer();
+    }
+
     void attach(final MatchSession session) {
         this.session = session;
         current = this;

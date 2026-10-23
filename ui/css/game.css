@@ -23,7 +23,7 @@
 }
 
 /* ---------- Rangées et cartes ---------- */
-.row { display: flex; align-items: center; min-height: 0; min-width: 0; padding: 2px 4px; gap: 6px; --squeeze: 0px; }
+.row { --gap: 6px; display: flex; align-items: center; min-height: 0; min-width: 0; padding: 2px 4px; gap: var(--gap); --squeeze: 0px; }
 .row > .slot + .slot { margin-left: var(--squeeze); }
 .row.back > .row { flex: 0 1 auto; padding: 0; height: 100%; }
 .row.back > .spacer { flex: 1 1 0; min-width: 4px; }
@@ -37,15 +37,22 @@
 }
 .slot.tapped { width: var(--h); }
 .slot > .mcard {
-  --w: inherit; --rot: 0deg; --lift: 0px; --fan: 0deg;
-  width: var(--w); transform: translateY(var(--lift)) rotate(calc(var(--rot) + var(--fan)));
+  --w: inherit; --rot: 0deg; --lift: 0px; --fan: 0deg; --shift: 0px;
+  width: var(--w); transform: translate(var(--shift), var(--lift)) rotate(calc(var(--rot) + var(--fan)));
 }
 .slot.tapped > .mcard { --rot: 90deg; }
 .slot.attacking > .mcard { --lift: calc(var(--w) * -0.2); }
 .opp-field .slot.attacking > .mcard { --lift: calc(var(--w) * 0.2); }
-/* Aura ou équipement : sous la carte hôte (placée après dans la rangée), presque alignée, son nom dépassant au-dessus. */
-.slot.attached { margin-right: calc(var(--w) * -0.88); }
-.slot.attached > .mcard { --lift: calc(var(--w) * -0.21 * var(--att-level, 1)); filter: brightness(0.9); }
+/* Aura ou équipement : derrière la carte hôte (placée juste après dans la rangée), exactement alignée, seul son
+   haut dépasse (nom et coût) ; écartés de part et d'autre quand on touche l'hôte. */
+.slot.attached { margin-right: calc(var(--w) * -1 - var(--gap)); z-index: 0; }
+.slot.attached.host-tapped { width: var(--h); margin-right: calc(var(--h) * -1 - var(--gap)); }
+.slot.attached > .mcard { --lift: calc(var(--w) * -0.13 * var(--att-level, 1)); filter: brightness(0.9); transition: transform 0.25s ease, filter 0.2s, box-shadow 0.2s; }
+.slot.attached.host-attacking > .mcard { --lift: calc(var(--w) * (-0.13 * var(--att-level, 1) - 0.2)); }
+.opp-field .slot.attached.host-attacking > .mcard { --lift: calc(var(--w) * (0.2 - 0.13 * var(--att-level, 1))); }
+.slot.attached.spread { z-index: 6; }
+.slot.attached.spread > .mcard { --lift: calc(var(--w) * -0.06); --shift: calc(var(--w) * 0.72 * var(--spread-x, -1)); filter: none; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65); }
+.slot.has-attach { z-index: 7; }
 .row > .slot.attached + .slot { margin-left: 0; }
 .slot.stacked { margin-left: calc(var(--w) * -0.8) !important; }
 .slot.stacked.tapped { margin-left: calc(var(--h) * -0.8) !important; }
@@ -552,6 +559,9 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 :root[data-board-theme="throne"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.3), rgb(6 7 12 / 0.5)), url("../img/themes/board-throne.svg") center / cover no-repeat, #0b0d14; }
 :root[data-board-theme="dragon"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.3), rgb(6 7 12 / 0.5)), url("../img/themes/board-dragon.svg") center / cover no-repeat, #0b0d14; }
 :root[data-board-theme="ether"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.3), rgb(6 7 12 / 0.5)), url("../img/themes/board-ether.svg") center / cover no-repeat, #0b0d14; }
+:root[data-board-theme="library"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.3), rgb(6 7 12 / 0.5)), url("../img/themes/board-library.svg") center / cover no-repeat, #0b0d14; }
+:root[data-board-theme="arena"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.38), rgb(6 7 12 / 0.58)), url("../img/themes/board-arena.svg") center / cover no-repeat, #0b0d14; }
+:root[data-board-theme="swamp"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.2), rgb(6 7 12 / 0.4)), url("../img/themes/board-swamp.svg") center / cover no-repeat, #0b0d14; }
 :root[data-board-theme]:not([data-board-theme="classic"]) .side-l,
 :root[data-board-theme]:not([data-board-theme="classic"]) .side-r { background: rgb(7 8 14 / 0.62); }
 :root[data-board-theme]:not([data-board-theme="classic"]) .divider .turn-label,

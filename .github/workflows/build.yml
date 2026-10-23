@@ -19,8 +19,19 @@ jobs:
     timeout-minutes: 60
     env:
       FORGE_DIR: ${{ github.workspace }}/../forge-src
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      # Version 0.2.x : le build 13 est la 0.2.0, chaque build suivant ajoute 1 au dernier chiffre.
+      - name: Version
+        id: version
+        run: |
+          VERSION="0.2.$(( ${{ github.run_number }} - 13 ))"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION"
 
       - name: Java 17
         uses: actions/setup-java@v4
@@ -48,10 +59,10 @@ jobs:
 
       - name: Construire l'APK
         working-directory: android
-        run: gradle --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName=0.1.${{ github.run_number }}
+        run: gradle --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName=$VERSION
 
       - name: Renommer l'APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk "ArcaneTable-0.1.${{ github.run_number }}.apk"
+        run: cp android/app/build/outputs/apk/release/app-release.apk "ArcaneTable-$VERSION.apk"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -78,7 +89,7 @@ jobs:
         run: |
           gh release delete apk-latest --yes --cleanup-tag || true
           gh release create apk-latest ArcaneTable-*.apk \
-            --title "Arcane Table — dernière version (build ${{ github.run_number }})" \
+            --title "Arcane Table $VERSION — dernière version (build ${{ github.run_number }})" \
             --notes "Construit automatiquement depuis le commit ${{ github.sha }}. Android : télécharge le fichier .apk sur le téléphone puis ouvre-le (autorise l'installation depuis cette source si Android le demande). Windows : télécharge le .zip (ajouté quelques minutes après l'APK), décompresse-le dans un dossier de ton choix, puis lance ArcaneTable.exe." \
             --prerelease
 
@@ -105,12 +116,12 @@ jobs:
         shell: pwsh
         run: |
           jpackage --type app-image --input dist --main-jar desktop-0.1.0.jar --main-class atclaude.desktop.DesktopMain `
-            --name ArcaneTableMoteur --app-version 0.1.${{ github.run_number }} --vendor "Arcane Table" `
+            --name ArcaneTableMoteur --app-version ${{ needs.apk.outputs.version }} --vendor "Arcane Table" `
             --icon windows/ArcaneTable.ico --java-options "-Xmx2g" --dest out
 
       - name: Fenêtre de l'application (WebView2)
         shell: pwsh
-        run: dotnet build windows/ArcaneTable.csproj -c Release -o out/fenetre -p:Version=0.1.${{ github.run_number }}
+        run: dotnet build windows/ArcaneTable.csproj -c Release -o out/fenetre -p:Version=${{ needs.apk.outputs.version }}
 
       - name: Assembler le paquet
         shell: pwsh
@@ -121,7 +132,7 @@ jobs:
           Copy-Item out/fenetre/runtimes/win-x64/native/WebView2Loader.dll pack/ArcaneTable/
           Move-Item out/ArcaneTableMoteur pack/ArcaneTable/moteur
           if (-not (Test-Path pack/ArcaneTable/moteur/ArcaneTableMoteur.exe)) { throw "moteur absent du paquet" }
-          Compress-Archive -Path pack/ArcaneTable -DestinationPath ArcaneTable-Windows-0.1.${{ github.run_number }}.zip
+          Compress-Archive -Path pack/ArcaneTable -DestinationPath ArcaneTable-Windows-${{ needs.apk.outputs.version }}.zip
 
       - uses: actions/upload-artifact@v4
         with:

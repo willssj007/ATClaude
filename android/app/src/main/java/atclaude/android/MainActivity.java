@@ -138,6 +138,11 @@ public class MainActivity extends Activity {
 
         if (bridge == null) {
             bridge = new Bridge(MainActivity::deliver);
+            try {
+                Bridge.setAppVersion(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+            } catch (final android.content.pm.PackageManager.NameNotFoundException e) {
+                // version inconnue : l'interface affiche seulement celle de Forge
+            }
         }
         web.loadUrl("https://" + HOST + "/index.html");
         if (!started) {
@@ -335,10 +340,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Musiques et sons fournis avec Forge, dans les ressources installées (res/music, res/sound). */
+    /** Musiques et sons fournis avec Forge, dans les ressources installées (res/sound, musiques du mode Aventure). */
     private static WebResourceResponse audio(final String rel) {
         final File root = resRoot;
-        if (root == null || !(rel.startsWith("sound/") || rel.startsWith("music/"))) {
+        if (root == null || !atclaude.bridge.Audio.servable(rel)) {
             return notFound();
         }
         try {

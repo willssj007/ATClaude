@@ -71,8 +71,10 @@ export class SearchPanel {
    * @param options.addLabel si présent, un bouton « + » ajoute la carte (onAdd)
    * @param options.counts   fonction nom -> exemplaires déjà dans le deck
    */
-  constructor(root, {onPick, onAdd, counts, identityLock} = {}) {
+  constructor(root, {onPick, onAdd, counts, identityLock, owned = false} = {}) {
     this.root = root;
+    // Mode Planeswalker : seulement les cartes de la collection, avec le nombre d'exemplaires possédés.
+    this.owned = owned;
     this.onPick = onPick;
     this.onAdd = onAdd;
     this.counts = counts || (() => 0);
@@ -220,7 +222,7 @@ export class SearchPanel {
       this.offset = 0;
     }
     this.loading = true;
-    const query = {...this.query, offset: this.offset, limit: PAGE};
+    const query = {...this.query, offset: this.offset, limit: PAGE, owned: this.owned || undefined};
     const lock = this.identityLock();
     if (lock !== null && lock !== undefined) {
       query.colors = (lock || 'C').split('');
@@ -243,12 +245,15 @@ export class SearchPanel {
         const cell = el(`<div class="cell"></div>`);
         cell._card = card;
         cell.appendChild(cardElement(card));
+        if (card.owned > 0) {
+          cell.appendChild(el(`<div class="owned-n" title="Exemplaires dans ta collection">${icon('book')}${card.owned}</div>`));
+        }
         if (this.onAdd) {
           cell.appendChild(el('<button class="add" title="Ajouter au deck">+</button>'));
         }
         grid.appendChild(cell);
       }
-      this.root.querySelector('.total').textContent = `${result.total.toLocaleString('fr-FR')} carte(s)`;
+      this.root.querySelector('.total').textContent = `${result.total.toLocaleString('fr-FR')} carte(s)${this.owned ? ' dans ta collection' : ''}`;
       this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : (result.total ? '' : 'Aucune carte ne correspond.');
       this.refreshCounts();
     } catch (e) {

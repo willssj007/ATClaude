@@ -77,6 +77,7 @@ final class GameSerializer {
         game.addProperty("phase", phase == null ? "" : phase.name());
         game.addProperty("activePlayer", turn == null ? -1 : turn.getId());
         game.addProperty("commander", gv.isCommander());
+        game.addProperty("career", gui.career());
         game.addProperty("mulligan", gv.isMulligan());
         game.addProperty("gameOver", gv.isGameOver());
         game.addProperty("matchOver", gv.isMatchOver());

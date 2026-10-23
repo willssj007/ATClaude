@@ -1,6 +1,6 @@
 // Apparences : palette et décor des menus, décor du plateau de jeu, dos des cartes.
 // Certaines se débloquent en jouant : parties jouées ou gagnées (sans triche, comme les trophées de Forge),
-// record de blessures infligées, trophées obtenus.
+// record de blessures infligées, trophées obtenus, et défis (exploits en partie, carrière Planeswalker).
 
 import {bridge} from './bridge.js';
 import {icon} from './icons.js';
@@ -15,6 +15,9 @@ export const MENU_THEMES = [
   {key: 'frost', name: 'Givre', desc: 'Sommets enneigés sous l\'aurore, bleu glacier et argent.', art: 'menu-frost', colors: ['#0a1016', '#6fbfe6', '#cfe0ee'], unlock: {kind: 'trophies', n: 5}},
   {key: 'royal', name: 'Cour royale', desc: 'Tentures de pourpre et fleurs de lys dorées.', art: 'menu-royal', colors: ['#12080c', '#c23a52', '#e8c26a'], unlock: {kind: 'win4', n: 1}},
   {key: 'astral', name: 'Astral', desc: 'Nébuleuses, planète et étoiles filantes.', art: 'menu-astral', colors: ['#070616', '#8f7cff', '#f0c674'], unlock: {kind: 'trophies', n: 15}},
+  {key: 'abyss', name: 'Abysses', desc: 'Ruines englouties, méduses lumineuses et léviathan.', art: 'menu-abyss', colors: ['#04121a', '#3fc1c9', '#d8c07a'], unlock: {kind: 'streak', n: 3}},
+  {key: 'desert', name: 'Dunes d\'or', desc: 'Pyramides et caravane sous le soleil couchant.', art: 'menu-desert', colors: ['#140b08', '#d8843a', '#e8b04a'], unlock: {kind: 'mythics', n: 1}},
+  {key: 'necro', name: 'Nécropole', desc: 'Cathédrale gothique, corbeaux et lune verte.', art: 'menu-necro', colors: ['#060a08', '#7fc28a', '#c8d8a0'], unlock: {kind: 'lowLife', n: 1}},
 ];
 
 export const BOARD_THEMES = [
@@ -24,6 +27,9 @@ export const BOARD_THEMES = [
   {key: 'throne', name: 'Salle du trône', desc: 'Vitrail, piliers et torches, un tapis rouge jusqu\'au trône.', art: 'board-throne', unlock: {kind: 'games', n: 25}},
   {key: 'dragon', name: 'Antre du dragon', desc: 'Un dragon perché devant la caverne, une rivière de lave, son trésor.', art: 'board-dragon', unlock: {kind: 'dealt', n: 60}},
   {key: 'ether', name: 'Plan éthéré', desc: 'Îles flottantes et cercle arcanique entre les nébuleuses.', art: 'board-ether', unlock: {kind: 'trophies', n: 10}},
+  {key: 'library', name: 'Bibliothèque arcanique', desc: 'Livres volants, runes et cercle magique au clair de lune.', art: 'board-library', unlock: {kind: 'opened', n: 10}},
+  {key: 'arena', name: 'Colisée', desc: 'Le sable de l\'arène, les bannières et la foule des gradins.', art: 'board-arena', unlock: {kind: 'fastWin', n: 1}},
+  {key: 'swamp', name: 'Marais des feux follets', desc: 'Mangroves tordues, nénuphars et lueurs sur l\'eau noire.', art: 'board-swamp', unlock: {kind: 'duelWins', n: 10}},
 ];
 
 // Dos des cartes cachées et de la bibliothèque : celui de Magic par défaut, les autres gagnés avec les trophées.
@@ -36,6 +42,10 @@ export const BACK_THEMES = [
   {key: 'heraldic', name: 'Blason', desc: 'Écu couronné sur champ de fleurs de lys.', unlock: {kind: 'trophies', n: 10}},
   {key: 'dragon', name: 'Œil du dragon', desc: 'Un œil de braise au milieu des écailles.', unlock: {kind: 'trophies', n: 15}},
   {key: 'astral', name: 'Lune astrale', desc: 'Croissant de lune, constellations et cercle d\'or.', unlock: {kind: 'trophies', n: 25}},
+  {key: 'kraken', name: 'Kraken', desc: 'Le monstre des abysses, cerclé d\'or.', unlock: {kind: 'streak', n: 5}},
+  {key: 'phoenix', name: 'Phénix', desc: 'L\'oiseau de feu qui renaît de ses cendres.', unlock: {kind: 'rainbowWin', n: 1}},
+  {key: 'compass', name: 'Rose des vents', desc: 'La boussole des voyageurs entre les plans.', unlock: {kind: 'unique', n: 500}},
+  {key: 'skull', name: 'Memento mori', desc: 'Crâne, os croisés et sablier.', unlock: {kind: 'monoWin', n: 1}},
 ];
 
 const KINDS = {
@@ -50,19 +60,72 @@ const GOALS = {
   win4: () => 'Gagner une partie à 4 joueurs',
   dealt: (n) => `Infliger ${n} blessures en une partie`,
   trophies: (n) => `Obtenir ${n} trophée${n > 1 ? 's' : ''}`,
+  // Défis
+  fastWin: (n) => `Gagner une partie en 7 tours ou moins${n > 1 ? ` (${n} fois)` : ''}`,
+  lowLife: () => 'Gagner une partie avec 5 points de vie ou moins',
+  monoWin: () => 'Gagner avec un deck d\'une seule couleur',
+  rainbowWin: () => 'Gagner avec un deck de 4 ou 5 couleurs',
+  duelWins: (n) => `Gagner ${n} duels Planeswalker`,
+  streak: (n) => `Gagner ${n} duels Planeswalker d'affilée`,
+  opened: (n) => `Ouvrir ${n} booster${n > 1 ? 's' : ''}`,
+  mythics: () => 'Trouver une carte mythique dans un booster',
+  unique: (n) => `Posséder ${n} cartes différentes (Planeswalker)`,
 };
+
+/** Conditions qui sont des défis (affichés dans Trophées), et non de simples paliers. */
+const CHALLENGES = ['fastWin', 'lowLife', 'monoWin', 'rainbowWin', 'duelWins', 'streak', 'opened', 'mythics', 'unique'];
 
 /** Où en est le joueur pour chaque condition (parties avec triche exclues). */
 export async function progress() {
-  const [games, trophies] = await Promise.all([loadGames().catch(() => []), bridge.request('trophies').catch(() => null)]);
+  const [games, trophies, career] = await Promise.all([loadGames().catch(() => []), bridge.request('trophies').catch(() => null),
+    bridge.request('career').catch(() => null)]);
   const fair = games.filter(g => !g.cheated);
+  const wins = fair.filter(g => g.result === 'win');
+  const colors = (g) => ((g.deck && g.deck.identity) || '').length;
+  const c = career || {};
   return {
     games: fair.length,
-    wins: fair.filter(g => g.result === 'win').length,
-    win4: fair.filter(g => g.result === 'win' && (g.players || 0) >= 4).length,
+    wins: wins.length,
+    win4: wins.filter(g => (g.players || 0) >= 4).length,
     dealt: fair.reduce((m, g) => Math.max(m, Number(g.dealt) || 0), 0),
     trophies: trophies ? trophies.earned || 0 : 0,
+    fastWin: wins.filter(g => Number(g.myTurns) > 0 && Number(g.myTurns) <= 7).length,
+    lowLife: wins.filter(g => g.life !== undefined && Number(g.life) <= 5).length,
+    monoWin: wins.filter(g => colors(g) === 1).length,
+    rainbowWin: wins.filter(g => colors(g) >= 4).length,
+    duelWins: c.wins || 0,
+    streak: c.bestStreak || 0,
+    opened: c.opened || 0,
+    mythics: c.mythics || 0,
+    unique: c.started ? c.unique || 0 : 0,
   };
+}
+
+const KIND_LABELS = {menu: 'Menus', board: 'Plateau', back: 'Dos des cartes'};
+const KIND_ICONS = {menu: 'palette', board: 'swords', back: 'cards'};
+
+/** Liste des défis et de l'apparence que chacun débloque (écran Trophées). */
+export async function challengesHtml() {
+  const p = await progress();
+  const items = [];
+  for (const [kind, def] of Object.entries(KINDS)) {
+    for (const t of def.list) {
+      if (t.unlock && CHALLENGES.includes(t.unlock.kind)) {
+        items.push({kind, t, done: isUnlocked(t, p), have: Math.min(p[t.unlock.kind] || 0, t.unlock.n)});
+      }
+    }
+  }
+  items.sort((a, b) => a.done - b.done);
+  const done = items.filter(i => i.done).length;
+  return `<div class="trophy-head"><h2 style="margin:0">Défis</h2><div class="trophy-count"><b>${done}</b> / ${items.length} réussis</div></div>
+    <p class="muted small">Chaque défi débloque une apparence (Réglages › Apparence). Les parties avec triche ne comptent pas.</p>
+    <div class="challenge-grid">${items.map(({kind, t, done: ok, have}) => `<div class="challenge panel${ok ? ' done' : ''}">
+      <span class="ch-prev th-prev th-${kind}-${t.key}">${ok ? '' : `<span class="th-lock">${icon('lock')}</span>`}</span>
+      <div class="ch-body"><b>${esc(GOALS[t.unlock.kind](t.unlock.n))}</b>
+        <span class="muted small">${icon(KIND_ICONS[kind])} ${esc(KIND_LABELS[kind])} : « ${esc(t.name)} »</span>
+        ${ok ? `<span class="th-goal small done">${icon('check')} Réussi</span>`
+          : t.unlock.n > 1 ? `<span class="th-meter"><i style="width:${Math.round(100 * have / t.unlock.n)}%"></i></span><span class="muted small">${have} / ${t.unlock.n}</span>` : ''}
+      </div></div>`).join('')}</div>`;
 }
 
 export function isUnlocked(theme, p) {
@@ -104,7 +167,7 @@ export async function appearanceHtml() {
     return `<div class="theme-grid${kind === 'back' ? ' backs' : ''}">${KINDS[kind].list.map(t => cardHtml(kind, t, p, current)).join('')}</div>`;
   };
   return `<h2>Apparence</h2>
-    <p class="muted small">Les apparences avec un cadenas se débloquent en jouant : parties jouées ou gagnées sans triche, records, trophées.</p>
+    <p class="muted small">Les apparences avec un cadenas se débloquent en jouant : parties jouées ou gagnées sans triche, records, trophées et défis (liste dans Trophées).</p>
     <h3 class="th-h">Menus et interface</h3>${grid('menu')}
     <h3 class="th-h">Plateau de jeu</h3>${grid('board')}
     <h3 class="th-h">Dos des cartes</h3>${grid('back')}`;

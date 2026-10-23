@@ -1,8 +1,8 @@
 // Musique d'ambiance et effets sonores.
 //
-// Les fichiers viennent de Forge (servis sous audio/) : musiques de Kevin MacLeod (incompetech.com,
-// licence CC BY 3.0) pour les menus et la partie, et effets sonores choisis par Forge pour chaque
-// événement de jeu (le pont envoie un message « sound » avec le nom du fichier).
+// Les fichiers viennent de Forge (servis sous audio/) : musiques douces et médiévales du mode Aventure
+// (Vindsvept, Brandon et Derek Fiechter, Logan Epic Canto) pour les menus et la partie, et effets sonores
+// choisis par Forge pour chaque événement de jeu (le pont envoie un message « sound » avec le nom du fichier).
 
 import {bridge} from './bridge.js';
 import {prefs} from './util.js';
@@ -19,6 +19,7 @@ let ctx = null;
 const buffers = new Map();
 const lastPlayed = new Map();
 let fadeTimer = 0;
+let gain = 1;
 
 function audioContext() {
   if (!ctx) {
@@ -118,16 +119,21 @@ function fadeOut(then) {
   }, 40);
 }
 
+/** Volume voulu pour le morceau en cours (réglage × volume propre au morceau). */
+function targetVolume() {
+  return Math.max(0, Math.min(1, Number(prefs.get('musicVolume')) * gain));
+}
+
 async function playMusic(load) {
   if (!prefs.get('musicOn') || !unlocked || !playlist.length || !mode) {
     music.pause();
     return;
   }
   if (load) {
-    const name = playlist[track % playlist.length];
+    const entry = playlist[track % playlist.length];
     try {
       // Lue depuis un blob : la WebView Android ne passe pas toujours les lectures de médias par le pont.
-      const res = await fetch(`audio/music/${mode}/${encodeURIComponent(name)}`);
+      const res = await fetch('audio/' + entry.path.split('/').map(encodeURIComponent).join('/'));
       if (!res.ok) {
         return;
       }
@@ -137,17 +143,31 @@ async function playMusic(load) {
       }
       blobUrl = URL.createObjectURL(blob);
       music.src = blobUrl;
+      gain = Number(entry.gain) || 1;
     } catch (e) {
       return;
     }
+    // Chaque morceau commence en douceur.
+    clearInterval(fadeTimer);
+    music.volume = 0;
+    music.play().catch(() => {});
+    const to = targetVolume();
+    fadeTimer = setInterval(() => {
+      music.volume = Math.min(to, music.volume + to / 60);
+      if (music.volume >= to) {
+        clearInterval(fadeTimer);
+      }
+    }, 50);
+    return;
   }
-  music.volume = Number(prefs.get('musicVolume'));
+  music.volume = targetVolume();
   music.play().catch(() => {});
 }
 
 /** Après un changement de réglage. */
 export function refreshAudio() {
-  music.volume = Number(prefs.get('musicVolume'));
+  clearInterval(fadeTimer);
+  music.volume = targetVolume();
   if (!prefs.get('musicOn')) {
     music.pause();
   } else if (unlocked && mode) {

@@ -108,6 +108,10 @@ const DEFAULTS = {
   cardBack: 'magic',
   themesKnown: null,
   statsWithCheats: true,
+  // « sandbox » (tout est permis) ou « planeswalker » (carrière : collection, duels, boosters).
+  mode: 'sandbox',
+  boosterSet: '',
+  careerDeck: null,
 };
 
 export const prefs = {

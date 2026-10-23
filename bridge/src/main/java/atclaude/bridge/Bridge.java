@@ -38,6 +38,13 @@ public final class Bridge {
 
     static final Gson GSON = new Gson();
 
+    /** Version de l'application (Android : celle de l'APK ; Windows : celle que jpackage donne au moteur). */
+    private static volatile String appVersion = System.getProperty("jpackage.app-version", "");
+
+    public static void setAppVersion(final String version) {
+        appVersion = version == null ? "" : version;
+    }
+
     private final Transport transport;
     private final ExecutorService edt;
     private volatile Thread edtThread;
@@ -150,9 +157,15 @@ public final class Bridge {
             dispatch(type, message);
             return;
         }
-        if ("leaveMatch".equals(type)) {
+        if ("leaveMatch".equals(type) || "startMatch".equals(type) || "resumeSaved".equals(type)) {
             // Un dialogue ouvert depuis l'EDT (choix d'une capacité) le bloque : on le ferme d'abord, l'EDT repart.
             cancelDialogs();
+        }
+        if (CATALOG_REQUESTS.contains(type)) {
+            // Decks, cartes, compte : sur leur propre fil, jamais en attente derrière la partie (ni derrière un
+            // dialogue de Forge resté ouvert) ; un seul fil, pour que enregistrer puis relire un deck restent dans l'ordre.
+            catalogThread.execute(() -> dispatch(type, message));
+            return;
         }
         if (NETWORK_REQUESTS.contains(type)) {
             // Appels réseau (GitHub) : sur leur propre fil, pour ne pas figer la partie pendant l'attente.
@@ -164,7 +177,7 @@ public final class Bridge {
             analyzer.execute(() -> dispatch(type, message));
             return;
         }
-        if ("edhrec".equals(type) || "deckPrices".equals(type)) {
+        if ("edhrec".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type)) {
             // Lecture d'EDHREC : à part, pour ne pas attendre derrière une synchronisation.
             web.execute(() -> dispatch(type, message));
             return;
@@ -173,6 +186,15 @@ public final class Bridge {
     }
 
     private static final java.util.Set<String> NETWORK_REQUESTS = java.util.Set.of("sync", "linkGithub");
+    private static final java.util.Set<String> CATALOG_REQUESTS = java.util.Set.of(
+            "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
+            "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
+            "clearStats", "audioFiles", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster");
+    private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        final Thread t = new Thread(r, "atclaude-catalog");
+        t.setDaemon(true);
+        return t;
+    });
     private final java.util.concurrent.ExecutorService network = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-net");
         t.setDaemon(true);
@@ -232,11 +254,19 @@ public final class Bridge {
             case "editions":
                 return catalog.editions();
             case "listDecks":
-                return catalog.listDecks();
+                return m.has("career") && m.get("career").getAsBoolean() ? careerDecks() : catalog.listDecks();
             case "loadDeck":
                 return catalog.loadDeck(m.get("name").getAsString());
             case "saveDeck": {
                 final JsonObject deck = m.getAsJsonObject("deck");
+                if (deck.has("career") && deck.get("career").getAsBoolean()) {
+                    final JsonElement saved = Career.saveDeck(catalog, deck);
+                    final String before = deck.has("previousName") ? deck.get("previousName").getAsString() : "";
+                    if (!before.isEmpty() && deck.has("name") && !before.equals(deck.get("name").getAsString())) {
+                        Stats.renameDeck(Career.KEY_PREFIX + before, Career.KEY_PREFIX + deck.get("name").getAsString(), deck.get("name").getAsString());
+                    }
+                    return saved;
+                }
                 final JsonElement saved = catalog.saveDeck(deck);
                 final String previous = deck.has("previousName") ? deck.get("previousName").getAsString() : "";
                 if (!previous.isEmpty() && deck.has("name") && !previous.equals(deck.get("name").getAsString())) {
@@ -249,6 +279,10 @@ public final class Bridge {
             }
             case "deleteDeck": {
                 final String key = m.get("name").getAsString();
+                if (key.startsWith(Career.KEY_PREFIX)) {
+                    Career.deleteDeck(key.substring(Career.KEY_PREFIX.length()));
+                    return null;
+                }
                 catalog.deleteDeck(key);
                 account.deckDeleted(key.substring(0, key.indexOf(':')), key.substring(key.indexOf(':') + 1));
                 return null;
@@ -287,10 +321,7 @@ public final class Bridge {
                 for (final JsonElement e : m.getAsJsonArray("commanders")) {
                     names.add(e.getAsString());
                 }
-                final JsonObject raw = Edhrec.fetch(names);
-                final JsonObject[] out = new JsonObject[1];
-                callOnEdt(() -> out[0] = Edhrec.present(catalog, raw));
-                return out[0];
+                return Edhrec.present(catalog, Edhrec.fetch(names));
             }
             case "deckPrices":
                 try {
@@ -301,6 +332,23 @@ public final class Bridge {
             case "clearStats":
                 Stats.clear();
                 return null;
+            case "career":
+                return Career.summary(catalog);
+            case "careerStart":
+                return Career.start(catalog);
+            case "careerReset":
+                if (session != null && session.isCareer()) {
+                    throw new IllegalStateException("Termine d'abord le duel en cours.");
+                }
+                SaveGame.deleteCareer();
+                Career.reset();
+                return Career.summary(catalog);
+            case "boosterSets":
+                return Career.boosterSets();
+            case "buyBooster":
+                return Career.buy(catalog, m.get("set").getAsString());
+            case "openBooster":
+                return Career.open(m.get("id").getAsString());
             case "startMatch":
                 startMatch(m.getAsJsonObject("setup"));
                 return null;
@@ -333,6 +381,7 @@ public final class Bridge {
     private JsonElement hello() {
         final JsonObject o = new JsonObject();
         o.addProperty("version", ForgeRuntime.version());
+        o.addProperty("appVersion", appVersion);
         o.addProperty("ready", ForgeRuntime.isReady());
         o.addProperty("status", ForgeRuntime.status());
         o.addProperty("inMatch", session != null);
@@ -348,6 +397,14 @@ public final class Bridge {
         for (final JsonObject dialog : openDialogs.values()) {
             send(dialog);
         }
+        return o;
+    }
+
+    /** Decks de la carrière (mode Planeswalker), au même format que ceux du mode Sandbox. */
+    private JsonElement careerDecks() {
+        final JsonObject o = new JsonObject();
+        o.add("decks", Career.summary(catalog).getAsJsonArray("decks"));
+        o.add("precons", new com.google.gson.JsonArray());
         return o;
     }
 

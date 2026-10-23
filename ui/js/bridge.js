@@ -44,6 +44,9 @@ function receive(json) {
 }
 
 const android = typeof window.AndroidBridge !== 'undefined';
+// Ordinateur : les images viennent de « localhost » et l'interface de « 127.0.0.1 ». Le navigateur limite les
+// connexions par adresse (6) ; des images lentes à télécharger ne retiennent ainsi jamais les requêtes du moteur.
+const IMAGE_BASE = !android && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
 
 function post(message) {
   const json = JSON.stringify(message);
@@ -121,6 +124,6 @@ export const bridge = {
    * La langue fait partie de l'adresse pour que le cache du navigateur ne mélange pas les deux.
    */
   imageUrl(key, lang = 'fr') {
-    return key ? 'cardimg?key=' + encodeURIComponent(key) + '&lang=' + (lang === 'en' ? 'en' : 'fr') : '';
+    return key ? IMAGE_BASE + 'cardimg?key=' + encodeURIComponent(key) + '&lang=' + (lang === 'en' ? 'en' : 'fr') : '';
   },
 };

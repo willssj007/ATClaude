@@ -71,7 +71,7 @@ public final class DesktopMain {
 
         final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.setExecutor(Executors.newCachedThreadPool());
-        // Musiques et sons fournis avec Forge (res/music, res/sound).
+        // Musiques et sons fournis avec Forge (res/sound, musiques du mode Aventure).
         final File res = new File(assets, "res").getCanonicalFile();
         // Seule l'interface servie ici peut parler au moteur : une page web quelconque ouverte dans le navigateur
         // ne doit pas pouvoir envoyer de commandes (relier un compte, synchroniser, jouer...) au serveur local.
@@ -160,7 +160,7 @@ public final class DesktopMain {
     private static void audio(final HttpExchange exchange, final File res) throws IOException {
         final String rel = exchange.getRequestURI().getPath().substring("/audio/".length());
         final File file = new File(res, rel).getCanonicalFile();
-        if (!(rel.startsWith("sound/") || rel.startsWith("music/")) || !file.getPath().startsWith(res.getPath() + File.separator) || !file.isFile()) {
+        if (!atclaude.bridge.Audio.servable(rel) || !file.getPath().startsWith(res.getPath() + File.separator) || !file.isFile()) {
             reply(exchange, 404, "text/plain", new byte[0]);
             return;
         }

@@ -11,7 +11,7 @@
     <ApplicationIcon>ArcaneTable.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>Arcane Table</Product>
     <Company>Arcane Table</Company>
     <Description>Arcane Table — Magic: The Gathering contre l'IA de Forge</Description>

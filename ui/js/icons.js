@@ -85,6 +85,12 @@ const PATHS = {
   // Bibliothèque à défiler, divers : flèches.
   chevronLeft: '<path d="m15 5-7 7 7 7"/>',
   chevronRight: '<path d="m9 5 7 7-7 7"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  // Mode Planeswalker : mana (la monnaie), booster, étincelle ; mode Sandbox : coffre.
+  mana: '<path d="M12 2.6c3.2 4.4 6.2 7.9 6.2 11.4a6.2 6.2 0 0 1-12.4 0c0-3.5 3-7 6.2-11.4z"/><path d="M9.3 14.4a2.9 2.9 0 0 0 2.7 3" opacity=".7"/>',
+  booster: '<path d="M6.2 2.8h11.6l-.7 1.6.7 1.6v12l-.7 1.6.7 1.6H6.2l.7-1.6-.7-1.6V6l.7-1.6z"/><path d="M6.2 6h11.6M6.2 18H17.8" opacity=".55"/><path d="m12 8.6 1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 14.6l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z"/>',
+  spark: '<path d="M12 2.5v19M5.5 6.6 8.7 18.2M18.5 6.6l-3.2 11.6"/><path d="M3.4 11.4 7 16.6M20.6 11.4 17 16.6"/><path d="M6 20.2c1.8.9 3.8 1.3 6 1.3s4.2-.4 6-1.3"/>',
+  chest: '<path d="M3.6 10.2h16.8v9.4H3.6z"/><path d="M3.6 10.2A3.6 3.6 0 0 1 7.2 6.6h9.6a3.6 3.6 0 0 1 3.6 3.6"/><path d="M10.4 10.2v3.4h3.2v-3.4"/><path d="M7.6 6.6v13M16.4 6.6v13" opacity=".5"/>',
 };
 
 /** SVG d'une icône (vide si le nom est inconnu). */

@@ -329,6 +329,7 @@ final class Account {
         b.addProperty("saveClearedAt", SaveGame.clearedAt());
         b.add("stats", Stats.load());
         b.add("arts", ArtChoices.json());
+        b.add("career", Career.load());
         return b;
     }
 
@@ -417,6 +418,13 @@ final class Account {
                 remote.has("arts") && remote.get("arts").isJsonArray() ? remote.getAsJsonArray("arts") : null));
         m.add("stats", Stats.merge(local.has("stats") && local.get("stats").isJsonObject() ? local.getAsJsonObject("stats") : null,
                 remote.has("stats") && remote.get("stats").isJsonObject() ? remote.getAsJsonObject("stats") : null));
+        // Carrière Planeswalker : la plus récente gagne (collection, mana et boosters vont ensemble).
+        final JsonObject lc = local.has("career") && local.get("career").isJsonObject() ? local.getAsJsonObject("career") : null;
+        final JsonObject rc = remote.has("career") && remote.get("career").isJsonObject() ? remote.getAsJsonObject("career") : null;
+        final JsonObject career = newer(lc, rc, "at");
+        if (career != null) {
+            m.add("career", career);
+        }
         return m;
     }
 
@@ -633,6 +641,9 @@ final class Account {
         // Historique des parties : celles jouées ici pendant la synchronisation sont gardées.
         if (merged.has("arts") && merged.get("arts").isJsonArray()) {
             ArtChoices.mergeIn(merged.getAsJsonArray("arts"));
+        }
+        if (merged.has("career") && merged.get("career").isJsonObject() && Career.mergeIn(merged.getAsJsonObject("career"))) {
+            report.addProperty("careerChanged", true);
         }
         if (merged.has("stats") && merged.get("stats").isJsonObject()) {
             final int newGames = Stats.mergeIn(merged.getAsJsonObject("stats"));

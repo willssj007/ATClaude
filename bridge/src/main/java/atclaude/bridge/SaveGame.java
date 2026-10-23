@@ -236,6 +236,20 @@ final class SaveGame {
         }
         final JsonObject s = o.has("info") ? o.getAsJsonObject("info").deepCopy() : new JsonObject();
         s.addProperty("savedAt", o.has("savedAt") ? o.get("savedAt").getAsLong() : 0);
+        s.addProperty("career", isCareer(o));
         return s;
+    }
+
+    /** Duel du mode Planeswalker ? */
+    static boolean isCareer(final JsonObject save) {
+        final JsonObject setup = save == null || !save.has("setup") ? null : save.getAsJsonObject("setup");
+        return setup != null && setup.has("career") && setup.get("career").getAsBoolean();
+    }
+
+    /** Carrière remise à zéro : son duel sauvegardé ne peut plus être repris. */
+    static synchronized void deleteCareer() {
+        if (isCareer(read())) {
+            delete(null);
+        }
     }
 }

@@ -4,9 +4,11 @@ import forge.LobbyPlayer;
 import forge.ai.LobbyPlayerAi;
 import forge.ai.PlayerControllerAi;
 import forge.game.Game;
+import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.card.CardCollectionView;
 import forge.game.player.Player;
+import forge.game.zone.ZoneType;
 import forge.player.LobbyPlayerHuman;
 import forge.player.PlayerControllerHuman;
 import forge.util.GuiDisplayUtil;
@@ -19,12 +21,28 @@ import forge.util.GuiDisplayUtil;
  */
 final class Mulligans {
 
-    /** Tous les mulligans sont gratuits (Forge s'arrête de lui-même après 7 ou 8 mulligans de suite). */
+    /**
+     * Tous les mulligans sont gratuits, sans limite. Le mulligan de Londres de Forge en refuse un huitième :
+     * en mode illimité, le mulligan est donc fait ici même, sans repasser par Forge (voir {@link #redraw}).
+     */
     static final int UNLIMITED = -1;
+    /** Garde-fou pour l'IA en mode illimité (une IA dont le deck n'a pas de terrain recommencerait sans fin). */
+    private static final int AI_UNLIMITED_CAP = 30;
     /** Règle de Forge : un mulligan gratuit à plus de deux joueurs, aucun en duel. */
     static final int FORGE_DEFAULT = -2;
 
     private Mulligans() { }
+
+    /** Mulligan gratuit fait par le pont : la main retourne dans la bibliothèque, mélange, une main pleine. */
+    static void redraw(final Player p) {
+        final CardCollection hand = new CardCollection(p.getCardsIn(ZoneType.Hand));
+        for (final Card c : hand) {
+            p.getGame().getAction().moveToLibrary(c, null);
+        }
+        p.shuffle(null);
+        p.drawCards(p.getMaxHandSize());
+        p.onMulliganned();
+    }
 
     /** Cartes à remettre après {@code taken} mulligans, dont {@code free} gratuits. */
     static int toReturn(final int taken, final int free) {
@@ -41,11 +59,20 @@ final class Mulligans {
 
                     @Override
                     public boolean mulliganKeepHand(final Player first, final int cardsToReturn) {
-                        final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
-                        if (!keep) {
+                        while (true) {
+                            final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
+                            if (keep) {
+                                return true;
+                            }
                             taken++;
+                            if (free != UNLIMITED) {
+                                return false;
+                            }
+                            redraw(getPlayer());
+                            if (getGame().isGameOver()) {
+                                return true;
+                            }
                         }
-                        return keep;
                     }
 
                     @Override
@@ -70,11 +97,20 @@ final class Mulligans {
 
                     @Override
                     public boolean mulliganKeepHand(final Player first, final int cardsToReturn) {
-                        final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
-                        if (!keep) {
+                        while (true) {
+                            final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
+                            if (keep) {
+                                return true;
+                            }
                             taken++;
+                            if (free != UNLIMITED) {
+                                return false;
+                            }
+                            if (taken >= AI_UNLIMITED_CAP) {
+                                return true;
+                            }
+                            redraw(getPlayer());
                         }
-                        return keep;
                     }
 
                     @Override

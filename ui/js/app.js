@@ -3,12 +3,15 @@
 import {AccountScreen, loadProfile, onProfile, syncNow} from './account.js';
 import {initAudio, refreshAudio, setMusicMode} from './audio.js';
 import {bridge} from './bridge.js';
+import {BoostersScreen} from './boosters.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
+import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCareer} from './career.js';
 import {Decks} from './decks.js';
 import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} from './dialogs.js';
 import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
+import {enhanceSelects} from './select.js';
 import {icon} from './icons.js';
 import {StatsScreen} from './stats.js';
 import {announceUnlocks, appearanceHtml, applyThemes, themeClicked} from './themes.js';
@@ -23,7 +26,16 @@ let lastSetup = null;
 let decksCache = null;
 let ready = false;
 
+/** Écrans réservés à un mode : le Sandbox a ses salons, le Planeswalker ses duels et ses boosters. */
+const SANDBOX_ONLY = ['lobby'];
+const PLANESWALKER_ONLY = ['duel', 'boosters'];
+
 function showScreen(name) {
+  if (isPlaneswalker() && SANDBOX_ONLY.includes(name)) {
+    name = 'duel';
+  } else if (!isPlaneswalker() && PLANESWALKER_ONLY.includes(name)) {
+    name = 'home';
+  }
   current = name;
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
@@ -34,6 +46,33 @@ function showScreen(name) {
   if (screen && screen.show) {
     screen.show();
   }
+}
+
+/** Mode de jeu : navigation, mana affiché, écrans. */
+function applyMode() {
+  const pw = isPlaneswalker();
+  document.body.classList.toggle('mode-pw', pw);
+  $$('#nav [data-mode-only]').forEach(b => b.classList.toggle('hidden', b.dataset.modeOnly !== (pw ? 'planeswalker' : 'sandbox')));
+  const cards = $('#nav [data-screen="cards"] span');
+  if (cards) {
+    cards.textContent = pw ? 'Collection' : 'Cartes';
+  }
+  $('#mana-chip').classList.toggle('hidden', !pw);
+  if (pw && ready) {
+    loadCareer().catch(() => {});
+  }
+}
+
+function setMode(mode) {
+  if (prefs.get('mode') === mode) {
+    return;
+  }
+  prefs.set('mode', mode);
+  decksCache = null;
+  screens.decks.deck = null;
+  screens.cards.reset();
+  applyMode();
+  showScreen('home');
 }
 
 async function getDecks(force = false) {
@@ -55,7 +94,7 @@ async function startMatch(setup) {
   if (game) {
     game.destroy();
   }
-  game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup), onMenu: () => showScreen('home')});
+  game = newGame(() => startMatch(lastSetup));
   inMatch = true;
   showScreen('game');
   try {
@@ -69,13 +108,22 @@ async function startMatch(setup) {
   }
 }
 
+/** Écran de partie. Duel de carrière : « Duel suivant » ramène à l'écran Duel, avec le nouvel adversaire. */
+function newGame(rematch) {
+  return new Game($('#screen-game'), {
+    onExit: leaveMatch,
+    onRematch: () => (game && game.career ? leaveMatch().then(() => showScreen('duel')) : rematch()),
+    onMenu: () => showScreen('home'),
+  });
+}
+
 /** Reprend la partie sauvegardée (l'application avait été fermée en pleine partie). */
 async function resumeSaved() {
   closeAllForgeDialogs();
   if (game) {
     game.destroy();
   }
-  game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup || prefs.get('lastSetup')), onMenu: () => showScreen('home')});
+  game = newGame(() => startMatch(lastSetup || prefs.get('lastSetup')));
   game.pauseUntilResumed('Reprise de la partie sauvegardée…');
   inMatch = true;
   showScreen('game');
@@ -113,6 +161,11 @@ async function leaveMatch() {
 }
 
 function playDeck(deckKey) {
+  if (isPlaneswalker()) {
+    screens.duel.useDeck(deckKey);
+    showScreen('duel');
+    return;
+  }
   const format = deckKey.startsWith('constructed:') ? 'constructed' : 'commander';
   const lobby = screens.lobby;
   lobby.format = format;
@@ -127,31 +180,63 @@ function homeScreen() {
   const root = $('#screen-home');
   return {
     async show() {
-      const decks = ready ? await getDecks() : {decks: [], precons: []};
-      const saved = ready && !inMatch ? await bridge.request('savedGame').catch(() => null) : null;
+      const pw = isPlaneswalker();
+      const [decks, saved, c] = await Promise.all([
+        ready && !pw ? getDecks() : {decks: [], precons: []},
+        ready && !inMatch ? bridge.request('savedGame').catch(() => null) : null,
+        ready && pw ? loadCareer(true).catch(() => null) : null,
+      ]);
+      const modes = `<div class="mode-pick" role="radiogroup" aria-label="Mode de jeu">
+          <button class="mode-card${pw ? '' : ' on'}" data-mode="sandbox" role="radio" aria-checked="${!pw}">${icon('chest', 'mode-ic')}
+            <span><b>Sandbox</b><span class="muted small">Tout est ouvert : toutes les cartes et les préconstruits, salons, mulligans à régler, triche.</span></span></button>
+          <button class="mode-card${pw ? ' on' : ''}" data-mode="planeswalker" role="radio" aria-checked="${pw}">${icon('spark', 'mode-ic')}
+            <span><b>Planeswalker</b><span class="muted small">Ta carrière : un deck tiré au hasard, des duels, des cartes, du mana et des boosters à gagner.</span></span></button>
+        </div>`;
+      const career = c && c.started ? `<div class="pw-stats home-stats">${manaAmount(c.mana, 'chip')}
+          <span class="chip-stat">${icon('swords')}<b>${c.wins}</b> victoire${c.wins > 1 ? 's' : ''}</span>
+          <span class="chip-stat">${icon('crown')}série <b>${c.streak}</b></span>
+          <span class="chip-stat">${icon('booster')}<b>${(c.boosters || []).length}</b> booster${(c.boosters || []).length > 1 ? 's' : ''}</span>
+          <span class="chip-stat">${icon('book')}<b>${c.unique}</b> cartes</span></div>` : '';
+      const actions = pw ? `
+            ${inMatch ? '<button class="btn gold" data-go="game">Reprendre la partie</button>' : ''}
+            <button class="btn gold" data-go="duel">${icon('swords')} ${c && c.started ? 'Duel' : 'Commencer ma carrière'}</button>
+            <button class="btn primary" data-go="boosters">${icon('booster')} Boosters</button>
+            <button class="btn" data-go="decks">Mes decks</button>` : `
+            ${inMatch ? '<button class="btn gold" data-go="game">Reprendre la partie</button>' : ''}
+            <button class="btn gold" data-go="quick">${icon('swords')} Partie rapide</button>
+            <button class="btn primary" data-go="lobby">Créer un salon</button>
+            <button class="btn" data-go="decks">Mes decks</button>`;
+      const tiles = pw ? `
+          <div class="tile panel" data-go="duel">${icon('swords', 'tile-ic')}<h3>Duel</h3><p class="muted">Un adversaire à la fois : 100 mana, des cartes et un booster par victoire.</p></div>
+          <div class="tile panel" data-go="boosters">${icon('booster', 'tile-ic')}<h3>Boosters</h3><p class="muted">Ouvre tes boosters, ou achètes-en de n'importe quelle extension.</p></div>
+          <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">Construis tes decks avec les cartes de ta collection.</p></div>
+          <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Collection</h3><p class="muted">${c && c.started ? `${c.unique} cartes différentes, ${c.cards} au total.` : 'Les cartes que tu possèdes.'}</p></div>`
+        : `
+          <div class="tile panel" data-go="lobby">${icon('swords', 'tile-ic')}<h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
+          <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
+          <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>`;
       root.innerHTML = `<div class="page">
         ${saved ? savedGameHtml(saved) : ''}
         <div class="hero">
           <span class="glow" aria-hidden="true"></span>
           <h1>Arcane Table</h1>
           <p>Magic: The Gathering contre l'IA, avec le moteur de règles Forge : toutes les cartes, en français, et un deck builder pensé pour le Commander.</p>
-          <div class="actions">
-            ${inMatch ? '<button class="btn gold" data-go="game">Reprendre la partie</button>' : ''}
-            <button class="btn gold" data-go="quick">${icon('swords')} Partie rapide</button>
-            <button class="btn primary" data-go="lobby">Créer un salon</button>
-            <button class="btn" data-go="decks">Mes decks</button>
-          </div>
+          ${modes}
+          ${career}
+          <div class="actions">${actions}</div>
         </div>
-        <div class="tiles">
-          <div class="tile panel" data-go="lobby">${icon('swords', 'tile-ic')}<h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
-          <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
-          <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
+        <div class="tiles">${tiles}
           <div class="tile panel" data-go="stats">${icon('banner', 'tile-ic')}<h3>Statistiques</h3><p class="muted">Victoires, decks les plus joués, records de blessures...</p></div>
-          <div class="tile panel" data-go="trophies">${icon('chalice', 'tile-ic')}<h3>Trophées</h3><p class="muted">Séries de victoires, victoires alternatives, défis...</p></div>
+          <div class="tile panel" data-go="trophies">${icon('chalice', 'tile-ic')}<h3>Trophées et défis</h3><p class="muted">Succès de Forge, et défis qui débloquent des apparences.</p></div>
           <div class="tile panel" data-go="settings">${icon('gear', 'tile-ic')}<h3>Réglages</h3><p class="muted">Apparence, priorité, images, musique, sons.</p></div>
         </div>
       </div>`;
       root.onclick = (e) => {
+        const mode = e.target.closest('[data-mode]');
+        if (mode) {
+          setMode(mode.dataset.mode);
+          return;
+        }
         const go = e.target.closest('[data-go]');
         if (!go) {
           return;
@@ -161,7 +246,7 @@ function homeScreen() {
         } else if (go.dataset.go === 'resumeSaved') {
           resumeSaved();
         } else if (go.dataset.go === 'dropSaved') {
-          confirmBox('Abandonner la partie sauvegardée ?', 'Elle ne pourra plus être reprise.', {yes: 'Abandonner', danger: true}).then(async (yes) => {
+          confirmBox('Abandonner la partie sauvegardée ?', saved && saved.career ? 'Le duel ne pourra plus être repris (ton adversaire t\'attendra toujours dans Duel).' : 'Elle ne pourra plus être reprise.', {yes: 'Abandonner', danger: true}).then(async (yes) => {
             if (yes) {
               await bridge.request('deleteSaved').catch(() => {});
               screens.home.show();
@@ -182,16 +267,20 @@ function savedGameHtml(s) {
   const players = (s.players || []).map(p => `${esc(p.name)} <b>${p.lost ? icon('skull') : Number(p.life) || 0}</b>`).join(' · ');
   return `<div class="saved-game panel">
     <div class="sg-icon">${icon('hourglass')}</div>
-    <div class="sg-info"><b>Partie en cours sauvegardée</b>
+    <div class="sg-info"><b>${s.career ? 'Duel Planeswalker sauvegardé' : 'Partie en cours sauvegardée'}</b>
       <div class="muted small">${s.format === 'constructed' ? 'Construit' : 'Commander'} · tour ${Number(s.turn) || 1}${s.active ? ` (${esc(s.active)})` : ''} · ${agoText}</div>
       <div class="small">${players}</div></div>
     <div class="sg-actions"><button class="btn small" data-go="dropSaved">Abandonner</button><button class="btn gold" data-go="resumeSaved">▶ Reprendre</button></div>
   </div>`;
 }
 
-const NAV_ICONS = {home: 'castle', lobby: 'swords', decks: 'cards', cards: 'book', stats: 'banner', trophies: 'chalice', settings: 'gear'};
+const NAV_ICONS = {home: 'castle', lobby: 'swords', duel: 'swords', decks: 'cards', cards: 'book', boosters: 'booster', stats: 'banner', trophies: 'chalice', settings: 'gear'};
 
 async function quickMatch() {
+  if (isPlaneswalker()) {
+    showScreen('duel');
+    return;
+  }
   const setup = prefs.get('lastSetup');
   if (setup) {
     startMatch(setup);
@@ -208,12 +297,19 @@ function cardsScreen() {
   let panel = null;
   return {
     show() {
+      // Mode Planeswalker : la collection (cartes possédées) ; mode Sandbox : toutes les cartes.
+      const pw = isPlaneswalker();
       if (!panel) {
-        root.innerHTML = '<div class="page cards-page"><h1>Cartes</h1><div class="browser"></div></div>';
+        root.innerHTML = `<div class="page cards-page"><h1>${pw ? 'Collection' : 'Cartes'}</h1><div class="browser"></div></div>`;
         const box = root.querySelector('.browser');
-        panel = new SearchPanel(box, {onPick: (card) => showZoom(card, legalityHtml(card))});
+        panel = new SearchPanel(box, {onPick: (card) => showZoom(card, legalityHtml(card)), owned: pw});
         panel.search(true);
+      } else if (pw) {
+        panel.search(true); // de nouvelles cartes ont pu arriver (duel, booster)
       }
+    },
+    reset() {
+      panel = null;
     },
   };
 }
@@ -226,6 +322,9 @@ function legalityHtml(card) {
   }
   if (card.set) {
     bits.push('Édition : ' + card.set);
+  }
+  if (card.owned !== undefined) {
+    bits.push(card.owned < 0 ? 'Terrain de base : illimité' : `Dans ta collection : ${card.owned} exemplaire${card.owned > 1 ? 's' : ''}`);
   }
   return `<div class="muted small" style="margin-top:12px">${bits.map(esc).join('<br>')}</div>`;
 }
@@ -244,14 +343,14 @@ function settingsScreen() {
         <div class="row"><div><b>Langue des images</b><p class="muted small">En français quand Scryfall a une impression française de la carte, sinon en anglais.</p></div>
           <select data-pref-select="imageLang"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         ${row('animations', 'Animations', 'Déplacements de cartes, bannières de tour, effets de points de vie.')}
-        ${row('musicOn', 'Musique d\'ambiance', 'Musiques médiévales de Kevin MacLeod, dans les menus et en partie.')}
+        ${row('musicOn', 'Musique d\'ambiance', 'Musiques douces, médiévales et féeriques, dans les menus et en partie.')}
         <div class="row"><div><b>Volume de la musique</b></div><input type="range" min="0" max="100" data-pref-range="musicVolume"></div>
         ${row('sfxOn', 'Effets sonores', 'Cartes engagées, sorts, terrains, boutons...')}
         <div class="row"><div><b>Volume des effets</b></div><input type="range" min="0" max="100" data-pref-range="sfxVolume"></div>
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
         <h2 style="margin-top:26px">À propos</h2>
-        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques : Kevin MacLeod (incompetech.com), licence Creative Commons Attribution 3.0. Icônes et illustrations des apparences : dessinées pour Arcane Table.</p>
+        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques (fournies avec Forge, mode Aventure) : Vindsvept (licence Creative Commons Attribution 4.0), Brandon et Derek Fiechter, Logan Epic Canto. Icônes et illustrations des apparences : dessinées pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
       </div>`;
@@ -277,7 +376,7 @@ function settingsScreen() {
         }
       }));
       bridge.request('hello').then(h => {
-        root.querySelector('.version').textContent = 'Version de Forge : ' + h.version;
+        root.querySelector('.version').textContent = `${h.appVersion ? `Arcane Table ${h.appVersion} · ` : ''}Version de Forge : ${h.version}`;
       });
       appearanceHtml().then((html) => {
         root.querySelector('.appearance').innerHTML = html;
@@ -301,6 +400,8 @@ function setLoading(text, percent) {
 /** Après une synchronisation : decks et réglages ont pu changer. */
 function afterSync() {
   decksCache = null;
+  forgetCareer();
+  applyMode();
   refreshAudio();
   applyThemes();
   if (current !== 'game' && current !== 'account' && screens[current] && screens[current].show) {
@@ -313,13 +414,14 @@ function onReady(hello) {
     return;
   }
   ready = true;
+  applyMode();
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
   checkUnlocks();
   $('#loading').classList.add('hidden');
   screens.lobby.setProfiles(hello && hello.aiProfiles);
   if (hello && hello.inMatch) {
     inMatch = true;
-    game = new Game($('#screen-game'), {onExit: leaveMatch, onRematch: () => startMatch(lastSetup || prefs.get('lastSetup')), onMenu: () => showScreen('home')});
+    game = newGame(() => startMatch(lastSetup || prefs.get('lastSetup')));
     showScreen('game');
   } else {
     showScreen(current === 'game' ? 'home' : current);
@@ -345,12 +447,15 @@ const checkUnlocks = debounce(() => announceUnlocks().catch(() => {}), 1500);
 function init() {
   applyThemes();
   initAudio();
+  enhanceSelects();
   screens.home = homeScreen();
   screens.lobby = new Lobby($('#screen-lobby'), {onStart: startMatch, getDecks: () => getDecks(true)});
   screens.decks = new Decks($('#screen-decks'), {onPlay: playDeck, onChanged: () => {
     decksCache = null;
   }});
   screens.cards = cardsScreen();
+  screens.duel = new DuelScreen($('#screen-duel'), {onStart: startMatch, onBoosters: () => showScreen('boosters'), playerName: () => screens.lobby.playerName});
+  screens.boosters = new BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')});
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
   screens.stats = new StatsScreen($('#screen-stats'));
@@ -361,10 +466,15 @@ function init() {
   });
 
   $('#profile-btn').addEventListener('click', () => ready && showScreen('account'));
+  $('#mana-chip').addEventListener('click', () => ready && showScreen('boosters'));
+  onCareer((c) => {
+    $('#mana-chip').innerHTML = c.started ? manaAmount(c.mana) : `${icon('spark')}<b>Carrière</b>`;
+  });
   for (const b of $$('#nav button')) {
     b.innerHTML = `${icon(NAV_ICONS[b.dataset.screen])}<span>${b.textContent}</span>`;
     b.title = b.textContent;
   }
+  applyMode();
   $('#nav').addEventListener('click', (e) => {
     const b = e.target.closest('[data-screen]');
     if (b && ready) {
@@ -413,6 +523,16 @@ function init() {
     }
     // Trophées et decks à jour sur les autres appareils.
     setTimeout(() => syncNow({auto: true, onDone: afterSync}), 1500);
+  });
+  bridge.on('careerReward', (m) => {
+    forgetCareer();
+    loadCareer().catch(() => {});
+    if (game) {
+      game.setReward(m.reward);
+    } else if (m.reward && !m.reward.won) {
+      toast('Duel perdu : ta série repart de zéro.', {title: 'Planeswalker'});
+    }
+    checkUnlocks();
   });
   bridge.on('trophy', (m) => {
     announceTrophy(m);

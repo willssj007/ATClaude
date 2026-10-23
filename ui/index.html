@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/game.css">
+  <link rel="stylesheet" href="css/career.css">
 </head>
 <body>
   <div id="app">
@@ -16,13 +17,16 @@
       <div class="brand"><img src="img/icon.svg" alt=""><span>Arcane Table</span></div>
       <nav id="nav">
         <button data-screen="home" class="active">Accueil</button>
-        <button data-screen="lobby">Jouer</button>
+        <button data-screen="lobby" data-mode-only="sandbox">Jouer</button>
+        <button data-screen="duel" data-mode-only="planeswalker">Duel</button>
         <button data-screen="decks">Decks</button>
         <button data-screen="cards">Cartes</button>
+        <button data-screen="boosters" data-mode-only="planeswalker">Boosters</button>
         <button data-screen="stats">Stats</button>
         <button data-screen="trophies">Trophées</button>
         <button data-screen="settings">Réglages</button>
       </nav>
+      <button id="mana-chip" class="mana-chip hidden" title="Ton mana (mode Planeswalker) : ouvre la boutique de boosters"></button>
       <button id="profile-btn" class="profile-btn" data-screen="account" title="Mon compte"></button>
       <button id="resume-game" class="btn gold hidden">Reprendre la partie</button>
     </header>
@@ -30,6 +34,8 @@
     <main id="screens">
       <section id="screen-home" class="screen active"></section>
       <section id="screen-lobby" class="screen"></section>
+      <section id="screen-duel" class="screen"></section>
+      <section id="screen-boosters" class="screen"></section>
       <section id="screen-decks" class="screen"></section>
       <section id="screen-cards" class="screen"></section>
       <section id="screen-settings" class="screen"></section>

@@ -27,9 +27,13 @@ for f in "$SRC"/*.txt; do
   cp "$f" "$OUT/res/"
 done
 
-# Musiques (Kevin MacLeod, CC BY 3.0) et effets sonores fournis avec Forge.
-for dir in music sound; do
-  cp -r "$SRC/$dir" "$OUT/res/$dir"
+# Effets sonores de Forge, et musiques douces de son mode Aventure (Vindsvept, Brandon et Derek Fiechter,
+# Logan Epic Canto) : seulement les morceaux joués par l'application (liste dans bridge/.../Audio.java).
+cp -r "$SRC/sound" "$OUT/res/sound"
+for track in menus/menu1 menus/menu2 town/town1 town/town5 town/town6 town/town7 white/white1 white/white2 \
+             green/green1 green/green2 colorless/waste1 colorless/waste2; do
+  mkdir -p "$OUT/res/adventure/common/music/$(dirname "$track")"
+  cp "$SRC/adventure/common/music/$track.mp3" "$OUT/res/adventure/common/music/$track.mp3"
 done
 
 # Langues : anglais (référence) et français.

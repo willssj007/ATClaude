@@ -4,6 +4,7 @@ import {bridge} from './bridge.js';
 import {sfx} from './audio.js';
 import {esc, el} from './util.js';
 import {icon} from './icons.js';
+import {challengesHtml} from './themes.js';
 
 const LEVELS = {common: 'Bronze', uncommon: 'Argent', rare: 'Or', mythic: 'Mythique', special: 'Spécial'};
 
@@ -29,8 +30,15 @@ export class Trophies {
         <div class="trophy-count"><b>${data.earned}</b> / ${data.total} obtenus</div>
       </div>
       <p class="muted small">Les trophées se gagnent en fin de partie. Une partie où le menu de triche a servi ne compte pas (règle de Forge).</p>
+      <div class="challenges"></div>
       ${sections}
     </div>`;
+    challengesHtml().then((html) => {
+      const box = this.root.querySelector('.challenges');
+      if (box) {
+        box.innerHTML = html;
+      }
+    }).catch(() => {});
   }
 
   trophyHtml(t) {

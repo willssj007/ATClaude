@@ -3,6 +3,7 @@
 import {bracketBadgeHtml, openAnalysis, openDeckStats, openEdhrec, summaryLineHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {cardElement, loadImage, showZoom, onLongPress} from './cards.js';
+import {isPlaneswalker} from './career.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {icon} from './icons.js';
 import {SearchPanel} from './search.js';
@@ -47,7 +48,7 @@ function translateProblem(text) {
  * Tuile de deck façon Arena : l'illustration du commandant (recadrée sur l'image de la carte) en bandeau,
  * puis le nom, le commandant et l'identité de couleur.
  */
-function deckTile(d, actionHtml, subtitle) {
+export function deckTile(d, actionHtml, subtitle) {
   const tile = el(`<div class="deck-tile panel" data-key="${esc(d.key)}">
     <div class="deck-art" style="--id-grad:${identityGradient(d.identity)}"><div class="deck-art-img"></div><div class="deck-pips">${identityHtml(d.identity)}</div></div>
     <div class="deck-body">
@@ -69,7 +70,7 @@ function deckTile(d, actionHtml, subtitle) {
 }
 
 /** Pastilles bracket / puissance sur des tuiles déjà affichées (calculées en arrière-plan). */
-async function fillBadges(tiles) {
+export async function fillBadges(tiles) {
   const keys = tiles.map(t => t.dataset.key).filter(k => !k.startsWith('random'));
   if (!keys.length) {
     return;
@@ -100,7 +101,7 @@ function identityGradient(identity) {
   return `linear-gradient(135deg, ${cols.join(', ')})`;
 }
 
-function identityHtml(identity) {
+export function identityHtml(identity) {
   return identity ? manaHtml(identity.split('').map(c => `{${c}}`).join('')) : '<span class="muted small">incolore</span>';
 }
 
@@ -139,23 +140,28 @@ export class Decks {
 
   async list() {
     this.deck = null;
-    this.data = await bridge.request('listDecks');
+    // Mode Planeswalker : les decks de la carrière, construits avec la collection ; pas de préconstruits.
+    const pw = isPlaneswalker();
+    this.data = await bridge.request('listDecks', pw ? {career: true} : {});
     const mine = this.data.decks;
     this.root.innerHTML = `<div class="page">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-        <h1 style="margin:0;flex:1">Mes decks</h1>
-        <button class="btn" data-new="constructed">+ Deck construit</button>
+        <h1 style="margin:0;flex:1">${pw ? 'Mes decks Planeswalker' : 'Mes decks'}</h1>
+        ${pw ? '' : '<button class="btn" data-new="constructed">+ Deck construit</button>'}
         <button class="btn" data-import>⇩ Importer (Moxfield, texte)</button>
         <button class="btn gold" data-new="commander">+ Deck Commander</button>
       </div>
-      <div class="deck-list mine">${mine.length ? '' : '<div class="panel" style="padding:18px"><p>Aucun deck pour l\'instant.</p><p class="muted">Crée un deck Commander, importe une liste Moxfield, ou pars d\'un des decks préconstruits ci-dessous.</p></div>'}</div>
-      <h2 style="margin-top:28px">Préconstruits Commander <span class="muted small">(${this.data.precons.length}, fournis par Forge)</span></h2>
+      ${pw ? '<p class="muted small" style="margin-top:-6px">Seulement les cartes de ta collection : gagne des duels et ouvre des boosters pour en avoir plus.</p>' : ''}
+      <div class="deck-list mine">${mine.length ? '' : `<div class="panel" style="padding:18px"><p>Aucun deck pour l'instant.</p><p class="muted">${pw
+        ? 'Commence ta carrière dans Duel : un premier deck t\'y attend.'
+        : 'Crée un deck Commander, importe une liste Moxfield, ou pars d\'un des decks préconstruits ci-dessous.'}</p></div>`}</div>
+      ${pw ? '' : `<h2 style="margin-top:28px">Préconstruits Commander <span class="muted small">(${this.data.precons.length}, fournis par Forge)</span></h2>
       <input type="search" class="precon-q" placeholder="Filtrer les préconstruits…" style="width:min(420px,100%);margin-bottom:10px">
-      <div class="deck-list precons"></div>
+      <div class="deck-list precons"></div>`}
     </div>`;
     const box = this.root.querySelector('.mine');
-    const mineTiles = mine.map(d => deckTile(d, `<button class="btn small gold" data-play>Jouer</button>`,
-      `${d.format === 'commander' ? 'Commander' : 'Construit'} · ${d.count} cartes`));
+    const mineTiles = mine.map(d => deckTile(d, `<button class="btn small gold" data-play${d.career && !d.legal ? ' disabled title="Deck incomplet"' : ''}>${pw ? 'Duel' : 'Jouer'}</button>`,
+      `${d.format === 'commander' ? 'Commander' : 'Construit'} · ${d.count} cartes${d.career && !d.legal ? ' · incomplet' : ''}`));
     mineTiles.forEach(t => box.appendChild(t));
     fillBadges(mineTiles);
     const renderPrecons = (filter = '') => {
@@ -167,8 +173,10 @@ export class Decks {
       list.replaceChildren(...tiles);
       fillBadges(tiles);
     };
-    renderPrecons();
-    this.root.querySelector('.precon-q').addEventListener('input', debounce(e => renderPrecons(e.target.value), 150));
+    if (!pw) {
+      renderPrecons();
+      this.root.querySelector('.precon-q').addEventListener('input', debounce(e => renderPrecons(e.target.value), 150));
+    }
     this.root.onclick = async (e) => {
       if (this.deck) {
         return;
@@ -176,7 +184,7 @@ export class Decks {
       const tile = e.target.closest('.deck-tile');
       const newBtn = e.target.closest('[data-new]');
       if (newBtn) {
-        this.edit({name: '', format: newBtn.dataset.new, sections: {commander: [], main: [], side: []}});
+        this.edit({name: '', format: newBtn.dataset.new, career: pw, sections: {commander: [], main: [], side: []}});
       } else if (e.target.closest('[data-import]')) {
         this.importDialog();
       } else if (tile && e.target.closest('[data-play]')) {
@@ -188,9 +196,15 @@ export class Decks {
         } else {
           deck.previousName = deck.name;
         }
+        deck.career = tile.dataset.key.startsWith('career:');
         this.edit(deck);
       }
     };
+  }
+
+  /** Clé du deck en cours d'édition (« career:Nom » pour un deck Planeswalker). */
+  deckKey(name = this.deck.name) {
+    return (this.deck.career ? 'career' : this.deck.format) + ':' + name;
   }
 
   // ------------------------------------------------------------------ deck builder
@@ -208,6 +222,7 @@ export class Decks {
     const right = this.root.querySelector('.right');
     right.classList.add('mobile-hidden');
     this.search = new SearchPanel(left, {
+      owned: !!deck.career,
       onAdd: (card) => this.add(card),
       onPick: (card) => showZoom(card, card.canBeCommander && this.deck.format === 'commander'
         ? '<p class="muted small">Ajoute la carte puis touche ♛ dans le deck pour en faire le commandant.</p>' : ''),
@@ -247,6 +262,11 @@ export class Decks {
   }
 
   add(card, section = 'main') {
+    // Mode Planeswalker : pas plus d'exemplaires que dans la collection (terrains de base illimités).
+    if (this.deck.career && !card.basic && card.owned !== undefined && card.owned >= 0 && this.count(card.name) >= card.owned) {
+      toast(card.owned ? `Tu n'as que ${card.owned} exemplaire${card.owned > 1 ? 's' : ''} de ${card.nameFr}.` : `${card.nameFr} n'est pas dans ta collection.`, {error: true});
+      return;
+    }
     const list = this.deck.sections[section];
     const line = list.find(l => l.card.name === card.name);
     if (line) {
@@ -374,14 +394,14 @@ export class Decks {
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
         <button class="btn small gold" data-act="save">Enregistrer</button>
         <button class="btn small" data-act="play">Jouer</button>
-        ${d.format === 'commander' ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
+        ${d.format === 'commander' && !d.career ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
         <button class="btn small" data-act="analysis">Analyse</button>
         ${d.previousName ? '<button class="btn small" data-act="stats">Stats</button>' : ''}
         <button class="btn small" data-act="export">Exporter</button>
         <button class="btn small" data-act="import">Importer</button>
         ${d.previousName ? '<button class="btn small danger" data-act="delete">Supprimer</button>' : ''}
       </div>
-      <div class="muted small">${d.format === 'commander' ? 'Commander' : 'Construit'} · <b style="color:var(--text)">${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</div>
+      <div class="muted small">${d.career ? 'Planeswalker · ' : ''}${d.format === 'commander' ? 'Commander' : 'Construit'} · <b style="color:var(--text)">${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</div>
       <div class="deck-price"></div>
       <div class="analysis-slot">${summaryLineHtml(this.analysis)}</div>
       <div class="problems ok">Vérification…</div>
@@ -451,7 +471,7 @@ export class Decks {
           await this.save();
         } else if (a === 'play') {
           if (await this.save()) {
-            this.onPlay(this.deck.format + ':' + this.deck.name);
+            this.onPlay(this.deckKey());
           }
         } else if (a === 'analysis') {
           if (this.analysis) {
@@ -466,14 +486,14 @@ export class Decks {
             openEdhrec(s.commander.map(l => l.card), {add: (card) => this.add(card), count: (name) => this.count(name)});
           }
         } else if (a === 'stats') {
-          openDeckStats(d.format + ':' + d.previousName, d.previousName);
+          openDeckStats(this.deckKey(d.previousName), d.previousName);
         } else if (a === 'export') {
           this.exportDialog();
         } else if (a === 'import') {
           this.importDialog();
         } else if (a === 'delete') {
           if (await confirmBox('Supprimer le deck ?', `« ${d.previousName} » sera supprimé.`, {yes: 'Supprimer', danger: true})) {
-            await bridge.request('deleteDeck', {name: d.format + ':' + d.previousName});
+            await bridge.request('deleteDeck', {name: this.deckKey(d.previousName)});
             toast('Deck supprimé.');
             this.onChanged();
             this.list();
@@ -704,6 +724,8 @@ export class Decks {
           toast(`${result.unknown.length} ligne(s) non reconnue(s) :\n${result.unknown.slice(0, 8).join('\n')}`, {title: 'Import partiel', error: true, duration: 9000});
         }
         close();
+        // Mode Planeswalker : la liste importée devient un deck de carrière (les cartes non possédées sont signalées).
+        deck.career = isPlaneswalker();
         this.edit(deck);
         this.dirty = true;
       };

@@ -126,10 +126,13 @@ final class Catalog {
         // Extension : les cartes imprimées dans ce set, montrées avec leur impression de ce set.
         final String setCode = str(q, "set");
         final java.util.Set<String> inSet = setCode.isEmpty() ? null : namesInSet(setCode);
+        // Mode Planeswalker : seulement les cartes de la collection (et les terrains de base).
+        final Map<String, Integer> owned = bool(q, "owned") ? Career.owned() : null;
 
         final List<Entry> matches = new ArrayList<>();
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
+            if (owned != null && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
             if (!text.isEmpty()) {
                 final boolean nameHit = e.searchName().contains(text);
                 if (!nameHit && !(inText && e.searchText().contains(text))) {
@@ -157,7 +160,11 @@ final class Catalog {
                 final PaperCard print = FModel.getMagicDb().getCommonCards().getCard(pc.getName(), setCode);
                 pc = print != null ? print : pc;
             }
-            cards.add(paperJson(pc));
+            final JsonObject card = paperJson(pc);
+            if (owned != null) {
+                card.addProperty("owned", Career.isBasic(pc) ? -1 : owned.getOrDefault(pc.getName(), 0));
+            }
+            cards.add(card);
         }
         result.add("cards", cards);
         return result;
@@ -396,6 +403,9 @@ final class Catalog {
         }
         final String kind = key.substring(0, colon);
         final String name = key.substring(colon + 1);
+        if ("career".equals(kind)) {
+            return Career.deck(this, name);
+        }
         if ("precon".equals(kind)) {
             for (final DeckProxy proxy : DeckProxy.getAllCommanderPreconDecks()) {
                 if (proxy.getName().equals(name)) {
@@ -595,6 +605,12 @@ final class Catalog {
         final String problem = deckFormat.getDeckConformanceProblem(deck);
         if (problem != null) {
             problems.add(problem);
+        }
+        if (bool(json, "career")) {
+            final List<String> lack = Career.missing(deck);
+            if (!lack.isEmpty()) {
+                problems.add("Cartes absentes de ta collection : " + String.join(", ", lack.subList(0, Math.min(15, lack.size()))) + (lack.size() > 15 ? "…" : ""));
+            }
         }
         o.add("problems", problems);
         o.addProperty("count", deck.getAllCardsInASinglePool(true, false).countAll());

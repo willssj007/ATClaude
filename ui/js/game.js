@@ -7,6 +7,7 @@
 
 import {bridge} from './bridge.js';
 import {cardElement, showZoom, onLongPress} from './cards.js';
+import {fillRewardCards, rewardHtml} from './career.js';
 import {confirmBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
 import {icon} from './icons.js';
@@ -393,6 +394,8 @@ export class Game {
         return;
       }
       const slot = e.target.closest('.slot');
+      // Créature équipée ou enchantée : ses pièces jointes s'écartent (ou se rangent), en plus de l'action habituelle.
+      this.toggleSpread(slot && slot.classList.contains('has-attach') ? Number(slot.dataset.key.slice(1)) : null);
       if (slot && slot.dataset.key && slot.dataset.key.startsWith('c')) {
         bridge.send('card', {id: Number(slot.dataset.key.slice(1))});
         if (inHand && this.handOpen && !this.handNeeded) {
@@ -654,6 +657,11 @@ export class Game {
 
   // ------------------------------------------------------------------ rendu
 
+  /** Duel du mode Planeswalker : pas de triche, récompenses à la fin. */
+  get career() {
+    return !!(this.state && this.state.game && this.state.game.career);
+  }
+
   render(state, force = false) {
     const prev = this.state;
     this.state = state;
@@ -665,6 +673,7 @@ export class Game {
       this.build(state);
       this.layoutKey = key;
     }
+    this.table.querySelector('[data-open="cheat"]').classList.toggle('hidden', this.career);
     const table = this.table;
     const animate = prefs.get('animations') && !force;
     const before = new Map();
@@ -704,18 +713,28 @@ export class Game {
       const list = [];
       let prevLand = null;
       for (const card of cards) {
-        // Auras et équipements glissés sous leur hôte, décalés vers le haut : on lit leur nom au-dessus.
+        // Auras et équipements derrière leur hôte, parfaitement alignés, le haut dépassant (comme sur Arena) ;
+        // toucher l'hôte les écarte de part et d'autre pour voir ce qui est attaché.
         const atts = attachments.get(card.id) || [];
+        const spread = this.spreadHost === card.id;
         atts.forEach((a, k) => {
           const s = this.slot('c' + a.id, a, used);
+          const level = atts.length - k;
           s.classList.add('attached');
           s.classList.remove('stacked', 'attacking', 'has-attach');
-          s.style.setProperty('--att-level', String(atts.length - k));
+          s.classList.toggle('host-tapped', !!card.tapped);
+          s.classList.toggle('host-attacking', combat.has(card.id));
+          s.classList.toggle('spread', spread);
+          s.dataset.host = String(card.id);
+          s.style.setProperty('--att-level', String(level));
+          // Écartées en alternance à gauche et à droite de l'hôte.
+          s.style.setProperty('--spread-x', String((level % 2 ? -1 : 1) * Math.ceil(level / 2)));
           list.push(s);
         });
         const slot = this.slot('c' + card.id, card, used);
         slot.classList.toggle('attacking', combat.has(card.id));
-        slot.classList.remove('attached');
+        slot.classList.remove('attached', 'spread', 'host-tapped');
+        delete slot.dataset.host;
         slot.classList.toggle('has-attach', atts.length > 0);
         const stack = opts.stackLands && card.land && prevLand && prevLand.name === card.name && prevLand.tapped === card.tapped
           && !card.counters && !atts.length && !card.selectable && !card.highlighted;
@@ -849,6 +868,22 @@ export class Game {
     this.refreshTray();
     if (this.drawer === 'log') {
       this.renderLog();
+    }
+  }
+
+  /** Écarte les pièces jointes de cette créature (ou les range si elles l'étaient) ; null : tout ranger. */
+  toggleSpread(hostId) {
+    const next = hostId !== null && this.spreadHost !== hostId ? hostId : null;
+    if (next === this.spreadHost) {
+      return;
+    }
+    this.spreadHost = next;
+    for (const s of this.table.querySelectorAll('.slot.attached')) {
+      s.classList.toggle('spread', next !== null && s.dataset.host === String(next));
+    }
+    clearTimeout(this.spreadTimer);
+    if (next !== null) {
+      this.spreadTimer = setTimeout(() => this.toggleSpread(null), 6000);
     }
   }
 
@@ -1640,6 +1675,10 @@ export class Game {
   // ------------------------------------------------------------------ tiroirs : journal, triche, menu
 
   openDrawer(kind) {
+    if (kind === 'cheat' && this.career) {
+      toast('La triche est désactivée en mode Planeswalker.');
+      return;
+    }
     const drawer = this.table.querySelector('[data-drawer]');
     if (this.drawer === kind) {
       this.closeDrawer();
@@ -1973,6 +2012,16 @@ export class Game {
 
   // ------------------------------------------------------------------ fin de partie
 
+  /** Récompenses du duel de carrière (elles arrivent juste avant la fin de partie). */
+  setReward(reward) {
+    this.reward = reward;
+    const slot = this.over && this.over.querySelector('.reward-slot');
+    if (slot) {
+      slot.innerHTML = rewardHtml(reward);
+      fillRewardCards(this.over, reward);
+    }
+  }
+
   gameOver(info) {
     if (!this.table || this.over) {
       return;
@@ -1984,11 +2033,13 @@ export class Game {
     const box = el(`<div class="game-over${won ? '' : ' defeat'}"><div class="box panel">
       <h1>${title}</h1>
       <div class="details">${esc((info.details || []).join('\n'))}${info.turns ? `\nPartie terminée au tour ${info.turns}.` : ''}</div>
+      <div class="reward-slot">${this.career ? rewardHtml(this.reward) : ''}</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn" data-go="board">Voir le plateau</button>
         <button class="btn" data-go="menu">Retour au menu</button>
-        <button class="btn gold" data-go="again">Revanche</button>
+        <button class="btn gold" data-go="again">${this.career ? 'Duel suivant' : 'Revanche'}</button>
       </div></div></div>`);
+    fillRewardCards(box, this.reward);
     box.addEventListener('click', (e) => {
       const b = e.target.closest('[data-go]');
       if (!b) {
