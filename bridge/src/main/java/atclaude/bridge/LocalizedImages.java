@@ -23,7 +23,6 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -458,7 +457,7 @@ final class LocalizedImages {
     // ------------------------------------------------------------------ HTTP
 
     private HttpURLConnection open(final String url, final String accept) throws IOException {
-        final HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
+        final HttpURLConnection c = Net.open(url);
         // Scryfall exige un User-Agent et un Accept explicites.
         c.setRequestProperty("User-Agent", userAgent.get());
         c.setRequestProperty("Accept", accept);

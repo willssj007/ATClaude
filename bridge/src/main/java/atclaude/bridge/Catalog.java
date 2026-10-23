@@ -23,7 +23,6 @@ import forge.util.storage.IStorage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -860,7 +859,7 @@ final class Catalog {
     }
 
     private static String httpGet(final String url) throws IOException {
-        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        final HttpURLConnection c = Net.open(url);
         c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36");
         c.setRequestProperty("Accept", "application/json");
         c.setConnectTimeout(10_000);

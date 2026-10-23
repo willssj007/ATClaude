@@ -16,7 +16,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -210,7 +209,7 @@ final class Prices {
             throw new IOException("Scryfall en pause après trop de demandes, réessaie dans un instant.");
         }
         ScryfallRateLimiter.acquire(url);
-        final HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
+        final HttpURLConnection c = Net.open(url);
         c.setRequestMethod("POST");
         c.setDoOutput(true);
         c.setRequestProperty("User-Agent", GuiBase.getInterface().getUserAgent());

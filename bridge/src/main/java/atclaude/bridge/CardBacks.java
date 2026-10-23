@@ -7,7 +7,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
@@ -50,7 +49,7 @@ final class CardBacks {
     }
 
     private static void download(final String url, final File dest) throws IOException {
-        final HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
+        final HttpURLConnection c = Net.open(url);
         c.setRequestProperty("User-Agent", GuiBase.getInterface().getUserAgent());
         c.setRequestProperty("Accept", "image/*");
         c.setConnectTimeout(10_000);

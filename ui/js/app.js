@@ -409,12 +409,25 @@ function afterSync() {
   }
 }
 
+/** Version iPhone ouverte dans Safari : explique comment l'installer sur l'écran d'accueil (une fois). */
+function installHint() {
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const installed = navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+  if (!bridge.web || !ios || installed || prefs.get('installHintShown')) {
+    return;
+  }
+  prefs.set('installHintShown', true);
+  toast('Touche le bouton Partager de Safari, puis « Sur l\'écran d\'accueil » : Arcane Table s\'ouvrira en plein écran, comme une application.',
+    {title: 'Installer Arcane Table', duration: 12000});
+}
+
 function onReady(hello) {
   if (ready) {
     return;
   }
   ready = true;
   applyMode();
+  installHint();
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
   checkUnlocks();
   $('#loading').classList.add('hidden');
@@ -579,7 +592,8 @@ function init() {
   };
 
   bridge.connect();
-  if ('serviceWorker' in navigator && !bridge.android && location.protocol === 'https:') {
+  // Version iPhone : le service worker garde l'interface et sert les images des cartes (voir sw.js, pwa.js).
+  if ('serviceWorker' in navigator && bridge.web) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }

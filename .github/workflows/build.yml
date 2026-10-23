@@ -69,6 +69,15 @@ jobs:
           name: ArcaneTable-apk
           path: ArcaneTable-*.apk
 
+      # Version iPhone (PWA) : le même code, publié sur GitHub Pages ; Forge y tourne dans Safari grâce à CheerpJ.
+      - name: Préparer la version iPhone (PWA)
+        run: scripts/package-pwa.sh "$RUNNER_TEMP/forge-assets" web/target "$VERSION" "$RUNNER_TEMP/pwa"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ${{ runner.temp }}/pwa
+
       - name: Préparer le paquet ordinateur
         run: |
           mkdir -p dist
@@ -90,8 +99,24 @@ jobs:
           gh release delete apk-latest --yes --cleanup-tag || true
           gh release create apk-latest ArcaneTable-*.apk \
             --title "Arcane Table $VERSION — dernière version (build ${{ github.run_number }})" \
-            --notes "Construit automatiquement depuis le commit ${{ github.sha }}. Android : télécharge le fichier .apk sur le téléphone puis ouvre-le (autorise l'installation depuis cette source si Android le demande). Windows : télécharge le .zip (ajouté quelques minutes après l'APK), décompresse-le dans un dossier de ton choix, puis lance ArcaneTable.exe." \
+            --notes "Construit automatiquement depuis le commit ${{ github.sha }}. Android : télécharge le fichier .apk sur le téléphone puis ouvre-le (autorise l'installation depuis cette source si Android le demande). Windows : télécharge le .zip (ajouté quelques minutes après l'APK), décompresse-le dans un dossier de ton choix, puis lance ArcaneTable.exe. iPhone : ouvre https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/ dans Safari, puis Partager > Sur l'écran d'accueil." \
             --prerelease
+
+  # Publication de la version iPhone. Une seule fois avant : Settings > Pages > Source « GitHub Actions ».
+  pwa:
+    needs: apk
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
 
   windows:
     needs: apk

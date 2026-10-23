@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -734,7 +733,7 @@ final class Account {
 
     private static JsonElement request(final String method, final String path, final String token, final JsonObject body) {
         try {
-            final HttpURLConnection c = (HttpURLConnection) URI.create(API + path).toURL().openConnection();
+            final HttpURLConnection c = Net.open(API + path);
             c.setRequestMethod(method);
             c.setRequestProperty("Authorization", "Bearer " + token);
             c.setRequestProperty("Accept", "application/vnd.github+json");
@@ -772,7 +771,7 @@ final class Account {
 
     private static String rawGet(final String url, final String token) {
         try {
-            final HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
+            final HttpURLConnection c = Net.open(url);
             c.setRequestProperty("Authorization", "Bearer " + token);
             c.setRequestProperty("User-Agent", "ArcaneTable");
             try (InputStream in = c.getInputStream()) {

@@ -11,7 +11,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -207,7 +206,7 @@ final class Edhrec {
     }
 
     private static String get(final String url) throws IOException {
-        final HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
+        final HttpURLConnection c = Net.open(url);
         c.setRequestProperty("User-Agent", "ArcaneTable/0.1 (+https://github.com/willssj007/ATClaude)");
         c.setRequestProperty("Accept", "application/json");
         c.setConnectTimeout(15_000);

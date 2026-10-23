@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
@@ -54,7 +53,7 @@ final class StreamImageFetcher extends ImageFetcher {
             target = target.replace(".jpg", ".fullborder.jpg");
         }
         ScryfallRateLimiter.acquire(urlToDownload);
-        final HttpURLConnection connection = (HttpURLConnection) new URL(urlToDownload).openConnection();
+        final HttpURLConnection connection = Net.open(urlToDownload);
         connection.setRequestProperty("Accept", "*/*");
         connection.setRequestProperty("User-Agent", GuiBase.getInterface().getUserAgent());
         connection.setConnectTimeout(10_000);
