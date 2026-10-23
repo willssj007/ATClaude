@@ -84,6 +84,10 @@ final class MatchSession {
     /** Reprise en cours : les questions d'avant la partie (jouer ou piocher, mulligan) sont répondues d'office. */
     private volatile boolean resumePending;
     private volatile String lastSaveKey = "";
+    /** Compteurs de la partie pour les statistiques (blessures, terrains, tours). */
+    private volatile GameTracker tracker;
+    private volatile boolean recorded;
+    private boolean commanderFormat;
     private static final Set<PhaseType> SAVE_PHASES = EnumSet.of(PhaseType.UPKEEP, PhaseType.DRAW, PhaseType.MAIN1, PhaseType.MAIN2, PhaseType.END_OF_TURN);
 
     private MatchSession(final Bridge bridge, final BridgeGuiGame gui, final HostedMatch match) {
@@ -115,6 +119,8 @@ final class MatchSession {
         }
         final List<RegisteredPlayer> players = new ArrayList<>();
         RegisteredPlayer human = null;
+        // Mulligans gratuits choisis dans le salon (absent : règle de Forge).
+        final int freeMulligans = setup.has("mulligans") ? setup.get("mulligans").getAsInt() : Mulligans.FORGE_DEFAULT;
         int aiIndex = 0;
         // Le salon tel quel, avec chaque deck écrit en entier : la sauvegarde ne dépend plus des decks enregistrés.
         final JsonObject resolved = setup.deepCopy();
@@ -132,13 +138,14 @@ final class MatchSession {
             if (ai) {
                 aiIndex++;
                 final String profile = str(seat, "profile");
-                lobby = profile.isEmpty() ? GamePlayerUtil.createAiPlayer(name, aiIndex)
+                final LobbyPlayer base = profile.isEmpty() ? GamePlayerUtil.createAiPlayer(name, aiIndex)
                         : GamePlayerUtil.createAiPlayer(name, aiIndex, profile);
+                lobby = freeMulligans == Mulligans.FORGE_DEFAULT || !(base instanceof forge.ai.LobbyPlayerAi la) ? base : Mulligans.ai(la, freeMulligans);
             } else {
                 if (human != null) {
                     throw new IllegalArgumentException("Un seul joueur humain par partie.");
                 }
-                lobby = GamePlayerUtil.getGuiPlayer(name, 0, 0, false);
+                lobby = freeMulligans == Mulligans.FORGE_DEFAULT ? GamePlayerUtil.getGuiPlayer(name, 0, 0, false) : Mulligans.human(name, freeMulligans);
                 human = rp;
             }
             rp.setPlayer(lobby);
@@ -166,6 +173,7 @@ final class MatchSession {
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
         final HostedMatch match = GuiBase.getInterface().hostMatch();
         final MatchSession session = new MatchSession(bridge, gui, match);
+        session.commanderFormat = commander;
         session.setup = setup;
         session.savedSetup = resolved;
         if (save != null) {
@@ -183,6 +191,10 @@ final class MatchSession {
                     ex.printStackTrace();
                     bridge.sendEvent("error", m -> m.addProperty("message", "La partie sauvegardée n'a pas pu être reprise entièrement : " + ex.getMessage()));
                 }
+                final GameTracker t = session.tracker;
+                if (t != null) {
+                    t.pause(false);
+                }
                 session.resumePending = false;
                 bridge.sendEvent("resumed", m -> { });
                 gui.markDirty();
@@ -192,8 +204,41 @@ final class MatchSession {
         match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
         final Set<GameType> variants = commander ? EnumSet.of(GameType.Commander) : null;
         match.startMatch(type, variants, players, human, gui);
+        // La partie existe (son fil attend le mulligan du joueur) : on s'abonne à ses événements pour les statistiques.
+        final Game game = match.getGame();
+        final Player me = game == null ? null : humanPlayer(game);
+        if (me != null) {
+            final GameTracker t = new GameTracker(me.getId());
+            if (save != null) {
+                t.restore(save.has("stats") && save.get("stats").isJsonObject() ? save.getAsJsonObject("stats") : null);
+                t.pause(true);
+            }
+            session.tracker = t;
+            game.subscribeToEvents(t);
+        }
         session.applyYieldPrefs();
         return session;
+    }
+
+    private static Player humanPlayer(final Game game) {
+        for (final Player p : game.getRegisteredPlayers()) {
+            if (p.getController() instanceof PlayerControllerHuman && !p.isControlled()) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /** Compteurs à garder dans la sauvegarde. */
+    private JsonObject trackerJson(final Game game) {
+        final GameTracker t = tracker;
+        if (t == null) {
+            return null;
+        }
+        final JsonObject o = t.toJson();
+        final Player me = humanPlayer(game);
+        o.addProperty("mulligans", t.mulligansBefore() + (me == null ? 0 : me.getStats().getMulliganCount()));
+        return o;
     }
 
     private static Deck deckFor(final Catalog catalog, final JsonObject seat) {
@@ -229,6 +274,7 @@ final class MatchSession {
                     // Partie finie : Forge attend de savoir s'il faut en lancer une autre.
                     c.nextGameDecision(forge.gamemodes.match.NextGameDecision.QUIT);
                 } else {
+                    releaseControl();
                     c.concede();
                 }
             }
@@ -272,13 +318,33 @@ final class MatchSession {
             case "cancelPass" -> c.autoPassCancel();
             case "alphaStrike" -> c.alphaStrike();
             case "undo" -> c.undoLastAction();
-            case "concede" -> c.concede();
+            case "concede" -> {
+                releaseControl();
+                c.concede();
+            }
             case "settings" -> updateSettings(m.getAsJsonObject("settings"));
             case "cheat" -> cheat(c, m);
             case "state" -> gui.markDirty();
             default -> throw new IllegalArgumentException("Action inconnue : " + type);
         }
         return null;
+    }
+
+    /**
+     * Rend les adversaires contrôlés par triche avant d'abandonner : sinon Forge les fait perdre avec nous
+     * (la partie finirait en nulle au lieu d'une défaite).
+     */
+    private void releaseControl() {
+        final Game game = game();
+        final Player me = game == null ? null : humanPlayer(game);
+        if (me == null) {
+            return;
+        }
+        for (final Player p : game.getPlayers()) {
+            if (p != me && p.getControllingPlayer() == me) {
+                p.removeController(me);
+            }
+        }
     }
 
     private CardView findCard(final int id) {
@@ -329,7 +395,7 @@ final class MatchSession {
                 return game.getPlayer(pv);
             }
         }
-        return game.getPlayer(gui.getCurrentPlayer());
+        return game.getPlayer(gui.localPlayer());
     }
 
     private static byte colorByte(final String letter) {
@@ -346,8 +412,10 @@ final class MatchSession {
     // ------------------------------------------------------------------ priorité et arrêts
 
     boolean skipsPhase(final PlayerView turnPlayer, final PhaseType phase) {
-        final PlayerView me = gui.getCurrentPlayer();
-        final boolean mine = me != null && turnPlayer != null && me.getId() == turnPlayer.getId();
+        final PlayerView me = gui.localPlayer();
+        // Le tour d'un adversaire que l'on contrôle se joue avec nos propres arrêts.
+        final PlayerView master = turnPlayer == null ? null : turnPlayer.getMindSlaveMaster();
+        final boolean mine = me != null && turnPlayer != null && (me.getId() == turnPlayer.getId() || master != null && master.getId() == me.getId());
         return !(mine ? myStops : theirStops).contains(phase);
     }
 
@@ -434,9 +502,12 @@ final class MatchSession {
             return;
         }
         final StackItemView top = gv.peekStack();
-        final PlayerView me = gui.getCurrentPlayer();
-        if (top == null || me == null || top.getActivatingPlayer() == null
-                || top.getActivatingPlayer().getId() != me.getId() || !seenStackItems.add(top.getId())) {
+        final PlayerView me = gui.localPlayer();
+        final PlayerView caster = top == null ? null : top.getActivatingPlayer();
+        final PlayerView casterMaster = caster == null ? null : caster.getMindSlaveMaster();
+        // Sort lancé par soi-même, ou pour un adversaire que l'on contrôle.
+        final boolean mine = caster != null && me != null && (caster.getId() == me.getId() || casterMaster != null && casterMaster.getId() == me.getId());
+        if (!mine || !seenStackItems.add(top.getId())) {
             return;
         }
         timer.schedule(() -> bridge.runOnEdt(() -> {
@@ -455,8 +526,8 @@ final class MatchSession {
             if (closed || !resumePending || c.getInputQueue().getInput() != input) {
                 return;
             }
-            if (input instanceof forge.gamemodes.match.input.InputSelectEntitiesFromList && gui.getCurrentPlayer() != null) {
-                c.selectPlayer(gui.getCurrentPlayer(), CLICK);
+            if (input instanceof forge.gamemodes.match.input.InputSelectEntitiesFromList && gui.localPlayer() != null) {
+                c.selectPlayer(gui.localPlayer(), CLICK);
             }
             c.selectButtonOk();
         }), 120, TimeUnit.MILLISECONDS);
@@ -494,7 +565,7 @@ final class MatchSession {
                     return;
                 }
                 try {
-                    final JsonObject snapshot = SaveGame.capture(game, savedSetup, sessionId);
+                    final JsonObject snapshot = SaveGame.capture(game, savedSetup, sessionId, trackerJson(game));
                     // Le joueur a pu agir pendant la photo : elle peut être incohérente, on la jette.
                     if (closed || c.getInputQueue().getInput() != input) {
                         lastSaveKey = "";
@@ -534,6 +605,11 @@ final class MatchSession {
     void onGameFinished() {
         // Partie terminée : rien à reprendre.
         SaveGame.delete(sessionId);
+        try {
+            recordGame();
+        } catch (final RuntimeException e) {
+            System.err.println("Partie non comptée dans les statistiques : " + e);
+        }
         if (closed) {
             return; // partie abandonnée pour en lancer une autre : l'écran de fin n'a pas lieu d'être
         }
@@ -553,10 +629,90 @@ final class MatchSession {
         });
     }
 
+    /** Ajoute la partie finie (ou abandonnée) à l'historique des statistiques. */
+    private void recordGame() {
+        final Game game = game();
+        final GameView gv = gui.getGameView();
+        final GameOutcome outcome = gv == null ? null : gv.getOutcome();
+        final GameTracker t = tracker;
+        if (recorded || game == null || outcome == null || t == null) {
+            return;
+        }
+        recorded = true;
+        final Player me = humanPlayer(game);
+        final boolean conceded = me != null && me.getOutcome() != null && me.getOutcome().lossState == forge.game.player.GameLossReason.Conceded;
+        if (me == null || outcome.getLastTurnNumber() < 1 || conceded && t.turns() == 0) {
+            return; // abandonnée avant son premier tour (mauvais deck, mulligan...) : pas comptée
+        }
+        final JsonObject g = new JsonObject();
+        g.addProperty("id", sessionId);
+        g.addProperty("at", System.currentTimeMillis());
+        g.addProperty("format", commanderFormat ? "commander" : "constructed");
+        g.addProperty("players", game.getRegisteredPlayers().size());
+        final boolean won = !outcome.isDraw() && outcome.isWinner(me.getRegisteredPlayer());
+        g.addProperty("result", outcome.isDraw() ? "draw" : won ? "win" : "loss");
+        g.addProperty("conceded", conceded);
+        g.addProperty("reason", outcome.getWinCondition() == null ? "" : outcome.getWinCondition().name());
+        g.addProperty("turns", outcome.getLastTurnNumber());
+        g.addProperty("myTurns", t.turns());
+        g.addProperty("mulligans", t.mulligansBefore() + me.getStats().getMulliganCount());
+        g.addProperty("lands", t.lands());
+        g.addProperty("dealt", t.dealt());
+        g.addProperty("taken", t.taken());
+        g.addProperty("spells", t.spells());
+        g.addProperty("life", me.getLife());
+        g.addProperty("cheated", t.cheated);
+        g.addProperty("winner", outcome.getWinningLobbyPlayer() == null ? "" : outcome.getWinningLobbyPlayer().getName());
+        final JsonObject humanSeat = savedSetup != null && savedSetup.has("players") && savedSetup.getAsJsonArray("players").size() > 0
+                ? savedSetup.getAsJsonArray("players").get(0).getAsJsonObject() : new JsonObject();
+        final JsonObject deck = deckSummary(me.getRegisteredPlayer().getDeck());
+        final String key = str(humanSeat, "deckKey");
+        deck.addProperty("key", key.isEmpty() || key.startsWith("random") ? (commanderFormat ? "random" : "randomConstructed") : key);
+        g.add("deck", deck);
+        final JsonArray opponents = new JsonArray();
+        for (final Player p : game.getRegisteredPlayers()) {
+            if (p == me) {
+                continue;
+            }
+            final JsonObject o = deckSummary(p.getRegisteredPlayer().getDeck());
+            o.addProperty("player", p.getName());
+            o.addProperty("won", !outcome.isDraw() && outcome.isWinner(p.getRegisteredPlayer()));
+            opponents.add(o);
+        }
+        g.add("opponents", opponents);
+        Stats.add(g);
+        bridge.sendEvent("statsChanged", m -> { });
+    }
+
+    /** Nom, commandants (anglais et français), couleurs et image d'un deck. */
+    private static JsonObject deckSummary(final Deck deck) {
+        final JsonObject o = new JsonObject();
+        o.addProperty("name", deck == null ? "" : deck.getName());
+        final JsonArray en = new JsonArray();
+        final JsonArray fr = new JsonArray();
+        if (deck != null && deck.has(forge.deck.DeckSection.Commander)) {
+            for (final PaperCard pc : deck.get(forge.deck.DeckSection.Commander).toFlatList()) {
+                en.add(pc.getName());
+                fr.add(Catalog.translated(pc.getName()));
+                if (!o.has("image")) {
+                    o.addProperty("image", pc.getImageKey(false));
+                }
+            }
+        }
+        o.add("commanders", en);
+        o.add("commandersFr", fr);
+        o.addProperty("identity", deck == null ? "" : Catalog.identity(deck));
+        return o;
+    }
+
     // ------------------------------------------------------------------ triche
 
     private void cheat(final PlayerControllerHuman c, final JsonObject m) {
         final String op = str(m, "op");
+        final GameTracker t = tracker;
+        if (t != null) {
+            t.cheated = true;
+        }
         final IDevModeCheats dev = c.cheat();
         final Game game = game();
         switch (op) {
@@ -624,6 +780,27 @@ final class MatchSession {
                     for (final Card card : p.getCardsIn(ZoneType.Battlefield)) {
                         card.untap();
                     }
+                });
+            }
+            case "control" -> {
+                final Player p = player(m);
+                final Player me = humanPlayer(game);
+                if (me == null || p == me) {
+                    throw new IllegalArgumentException("Choisis un adversaire à contrôler.");
+                }
+                final boolean on = m.get("value").getAsBoolean();
+                inGame(game, () -> {
+                    if (on && p.getControllingPlayer() != me) {
+                        // Comme Mindslaver, mais sans fin : ses décisions passent par l'interface jusqu'à ce qu'on le rende.
+                        p.addController(game.getNextTimestamp(), me);
+                    } else if (!on) {
+                        p.removeController(me);
+                    }
+                });
+                bridge.sendEvent("notice", n -> {
+                    n.addProperty("title", "Triche");
+                    n.addProperty("message", on ? "Tu contrôles " + p.getName() + " : ses choix et ses sorts passent par toi (sa main s'ouvre depuis sa fiche)."
+                            : p.getName() + " reprend le contrôle de ses décisions.");
                 });
             }
             case "viewAll" -> dev.setViewAllCards(m.get("value").getAsBoolean());

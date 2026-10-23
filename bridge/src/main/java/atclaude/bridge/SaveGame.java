@@ -37,7 +37,7 @@ final class SaveGame {
      * Photo de la partie en cours. À appeler quand le fil de partie attend une décision du joueur.
      * {@code setup} liste les places dans l'ordre de Forge (humain d'abord), comme ses joueurs inscrits.
      */
-    static JsonObject capture(final Game game, final JsonObject setup, final String sessionId) {
+    static JsonObject capture(final Game game, final JsonObject setup, final String sessionId, final JsonObject stats) {
         final GameState state = new GameState();
         state.initFromGame(game);
         final JsonObject save = new JsonObject();
@@ -89,6 +89,9 @@ final class SaveGame {
             summary.add(s);
         }
         save.add("extras", extras);
+        if (stats != null) {
+            save.add("stats", stats);
+        }
         final JsonObject info = new JsonObject();
         info.addProperty("turn", game.getPhaseHandler().getTurn());
         info.addProperty("active", game.getPhaseHandler().getPlayerTurn() == null ? "" : game.getPhaseHandler().getPlayerTurn().getName());

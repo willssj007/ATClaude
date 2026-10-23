@@ -9,6 +9,7 @@ import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} f
 import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
+import {StatsScreen} from './stats.js';
 import {announceTrophy, Trophies} from './trophies.js';
 import {$, $$, avatarHtml, esc, prefs, toast} from './util.js';
 
@@ -134,6 +135,7 @@ function homeScreen() {
           <div class="tile panel" data-go="lobby"><h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
           <div class="tile panel" data-go="decks"><h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
           <div class="tile panel" data-go="cards"><h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
+          <div class="tile panel" data-go="stats"><h3>Statistiques</h3><p class="muted">Victoires, decks les plus joués, records de blessures...</p></div>
           <div class="tile panel" data-go="trophies"><h3>Trophées</h3><p class="muted">Séries de victoires, victoires alternatives, défis...</p></div>
           <div class="tile panel" data-go="settings"><h3>Réglages</h3><p class="muted">Priorité, images, musique, sons.</p></div>
         </div>
@@ -325,6 +327,7 @@ function init() {
   screens.cards = cardsScreen();
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
+  screens.stats = new StatsScreen($('#screen-stats'));
   screens.account = new AccountScreen($('#screen-account'), {onSynced: afterSync});
   onProfile((p) => {
     $('#profile-btn').innerHTML = `${avatarHtml(p.name, p.avatar, 28)}<span>${esc(p.name)}</span>${p.linked ? '<i title="Synchronisé">⟳</i>' : ''}`;
@@ -377,6 +380,11 @@ function init() {
     setTimeout(() => syncNow({auto: true, onDone: afterSync}), 1500);
   });
   bridge.on('trophy', (m) => announceTrophy(m));
+  bridge.on('statsChanged', () => {
+    if (current === 'stats') {
+      screens.stats.show();
+    }
+  });
   bridge.on('resumed', () => game && game.resumed());
   bridge.on('openUrl', (m) => bridge.openUrl(m.url));
   bridge.on('incorrectAction', () => {

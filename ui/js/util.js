@@ -102,6 +102,7 @@ const DEFAULTS = {
   autoPass: true,
   showEnglish: false,
   lastSetup: null,
+  statsWithCheats: true,
 };
 
 export const prefs = {

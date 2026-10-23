@@ -284,6 +284,7 @@ final class Account {
             b.add("save", save);
         }
         b.addProperty("saveClearedAt", SaveGame.clearedAt());
+        b.add("stats", Stats.load());
         return b;
     }
 
@@ -368,6 +369,8 @@ final class Account {
         if (save != null) {
             m.add("save", save);
         }
+        m.add("stats", Stats.merge(local.has("stats") && local.get("stats").isJsonObject() ? local.getAsJsonObject("stats") : null,
+                remote.has("stats") && remote.get("stats").isJsonObject() ? remote.getAsJsonObject("stats") : null));
         return m;
     }
 
@@ -578,6 +581,13 @@ final class Account {
             if (mine == null || mine.get("savedAt").getAsLong() < theirs.get("savedAt").getAsLong()) {
                 SaveGame.write(theirs);
                 report.addProperty("saveImported", true);
+            }
+        }
+        // Historique des parties : celles jouées ici pendant la synchronisation sont gardées.
+        if (merged.has("stats") && merged.get("stats").isJsonObject()) {
+            final int newGames = Stats.mergeIn(merged.getAsJsonObject("stats"));
+            if (newGames != 0) {
+                report.addProperty("statsChange", newGames);
             }
         }
         final JsonObject prefs = merged.getAsJsonObject("prefs");

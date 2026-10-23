@@ -6,6 +6,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -149,12 +150,34 @@ public final class Bridge {
             network.execute(() -> dispatch(type, message));
             return;
         }
+        if ("deckSummaries".equals(type)) {
+            // Analyse de nombreux decks : à part, pour ne pas retarder le reste de l'interface.
+            analyzer.execute(() -> dispatch(type, message));
+            return;
+        }
+        if ("edhrec".equals(type)) {
+            // Lecture d'EDHREC : à part, pour ne pas attendre derrière une synchronisation.
+            web.execute(() -> dispatch(type, message));
+            return;
+        }
         runOnEdt(() -> dispatch(type, message));
     }
 
     private static final java.util.Set<String> NETWORK_REQUESTS = java.util.Set.of("sync", "linkGithub");
     private final java.util.concurrent.ExecutorService network = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-net");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private final java.util.concurrent.ExecutorService web = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        final Thread t = new Thread(r, "atclaude-web");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private final java.util.concurrent.ExecutorService analyzer = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        final Thread t = new Thread(r, "atclaude-analyze");
         t.setDaemon(true);
         return t;
     });
@@ -201,7 +224,10 @@ public final class Bridge {
                 final JsonElement saved = catalog.saveDeck(deck);
                 final String previous = deck.has("previousName") ? deck.get("previousName").getAsString() : "";
                 if (!previous.isEmpty() && deck.has("name") && !previous.equals(deck.get("name").getAsString())) {
-                    account.deckDeleted(deck.has("format") ? deck.get("format").getAsString() : "commander", previous);
+                    final String format = deck.has("format") ? deck.get("format").getAsString() : "commander";
+                    account.deckDeleted(format, previous);
+                    // Le deck renommé garde ses statistiques.
+                    Stats.renameDeck(format + ":" + previous, format + ":" + deck.get("name").getAsString(), deck.get("name").getAsString());
                 }
                 return saved;
             }
@@ -228,12 +254,31 @@ public final class Bridge {
                 return catalog.fetchMoxfield(m.get("url").getAsString());
             case "validateDeck":
                 return catalog.validate(m.getAsJsonObject("deck"));
+            case "analyzeDeck":
+                return catalog.analyze(m);
+            case "deckSummaries":
+                return catalog.deckSummaries(m.getAsJsonArray("keys"));
             case "randomCommanderDeck":
                 return catalog.randomCommanderDeck();
             case "audioFiles":
                 return Audio.files();
             case "trophies":
                 return Trophies.all();
+            case "stats":
+                return Stats.load();
+            case "edhrec": {
+                final List<String> names = new java.util.ArrayList<>();
+                for (final JsonElement e : m.getAsJsonArray("commanders")) {
+                    names.add(e.getAsString());
+                }
+                final JsonObject raw = Edhrec.fetch(names);
+                final JsonObject[] out = new JsonObject[1];
+                callOnEdt(() -> out[0] = Edhrec.present(catalog, raw));
+                return out[0];
+            }
+            case "clearStats":
+                Stats.clear();
+                return null;
             case "startMatch":
                 startMatch(m.getAsJsonObject("setup"));
                 return null;

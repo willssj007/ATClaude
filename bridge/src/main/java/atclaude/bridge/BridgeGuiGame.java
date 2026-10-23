@@ -82,6 +82,28 @@ final class BridgeGuiGame extends AbstractGuiGame {
         flusher.shutdownNow();
     }
 
+    /** Le joueur local. Forge change de « joueur courant » quand on décide pour un adversaire contrôlé : pas nous. */
+    private volatile PlayerView localPlayer;
+
+    @Override
+    public void setOriginalGameController(final PlayerView player, final IGameController gameController) {
+        super.setOriginalGameController(player, gameController);
+        localPlayer = player; // un seul joueur humain par partie
+    }
+
+    PlayerView localPlayer() {
+        final PlayerView p = localPlayer;
+        if (p != null && getGameView() != null) {
+            // Vue à jour de la partie en cours (même identifiant).
+            for (final PlayerView v : getGameView().getPlayers()) {
+                if (v.getId() == p.getId()) {
+                    return v;
+                }
+            }
+        }
+        return p != null ? p : getCurrentPlayer();
+    }
+
     PlayerControllerHuman controller() {
         final IGameController c = getGameController();
         return c instanceof PlayerControllerHuman h ? h : null;

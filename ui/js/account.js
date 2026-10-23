@@ -1,4 +1,4 @@
-// Compte : pseudo et avatar, et synchronisation des decks, trophées, réglages et de la partie en cours
+// Compte : pseudo et avatar, et synchronisation des decks, trophées, statistiques, réglages et de la partie en cours
 // entre appareils, par un Gist secret sur le compte GitHub du joueur.
 
 import {bridge} from './bridge.js';
@@ -56,6 +56,11 @@ export async function syncNow({auto = false, onDone} = {}) {
     if (r.saveImported) {
       bits.push('partie en cours récupérée');
     }
+    if (r.statsChange > 0) {
+      bits.push(`${r.statsChange} partie(s) ajoutée(s) aux statistiques`);
+    } else if (r.statsChange < 0) {
+      bits.push('statistiques effacées sur un autre appareil');
+    }
     if (!auto || bits.length) {
       toast(bits.length ? bits.join(', ') + '.' : 'Tout est à jour.', {title: 'Compte synchronisé'});
     }
@@ -100,7 +105,7 @@ export class AccountScreen {
 
       <h2>Un seul compte sur tous tes appareils</h2>
       ${p.linked ? `<div class="panel acc-sync">
-          <p>Relié au compte GitHub <b>${esc(p.login || '?')}</b>. Tes decks, tes trophées, tes réglages et la partie en cours sont partagés avec tes autres appareils reliés au même compte.</p>
+          <p>Relié au compte GitHub <b>${esc(p.login || '?')}</b>. Tes decks, tes trophées, tes statistiques, tes réglages et la partie en cours sont partagés avec tes autres appareils reliés au même compte.</p>
           <p class="muted small">Dernière synchronisation : ${esc(last)}. Elle se fait aussi toute seule au démarrage et à la fin de chaque partie.</p>
           <div class="acc-actions"><button class="btn gold" data-sync>⟳ Synchroniser maintenant</button><button class="btn" data-unlink>Délier</button></div>
         </div>` : `<div class="panel acc-sync">

@@ -68,7 +68,7 @@ final class GameSerializer {
         if (gv == null) {
             return state;
         }
-        final PlayerView me = gui.getCurrentPlayer();
+        final PlayerView me = gui.localPlayer();
         final PlayerView turn = gv.getPlayerTurn();
         final PhaseType phase = gv.getPhase();
 
@@ -118,6 +118,9 @@ final class GameSerializer {
         o.addProperty("maxLands", p.hasUnlimitedLandPlay() ? -1 : p.getMaxLandPlay());
         o.addProperty("selectable", gui.isSelectable(p));
         o.addProperty("highlighted", gui.isHighlighted(p));
+        // Joueur dont le joueur local prend les décisions (triche « contrôler »).
+        final PlayerView master = p.getMindSlaveMaster();
+        o.addProperty("controlledByMe", master != null && me != null && master.getId() == me.getId() && p.getId() != me.getId());
 
         final JsonObject mana = new JsonObject();
         for (int i = 0; i < MANA_COLORS.length; i++) {

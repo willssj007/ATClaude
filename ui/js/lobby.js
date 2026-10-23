@@ -1,10 +1,26 @@
 // Salon : préparation d'une partie contre 1 à 3 IA.
 
+import {bracketBadgeHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {confirmBox} from './dialogs.js';
 import {esc, el, prefs, toast, avatarHtml} from './util.js';
 
 const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless: 'Agressive', Experimental: 'Expérimentale'};
+const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
+
+function mulliganHelp(free, count) {
+  if (free === null) {
+    return count > 2 ? 'Règle officielle : le premier mulligan est gratuit, chaque suivant coûte une carte.'
+      : 'Règle officielle : chaque mulligan coûte une carte (on pioche 7, on en remet sous la bibliothèque).';
+  }
+  if (free === -1) {
+    return 'Mulligans illimités : on garde toujours 7 cartes. Vaut pour tous les joueurs, IA comprises.';
+  }
+  if (free === 0) {
+    return 'Aucun mulligan gratuit : chaque mulligan coûte une carte, même à plusieurs. Vaut pour tous les joueurs.';
+  }
+  return `${free === 1 ? 'Le premier mulligan est gratuit' : `Les ${free} premiers mulligans sont gratuits`} (on garde 7 cartes), puis chacun coûte une carte. Vaut pour tous les joueurs.`;
+}
 
 export class Lobby {
   constructor(root, {onStart, getDecks}) {
@@ -16,6 +32,8 @@ export class Lobby {
     this.format = last && last.format || 'commander';
     this.count = last && last.players ? last.players.length : 2;
     this.seats = last && last.players ? last.players : null;
+    // Mulligans gratuits : absent = règle de Forge, -1 = illimités.
+    this.mulligans = last && typeof last.mulligans === 'number' ? last.mulligans : null;
   }
 
   setProfiles(list) {
@@ -73,7 +91,7 @@ export class Lobby {
         <input type="text" data-f="name" value="${esc(s.name)}" maxlength="24" placeholder="Nom">
         ${s.ai ? `<select data-f="profile">${profiles.map(p => `<option value="${esc(p)}"${p === s.profile ? ' selected' : ''}>IA ${esc(PROFILE_LABELS[p] || p)}</option>`).join('')}</select>`
           : '<div class="muted small" style="align-self:center">Vous</div>'}
-        <div class="deck-line"><select data-f="deckKey">${this.deckOptions(s.deckKey)}</select></div>
+        <div class="deck-line"><select data-f="deckKey">${this.deckOptions(s.deckKey)}</select><span class="seat-bk"></span></div>
       </div>
     </div>`).join('');
     this.root.innerHTML = `<div class="page">
@@ -93,6 +111,12 @@ export class Lobby {
               ${[2, 3, 4].map(n => `<button data-v="${n}" class="${this.count === n ? 'on' : ''}">${n}</button>`).join('')}
             </div>
             <div class="muted small">Vous + ${this.count - 1} IA${this.count > 2 ? ', chacun pour soi' : ''}.</div>
+          </div>
+          <div class="field"><span>Mulligans gratuits</span>
+            <div class="seg" data-seg="mulligans">
+              ${MULLIGANS.map(([v, label]) => `<button data-v="${v}" class="${String(this.mulligans) === v ? 'on' : ''}">${label}</button>`).join('')}
+            </div>
+            <div class="muted small">${mulliganHelp(this.mulligans, this.count)}</div>
           </div>
           <button class="btn gold" data-start style="width:100%;min-height:48px;font-size:16px;margin-top:6px">▶ Lancer la partie</button>
           <p class="muted small" style="margin-top:12px">Astuce : les decks préconstruits Commander de Forge sont prêts à jouer. Crée les tiens dans l'onglet Decks, ou importe-les depuis Moxfield.</p>
@@ -114,6 +138,8 @@ export class Lobby {
         this.seats.forEach((s, i) => {
           s.deckKey = this.defaultDeck(i === 0);
         });
+      } else if (seg.dataset.seg === 'mulligans') {
+        this.mulligans = b.dataset.v === 'null' ? null : Number(b.dataset.v);
       } else {
         this.count = Number(b.dataset.v);
       }
@@ -125,11 +151,37 @@ export class Lobby {
         seat[input.dataset.f] = input.value;
         if (input.dataset.f === 'deckKey') {
           this.seatArt(node, seat.deckKey);
+          this.seatBadges();
         }
       }));
       this.seatArt(node, seat.deckKey);
     });
     this.root.querySelector('[data-start]').addEventListener('click', () => this.start());
+    this.seatBadges();
+  }
+
+  /** Bracket et puissance du deck de chaque place : pour composer une table équilibrée. */
+  async seatBadges() {
+    const nodes = [...this.root.querySelectorAll('.seat')];
+    const keys = this.seats.map(s => s.deckKey).filter(k => k && !k.startsWith('random'));
+    nodes.forEach((n, i) => {
+      const k = this.seats[i] && this.seats[i].deckKey;
+      n.querySelector('.seat-bk').innerHTML = !k || k.startsWith('random') ? '<span class="muted small">bracket inconnu</span>' : '';
+    });
+    if (!keys.length) {
+      return;
+    }
+    try {
+      const sums = await bridge.request('deckSummaries', {keys: [...new Set(keys)]});
+      nodes.forEach((n, i) => {
+        const sum = this.seats[i] && sums[this.seats[i].deckKey];
+        if (sum && n.isConnected) {
+          n.querySelector('.seat-bk').innerHTML = bracketBadgeHtml(sum);
+        }
+      });
+    } catch (e) {
+      // pas de pastille
+    }
   }
 
   /** Illustration du commandant du deck choisi, en fond de la place. */
@@ -162,6 +214,9 @@ export class Lobby {
       format: this.format,
       players: this.seats.map(s => ({name: s.name.trim() || (s.ai ? 'IA' : 'Moi'), ai: s.ai, deckKey: s.deckKey, profile: s.ai ? s.profile || '' : ''})),
     };
+    if (this.mulligans !== null) {
+      setup.mulligans = this.mulligans;
+    }
     const names = new Set(setup.players.map(p => p.name));
     if (names.size !== setup.players.length) {
       toast('Donne un nom différent à chaque joueur.', {error: true});

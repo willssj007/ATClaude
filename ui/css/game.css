@@ -209,6 +209,8 @@
 .stat.poison b { color: #8be08b; }
 .stat.cmd b { color: #ffb36b; }
 .stat.lib { cursor: pointer; }
+.stat.hand-of { cursor: pointer; background: rgba(124, 108, 242, 0.35); color: var(--text); }
+.stat.ctrl { background: rgba(124, 108, 242, 0.35); }
 .pile {
   position: relative; width: var(--zone-w); height: calc(var(--zone-w) * 88 / 63); flex: none; cursor: pointer;
   border-radius: 6px; border: 1px dashed rgba(255, 255, 255, 0.15);

@@ -1,5 +1,6 @@
 // Decks : liste, édition (deck builder orienté Commander), import Moxfield ou texte, export.
 
+import {bracketBadgeHtml, openAnalysis, openDeckStats, openEdhrec, summaryLineHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {cardElement, showZoom, onLongPress} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
@@ -59,6 +60,25 @@ function deckTile(d, actionHtml, subtitle) {
     img.src = url;
   }
   return tile;
+}
+
+/** Pastilles bracket / puissance sur des tuiles déjà affichées (calculées en arrière-plan). */
+async function fillBadges(tiles) {
+  const keys = tiles.map(t => t.dataset.key).filter(k => !k.startsWith('random'));
+  if (!keys.length) {
+    return;
+  }
+  try {
+    const sums = await bridge.request('deckSummaries', {keys});
+    for (const t of tiles) {
+      const sum = sums[t.dataset.key];
+      if (sum && t.isConnected && !t.querySelector('.bk-badge')) {
+        t.querySelector('.deck-art').insertAdjacentHTML('beforeend', bracketBadgeHtml(sum));
+      }
+    }
+  } catch (e) {
+    // pas de pastille : l'analyse reste disponible dans l'éditeur
+  }
 }
 
 const ID_COLORS = {W: '#e9e2c4', U: '#3d8fd8', B: '#5d5263', R: '#d9553b', G: '#3c9a5a'};
@@ -128,16 +148,18 @@ export class Decks {
       <div class="deck-list precons"></div>
     </div>`;
     const box = this.root.querySelector('.mine');
-    for (const d of mine) {
-      box.appendChild(deckTile(d, `<button class="btn small gold" data-play>Jouer</button>`,
-        `${d.format === 'commander' ? 'Commander' : 'Construit'} · ${d.count} cartes`));
-    }
+    const mineTiles = mine.map(d => deckTile(d, `<button class="btn small gold" data-play>Jouer</button>`,
+      `${d.format === 'commander' ? 'Commander' : 'Construit'} · ${d.count} cartes`));
+    mineTiles.forEach(t => box.appendChild(t));
+    fillBadges(mineTiles);
     const renderPrecons = (filter = '') => {
       const f = filter.toLowerCase();
       const list = this.root.querySelector('.precons');
-      list.replaceChildren(...this.data.precons
+      const tiles = this.data.precons
         .filter(p => !f || p.name.toLowerCase().includes(f) || (p.commanders || []).some(c => c.toLowerCase().includes(f)))
-        .slice(0, 80).map(p => deckTile(p, '<button class="btn small" data-copy>Copier</button>', 'Préconstruit')));
+        .slice(0, 80).map(p => deckTile(p, '<button class="btn small" data-copy>Copier</button>', 'Préconstruit'));
+      list.replaceChildren(...tiles);
+      fillBadges(tiles);
     };
     renderPrecons();
     this.root.querySelector('.precon-q').addEventListener('input', debounce(e => renderPrecons(e.target.value), 150));
@@ -169,6 +191,7 @@ export class Decks {
 
   edit(deck) {
     this.deck = deck;
+    this.analysis = null;
     this.dirty = false;
     this.root.innerHTML = `<div class="tabs-mobile seg"><button data-tab="left" class="on">Recherche</button><button data-tab="right">Deck</button></div>
       <div class="builder">
@@ -195,6 +218,7 @@ export class Decks {
       right.classList.toggle('mobile-hidden', b.dataset.tab !== 'right');
     });
     this.renderDeck();
+    this.analyze();
     this.search.search(true);
   }
 
@@ -270,7 +294,25 @@ export class Decks {
     this.renderDeck();
     this.search && this.search.refreshCounts();
     this.validate();
+    this.analyze();
   }
+
+  analyze = debounce(async () => {
+    const deck = this.deck;
+    try {
+      const a = await bridge.request('analyzeDeck', {deck});
+      if (deck !== this.deck) {
+        return;
+      }
+      this.analysis = a;
+    } catch (e) {
+      this.analysis = null;
+    }
+    const slot = this.root.querySelector('.analysis-slot');
+    if (slot) {
+      slot.innerHTML = summaryLineHtml(this.analysis);
+    }
+  }, 400);
 
   validate = debounce(async () => {
     try {
@@ -319,11 +361,15 @@ export class Decks {
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
         <button class="btn small gold" data-act="save">Enregistrer</button>
         <button class="btn small" data-act="play">Jouer</button>
+        ${d.format === 'commander' ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
+        <button class="btn small" data-act="analysis">Analyse</button>
+        ${d.previousName ? '<button class="btn small" data-act="stats">Stats</button>' : ''}
         <button class="btn small" data-act="export">Exporter</button>
         <button class="btn small" data-act="import">Importer</button>
         ${d.previousName ? '<button class="btn small danger" data-act="delete">Supprimer</button>' : ''}
       </div>
       <div class="muted small">${d.format === 'commander' ? 'Commander' : 'Construit'} · <b style="color:var(--text)">${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</div>
+      <div class="analysis-slot">${summaryLineHtml(this.analysis)}</div>
       <div class="problems ok">Vérification…</div>
       ${d.format === 'commander' ? `<div class="deck-section"><h4>Commandant</h4>
         <div class="commander-slot">${s.commander.length ? '' : '<span class="muted small">Ajoute une créature légendaire, puis touche ♛ pour en faire le commandant.</span>'}</div></div>` : ''}
@@ -375,6 +421,20 @@ export class Decks {
           if (await this.save()) {
             this.onPlay(this.deck.format + ':' + this.deck.name);
           }
+        } else if (a === 'analysis') {
+          if (this.analysis) {
+            openAnalysis(this.deck, this.analysis);
+          } else {
+            toast('Analyse en cours, réessaie dans un instant.');
+          }
+        } else if (a === 'edhrec') {
+          if (!s.commander.length) {
+            toast('Choisis d\'abord le commandant (♛) : EDHREC donne les cartes jouées avec lui.', {error: true});
+          } else {
+            openEdhrec(s.commander.map(l => l.card), {add: (card) => this.add(card), count: (name) => this.count(name)});
+          }
+        } else if (a === 'stats') {
+          openDeckStats(d.format + ':' + d.previousName, d.previousName);
         } else if (a === 'export') {
           this.exportDialog();
         } else if (a === 'import') {

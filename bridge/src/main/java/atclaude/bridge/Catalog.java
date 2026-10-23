@@ -244,7 +244,7 @@ final class Catalog {
         return o;
     }
 
-    private static String translated(final String name) {
+    static String translated(final String name) {
         final String fr = CardTranslation.getTranslatedName(name);
         return fr == null || fr.isEmpty() ? name : fr;
     }
@@ -499,6 +499,64 @@ final class Catalog {
         o.addProperty("count", deck.getAllCardsInASinglePool(true, false).countAll());
         o.addProperty("identity", identity(deck));
         return o;
+    }
+
+    /** Analyse d'un deck (bracket, puissance, rôles des cartes) : le deck en cours d'édition ou un deck par sa clé. */
+    JsonElement analyze(final JsonObject m) {
+        final Deck deck;
+        final boolean commander;
+        if (m.has("deck") && m.get("deck").isJsonObject()) {
+            final JsonObject json = m.getAsJsonObject("deck");
+            deck = deckFromJson(json, new ArrayList<>());
+            commander = !"constructed".equals(str(json, "format"));
+        } else {
+            final String key = str(m, "key");
+            if (key.isEmpty() || key.startsWith("random")) {
+                throw new IllegalArgumentException("Deck aléatoire : rien à analyser avant la partie.");
+            }
+            deck = deckFromKey(key);
+            commander = !key.startsWith("constructed:");
+        }
+        return DeckAnalyzer.analyze(deck, commander);
+    }
+
+    /** Résumés déjà calculés : clé du deck → (contenu, résumé). */
+    private final Map<String, Object[]> summaries = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Bracket et puissance de plusieurs decks (tuiles, salon). Les decks inchangés ne sont pas réanalysés. */
+    JsonElement deckSummaries(final JsonArray keys) {
+        final JsonObject out = new JsonObject();
+        for (final JsonElement e : keys) {
+            final String key = e.getAsString();
+            if (key.startsWith("random")) {
+                continue;
+            }
+            try {
+                final Deck deck = deckFromKey(key);
+                final List<String> lines = new ArrayList<>();
+                for (final Map.Entry<PaperCard, Integer> c : deck.getAllCardsInASinglePool(true, false)) {
+                    lines.add(c.getKey().getName() + "×" + c.getValue());
+                }
+                java.util.Collections.sort(lines);
+                final String signature = String.join("|", lines);
+                final Object[] hit = summaries.get(key);
+                if (hit != null && hit[0].equals(signature)) {
+                    out.add(key, (JsonObject) hit[1]);
+                    continue;
+                }
+                final JsonObject a = DeckAnalyzer.analyze(deck, !key.startsWith("constructed:"));
+                final JsonObject summary = new JsonObject();
+                summary.add("bracket", a.getAsJsonObject("bracket").deepCopy());
+                summary.getAsJsonObject("bracket").remove("reasons");
+                summary.add("power", a.getAsJsonObject("power").deepCopy());
+                summary.getAsJsonObject("power").remove("factors");
+                summaries.put(key, new Object[]{signature, summary});
+                out.add(key, summary);
+            } catch (final RuntimeException ex) {
+                // deck illisible ou supprimé entre-temps : pas de pastille
+            }
+        }
+        return out;
     }
 
     /** Identité de couleur d'un deck : union des identités de ses cartes, commandant compris. */

@@ -7,9 +7,9 @@ import {esc, el, debounce, rulesHtml} from './util.js';
 const root = () => document.getElementById('dialogs');
 const open = new Map();
 
-function shell({title, message = '', narrow = false, peekable = true}) {
-  const back = el(`<div class="modal-back">
-    <div class="modal${narrow ? ' narrow' : ''}">
+function shell({title, message = '', narrow = false, peekable = true, full = false}) {
+  const back = el(`<div class="modal-back${full ? ' full' : ''}">
+    <div class="modal${narrow ? ' narrow' : ''}${full ? ' full' : ''}">
       <header><h2>${esc(title || 'Choix')}</h2>${peekable ? '<button class="btn small ghost peek-btn" title="Voir le plateau">👁 Plateau</button>' : ''}</header>
       <div class="body">${message ? `<div class="message">${esc(message)}</div>` : ''}</div>
       <footer></footer>
@@ -649,8 +649,8 @@ export function confirmBox(title, message, {yes = 'Oui', no = 'Annuler', danger 
 }
 
 /** Boîte libre : build(body, footer, close) remplit le contenu. */
-export function customBox(title, build, {narrow = false} = {}) {
-  const s = shell({title, narrow, peekable: false});
+export function customBox(title, build, {narrow = false, full = false} = {}) {
+  const s = shell({title, narrow, peekable: false, full});
   s.back.addEventListener('click', (e) => {
     if (e.target === s.back) {
       s.close();

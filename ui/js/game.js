@@ -304,6 +304,11 @@ export class Game {
         this.setHandOpen(true);
         return;
       }
+      const handOf = e.target.closest('[data-hand-of]');
+      if (handOf) {
+        this.openZone(Number(handOf.dataset.handOf), 'hand');
+        return;
+      }
       if (e.target.closest('.me-panel .stat.lib')) {
         this.openZone(0, 'library');
         return;
@@ -864,7 +869,9 @@ export class Game {
     life.classList.toggle('low', p.life <= 10);
     const stats = box.querySelector('.stats');
     let html = '';
-    if (!isMe) {
+    if (!isMe && p.controlledByMe) {
+      html += `<span class="stat ctrl" title="Tu contrôles ce joueur">🎮</span><span class="stat hand-of" data-hand-of="${p.id}" title="Ouvrir sa main">✋ <b>${p.handSize}</b> ▸</span>`;
+    } else if (!isMe) {
       html += `<span class="stat" title="Cartes en main">✋ <b>${p.handSize}</b></span>`;
     }
     html += `<span class="stat lib" data-zone="library" title="Bibliothèque">📚 <b>${p.library}</b></span>`;
@@ -921,7 +928,9 @@ export class Game {
     if (p.input === 'InputPassPriority' && /^Priorit/.test(message)) {
       // Forge répète tour, phase et pile, déjà affichés sur la ligne du milieu : on dit plutôt quoi faire.
       const active = state.players.find(pl => pl.id === state.game.activePlayer);
-      message = state.stack.length ? 'Un sort est sur la pile : réponds ou laisse-le se résoudre.'
+      const ruled = state.players.find(pl => pl.controlledByMe && pl.priority);
+      message = ruled ? `Tu joues pour ${ruled.name} : ${state.stack.length ? 'réponds avec ses cartes ou laisse résoudre.' : 'joue une de ses cartes (✋ sur sa fiche) ou passe.'}`
+        : state.stack.length ? 'Un sort est sur la pile : réponds ou laisse-le se résoudre.'
         : state.game.activePlayer === me.id ? 'À toi : joue une carte ou passe.'
           : `Tour de ${active ? active.name : 'l\'adversaire'} : tu peux répondre ou passer.`;
     }
@@ -1198,9 +1207,20 @@ export class Game {
     }
     // Ouverture automatique quand Forge demande de choisir une carte dans une zone cachée.
     const p = state.prompt || {};
+    // Adversaire contrôlé qui a la priorité pendant son tour, avec des cartes jouables : sa main s'ouvre (une fois par
+    // phase). Sur les autres tours, l'invite suffit : on ouvre sa main soi-même pour lui faire répondre.
+    const ruled = state.players.find(pl => pl.controlledByMe && pl.priority && pl.id === state.game.activePlayer
+      && pl.zones.hand.some(c => c.playable || c.selectable));
+    if (!this.trayZone && ruled) {
+      const k = `${ruled.id}hand${state.game.turn}${state.game.phase}`;
+      if (this.autoTrayKey !== k) {
+        this.autoTrayKey = k;
+        this.trayZone = {pid: ruled.id, zone: 'hand', auto: true};
+      }
+    }
     if (!this.trayZone && p.selectMax > 0) {
       for (const pl of state.players) {
-        for (const zone of ['graveyard', 'exile', 'command']) {
+        for (const zone of pl.controlledByMe ? ['graveyard', 'exile', 'command', 'hand'] : ['graveyard', 'exile', 'command']) {
           if (pl.zones[zone].some(c => c.selectable)) {
             const k = pl.id + zone + p.message;
             if (this.autoTrayKey !== k) {
@@ -1218,12 +1238,12 @@ export class Game {
     }
     const player = state.players.find(pl => pl.id === this.trayZone.pid);
     const cards = player ? player.zones[this.trayZone.zone] : [];
-    if (this.trayZone.auto && !cards.some(c => c.selectable) && !force) {
+    if (this.trayZone.auto && !cards.some(c => c.selectable || (this.trayZone.zone === 'hand' && c.playable)) && !force) {
       this.trayZone = null;
       tray && tray.remove();
       return;
     }
-    const names = {graveyard: 'Cimetière', exile: 'Exil', command: 'Zone de commandement'};
+    const names = {graveyard: 'Cimetière', exile: 'Exil', command: 'Zone de commandement', hand: 'Main'};
     if (!tray) {
       tray = el('<div class="zone-tray"><header><h2></h2><button class="btn small">Fermer</button></header><div class="cards"></div></div>');
       tray.querySelector('header .btn').addEventListener('click', () => {
@@ -1406,6 +1426,10 @@ export class Game {
           <div class="grid-btns"><button class="btn" data-life="-5">−5</button><button class="btn" data-life="-1">−1</button><button class="btn" data-life="1">+1</button><button class="btn" data-life="5">+5</button><button class="btn" data-life="10">+10</button><button class="btn" data-life="20">+20</button></div>
           <div style="display:flex;gap:6px;margin-top:6px"><input type="number" class="life-set" placeholder="Fixer à…" style="flex:1"><button class="btn small" data-life-set>Fixer</button></div>
         </section>
+        <section><h3>Contrôler un adversaire</h3>
+          <p class="muted small">Tu prends toutes ses décisions (sorts, attaques, choix) comme avec Mindslaver, jusqu'à ce que tu le rendes. Sa main s'ouvre depuis sa fiche (✋).</p>
+          <div style="display:flex;flex-direction:column;gap:6px">${state.players.filter(p => !p.me && !p.lost).map(p => `<label class="check"><input type="checkbox" data-control="${p.id}" ${p.controlledByMe ? 'checked' : ''}> Contrôler ${esc(p.name)}</label>`).join('') || '<span class="muted small">Aucun adversaire en jeu.</span>'}</div>
+        </section>
         <section><h3>Tour</h3>
           <div style="display:flex;flex-direction:column;gap:6px">
             <button class="btn" data-cheat="endTurn">Terminer le tour en cours</button>
@@ -1496,6 +1520,9 @@ export class Game {
       }
     });
     drawer.querySelectorAll('[data-toggle]').forEach(i => i.addEventListener('change', () => cheat(i.dataset.toggle, {value: i.checked})));
+    drawer.querySelectorAll('[data-control]').forEach(i => i.addEventListener('change', () => {
+      bridge.send('cheat', {op: 'control', player: Number(i.dataset.control), value: i.checked});
+    }));
   }
 
   // ------------------------------------------------------------------ fin de partie
