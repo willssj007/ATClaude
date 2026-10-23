@@ -59,6 +59,7 @@ async function startMatch(setup) {
   try {
     await bridge.request('startMatch', {setup});
     bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
+    prefetchImages();
   } catch (e) {
     inMatch = false;
     toast(e.message, {title: 'Impossible de lancer la partie', error: true, duration: 8000});
@@ -79,10 +80,18 @@ async function resumeSaved() {
   try {
     await bridge.request('resumeSaved');
     bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
+    prefetchImages();
   } catch (e) {
     inMatch = false;
     toast(e.message, {title: 'Impossible de reprendre la partie', error: true, duration: 8000});
     showScreen('home');
+  }
+}
+
+/** Images du deck téléchargées d'avance (une à la fois, derrière celles que l'écran demande). */
+function prefetchImages() {
+  if (prefs.get('images')) {
+    bridge.send('prefetchImages', {lang: prefs.get('imageLang')});
   }
 }
 

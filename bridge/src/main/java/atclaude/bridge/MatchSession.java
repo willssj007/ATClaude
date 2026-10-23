@@ -323,11 +323,37 @@ final class MatchSession {
                 c.concede();
             }
             case "settings" -> updateSettings(m.getAsJsonObject("settings"));
+            case "prefetchImages" -> prefetchImages(str(m, "lang"));
             case "cheat" -> cheat(c, m);
             case "state" -> gui.markDirty();
             default -> throw new IllegalArgumentException("Action inconnue : " + type);
         }
         return null;
+    }
+
+    /**
+     * Images à télécharger d'avance : tout le deck du joueur (commandant d'abord), puis les commandants adverses.
+     * Les cartes adverses arrivent au fil de la partie, une par une : l'écran les demande quand elles sont jouées.
+     */
+    private void prefetchImages(final String lang) {
+        final Game game = game();
+        final Player me = game == null ? null : humanPlayer(game);
+        if (me == null) {
+            return;
+        }
+        final java.util.LinkedHashSet<String> keys = new java.util.LinkedHashSet<>();
+        final Deck mine = me.getRegisteredPlayer().getDeck();
+        if (mine.has(forge.deck.DeckSection.Commander)) {
+            mine.get(forge.deck.DeckSection.Commander).toFlatList().forEach(pc -> keys.add(pc.getImageKey(false)));
+        }
+        mine.getMain().toFlatList().forEach(pc -> keys.add(pc.getImageKey(false)));
+        for (final Player p : game.getRegisteredPlayers()) {
+            final Deck d = p == me ? null : p.getRegisteredPlayer().getDeck();
+            if (d != null && d.has(forge.deck.DeckSection.Commander)) {
+                d.get(forge.deck.DeckSection.Commander).toFlatList().forEach(pc -> keys.add(pc.getImageKey(false)));
+            }
+        }
+        ImageService.prefetch(new ArrayList<>(keys), lang.isEmpty() ? null : lang);
     }
 
     /**

@@ -11,11 +11,10 @@
   --hand-w0: clamp(62px, calc(26vh * 63 / 88), 124px);
   --hand-w-open: clamp(84px, calc(42vh * 63 / 88), 176px);
   --band: calc(var(--hand-w0) * 88 / 63 * 0.42);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
   position: absolute; inset: 0; display: grid;
   grid-template-columns: var(--rail-l) minmax(0, 1fr) var(--rail-r);
-  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+  /* Jusqu'aux bords à gauche et à droite : seuls les blocs placés devant l'encoche s'en écartent (script). */
+  padding: var(--safe-top) 0 0 0;
   background:
     radial-gradient(ellipse 60% 45% at 50% 50%, rgba(124, 108, 242, 0.11), transparent 70%),
     linear-gradient(180deg, #121022 0%, #0f1424 50%, #0c1020 100%);
@@ -29,6 +28,7 @@
 .row.back > .row { flex: 0 1 auto; padding: 0; height: 100%; }
 .row.back > .spacer { flex: 1 1 0; min-width: 4px; }
 .row.front { justify-content: center; }
+.row.front.wrap { flex-wrap: wrap; align-content: center; row-gap: 4px; }
 .slot {
   --w: var(--bf-w, 64px); --h: calc(var(--w) * 88 / 63);
   position: relative; flex: none; width: var(--w); height: var(--h);
@@ -50,6 +50,7 @@
 .slot.stacked { margin-left: calc(var(--w) * -0.8) !important; }
 .slot.stacked.tapped { margin-left: calc(var(--h) * -0.8) !important; }
 .slot.leaving { pointer-events: none; }
+.table.measuring .slot { transition: none !important; }
 
 /* États d'une carte en jeu */
 .mcard.sick .face::after {
@@ -95,9 +96,10 @@
 .board { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr) var(--band); }
 .half { position: relative; min-height: 0; min-width: 0; }
 /* Taille des cartes : deux rangées par moitié, plafonnée pour que cinq cartes tiennent en largeur. */
+/* --fit (posé par le script) réduit toutes les cartes d'une moitié quand elle est trop pleine. */
 .me-half, .opp-field {
   container-type: size;
-  --bf-w: min(var(--card-max), calc((100cqh - 10px) * 0.5 * 0.9 * 63 / 88), calc(100cqw / 5));
+  --bf-w: calc(min(var(--card-max), calc((100cqh - 10px) * 0.5 * 0.9 * 63 / 88), calc(100cqw / 5)) * var(--fit, 1));
   display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; min-width: 0;
 }
 .me-half > .row.front { align-items: center; }
@@ -166,9 +168,18 @@
 /* ---------- Colonne de gauche : adversaires, puis moi ---------- */
 .side-l {
   --zone-w: min(66px, calc((var(--rail-l) - 30px) / 3));
+  position: relative; container: rail / inline-size;
   display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.18);
 }
+/* Poignée du panneau : glisser pour régler sa largeur, toucher pour passer en compact. */
+.rail-grip {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 16; width: 14px; height: 64px;
+  display: flex; align-items: center; justify-content: center; cursor: ew-resize; touch-action: none;
+}
+.rail-grip::before { content: ""; width: 4px; height: 40px; border-radius: 2px; background: rgba(255, 255, 255, 0.16); transition: background 0.15s; }
+.rail-grip:hover::before, .rail-grip.dragging::before { background: var(--gold); }
+
 .opps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding: 6px; }
 .opp-view { align-self: stretch; justify-content: center; }
 .opp-view button { flex: 1; padding: 3px 6px; font-size: 11px; }
@@ -401,6 +412,7 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
     --hand-w0: clamp(58px, 17vw, 100px); --hand-w-open: clamp(80px, 26vw, 150px);
   }
   .side-l, .side-r { display: contents; }
+  .rail-grip { display: none; }
   .opps { grid-area: opps; flex-direction: row; overflow-x: auto; overflow-y: hidden; }
   .toolbar { grid-area: tools; padding: 6px; align-self: start; }
   .board { grid-area: board; }
@@ -409,4 +421,19 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
   .side-l { --zone-w: 44px; }
   /* La main repliée dépasse sous le plateau : mes infos et les boutons passent devant. */
   .me-panel, .hud-actions { position: relative; z-index: 13; background: var(--bg); }
+}
+
+/* Panneau étroit : piles en deux colonnes, textes et pastilles resserrés. */
+@container rail (max-width: 110px) {
+  .opp-card, .me-panel { --zone-w: calc((100cqw - 26px) / 2); }
+  .zones { grid-template-columns: repeat(2, var(--zone-w)); gap: 5px; }
+  .opps { padding: 4px; }
+  .opp-card { padding: 4px; }
+  .me-panel { padding: 4px 4px calc(4px + var(--safe-bottom)); }
+  .player-hit { gap: 3px; padding-right: 2px; }
+  .player-name { font-size: 11px; }
+  .me-panel .life { font-size: 20px !important; }
+  .opp-card .life { font-size: 16px; }
+  .stat { font-size: 10px; padding: 1px 4px; }
+  .mana-pool .ms { width: 18px; height: 18px; font-size: 9px; }
 }

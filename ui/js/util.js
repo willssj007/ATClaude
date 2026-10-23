@@ -208,3 +208,30 @@ export function translatePrompt(text) {
     return line;
   }).join('\n');
 }
+
+// ------------------------------------------------------------------ encoche de la caméra (Android)
+
+let cutout = {left: 0, top: 0, right: 0, bottom: 0, rects: []};
+
+/** Rectangles occupés par l'encoche, en pixels CSS (vide sans encoche ou hors Android). */
+export function cutoutRects() {
+  return cutout.rects || [];
+}
+
+function applyCutout(c) {
+  cutout = Object.assign({left: 0, top: 0, right: 0, bottom: 0, rects: []}, c || {});
+  const style = document.documentElement.style;
+  for (const side of ['left', 'top', 'right', 'bottom']) {
+    style.setProperty('--cut-' + side, (Number(cutout[side]) || 0) + 'px');
+  }
+  window.dispatchEvent(new Event('cutout'));
+}
+
+window.__atCutout = applyCutout;
+try {
+  if (window.AndroidBridge && window.AndroidBridge.cutout) {
+    applyCutout(JSON.parse(window.AndroidBridge.cutout()));
+  }
+} catch (e) {
+  // pas d'information d'encoche : la page garde ses marges normales
+}

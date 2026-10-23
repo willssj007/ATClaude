@@ -29,8 +29,11 @@
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   --title-font: "Cinzel", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --ui-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Encoche de la caméra : --cut-* viennent de l'application Android (la WebView va jusqu'aux bords). */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--cut-top, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--cut-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--cut-left, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--cut-right, 0px));
   color-scheme: dark;
 }
 
@@ -254,7 +257,7 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 
 #app { height: 100%; display: flex; flex-direction: column; }
 #topbar {
-  display: flex; align-items: center; gap: 16px; padding: calc(8px + var(--safe-top)) 16px 8px;
+  display: flex; align-items: center; gap: 16px; padding: calc(8px + var(--safe-top)) calc(16px + var(--safe-right)) 8px calc(16px + var(--safe-left));
   background: rgba(10, 12, 22, 0.8); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); z-index: 5;
 }
 #topbar .brand { display: flex; align-items: center; gap: 8px; font-family: var(--title-font); font-size: 18px; color: var(--gold-2); }
@@ -264,7 +267,7 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 #nav button.active { color: var(--text); background: rgba(255, 255, 255, 0.07); }
 body.in-game #topbar { display: none; }
 #screens { flex: 1; position: relative; overflow: hidden; }
-.screen { position: absolute; inset: 0; overflow: auto; padding: 20px; display: none; }
+.screen { position: absolute; inset: 0; overflow: auto; padding: 20px calc(20px + var(--safe-right)) 20px calc(20px + var(--safe-left)); display: none; }
 .screen.active { display: block; animation: fade-in 0.2s ease; }
 #screen-game { padding: 0; overflow: hidden; }
 .page { max-width: 1200px; margin: 0 auto; }
@@ -380,7 +383,7 @@ body.in-game #topbar { display: none; }
 /* ---------- Petits écrans ---------- */
 
 @media (max-width: 860px) {
-  .screen { padding: 12px; }
+  .screen { padding: 12px calc(12px + var(--safe-right)) 12px calc(12px + var(--safe-left)); }
   .lobby { grid-template-columns: 1fr; }
   .builder { grid-template-columns: 1fr; height: auto; }
   .builder .left.mobile-hidden, .builder .right.mobile-hidden { display: none; }

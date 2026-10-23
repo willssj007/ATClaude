@@ -95,19 +95,15 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(true);
         web.addJavascriptInterface(new JsApi(), "AndroidBridge");
         web.setWebViewClient(new LocalClient());
-        // Barres système masquées, mais l'encoche de la caméra reste : la page s'arrête à son bord
-        // (sinon des cartes ou des boutons passent dessous en paysage).
+        // Barres système masquées, la page va jusqu'aux bords de l'écran, encoche de la caméra comprise :
+        // elle reçoit la position de l'encoche et n'écarte que ce qui tomberait dessous.
         final FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF0D0F1A);
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                final DisplayCutout cutout = insets.getDisplayCutout();
-                if (cutout != null) {
-                    v.setPadding(cutout.getSafeInsetLeft(), cutout.getSafeInsetTop(), cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
-                } else {
-                    v.setPadding(0, 0, 0, 0);
-                }
+                cutoutJson = describeCutout(insets.getDisplayCutout());
+                web.evaluateJavascript("window.__atCutout && window.__atCutout(" + cutoutJson + ")", null);
             }
             return insets;
         });
@@ -183,10 +179,45 @@ public class MainActivity extends Activity {
     }
 
     /** Messages de l'interface : appelés par la WebView sur un fil à elle. */
+    /** Encoche de la caméra en pixels CSS : marges de sécurité et rectangles occupés. */
+    private static volatile String cutoutJson = "{}";
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.P)
+    private String describeCutout(final DisplayCutout cutout) {
+        final JSONObject o = new JSONObject();
+        try {
+            if (cutout != null) {
+                final float d = getResources().getDisplayMetrics().density;
+                o.put("left", cutout.getSafeInsetLeft() / d);
+                o.put("top", cutout.getSafeInsetTop() / d);
+                o.put("right", cutout.getSafeInsetRight() / d);
+                o.put("bottom", cutout.getSafeInsetBottom() / d);
+                final org.json.JSONArray rects = new org.json.JSONArray();
+                for (final android.graphics.Rect r : cutout.getBoundingRects()) {
+                    final JSONObject j = new JSONObject();
+                    j.put("l", r.left / d);
+                    j.put("t", r.top / d);
+                    j.put("r", r.right / d);
+                    j.put("b", r.bottom / d);
+                    rects.put(j);
+                }
+                o.put("rects", rects);
+            }
+        } catch (final org.json.JSONException e) {
+            return "{}";
+        }
+        return o.toString();
+    }
+
     private static final class JsApi {
         @JavascriptInterface
         public void send(final String json) {
             bridge.receive(json);
+        }
+
+        @JavascriptInterface
+        public String cutout() {
+            return cutoutJson;
         }
 
         @JavascriptInterface

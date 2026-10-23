@@ -9,13 +9,28 @@ import {bridge} from './bridge.js';
 import {cardElement, showZoom, onLongPress} from './cards.js';
 import {confirmBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
-import {esc, el, manaHtml, avatarHtml, PHASES, prefs, toast, debounce, translatePrompt} from './util.js';
+import {esc, el, manaHtml, avatarHtml, cutoutRects, PHASES, prefs, toast, debounce, translatePrompt} from './util.js';
 
 const COUNTER_LABELS = {P1P1: '+1/+1', M1M1: '−1/−1', LOYALTY: 'Loyauté', CHARGE: 'Charge', LORE: 'Histoire', DEFENSE: 'Défense', SHIELD: 'Bouclier', STUN: 'Étourdi', OIL: 'Huile', TIME: 'Temps'};
 const MANA_ORDER = ['W', 'U', 'B', 'R', 'G', 'C'];
+// Panneau de gauche : largeur réglable (px), et largeur du mode compact.
+const RAIL_MIN = 78;
+const RAIL_MAX = 300;
+const RAIL_COMPACT = 86;
 
 function counterLabel(name) {
   return COUNTER_LABELS[name] || name.charAt(0) + name.slice(1).toLowerCase();
+}
+
+/** Marqueurs sur une carte : « +6/+6 » plutôt que « +1/+1 ×6 » pour les marqueurs de force et d'endurance. */
+function counterBadge(name, count) {
+  // Forge les nomme « +1/+1 », « -1/-1 », « +1/+0 »... (ou P1P1 selon les versions).
+  const pt = /^([+-]|[PM])(\d+)\/?([+-]|[PM])(\d+)$/.exec(name);
+  if (pt) {
+    const part = (sign, n) => `${sign === '+' || sign === 'P' ? '+' : '−'}${Number(n) * count}`;
+    return `${part(pt[1], pt[2])}/${part(pt[3], pt[4])}`;
+  }
+  return counterLabel(name) + (count > 1 ? ' ×' + count : '');
 }
 
 function isFront(card) {
@@ -100,6 +115,7 @@ export class Game {
     this.root.innerHTML = '';
     const table = el(`<div class="table" data-opponents="${opponents.length}">
       <div class="side-l">
+        <div class="rail-grip" title="Glisser pour élargir ou rétrécir ce panneau · toucher : compact ou normal"></div>
         <div class="opps">${opponents.length > 1 ? `<div class="opp-view seg" title="Plateaux adverses : un seul à la fois ou tous ensemble">
           <button data-set-view="focus">Un</button><button data-set-view="all">Tous</button></div>` : ''}</div>
         <div class="me-panel">
@@ -173,6 +189,7 @@ export class Game {
     this.root.appendChild(table);
     this.table = table;
     this.board = table.querySelector('.board');
+    this.applyRail(prefs.get('railWidth'));
     this.slots.clear();
     this.handOpen = false;
     this.applySplit(this.split());
@@ -270,6 +287,7 @@ export class Game {
     }, true);
     this.bindHandSwipe(table.querySelector('.hand'));
     this.bindDivider(table.querySelector('.divider'));
+    this.bindRailGrip(table);
 
     table.addEventListener('click', (e) => {
       if (consumed()) {
@@ -393,6 +411,8 @@ export class Game {
       }
     });
 
+    // Le plateau est reconstruit quand les joueurs changent : un seul exemplaire des écouteurs globaux.
+    this.destroy();
     this.keyHandler = (e) => {
       if (!document.body.classList.contains('in-game') || e.target.matches('input, textarea, select')) {
         return;
@@ -418,6 +438,7 @@ export class Game {
       }
       this.stackPanel && this.stackPanel.place();
     }, 120));
+    window.addEventListener('cutout', this.onCutout = () => this.table && this.dodgeCutout());
   }
 
   setHandOpen(open) {
@@ -533,6 +554,7 @@ export class Game {
   destroy() {
     document.removeEventListener('keydown', this.keyHandler);
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('cutout', this.onCutout);
   }
 
   primary() {
@@ -797,7 +819,7 @@ export class Game {
     if (card.counters) {
       const entries = Object.entries(card.counters).filter(([k]) => !(card.planeswalker && k === 'LOYALTY'));
       if (entries.length) {
-        html += `<div class="b-counters">${entries.map(([k, v]) => `<div class="b-counter">${esc(counterLabel(k))}${v > 1 ? ' ×' + v : ''}</div>`).join('')}</div>`;
+        html += `<div class="b-counters">${entries.map(([k, v]) => `<div class="b-counter">${esc(counterBadge(k, v))}</div>`).join('')}</div>`;
       }
     }
     if (onField && card.damage) {
@@ -1007,20 +1029,174 @@ export class Game {
     });
   }
 
-  /** Resserre les cartes d'une rangée trop pleine. */
+  /**
+   * Plateau trop plein : les cartes de chaque moitié rétrécissent ensemble (jusqu'à la moitié de leur taille)
+   * pour que chaque rangée tienne dans sa largeur ; au-delà seulement, elles se chevauchent.
+   * Les mesures se font sans transition, sinon on lirait des largeurs en cours d'animation.
+   */
   fitRows() {
-    for (const row of this.table.querySelectorAll('.row')) {
-      const slots = row.querySelectorAll(':scope > .slot');
-      row.style.setProperty('--squeeze', '0px');
-      if (slots.length < 2) {
-        continue;
+    const table = this.table;
+    table.classList.add('measuring');
+    const slotsOf = (row) => row ? [...row.querySelectorAll(':scope > .slot')] : [];
+    // Largeur occupée par les cartes d'une rangée, d'un bord à l'autre (marges négatives comprises).
+    const extent = (row) => {
+      const s = slotsOf(row);
+      return s.length ? s[s.length - 1].offsetLeft + s[s.length - 1].offsetWidth - s[0].offsetLeft : 0;
+    };
+    const ROW_GAP = 6;
+    const ROW_PAD = 8;
+    table.querySelectorAll('.row').forEach(r => r.style.setProperty('--squeeze', '0px'));
+    for (const half of table.querySelectorAll('.me-half, .opp-field')) {
+      if (!half.offsetWidth) {
+        continue; // plateau adverse masqué
       }
-      const over = row.scrollWidth - row.clientWidth;
-      if (over > 0) {
-        const w = slots[0].offsetWidth;
-        row.style.setProperty('--squeeze', `${-Math.min(w * 0.82, over / (slots.length - 1) + 6)}px`);
+      half.style.setProperty('--fit', '1');
+      const front = half.querySelector(':scope > .row.front');
+      const back = half.querySelector(':scope > .row.back');
+      front && front.classList.remove('wrap');
+      let fit = 1;
+      let frontFit = 1;
+      // Rangée de devant : ses cartes seules. Rangée du fond : non-terrains + terrains, séparés par un vide.
+      const lines = [
+        {avail: front ? front.clientWidth : 0, parts: [front]},
+        {avail: back ? back.clientWidth : 0, parts: back ? [back.querySelector('.nonlands'), back.querySelector('.lands')] : [], extra: 4 + 2 * ROW_GAP},
+      ];
+      for (const line of lines) {
+        const n = line.parts.reduce((a, r) => a + slotsOf(r).length, 0);
+        if (!n || !line.avail) {
+          continue;
+        }
+        const fixed = ROW_PAD + (line.extra || 0) + line.parts.reduce((a, r) => a + Math.max(0, slotsOf(r).length - 1) * ROW_GAP, 0);
+        const scalable = line.parts.reduce((a, r) => a + extent(r), 0) - line.parts.reduce((a, r) => a + Math.max(0, slotsOf(r).length - 1) * ROW_GAP, 0);
+        if (scalable + fixed > line.avail && scalable > 0) {
+          const f = (line.avail - fixed) / scalable;
+          if (line.parts[0] === front) {
+            frontFit = f;
+          } else {
+            fit = Math.min(fit, f);
+          }
+        }
+      }
+      // Créatures trop nombreuses pour une ligne, même réduites de moitié : deux lignes, dans la hauteur que
+      // la réduction a libérée (plus lisible que des cartes qui se chevauchent).
+      const slotH = front && slotsOf(front).length ? Math.max(...slotsOf(front).map(x => x.offsetHeight)) : 0;
+      if (frontFit < 0.5 && slotH) {
+        const byHeight = (front.clientHeight - 8) / (2 * slotH);
+        const twoLines = Math.min(1, byHeight, frontFit * 2 * 0.95);
+        if (twoLines > frontFit) {
+          front.classList.add('wrap');
+          frontFit = twoLines;
+        }
+      }
+      fit = Math.min(fit, frontFit);
+      fit = Math.max(front && front.classList.contains('wrap') ? 0.3 : 0.5, Math.min(1, fit));
+      if (fit < 1) {
+        half.style.setProperty('--fit', fit.toFixed(3));
       }
     }
+    // Toujours trop large à la taille minimale : les cartes se chevauchent.
+    for (const row of table.querySelectorAll('.board .row')) {
+      const slots = slotsOf(row);
+      if (slots.length < 2 || row.classList.contains('back') || row.classList.contains('wrap')) {
+        continue;
+      }
+      const over = extent(row) + (row.parentElement.classList.contains('back') ? 0 : ROW_PAD) - row.clientWidth;
+      if (over > 0) {
+        const w = slots[0].offsetWidth;
+        row.style.setProperty('--squeeze', `${-Math.min(w * 0.82, over / (slots.length - 1) + 2)}px`);
+      }
+    }
+    void table.offsetWidth;
+    table.classList.remove('measuring');
+    this.dodgeCutout();
+  }
+
+  /**
+   * Encoche de la caméra (Android) : le plateau va jusqu'au bord de l'écran ; seuls les blocs des colonnes
+   * qui passeraient dessous s'en écartent.
+   */
+  dodgeCutout() {
+    const holes = cutoutRects();
+    if (!holes.length && !this.dodged) {
+      return;
+    }
+    const blocks = this.table.querySelectorAll('.side-l .opps > *, .side-l .me-panel, .side-r .toolbar, .side-r .hud-actions > *');
+    blocks.forEach(b => {
+      b.style.marginLeft = '';
+      b.style.marginRight = '';
+    });
+    this.dodged = holes.length > 0;
+    const middle = window.innerWidth / 2;
+    blocks.forEach(b => {
+      const r = b.getBoundingClientRect();
+      for (const h of holes) {
+        if (h.t < r.bottom && h.b > r.top && h.l < r.right && h.r > r.left) {
+          if (h.l < middle) {
+            b.style.marginLeft = Math.ceil(h.r - r.left + 4) + 'px';
+          } else {
+            b.style.marginRight = Math.ceil(r.right - h.l + 4) + 'px';
+          }
+        }
+      }
+    });
+  }
+
+  /** Largeur du panneau de gauche (null : largeur normale, selon l'écran). */
+  applyRail(width) {
+    if (width) {
+      this.table.style.setProperty('--rail-l', Math.round(width) + 'px');
+    } else {
+      this.table.style.removeProperty('--rail-l');
+    }
+  }
+
+  /** Poignée du panneau de gauche : on la glisse pour régler sa largeur ; un toucher passe en compact ou revient. */
+  bindRailGrip(table) {
+    const grip = table.querySelector('.rail-grip');
+    const side = table.querySelector('.side-l');
+    if (!grip || !side) {
+      return;
+    }
+    let drag = null;
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      grip.setPointerCapture(e.pointerId);
+      drag = {id: e.pointerId, x: e.clientX, left: side.getBoundingClientRect().left, moved: false, width: null};
+      grip.classList.add('dragging');
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) {
+        return;
+      }
+      if (Math.abs(e.clientX - drag.x) > 6) {
+        drag.moved = true;
+      }
+      if (drag.moved) {
+        drag.width = Math.max(RAIL_MIN, Math.min(RAIL_MAX, e.clientX - drag.left + 6));
+        this.applyRail(drag.width);
+        this.afterResize();
+      }
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) {
+        return;
+      }
+      grip.classList.remove('dragging');
+      if (drag.moved && drag.width) {
+        prefs.set('railWidth', Math.round(drag.width));
+      } else {
+        // Toucher : compact, ou retour à la largeur normale.
+        const compact = side.getBoundingClientRect().width > RAIL_COMPACT + 8;
+        prefs.set('railWidth', compact ? RAIL_COMPACT : null);
+        this.applyRail(compact ? RAIL_COMPACT : null);
+      }
+      drag = null;
+      this.afterResize();
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+    grip.addEventListener('click', (e) => e.stopPropagation());
   }
 
   // ------------------------------------------------------------------ animations
@@ -1180,7 +1356,7 @@ export class Game {
       bits.push(`Blessures marquées : ${card.damage}`);
     }
     if (card.counters) {
-      bits.push('Marqueurs : ' + Object.entries(card.counters).map(([k, v]) => `${counterLabel(k)} ×${v}`).join(', '));
+      bits.push('Marqueurs : ' + Object.entries(card.counters).map(([k, v]) => counterBadge(k, v)).join(', '));
     }
     if (card.sick && card.creature && card.zone === 'battlefield') {
       bits.push('Mal d\'invocation');

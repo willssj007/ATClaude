@@ -28,7 +28,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -119,7 +118,9 @@ final class LocalizedImages {
     static LocalizedImages forLang(final String lang) {
         return BY_LANG.computeIfAbsent(lang, l -> new LocalizedImages(l,
                 new File(ForgeConstants.CACHE_DIR, "pics" + File.separator + "cards-" + l),
-                "https://api.scryfall.com/", ForgeConstants.URL_SCRYFALL_CDN,
+                // Adresses remplaçables pour les essais (faux Scryfall local) ; Scryfall en temps normal.
+                System.getProperty("atclaude.scryfallApi", "https://api.scryfall.com/"),
+                System.getProperty("atclaude.scryfallCdn", ForgeConstants.URL_SCRYFALL_CDN),
                 () -> GuiBase.getInterface().getUserAgent()));
     }
 
@@ -147,10 +148,16 @@ final class LocalizedImages {
         this.cdnPrefix = cdnPrefix;
         this.userAgent = userAgent;
         loadIndex();
-        final Thread worker = new Thread(this::work, "atclaude-images-" + lang);
-        worker.setDaemon(true);
-        worker.start();
+        // Plusieurs recherches à la fois : chacune passe surtout son temps à attendre Scryfall, et le limiteur
+        // global garde l'écart imposé entre deux appels à l'API.
+        for (int i = 0; i < WORKERS; i++) {
+            final Thread worker = new Thread(this::work, "atclaude-images-" + lang + "-" + i);
+            worker.setDaemon(true);
+            worker.start();
+        }
     }
+
+    private static final int WORKERS = Integer.getInteger("atclaude.imageWorkers", 4);
 
     /** Fichier de la face dans ce cache (qu'il existe ou non). */
     File file(final String fileKey) {
@@ -214,13 +221,31 @@ final class LocalizedImages {
         }
     }
 
-    /** Prépare en arrière-plan les images d'un deck (après les demandes de l'écran). */
-    void prefetch(final Collection<String> imageKeys) {
-        for (final String key : imageKeys) {
-            final CardRef ref = ref(key);
-            if (ref != null && !file(ref.fileKey()).isFile()) {
-                submit(ref, false);
-            }
+    /**
+     * Préparation en arrière-plan d'une image (après les demandes de l'écran, qui passent devant) :
+     * attend au plus {@code timeoutMs} et renvoie le résultat.
+     */
+    Outcome prefetch(final String imageKey, final long timeoutMs) {
+        final File f = file(ImageService.fileKey(imageKey));
+        if (f.isFile() && f.length() > 0) {
+            return new Outcome(Status.FOUND, f);
+        }
+        final CardRef ref = ref(imageKey);
+        if (ref == null) {
+            return Outcome.ABSENT;
+        }
+        if (isAbsent(printKey(ref)) && isAbsent(nameKey(ref)) && !named.containsKey(nameKey(ref))) {
+            return Outcome.ABSENT;
+        }
+        try {
+            return submit(ref, false).future.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (final TimeoutException e) {
+            return Outcome.PENDING;
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Outcome.PENDING;
+        } catch (final ExecutionException e) {
+            return Outcome.ERROR;
         }
     }
 

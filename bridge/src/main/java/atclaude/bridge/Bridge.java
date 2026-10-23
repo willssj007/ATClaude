@@ -337,6 +337,7 @@ public final class Bridge {
     void endSession() {
         final MatchSession old = session;
         session = null;
+        ImageService.cancelPrefetch();
         cancelDialogs();
         if (old != null) {
             old.close();
