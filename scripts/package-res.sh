@@ -27,14 +27,9 @@ for f in "$SRC"/*.txt; do
   cp "$f" "$OUT/res/"
 done
 
-# Effets sonores de Forge, et musiques douces de son mode Aventure (Vindsvept, Brandon et Derek Fiechter,
-# Logan Epic Canto) : seulement les morceaux joués par l'application (liste dans bridge/.../Audio.java).
-cp -r "$SRC/sound" "$OUT/res/sound"
-for track in menus/menu1 menus/menu2 town/town1 town/town5 town/town6 town/town7 white/white1 white/white2 \
-             green/green1 green/green2 colorless/waste1 colorless/waste2; do
-  mkdir -p "$OUT/res/adventure/common/music/$(dirname "$track")"
-  cp "$SRC/adventure/common/music/$track.mp3" "$OUT/res/adventure/common/music/$track.mp3"
-done
+# Pas de sons ni de musiques de Forge : ceux de l'application sont dans ui/snd (tools/audio). Le dossier reste,
+# vide, pour Forge qui y cherche ses jeux de sons.
+mkdir -p "$OUT/res/sound"
 
 # Langues : anglais (référence) et français.
 mkdir -p "$OUT/res/languages"

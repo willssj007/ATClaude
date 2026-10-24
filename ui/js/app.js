@@ -359,7 +359,7 @@ function settingsScreen() {
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
         <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>
-        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques (fournies avec Forge, mode Aventure) : Vindsvept (licence Creative Commons Attribution 4.0), Brandon et Derek Fiechter, Logan Epic Canto. Icônes et illustrations des apparences : dessinées pour Arcane Table.</p>
+        <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques, bruitages, icônes et illustrations des apparences : composés, synthétisés et dessinés pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
       </div>`;

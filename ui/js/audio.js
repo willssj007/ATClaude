@@ -1,8 +1,8 @@
 // Musique d'ambiance et effets sonores.
 //
-// Les fichiers viennent de Forge (servis sous audio/) : musiques douces et médiévales du mode Aventure
-// (Vindsvept, Brandon et Derek Fiechter, Logan Epic Canto) pour les menus et la partie, et effets sonores
-// choisis par Forge pour chaque événement de jeu (le pont envoie un message « sound » avec le nom du fichier).
+// Musiques et bruitages composés et générés pour Arcane Table (tools/audio : synthèse d'instruments médiévaux),
+// rangés avec l'interface sous snd/. Forge choisit le bruitage de chaque événement de jeu : le pont envoie un
+// message « sound » avec son nom (« tap.mp3 », « white_blue_land.mp3 »...).
 
 import {bridge} from './bridge.js';
 import {prefs} from './util.js';
@@ -35,16 +35,20 @@ function audioContext() {
   return ctx;
 }
 
-async function audioFiles() {
+function audioFiles() {
   if (!files) {
-    try {
-      files = await bridge.request('audioFiles');
-    } catch (e) {
+    files = fetch('snd/music.json').then(r => r.json()).catch(() => {
       files = null;
-      return {menus: [], match: [], sounds: []};
-    }
+      return {menus: [], match: []};
+    });
   }
   return files;
+}
+
+/** Nom du bruitage : celui de Forge sans extension ; un terrain de plusieurs couleurs sonne comme les autres. */
+function fxName(name) {
+  const base = String(name).replace(/\.(mp3|wav|ogg)$/i, '');
+  return /^(white|blue|black|red|green)_(white|blue|black|red|green)/.test(base) ? 'multi_land' : base;
 }
 
 function shuffle(list) {
@@ -133,7 +137,7 @@ async function playMusic(load) {
     const entry = playlist[track % playlist.length];
     try {
       // Lue depuis un blob : la WebView Android ne passe pas toujours les lectures de médias par le pont.
-      const res = await fetch('audio/' + entry.path.split('/').map(encodeURIComponent).join('/'));
+      const res = await fetch('snd/' + entry.path);
       if (!res.ok) {
         return;
       }
@@ -143,7 +147,7 @@ async function playMusic(load) {
       }
       blobUrl = URL.createObjectURL(blob);
       music.src = blobUrl;
-      gain = Number(entry.gain) || 1;
+      gain = entry.gain === undefined ? 1 : Number(entry.gain) || 1;
     } catch (e) {
       return;
     }
@@ -181,7 +185,7 @@ async function buffer(name) {
   }
   const promise = (async () => {
     try {
-      const res = await fetch('audio/sound/' + encodeURIComponent(name));
+      const res = await fetch('snd/fx/' + encodeURIComponent(name) + '.mp3');
       if (!res.ok) {
         return null;
       }
@@ -195,11 +199,12 @@ async function buffer(name) {
   return promise;
 }
 
-/** Joue un effet sonore de Forge (« tap.mp3 », « draw.mp3 »...). */
-export async function sfx(name, gain = 1) {
-  if (!name || !prefs.get('sfxOn') || !unlocked) {
+/** Joue un bruitage (« tap », « draw.mp3 »...). */
+export async function sfx(raw, gain = 1) {
+  if (!raw || !prefs.get('sfxOn') || !unlocked) {
     return;
   }
+  const name = fxName(raw);
   const now = performance.now();
   if (now - (lastPlayed.get(name) || 0) < 90) {
     return; // plusieurs cartes engagées d'un coup : un seul son

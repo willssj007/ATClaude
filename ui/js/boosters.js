@@ -298,7 +298,7 @@ export function openPack(booster, set, next) {
       // Charge : le paquet tremble de plus en plus, la lumière perce les soudures.
       wrap.classList.remove('idle');
       wrap.classList.add('charging');
-      sfx('shuffle.mp3');
+      sfx('booster_open');
       await Promise.all([request, play(holder, [
         {transform: 'scale(1)'}, {transform: 'scale(1.04) rotate(-2deg)'}, {transform: 'scale(1.06) rotate(2.5deg)'},
         {transform: 'scale(1.09) rotate(-3deg)'}, {transform: 'scale(1.12) rotate(3deg)'}, {transform: 'scale(1.16) rotate(0deg)'},
@@ -408,7 +408,7 @@ export function openPack(booster, set, next) {
           sparks(fx, r.left + r.width / 2 - sr.left, r.top + r.height / 2 - sr.top, kind === 'mythic'
             ? {count: 46, spread: 300, size: 8, colors: ['#fff1c4', '#ffb27a', '#ff7a3a', '#ff4a2a'], life: 1300}
             : {count: 26, spread: 200, size: 6, colors: ['#fff6d8', '#ffe08a', '#f6c04a'], life: 1000});
-          sfx(kind === 'mythic' ? 'planeswalker.mp3' : 'enchant.mp3');
+          sfx(kind === 'mythic' ? 'reveal_mythic' : 'reveal_rare');
           await play(tiltEl, [{transform: 'scale(1.18)'}, {transform: 'scale(1.28)', offset: 0.35}, {transform: 'scale(1)'}],
             {duration: kind === 'mythic' ? 1000 : 700, easing: 'cubic-bezier(.3,1.4,.5,1)'});
           ov.classList.remove('dim');

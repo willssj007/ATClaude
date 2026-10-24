@@ -1,0 +1,38 @@
+{
+ "menus": [
+  {
+   "path": "music/repos.mp3?v=16b6780f19",
+   "title": "Le Repos du Voyageur"
+  },
+  {
+   "path": "music/clairiere.mp3?v=198759a4d5",
+   "title": "La Clairière aux Fées"
+  },
+  {
+   "path": "music/cloitre.mp3?v=7296ba8365",
+   "title": "Le Cloître"
+  },
+  {
+   "path": "music/fete.mp3?v=a15fb66dc5",
+   "title": "La Fête du Village"
+  }
+ ],
+ "match": [
+  {
+   "path": "music/veillee.mp3?v=2b963bb08f",
+   "title": "Veillée d'Armes"
+  },
+  {
+   "path": "music/mages.mp3?v=ac303c4e26",
+   "title": "Le Duel des Mages"
+  },
+  {
+   "path": "music/brumes.mp3?v=4b7eb4cabd",
+   "title": "Les Brumes d'Avalon"
+  },
+  {
+   "path": "music/marche.mp3?v=825c7eafab",
+   "title": "La Marche des Bannières"
+  }
+ ]
+}

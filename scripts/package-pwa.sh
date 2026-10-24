@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Assemble la version iPhone (PWA) : l'interface, le moteur (jars du pont et de Forge, lancés dans la page par
-# CheerpJ), les ressources de Forge (installées dans le navigateur au premier lancement) et les musiques.
+# CheerpJ) et les ressources de Forge (installées dans le navigateur au premier lancement). Musiques et
+# bruitages font partie de l'interface (ui/snd).
 #
 # Usage : scripts/package-pwa.sh DOSSIER_RESSOURCES_FORGE DOSSIER_JARS_WEB VERSION DOSSIER_SORTIE
 #   DOSSIER_RESSOURCES_FORGE : sortie de package-res.sh (contient res/)
@@ -25,10 +26,10 @@ mkdir -p "$OUT/$ENGINE"
 cp "$JARS"/web-*.jar "$OUT/$ENGINE/"
 cp "$JARS"/lib/*.jar "$OUT/$ENGINE/"
 
-# Ressources de Forge, sans les sons ni les musiques (servis tels quels par le site, sous audio/).
+# Ressources de Forge.
 TMP="$(mktemp -d)"
 cp -r "$ASSETS/res" "$TMP/res"
-rm -rf "$TMP/res/sound" "$TMP/res/adventure" "$TMP/res/forge.profile.properties"
+rm -rf "$TMP/res/forge.profile.properties"
 # Empreinte du contenu (pas de l'archive) : une nouvelle version ne réinstalle les cartes que si elles ont changé.
 RES_HASH="$(cd "$TMP" && find res -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16)"
 mkdir -p "$OUT/forge-$RES_HASH"
@@ -36,11 +37,6 @@ mkdir -p "$OUT/forge-$RES_HASH"
 RES_SIZE="$(stat -c %s "$OUT/forge-$RES_HASH/res.zip")"
 rm -rf "$TMP"
 
-mkdir -p "$OUT/audio"
-cp -r "$ASSETS/res/sound" "$OUT/audio/sound"
-if [ -d "$ASSETS/res/adventure" ]; then
-  cp -r "$ASSETS/res/adventure" "$OUT/audio/adventure"
-fi
 
 # Page : CheerpJ (servi par Leaning Technologies) puis le démarrage du moteur, avant l'interface.
 python3 - "$OUT/index.html" <<'PY'
@@ -57,12 +53,13 @@ PY
 sed -i "s/^const VERSION = 'dev';/const VERSION = '$VERSION';/" "$OUT/sw.js"
 grep -q "const VERSION = '$VERSION';" "$OUT/sw.js"
 
-# Fichiers de l'interface gardés par le service worker (pas le moteur, les ressources ni les musiques).
+# Fichiers de l'interface gardés par le service worker à l'installation (pas le moteur, les ressources ni les
+# musiques, gardées une fois écoutées).
 (cd "$OUT" && python3 - "$VERSION" <<'PY'
 import json, os, sys
 files = ['./']
 for root, dirs, names in os.walk('.'):
-    dirs[:] = [d for d in dirs if not d.startswith(('engine-', 'forge-', 'audio'))]
+    dirs[:] = [d for d in dirs if not d.startswith(('engine-', 'forge-')) and os.path.join(root, d) != './snd/music']
     for n in names:
         rel = os.path.join(root, n)[2:]
         if rel in ('sw.js', 'precache.json', 'engine.json', '.nojekyll'):

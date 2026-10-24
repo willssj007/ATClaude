@@ -42,8 +42,26 @@ self.addEventListener('fetch', (event) => {
   if (path.startsWith('engine') || path.startsWith('forge') || path === 'engine.json' || path === 'precache.json') {
     return;
   }
+  if (path.startsWith('snd/music/')) {
+    event.respondWith(music(event.request));
+    return;
+  }
   event.respondWith(shell(event.request));
 });
+
+/** Musiques : gardées d'une version à l'autre une fois écoutées (l'adresse change avec le fichier). */
+async function music(request) {
+  const cache = await caches.open('arcane-music');
+  const hit = await cache.match(request);
+  if (hit) {
+    return hit;
+  }
+  const response = await fetch(request);
+  if (response.ok && response.type === 'basic') {
+    cache.put(request, response.clone());
+  }
+  return response;
+}
 
 /** Interface : depuis le cache de la version, sinon le réseau (et on la garde). */
 async function shell(request) {

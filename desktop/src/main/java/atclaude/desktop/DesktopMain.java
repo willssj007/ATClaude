@@ -33,11 +33,12 @@ import java.util.concurrent.TimeUnit;
  */
 public final class DesktopMain {
 
-    private static final Map<String, String> TYPES = Map.of(
-            "html", "text/html; charset=utf-8", "js", "text/javascript; charset=utf-8",
-            "css", "text/css; charset=utf-8", "svg", "image/svg+xml", "png", "image/png",
-            "jpg", "image/jpeg", "json", "application/json", "webmanifest", "application/manifest+json",
-            "woff2", "font/woff2", "ico", "image/x-icon");
+    private static final Map<String, String> TYPES = Map.ofEntries(
+            Map.entry("html", "text/html; charset=utf-8"), Map.entry("js", "text/javascript; charset=utf-8"),
+            Map.entry("css", "text/css; charset=utf-8"), Map.entry("svg", "image/svg+xml"), Map.entry("png", "image/png"),
+            Map.entry("jpg", "image/jpeg"), Map.entry("json", "application/json"),
+            Map.entry("webmanifest", "application/manifest+json"), Map.entry("woff2", "font/woff2"),
+            Map.entry("ico", "image/x-icon"), Map.entry("mp3", "audio/mpeg"));
 
     /** Un onglet connecté au flux d'événements. */
     private static final class Client {
@@ -71,15 +72,12 @@ public final class DesktopMain {
 
         final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.setExecutor(Executors.newCachedThreadPool());
-        // Musiques et sons fournis avec Forge (res/sound, musiques du mode Aventure).
-        final File res = new File(assets, "res").getCanonicalFile();
         // Seule l'interface servie ici peut parler au moteur : une page web quelconque ouverte dans le navigateur
         // ne doit pas pouvoir envoyer de commandes (relier un compte, synchroniser, jouer...) au serveur local.
         final com.sun.net.httpserver.Filter localOnly = new LocalOnly(port);
         server.createContext("/api/events", DesktopMain::events).getFilters().add(localOnly);
         server.createContext("/api/send", exchange -> send(exchange, bridge)).getFilters().add(localOnly);
         server.createContext("/cardimg", DesktopMain::cardImage).getFilters().add(localOnly);
-        server.createContext("/audio/", exchange -> audio(exchange, res)).getFilters().add(localOnly);
         server.createContext("/", exchange -> serveStatic(exchange, ui)).getFilters().add(localOnly);
         server.start();
 
@@ -155,17 +153,6 @@ public final class DesktopMain {
         exchange.getResponseHeaders().add("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
         exchange.getResponseHeaders().add("Content-Language", img.lang());
         reply(exchange, 200, ImageService.contentType(img.file()), Files.readAllBytes(img.file().toPath()));
-    }
-
-    private static void audio(final HttpExchange exchange, final File res) throws IOException {
-        final String rel = exchange.getRequestURI().getPath().substring("/audio/".length());
-        final File file = new File(res, rel).getCanonicalFile();
-        if (!atclaude.bridge.Audio.servable(rel) || !file.getPath().startsWith(res.getPath() + File.separator) || !file.isFile()) {
-            reply(exchange, 404, "text/plain", new byte[0]);
-            return;
-        }
-        exchange.getResponseHeaders().add("Cache-Control", "max-age=604800");
-        reply(exchange, 200, "audio/mpeg", Files.readAllBytes(file.toPath()));
     }
 
     /** Refuse les requêtes qui ne viennent pas de l'interface locale (autre site, adresse détournée par DNS). */
