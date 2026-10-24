@@ -78,6 +78,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/pwa
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pwa-site
+          path: ${{ runner.temp }}/pwa
+          retention-days: 3
+
       - name: Préparer le paquet ordinateur
         run: |
           mkdir -p dist
@@ -109,14 +115,73 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      - name: GitHub Pages activé ?
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(gh api repos/${{ github.repository }} -q .has_pages)" = "true" ]; then
+            echo "on=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=Version iPhone non publiée::GitHub Pages n'est pas activé. Une seule fois : Settings > Pages > Source « GitHub Actions », puis relancer ce build."
+            echo "on=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: deploy
+        if: steps.pages.outputs.on == 'true'
         uses: actions/deploy-pages@v4
+
+  # Essai de la version iPhone dans Chromium et WebKit (le moteur de Safari) : démarrage de Forge dans la page,
+  # une partie, un second lancement. Rapport et captures sur la branche pwa-test-results.
+  pwa-test:
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: pwa-site
+          path: site
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Navigateurs
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+
+      - name: Essayer la version iPhone
+        run: node scripts/pwa-test.mjs site pwa-test chromium,webkit
+
+      - name: Publier le rapport (branche pwa-test-results)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -d pwa-test ] || exit 0
+          cd pwa-test
+          git init -q -b pwa-test-results
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Essai de la version iPhone (${{ github.sha }})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" pwa-test-results
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pwa-test
+          path: pwa-test
 
   windows:
     needs: apk

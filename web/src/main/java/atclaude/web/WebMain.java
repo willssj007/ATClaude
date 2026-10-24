@@ -85,8 +85,9 @@ public final class WebMain {
         Net.setHandler(new FetchHandler());
         Bridge.setAppVersion(version);
         final WebMain app = new WebMain();
+        // Ce fil reste dans nativeReady : tant qu'il vit, le programme aussi (CheerpJ s'arrête quand il n'y a plus
+        // de fil utilisateur, comme une JVM).
         final Thread js = new Thread(() -> nativeReady(app), "atclaude-js");
-        js.setDaemon(true);
         js.start();
 
         final Thread loader = new Thread(() -> {
@@ -101,6 +102,11 @@ public final class WebMain {
             }
         }, "atclaude-loader");
         loader.start();
+        try {
+            js.join();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static long parseLong(final String s) {
