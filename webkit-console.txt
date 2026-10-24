@@ -1,0 +1,726 @@
+[52] log: Language 'fr-FR' loaded successfully.
+[52] log: 
+
+[52.2] log: (ThreadUtil first call): Running with priority 
+[52.2] log: 5
+[52.2] log: 
+
+[79.9] log: Read cards: 
+[79.9] log: 34131
+[79.9] log:  archived files in 
+[79.9] log: 18
+[79.9] log:  ms (
+[79.9] log: 25
+[79.9] log:  parts) 
+[79.9] log: in same thread
+[79.9] log: 
+
+[136.1] log: Upcoming set Marvel: Darkhold Destiny (MDD) dated in the future. All `upcoming` cards will be added to this set with unknown rarity.
+[136.1] log: 
+
+[136.1] log: The card A-Alrund's Epiphany was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.1] log: 
+
+[136.2] log: The card A-Baba Lysaga, Night Witch was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Divide by Zero was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Esika's Chariot was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Faceless Haven was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Fires of Invention was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Goldspan Dragon was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Hullbreaker Horror was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Kumano Faces Kakkazan was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Luminarch Aspirant was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Monster Manual was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Omnath, Locus of Creation was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-The Meathook Massacre was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card A-Unholy Heat was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.2] log: The card Blinding Radiance was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.2] log: 
+
+[136.3] log: The card Goblin Bruiser was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.3] log: 
+
+[136.3] log: The card Ogre Painbringer was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.3] log: 
+
+[136.3] log: The card Titanic Pelagosaur was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.3] log: 
+
+[136.3] log: The card Treetop Recluse was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[136.3] log: 
+
+[150.8] log: Upcoming set Marvel: Darkhold Destiny (MDD) dated in the future. All `upcoming` cards will be added to this set with unknown rarity.
+[150.8] log: 
+
+[155.8] log: Read cards: 
+[155.8] log: 857
+[155.8] log:  files in 
+[155.8] log: 4
+[155.8] log:  ms (
+[155.8] log: 8
+[155.8] log:  parts) 
+[155.8] log: in same thread
+[155.8] log: 
+
+[210.4] log: java.util.MissingResourceException: Can't find resource for bundle java.util.PropertyResourceBundle, key lblCommanderDraft
+[210.4] log: 
+
+[210.5] log: 	at java.util.ResourceBundle.getObject(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.util.ResourceBundle.getString(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.util.Localizer.lookup(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.GameType.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.GameType.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.GameType.<clinit>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.reflect.Method.invoke(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.Class.getEnumConstantsShared(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.System$2.getEnumConstantsShared(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.util.EnumSet.getUniverse(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.util.EnumSet.noneOf(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.SpellAbilityVariables.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.SpellAbilityCondition.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.SpellAbility.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.Ability.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.AbilityStatic.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.LandAbility.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.updateSpellAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.getSpellAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.getIntrinsicSpellAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.getFirstAbility(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.Card.getAbilityText(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardView$CardStateView.updateAbilityText(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardView$CardStateView.updateKeywords(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardView.updateState(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.Card.updateStateForView(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardFactory.buildAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.lambda$steps$5(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe$$Lambda$306.call(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.step(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.steps(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.warmUp(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.WebMain$$Lambda$58.run(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.bridge.ForgeRuntime.init(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.WebMain.lambda$main$3(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.WebMain$$Lambda$54.run(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.Thread.run(Unknown Source)
+[210.5] log: 
+
+[210.5] log: INVALID PROPERTY: 'lblCommanderDraft' -- Translation missing from fr_FR
+[210.5] log: 
+
+[210.5] log: java.util.MissingResourceException: Can't find resource for bundle java.util.PropertyResourceBundle, key lblCommanderDraftDesc
+[210.5] log: 
+
+[210.5] log: 	at java.util.ResourceBundle.getObject(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.util.ResourceBundle.getString(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.util.Localizer.lookup(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.GameType.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.GameType.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.GameType.<clinit>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.reflect.Method.invoke(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.Class.getEnumConstantsShared(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.System$2.getEnumConstantsShared(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.util.EnumSet.getUniverse(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.util.EnumSet.noneOf(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.SpellAbilityVariables.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.SpellAbilityCondition.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.SpellAbility.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.Ability.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.AbilityStatic.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.spellability.LandAbility.<init>(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.updateSpellAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.getSpellAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.getIntrinsicSpellAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardState.getFirstAbility(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.Card.getAbilityText(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardView$CardStateView.updateAbilityText(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardView$CardStateView.updateKeywords(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardView.updateState(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.Card.updateStateForView(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardFactory.buildAbilities(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.lambda$steps$5(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe$$Lambda$306.call(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.step(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.steps(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.Probe.warmUp(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.WebMain$$Lambda$58.run(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.bridge.ForgeRuntime.init(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.WebMain.lambda$main$3(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at atclaude.web.WebMain$$Lambda$54.run(Unknown Source)
+[210.5] log: 
+
+[210.5] log: 	at java.lang.Thread.run(Unknown Source)
+[210.5] log: 
+
+[210.5] log: INVALID PROPERTY: 'lblCommanderDraftDesc' -- Translation missing from fr_FR
+[210.5] log: 
+
+[211.7] log: Forge prêt.
+[211.7] log: 
+
+[229.4] error: Message refusé par le moteur Java code still running, check for a missing 'await'
+[840] log: Language 'fr-FR' loaded successfully.
+[840] log: 
+
+[840.1] log: (ThreadUtil first call): Running with priority 
+[840.1] log: 5
+[840.1] log: 
+
+[868.1] log: Read cards: 
+[868.1] log: 34131
+[868.1] log:  archived files in 
+[868.1] log: 18
+[868.1] log:  ms (
+[868.1] log: 25
+[868.1] log:  parts) 
+[868.1] log: in same thread
+[868.1] log: 
+
+[927.4] log: Upcoming set Marvel: Darkhold Destiny (MDD) dated in the future. All `upcoming` cards will be added to this set with unknown rarity.
+[927.4] log: 
+
+[927.4] log: The card A-Alrund's Epiphany was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.4] log: 
+
+[927.5] log: The card A-Baba Lysaga, Night Witch was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Divide by Zero was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Esika's Chariot was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Faceless Haven was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Fires of Invention was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Goldspan Dragon was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Hullbreaker Horror was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Kumano Faces Kakkazan was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Luminarch Aspirant was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Monster Manual was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Omnath, Locus of Creation was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-The Meathook Massacre was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card A-Unholy Heat was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card Blinding Radiance was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.5] log: The card Goblin Bruiser was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.5] log: 
+
+[927.6] log: The card Ogre Painbringer was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.6] log: 
+
+[927.6] log: The card Titanic Pelagosaur was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.6] log: 
+
+[927.6] log: The card Treetop Recluse was not assigned to any set. Adding it to UNKNOWN set... to fix see res/editions/ folder. 
+[927.6] log: 
+
+[942.4] log: Upcoming set Marvel: Darkhold Destiny (MDD) dated in the future. All `upcoming` cards will be added to this set with unknown rarity.
+[942.4] log: 
+
+[947.5] log: Read cards: 
+[947.5] log: 857
+[947.5] log:  files in 
+[947.5] log: 3
+[947.5] log:  ms (
+[947.5] log: 8
+[947.5] log:  parts) 
+[947.5] log: in same thread
+[947.5] log: 
+
+[1000.2] log: java.util.MissingResourceException: Can't find resource for bundle java.util.PropertyResourceBundle, key lblCommanderDraft
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.ResourceBundle.getObject(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.ResourceBundle.getString(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.util.Localizer.lookup(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.GameType.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.GameType.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.GameType.<clinit>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.reflect.Method.invoke(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.Class.getEnumConstantsShared(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.System$2.getEnumConstantsShared(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.EnumSet.getUniverse(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.EnumSet.noneOf(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.SpellAbilityVariables.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.SpellAbilityCondition.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.SpellAbility.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.Ability.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.AbilityStatic.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.LandAbility.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.updateSpellAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.getSpellAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.getIntrinsicSpellAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.getFirstAbility(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.Card.getAbilityText(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardView$CardStateView.updateAbilityText(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardView$CardStateView.updateKeywords(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardView.updateState(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.Card.updateStateForView(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardFactory.buildAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.Probe.lambda$steps$5(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.Probe$$Lambda$305.call(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.Probe.step(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.Probe.steps(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.Probe.warmUp(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.WebMain$$Lambda$57.run(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.bridge.ForgeRuntime.init(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.WebMain.lambda$main$3(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at atclaude.web.WebMain$$Lambda$54.run(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.Thread.run(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: INVALID PROPERTY: 'lblCommanderDraft' -- Translation missing from fr_FR
+[1000.2] log: 
+
+[1000.2] log: java.util.MissingResourceException: Can't find resource for bundle java.util.PropertyResourceBundle, key lblCommanderDraftDesc
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.ResourceBundle.getObject(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.ResourceBundle.getString(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.util.Localizer.lookup(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.util.Localizer.getMessage(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.GameType.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.GameType.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.GameType.<clinit>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.reflect.Method.invoke(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.Class.getEnumConstantsShared(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.lang.System$2.getEnumConstantsShared(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.EnumSet.getUniverse(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at java.util.EnumSet.noneOf(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.SpellAbilityVariables.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.SpellAbilityCondition.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.SpellAbility.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.Ability.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.AbilityStatic.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.spellability.LandAbility.<init>(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.updateSpellAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.getSpellAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.getIntrinsicSpellAbilities(Unknown Source)
+[1000.2] log: 
+
+[1000.2] log: 	at forge.game.card.CardState.getFirstAbility(Unknown Source)
+[1000.2] log: 
+
+[1000.3] log: 	at forge.game.card.Card.getAbilityText(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.CardView$CardStateView.updateAbilityText(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.CardView$CardStateView.updateKeywords(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.CardView.updateState(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.Card.updateStateForView(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.CardFactory.buildAbilities(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at forge.game.card.CardFactory.getCard(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.Probe.lambda$steps$5(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.Probe$$Lambda$305.call(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.Probe.step(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.Probe.steps(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.Probe.warmUp(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.WebMain$$Lambda$57.run(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.bridge.ForgeRuntime.init(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.WebMain.lambda$main$3(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at atclaude.web.WebMain$$Lambda$54.run(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: 	at java.lang.Thread.run(Unknown Source)
+[1000.3] log: 
+
+[1000.3] log: INVALID PROPERTY: 'lblCommanderDraftDesc' -- Translation missing from fr_FR
+[1000.3] log: 
+
+[1001.4] log: Forge prêt.
+[1001.4] log: 

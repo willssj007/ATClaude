@@ -1,0 +1,13 @@
+== concaténation : a1bc2.5true
+== concaténation avec null : Error in Card X with Keyword null
+== split : etbCounter | P1P1 | X | no Condition | CARDNAME enters with X +1/+1 counters on it, where X is the total toughness of other creatures you control.
+== mot-clé : forge.game.keyword.SimpleKeyword /  / etbCounter:P1P1:X:no Condition:CARDNAME enters with X +1/+1 counters on it, where X is the total toughness of other creatures you control.
+== corps de keywordsToText (etbCounter) : CARDNAME enters with X +1/+1 counters on it, where X is the total toughness of other creatures you control. (1)
+== carte Forest : → 
+== carte Llanowar Elves : → 
+== carte Serra Angel : → 
+== carte Towering Titan : → 
+== keywordsToText (réflexion) : CARDNAME enters with X +1/+1 counters on it, where X is the total toughness of other creatures you control.
+
+
+
