@@ -199,6 +199,15 @@ async function run(name) {
           }
           await page.waitForTimeout(1500);
         }
+        if (!r.steps.main) {
+          // Partie figée : où en est chaque fil Java.
+          const threads = await Promise.race([
+            page.evaluate(() => window.AT_WEB && window.AT_WEB.threads ? window.AT_WEB.threads() : 'AT_WEB.threads absent'),
+            new Promise((resolve) => setTimeout(() => resolve('pas de réponse en 60 s'), 60_000)),
+          ]).catch((e) => 'erreur : ' + e.message);
+          fs.writeFileSync(path.join(OUT, `${name}-threads.txt`), String(threads));
+          r.steps.threads = `${name}-threads.txt`;
+        }
         await page.waitForTimeout(20_000);
         r.steps.images = await page.evaluate(() => ({
           cards: document.querySelectorAll('.table .mcard:not(.back)').length,

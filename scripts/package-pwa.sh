@@ -27,6 +27,42 @@ mkdir -p "$OUT/$ENGINE/lib"
 cp "$JARS"/web-*.jar "$OUT/$ENGINE/"
 cp "$JARS"/lib/*.jar "$OUT/$ENGINE/lib/"
 
+# Java 11 dans le navigateur : celle de CheerpJ est la plus aboutie (son Java 17 n'est qu'un aperçu, et Forge s'y
+# plantait en créant les cartes). Les jars compilés pour Java 17 (Forge, le pont, ce module) sont convertis par
+# JvmDowngrader ; ses classes de remplacement des API Java 12 à 17 vont dans lib/jvmdg-api.jar.
+JVMDG_VERSION=2.0.1
+JVMDG_SHA256=60a5bd57846fb4be1756fb93e6f63b3d9a63c2759a63e763c44553b086326107
+JVMDG="${XDG_CACHE_HOME:-$HOME/.cache}/atclaude/jvmdowngrader-$JVMDG_VERSION-all.jar"
+if [ ! -f "$JVMDG" ]; then
+  mkdir -p "$(dirname "$JVMDG")"
+  curl -fsSL -o "$JVMDG.part" \
+    "https://repo1.maven.org/maven2/xyz/wagyourtail/jvmdowngrader/jvmdowngrader/$JVMDG_VERSION/jvmdowngrader-$JVMDG_VERSION-all.jar"
+  echo "$JVMDG_SHA256  $JVMDG.part" | sha256sum -c --quiet -
+  mv "$JVMDG.part" "$JVMDG"
+fi
+ENGINE_CP="$(ls "$OUT/$ENGINE"/web-*.jar "$OUT/$ENGINE"/lib/*.jar | tr '\n' ':')"
+DOWN="$(mktemp -d)"
+for jar in "$OUT/$ENGINE"/web-*.jar "$OUT/$ENGINE"/lib/*.jar; do
+  # Classe la plus récente du jar (hors variantes Multi-Release, que Java 11 ne lit pas au-delà de 11).
+  MAJOR="$(python3 - "$jar" <<'PY'
+import sys, zipfile
+best = 0
+with zipfile.ZipFile(sys.argv[1]) as z:
+    for n in z.namelist():
+        if n.endswith('.class') and not n.startswith('META-INF/'):
+            head = z.open(n).read(8)
+            best = max(best, int.from_bytes(head[6:8], 'big'))
+print(best)
+PY
+)"
+  if [ "$MAJOR" -gt 55 ]; then
+    java -jar "$JVMDG" --classVersion 55 downgrade --classpath "$ENGINE_CP" --target "$jar" "$DOWN/$(basename "$jar")"
+    mv "$DOWN/$(basename "$jar")" "$jar"
+  fi
+done
+rm -rf "$DOWN"
+java -jar "$JVMDG" --classVersion 55 debug downgradeApi "$OUT/$ENGINE/lib/jvmdg-api.jar"
+
 # Ressources de Forge.
 TMP="$(mktemp -d)"
 cp -r "$ASSETS/res" "$TMP/res"
@@ -75,7 +111,8 @@ python3 - "$OUT/engine.json" "$VERSION" "$ENGINE" "forge-$RES_HASH/res.zip" "$RE
 import json, sys
 out, version, engine, res, res_hash, res_size = sys.argv[1:7]
 jars = """$JARS_JSON""".split()
-json.dump({'version': version, 'engine': engine, 'jars': jars, 'res': res, 'resHash': res_hash, 'resSize': int(res_size)},
+json.dump({'version': version, 'java': 11, 'engine': engine, 'jars': jars, 'res': res, 'resHash': res_hash,
+           'resSize': int(res_size)},
           open(out, 'w'), indent=1)
 PY
 

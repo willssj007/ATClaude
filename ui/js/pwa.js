@@ -40,6 +40,10 @@
       deliver = fn;
       early.splice(0).forEach(fn);
     },
+    // Diagnostic : où en est chaque fil Java (partie figée...).
+    threads() {
+      return app ? app.threads() : Promise.resolve('Moteur pas encore prêt.');
+    },
   };
 
   function engineReady(timeoutMs) {
@@ -146,7 +150,9 @@
     if (navigator.storage && navigator.storage.persist) {
       navigator.storage.persist().catch(() => {});
     }
-    await cheerpjInit({version: 17, status: 'none', natives});
+    // Java 11 : celle de CheerpJ est la plus aboutie (Java 17 n'y est qu'en aperçu, et Forge s'y plantait en
+    // créant les cartes). Le build convertit Forge pour elle (scripts/package-pwa.sh).
+    await cheerpjInit({version: manifest.java || 17, status: 'none', natives});
     emit({type: 'loading', text: 'Démarrage du moteur Forge…', percent: -1});
     // /app/ est la racine du serveur : le site peut être dans un sous-dossier (GitHub Pages : /ATClaude/).
     const site = '/app' + new URL('.', location.href).pathname;

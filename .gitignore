@@ -14,3 +14,4 @@ android/app/src/main/assets/
 android/local.properties
 windows/bin/
 windows/obj/
+.jvmdg/

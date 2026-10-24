@@ -7,6 +7,7 @@ import atclaude.bridge.Net;
 import com.google.gson.JsonObject;
 
 import java.io.File;
+import java.util.Map;
 
 /**
  * Version iPhone (PWA) : Forge tourne dans la page, sur la machine Java de CheerpJ (WebAssembly).
@@ -73,6 +74,22 @@ public final class WebMain {
         o.addProperty("cacheable", img.cacheable());
         o.addProperty("type", ImageService.contentType(img.file()));
         return o.toString();
+    }
+
+    /** Pile d'appels de chaque fil Java, pour comprendre un blocage (depuis la page : AT_WEB.threads()). */
+    public String threads() {
+        final StringBuilder sb = new StringBuilder();
+        try {
+            for (final Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+                sb.append('"').append(e.getKey().getName()).append("\" ").append(e.getKey().getState()).append('\n');
+                for (final StackTraceElement el : e.getValue()) {
+                    sb.append("    at ").append(el).append('\n');
+                }
+            }
+        } catch (final RuntimeException | Error e) {
+            sb.append("Piles indisponibles : ").append(e);
+        }
+        return sb.toString();
     }
 
     public static void main(final String[] args) {
