@@ -116,7 +116,9 @@ public final class WebMain {
             try {
                 final File assets = ResInstall.ensure(site + resPath, new File(ROOT + "forge"), resHash, resSize,
                         percent -> app.bridge.notifyLoading("Installation des cartes dans le navigateur (une seule fois)…", percent));
-                ForgeRuntime.init(app.bridge, new ForgeRuntime.Paths(assets.getPath(), ROOT + "data", ROOT + "cache"), false);
+                // Mise en route avant d'annoncer Forge prêt : voir Probe.warmUp.
+                ForgeRuntime.init(app.bridge, new ForgeRuntime.Paths(assets.getPath(), ROOT + "data", ROOT + "cache"), false,
+                        Probe::warmUp);
                 System.out.println("Forge prêt.");
             } catch (final Throwable e) {
                 e.printStackTrace();

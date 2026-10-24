@@ -48,7 +48,7 @@ const android = typeof window.AndroidBridge !== 'undefined';
 const web = !android && typeof window.AT_WEB !== 'undefined';
 // Ordinateur : les images viennent de « localhost » et l'interface de « 127.0.0.1 ». Le navigateur limite les
 // connexions par adresse (6) ; des images lentes à télécharger ne retiennent ainsi jamais les requêtes du moteur.
-const IMAGE_BASE = !android && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
+const IMAGE_BASE = !android && !web && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
 
 function post(message) {
   const json = JSON.stringify(message);

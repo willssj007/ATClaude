@@ -15,9 +15,15 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * Diagnostic de la version iPhone : rejoue pas à pas, hors partie, ce que fait Forge en créant une carte, et note
- * chaque erreur en entier (depuis la page : AT_WEB.probe()). Sert à comprendre ce que la machine Java du
- * navigateur fait autrement qu'une vraie JVM.
+ * Création de cartes pas à pas, hors partie, pour la machine Java du navigateur (CheerpJ).
+ *
+ * <p>Mise en route ({@link #warmUp}) : quand la première partie était la première à créer des cartes, CheerpJ s'y
+ * trompait (plantage dans Card.keywordsToText sous WebKit, partie figée sous Chromium) — sans doute parce que
+ * plusieurs fils préparaient en même temps les mêmes classes de Forge. Créées une fois ici, sur un seul fil,
+ * avant d'annoncer Forge prêt, la partie se déroule normalement.
+ *
+ * <p>Diagnostic ({@link #run}, depuis la page : AT_WEB.probe()) : les mêmes étapes, avec le résultat ou l'erreur
+ * complète de chacune.
  */
 final class Probe {
 
@@ -25,11 +31,20 @@ final class Probe {
             + "where X is the total toughness of other creatures you control.";
 
     private final StringBuilder out = new StringBuilder();
+    private final boolean quiet;
+
+    private Probe(final boolean quiet) {
+        this.quiet = quiet;
+    }
 
     static String run() {
-        final Probe p = new Probe();
+        final Probe p = new Probe(false);
         p.steps();
         return p.out.toString();
+    }
+
+    static void warmUp() {
+        new Probe(true).steps();
     }
 
     private void steps() {
@@ -95,7 +110,14 @@ final class Probe {
     }
 
     private void step(final String label, final Callable<Object> body) {
-        System.out.println("[sonde] " + label);
+        if (quiet) {
+            try {
+                body.call();
+            } catch (final Throwable t) {
+                System.err.println("Mise en route (" + label + ") : " + t);
+            }
+            return;
+        }
         out.append("== ").append(label).append(" : ");
         try {
             out.append(body.call());

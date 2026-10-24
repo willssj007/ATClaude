@@ -53,6 +53,14 @@ public final class ForgeRuntime {
      * @param desktop vrai sur ordinateur ; faux sur Android, où Forge charge les cartes autrement.
      */
     public static synchronized void init(final Bridge bridge, final Paths paths, final boolean desktop) {
+        init(bridge, paths, desktop, null);
+    }
+
+    /**
+     * @param beforeReady travail fait une fois Forge chargé, avant de l'annoncer prêt à l'interface (peut être null).
+     */
+    public static synchronized void init(final Bridge bridge, final Paths paths, final boolean desktop,
+                                         final Runnable beforeReady) {
         if (ready) {
             return;
         }
@@ -118,6 +126,9 @@ public final class ForgeRuntime {
         });
         French.prebuildVariantMappings();
         ImageService.onLateImage = key -> bridge.sendEvent("imageReady", m -> m.addProperty("key", key));
+        if (beforeReady != null) {
+            beforeReady.run();
+        }
         status = "Prêt";
         ready = true;
         bridge.sendEvent("ready", m -> m.addProperty("version", version()));

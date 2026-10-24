@@ -157,12 +157,6 @@ async function run(name) {
     await memory('ready');
     r.steps.firstLaunch.shot = await shot('accueil');
     if (r.steps.firstLaunch.ok) {
-      // Sonde : création de cartes pas à pas, hors partie (diagnostic de la machine Java du navigateur).
-      const probe = await Promise.race([
-        page.evaluate(() => window.AT_WEB && window.AT_WEB.probe ? window.AT_WEB.probe() : 'AT_WEB.probe absent'),
-        new Promise((resolve) => setTimeout(() => resolve('pas de réponse en 3 min'), 180_000)),
-      ]).catch((e) => 'erreur : ' + e.message);
-      fs.writeFileSync(path.join(OUT, `${name}-probe.txt`), String(probe));
       // Une partie : Sandbox, salon, partie rapide à deux joueurs.
       const g0 = Date.now();
       try {
@@ -175,16 +169,17 @@ async function run(name) {
         r.steps.table.prompt = (await page.textContent('.prompt')).replace(/\s+/g, ' ').trim().slice(0, 160);
         r.steps.table.promptAfter = Math.round((Date.now() - g0) / 1000);
         r.steps.table.shot = await shot('partie');
-        // Garder sa main, jouer, passer : jusqu'à la phase principale (ou 4 minutes).
+        // Garder sa main puis passer : phase principale, puis 3 minutes de plus pour laisser l'IA jouer
+        // quelques tours (4 minutes au plus sans atteindre la phase principale).
         const m0 = Date.now();
-        while (Date.now() - m0 < 4 * 60_000) {
-          const main = await page.evaluate(() => {
+        while (Date.now() - m0 < (r.steps.main ? r.steps.main.seconds * 1000 - (m0 - g0) + 3 * 60_000 : 4 * 60_000)) {
+          const main = !r.steps.main && await page.evaluate(() => {
             const now = document.querySelector('.phases .ph.now');
             return !!now && /principale/i.test(now.title || '') && !document.querySelector('#dialogs .modal-back');
           });
           if (main) {
             r.steps.main = {seconds: Math.round((Date.now() - g0) / 1000)};
-            break;
+            await shot('principale');
           }
           const gold = await page.$('#dialogs footer .btn.gold:not([disabled])');
           if (gold) {
@@ -226,6 +221,12 @@ async function run(name) {
         r.steps.gameError = String(e.message || e).split('\n')[0];
         await shot('partie-erreur');
       }
+      // Sonde, après la partie : création de cartes pas à pas (diagnostic de la machine Java du navigateur).
+      const probe = await Promise.race([
+        page.evaluate(() => window.AT_WEB && window.AT_WEB.probe ? window.AT_WEB.probe() : 'AT_WEB.probe absent'),
+        new Promise((resolve) => setTimeout(() => resolve('pas de réponse en 3 min'), 180_000)),
+      ]).catch((e) => 'erreur : ' + e.message);
+      fs.writeFileSync(path.join(OUT, `${name}-probe.txt`), String(probe));
       // Deuxième lancement : les ressources sont déjà dans le navigateur.
       await page.reload({waitUntil: 'domcontentloaded'});
       r.steps.secondLaunch = await boot('second');
