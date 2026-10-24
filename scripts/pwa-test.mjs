@@ -92,7 +92,7 @@ const SITE_URL = `http://127.0.0.1:${PORT}${PREFIX}`;
 // ------------------------------------------------------------------ essai d'un navigateur
 
 async function run(name) {
-  const r = {browser: name, steps: {}, loading: [], errors: [], failed: [], memory: {}};
+  const r = {browser: name, steps: {}, loading: [], errors: [], failed: [], memory: {}, dialogs: []};
   const t0 = Date.now();
   const ts = () => Math.round((Date.now() - t0) / 100) / 10;
   const consoleLines = [];
@@ -182,6 +182,14 @@ async function run(name) {
           }
           const gold = await page.$('#dialogs footer .btn.gold:not([disabled])');
           if (gold) {
+            // Ce que dit la fenêtre (choix, mulligan... ou plantage de Forge) avant de la valider.
+            const text = await page.evaluate(() => {
+              const box = document.querySelector('#dialogs .modal-back:last-child') || document.querySelector('#dialogs');
+              return (box ? box.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 300);
+            }).catch(() => '');
+            if (text && r.dialogs[r.dialogs.length - 1] !== text) {
+              r.dialogs.push(text);
+            }
             await gold.click().catch(() => {});
           } else {
             const ok = await page.$('.ok-btn:not(.hidden):not([disabled])');
@@ -195,6 +203,7 @@ async function run(name) {
         r.steps.images = await page.evaluate(() => ({
           cards: document.querySelectorAll('.table .mcard:not(.back)').length,
           withImage: document.querySelectorAll('.table .mcard.has-img').length,
+          turn: ((document.querySelector('.table') || {}).textContent || '').match(/Tour\s*(\d+)/)?.[1] || '?',
         }));
         await memory('game');
         r.steps.gameShot = await shot('partie-2');
@@ -244,7 +253,7 @@ for (const r of report.results) {
     md.push(`- Phase principale atteinte en ${s.main.seconds} s`);
   }
   if (s.images) {
-    md.push(`- Images : ${s.images.withImage} / ${s.images.cards} cartes affichées avec leur image`);
+    md.push(`- Tour ${s.images.turn} ; images : ${s.images.withImage} / ${s.images.cards} cartes affichées avec leur image`);
   }
   if (s.gameError) {
     md.push(`- Erreur pendant la partie : ${s.gameError}`);
@@ -253,6 +262,9 @@ for (const r of report.results) {
     md.push(`- Second lancement : ${s.secondLaunch.ok ? `prêt en ${s.secondLaunch.seconds} s` : `échec (${s.secondLaunch.error})`}`);
   }
   md.push(`- Mémoire JS : ${JSON.stringify(r.memory)}`, `- Erreurs de page : ${r.errors.length}, requêtes en échec : ${r.failed.length}`, '');
+  if (r.dialogs.length) {
+    md.push('Fenêtres validées pendant la partie :', '', ...r.dialogs.slice(0, 20).map(d => `- ${d}`), '');
+  }
   md.push('Chargement :', '', '```', ...r.loading.slice(0, 80), '```', '');
 }
 fs.writeFileSync(path.join(OUT, 'report.md'), md.join('\n'));

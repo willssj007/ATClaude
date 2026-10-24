@@ -2,6 +2,7 @@ package atclaude.bridge;
 
 import forge.gui.GuiBase;
 import forge.gui.interfaces.IProgressBar;
+import forge.localinstance.properties.ForgeConstants;
 import forge.localinstance.properties.ForgePreferences.FPref;
 import forge.model.FModel;
 import forge.util.BuildInfo;
@@ -108,6 +109,10 @@ public final class ForgeRuntime {
             // Effets sonores : Forge choisit le son de chaque événement, l'interface le joue.
             prefs.setPref(FPref.UI_ENABLE_SOUNDS, "true");
             prefs.setPref(FPref.UI_ALT_SOUND_SYSTEM, "false");
+            // Pas d'enregistrement des parties (replays de Forge) : l'application ne les montre pas, et chaque
+            // événement de la partie y serait sérialisé puis compressé (dans le navigateur, la partie s'y bloquait).
+            prefs.setPref(FPref.UI_RECORD_REPLAYS, "false");
+            new File(ForgeConstants.USER_PREFS_DIR).mkdirs();
             prefs.save();
             return null;
         });

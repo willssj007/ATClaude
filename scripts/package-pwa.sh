@@ -20,11 +20,12 @@ mkdir -p "$OUT"
 cp -r "$UI"/. "$OUT"/
 touch "$OUT/.nojekyll"
 
-# Moteur : dossier propre à la version (le navigateur ne mélange jamais deux versions).
+# Moteur : dossier propre à la version (le navigateur ne mélange jamais deux versions). Les bibliothèques
+# restent dans lib/, là où le manifeste du jar web les annonce (CheerpJ les y cherche aussi).
 ENGINE="engine-$VERSION"
-mkdir -p "$OUT/$ENGINE"
+mkdir -p "$OUT/$ENGINE/lib"
 cp "$JARS"/web-*.jar "$OUT/$ENGINE/"
-cp "$JARS"/lib/*.jar "$OUT/$ENGINE/"
+cp "$JARS"/lib/*.jar "$OUT/$ENGINE/lib/"
 
 # Ressources de Forge.
 TMP="$(mktemp -d)"
@@ -69,7 +70,7 @@ json.dump(sorted(files), open('precache.json', 'w'))
 PY
 )
 
-JARS_JSON="$(cd "$OUT/$ENGINE" && ls web-*.jar; ls | grep -v '^web-' | sort)"
+JARS_JSON="$(cd "$OUT/$ENGINE" && ls web-*.jar; ls lib | sort | sed 's|^|lib/|')"
 python3 - "$OUT/engine.json" "$VERSION" "$ENGINE" "forge-$RES_HASH/res.zip" "$RES_HASH" "$RES_SIZE" <<PY
 import json, sys
 out, version, engine, res, res_hash, res_size = sys.argv[1:7]
