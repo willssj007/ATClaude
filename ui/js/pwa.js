@@ -44,6 +44,9 @@
     threads() {
       return app ? app.threads() : Promise.resolve('Moteur pas encore prêt.');
     },
+    probe() {
+      return app ? app.probe() : Promise.resolve('Moteur pas encore prêt.');
+    },
   };
 
   function engineReady(timeoutMs) {

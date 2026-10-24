@@ -157,6 +157,12 @@ async function run(name) {
     await memory('ready');
     r.steps.firstLaunch.shot = await shot('accueil');
     if (r.steps.firstLaunch.ok) {
+      // Sonde : création de cartes pas à pas, hors partie (diagnostic de la machine Java du navigateur).
+      const probe = await Promise.race([
+        page.evaluate(() => window.AT_WEB && window.AT_WEB.probe ? window.AT_WEB.probe() : 'AT_WEB.probe absent'),
+        new Promise((resolve) => setTimeout(() => resolve('pas de réponse en 3 min'), 180_000)),
+      ]).catch((e) => 'erreur : ' + e.message);
+      fs.writeFileSync(path.join(OUT, `${name}-probe.txt`), String(probe));
       // Une partie : Sandbox, salon, partie rapide à deux joueurs.
       const g0 = Date.now();
       try {

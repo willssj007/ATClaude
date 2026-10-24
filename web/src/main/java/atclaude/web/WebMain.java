@@ -92,6 +92,11 @@ public final class WebMain {
         return sb.toString();
     }
 
+    /** Diagnostic : création de cartes pas à pas, hors partie (voir {@link Probe}). */
+    public String probe() {
+        return Probe.run();
+    }
+
     public static void main(final String[] args) {
         final String site = args.length > 0 ? args[0] : "/app/";
         final String version = args.length > 1 ? args[1] : "";
