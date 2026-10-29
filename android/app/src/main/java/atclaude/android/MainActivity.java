@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -259,6 +260,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String cutout() {
             return cutoutJson;
+        }
+
+        /** « any » : écrans des decks, qu'on peut tenir en portrait ; sinon paysage, comme au lancement. */
+        @JavascriptInterface
+        public void setOrientation(final String mode) {
+            final MainActivity activity = current;
+            if (activity != null) {
+                activity.ui.post(() -> activity.setRequestedOrientation("any".equals(mode)
+                        ? ActivityInfo.SCREEN_ORIENTATION_SENSOR : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE));
+            }
         }
 
         @JavascriptInterface

@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class ArtChoices {
 
-    private static final Set<String> KEYS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> KEYS = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static volatile boolean loaded;
 
     private ArtChoices() { }

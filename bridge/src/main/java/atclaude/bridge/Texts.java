@@ -75,7 +75,7 @@ final class Texts {
         }
         final BridgeGuiGame gui = BridgeGuiGame.current();
         final boolean visible = gui != null && gui.mayView(c) && !c.isFaceDown();
-        final Set<String> names = KNOWN.computeIfAbsent(c.getId(), k -> ConcurrentHashMap.newKeySet());
+        final Set<String> names = KNOWN.computeIfAbsent(c.getId(), k -> Collections.newSetFromMap(new ConcurrentHashMap<>()));
         final int before = names.size();
         addName(names, c.getName());
         addName(names, c.getOracleName());

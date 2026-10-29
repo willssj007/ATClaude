@@ -16,10 +16,15 @@ import forge.localinstance.properties.ForgeConstants;
 import forge.util.ImageUtil;
 import forge.util.ScryfallRateLimiter;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.HttpURLConnection;
@@ -27,6 +32,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -145,7 +151,7 @@ final class LocalizedImages {
     /** Nom de carte (+ face) → image trouvée par la recherche, réutilisée pour ses autres impressions (persisté). */
     private final Map<String, String> named = new ConcurrentHashMap<>();
     /** Fichiers trouvés dans une autre impression de la langue (illustration différente) : écartés pour une impression choisie. */
-    private final Set<String> fallback = ConcurrentHashMap.newKeySet();
+    private final Set<String> fallback = Collections.newSetFromMap(new ConcurrentHashMap<>());
     /** Face → date de la dernière erreur passagère (en mémoire seulement). */
     private final Map<String, Long> errors = new ConcurrentHashMap<>();
     private final Map<String, Task> inflight = new ConcurrentHashMap<>();
@@ -499,7 +505,7 @@ final class LocalizedImages {
         dest.getParentFile().mkdirs();
         final File tmp = new File(dest.getPath() + ".tmp");
         try (InputStream in = c.getInputStream()) {
-            Files.copy(in, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Io.copy(in, tmp);
         }
         if (tmp.length() == 0) {
             tmp.delete();
@@ -524,7 +530,7 @@ final class LocalizedImages {
         if (!indexFile.isFile()) {
             return;
         }
-        try (Reader r = Files.newBufferedReader(indexFile.toPath(), StandardCharsets.UTF_8)) {
+        try (Reader r = new BufferedReader(new InputStreamReader(new FileInputStream(indexFile), StandardCharsets.UTF_8))) {
             final JsonObject o = JsonParser.parseReader(r).getAsJsonObject();
             if (o.has("absent")) {
                 o.getAsJsonObject("absent").entrySet().forEach(e -> absent.put(e.getKey(), e.getValue().getAsLong()));
@@ -554,7 +560,7 @@ final class LocalizedImages {
         try {
             dir.mkdirs();
             final File tmp = new File(dir, "_index.json.tmp");
-            try (Writer w = Files.newBufferedWriter(tmp.toPath(), StandardCharsets.UTF_8)) {
+            try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8))) {
                 w.write(o.toString());
             }
             Files.move(tmp.toPath(), indexFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

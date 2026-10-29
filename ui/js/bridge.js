@@ -1,5 +1,6 @@
 // Communication avec le pont Java.
 // - Android : la WebView expose window.AndroidBridge.send() et appelle window.__atReceive(json).
+// - iPhone et iPad : window.webkit.messageHandlers.atclaude.postMessage(json), réponses par window.__atReceive.
 // - Ordinateur : flux Server-Sent Events sur /api/events et POST sur /api/send.
 
 const listeners = new Map();
@@ -44,6 +45,9 @@ function receive(json) {
 }
 
 const android = typeof window.AndroidBridge !== 'undefined';
+// iPhone et iPad : l'application native (WKWebView) reçoit les messages par window.webkit.messageHandlers.
+const iosHandlers = !android && window.webkit && window.webkit.messageHandlers;
+const ios = !!(iosHandlers && iosHandlers.atclaude);
 // Ordinateur : les images viennent de « localhost » et l'interface de « 127.0.0.1 ». Le navigateur limite les
 // connexions par adresse (6) ; des images lentes à télécharger ne retiennent ainsi jamais les requêtes du moteur.
 const IMAGE_BASE = !android && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
@@ -54,12 +58,17 @@ function post(message) {
     window.AndroidBridge.send(json);
     return;
   }
+  if (ios) {
+    iosHandlers.atclaude.postMessage(json);
+    return;
+  }
   fetch('api/send', {method: 'POST', body: json, headers: {'Content-Type': 'application/json'}})
     .catch(() => emit('connection', {type: 'connection', connected: false}));
 }
 
 export const bridge = {
   android,
+  ios,
 
   /** Écoute un type de message ('state', 'dialog', 'notice'...), ou '*' pour tous. */
   on(type, fn) {
@@ -89,7 +98,7 @@ export const bridge = {
   },
 
   connect() {
-    if (android) {
+    if (android || ios) {
       window.__atReceive = receive;
       window.__atReceiveMany = (list) => list.forEach(receive);
       connected = true;
@@ -114,8 +123,22 @@ export const bridge = {
   openUrl(url) {
     if (android && window.AndroidBridge.openUrl) {
       window.AndroidBridge.openUrl(url);
+    } else if (ios) {
+      iosHandlers.atclaudeUrl.postMessage(url);
     } else {
       window.open(url, '_blank');
+    }
+  },
+
+  /**
+   * Orientation permise sur téléphone et tablette : 'landscape' (partout par défaut) ou 'any' (écrans des decks,
+   * qu'on peut tenir en portrait). Sans effet sur ordinateur.
+   */
+  orientation(mode) {
+    if (android && window.AndroidBridge.setOrientation) {
+      window.AndroidBridge.setOrientation(mode);
+    } else if (ios && iosHandlers.atclaudeOrientation) {
+      iosHandlers.atclaudeOrientation.postMessage(mode);
     }
   },
 

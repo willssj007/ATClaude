@@ -34,6 +34,7 @@ import forge.player.GamePlayerUtil;
 import forge.player.PlayerControllerHuman;
 import forge.util.ITriggerEvent;
 
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -73,9 +74,9 @@ final class MatchSession {
 
     private volatile boolean holdPriority;
     private volatile boolean autoPassNoActions = true;
-    private final Set<PhaseType> myStops = ConcurrentHashMap.newKeySet();
-    private final Set<PhaseType> theirStops = ConcurrentHashMap.newKeySet();
-    private final Set<Integer> seenStackItems = ConcurrentHashMap.newKeySet();
+    private final Set<PhaseType> myStops = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<PhaseType> theirStops = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<Integer> seenStackItems = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private volatile boolean closed;
 
     private JsonObject setup;
@@ -210,6 +211,10 @@ final class MatchSession {
                 bridge.sendEvent("resumed", m -> { });
                 gui.markDirty();
             });
+        } else if (commander) {
+            // Au début du premier tour, sur le fil de la partie : posé depuis un autre fil pendant les mulligans,
+            // l'effet croisait parfois Forge en train de remplir les zones (plantage dans GameAction.moveTo).
+            match.setStartGameHook(() -> noCommanderDamageLoss(match.getGame()));
         }
         gui.attach(session);
         match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
@@ -231,9 +236,6 @@ final class MatchSession {
                 session.markCheated(game);
             }
         }
-        if (commander && game != null) {
-            game.getAction().invoke(() -> noCommanderDamageLoss(game));
-        }
         session.applyYieldPrefs();
         return session;
     }
@@ -247,6 +249,15 @@ final class MatchSession {
      * carte Mine, Mine, Mine! le fait pour la bibliothèque vide). Sans effet si la partie en a déjà (reprise).
      */
     static void noCommanderDamageLoss(final Game game) {
+        try {
+            addNoCommanderDamageLoss(game);
+        } catch (final RuntimeException e) {
+            // Règle maison : sans elle la partie continue (avec la règle normale des 21 blessures).
+            e.printStackTrace();
+        }
+    }
+
+    private static void addNoCommanderDamageLoss(final Game game) {
         for (final Player p : game.getPlayers()) {
             boolean present = false;
             for (final Card c : p.getCardsIn(ZoneType.Command)) {

@@ -68,7 +68,7 @@ final class StreamImageFetcher extends ImageFetcher {
         final File tmp = new File(target + ".tmp");
         dest.getParentFile().mkdirs();
         try (InputStream in = connection.getInputStream()) {
-            Files.copy(in, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Io.copy(in, tmp);
         }
         Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
         return true;

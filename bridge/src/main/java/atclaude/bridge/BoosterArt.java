@@ -135,7 +135,7 @@ final class BoosterArt {
         dest.getParentFile().mkdirs();
         final File tmp = new File(dest.getPath() + ".tmp");
         try (InputStream in = c.getInputStream()) {
-            Files.copy(in, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Io.copy(in, tmp);
         }
         if (tmp.length() == 0) {
             tmp.delete();

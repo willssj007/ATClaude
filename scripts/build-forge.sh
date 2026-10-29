@@ -23,7 +23,8 @@ VERSION="$(cd "$FORGE_DIR" && mvn -B -q help:evaluate -Dexpression=project.versi
 VERSION="${VERSION:-2.0.16-SNAPSHOT}"
 for module in forge forge-core forge-game forge-ai forge-gui; do
   pom="$HOME/.m2/repository/forge/$module/$VERSION/$module-$VERSION.pom"
-  [ -f "$pom" ] && sed -i "s/\${revision}/$VERSION/g" "$pom"
+  # -i.bak : accepté par le sed GNU (Linux) comme par celui de macOS.
+  [ -f "$pom" ] && sed -i.bak "s/\${revision}/$VERSION/g" "$pom" && rm -f "$pom.bak"
 done
 rm -rf "$HOME/.m2/repository/forge/forge/\${revision}"
 echo "Forge $VERSION installé depuis $FORGE_DIR"
