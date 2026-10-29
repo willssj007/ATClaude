@@ -155,7 +155,38 @@ final class Career {
         if (c.has("starter")) {
             o.addProperty("starter", str(c, "starter"));
         }
+        o.add("cosmetics", array(c, "cosmetics").deepCopy());
+        o.addProperty("cosmeticPrice", COSMETIC_PRICE);
         return o;
+    }
+
+    /** Prix en mana d'une apparence mythique à acheter (fond, dos de cartes). */
+    static final int COSMETIC_PRICE = 3000;
+
+    /** Achète une apparence (« menu:nebula », « back:rune »...) avec du mana ; elle reste acquise. */
+    static synchronized JsonObject buyCosmetic(final Catalog catalog, final String id) {
+        final JsonObject c = load();
+        if (!bool(c, "started")) {
+            throw new IllegalStateException("Les apparences s'achètent avec le mana du mode Planeswalker : commence d'abord ta carrière.");
+        }
+        if (id == null || !id.matches("[a-z]+:[a-z0-9-]+")) {
+            throw new IllegalArgumentException("Apparence inconnue.");
+        }
+        final JsonArray owned = array(c, "cosmetics");
+        for (final JsonElement e : owned) {
+            if (id.equals(e.getAsString())) {
+                return summary(catalog);
+            }
+        }
+        final long mana = num(c, "mana");
+        if (mana < COSMETIC_PRICE) {
+            throw new IllegalStateException("Il te faut " + COSMETIC_PRICE + " mana (tu en as " + mana + "). Chaque duel gagné en rapporte " + WIN_MANA + ".");
+        }
+        c.addProperty("mana", mana - COSMETIC_PRICE);
+        owned.add(id);
+        c.add("cosmetics", owned);
+        save(c);
+        return summary(catalog);
     }
 
     /** Préconstruits proposés pour commencer : ceux de bracket 2, du moins puissant au plus puissant. */

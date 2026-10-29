@@ -49,6 +49,14 @@ function showScreen(name) {
   if (screen && screen.show) {
     screen.show();
   }
+  sendPresence();
+}
+
+/** Ordinateur : l'écran et le mode en cours, pour la présence Discord (la partie, elle, est suivie par le moteur). */
+function sendPresence() {
+  if (!bridge.android && !bridge.ios) {
+    bridge.send('presence', {screen: current, mode: isPlaneswalker() ? 'planeswalker' : 'sandbox', enabled: !!prefs.get('discordPresence')});
+  }
 }
 
 /** Mode de jeu : navigation, mana affiché, écrans. */
@@ -360,6 +368,7 @@ function settingsScreen() {
         <div class="row"><div><b>Volume des effets</b></div><input type="range" min="0" max="100" data-pref-range="sfxVolume"></div>
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
+        ${bridge.android || bridge.ios ? '' : row('discordPresence', 'Montrer ma partie sur Discord', 'Si Discord est ouvert sur cet ordinateur, ton profil affiche ton mode, ton deck, tes points de vie et le tour.')}
         <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>
         <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques, bruitages, icônes et illustrations des apparences : composés, synthétisés et dessinés pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
@@ -387,6 +396,9 @@ function settingsScreen() {
         }
         if (inMatch && (i.dataset.pref === 'holdPriority' || i.dataset.pref === 'autoPass')) {
           bridge.send('settings', {settings: {[i.dataset.pref]: i.checked}});
+        }
+        if (i.dataset.pref === 'discordPresence') {
+          sendPresence();
         }
       }));
       bridge.request('hello').then(h => {
@@ -571,7 +583,7 @@ function init() {
   bridge.on('resumed', () => game && game.resumed());
   bridge.on('openUrl', (m) => bridge.openUrl(m.url));
   bridge.on('incorrectAction', () => {
-    const p = document.querySelector('.prompt');
+    const p = document.querySelector('.table .actions');
     if (p) {
       p.classList.remove('shake');
       void p.offsetWidth;

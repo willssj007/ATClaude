@@ -47,6 +47,12 @@ public final class DesktopMain {
 
     private static final List<Client> CLIENTS = new CopyOnWriteArrayList<>();
 
+    /**
+     * Application Discord d'Arcane Table (Discord › Developer Portal › Applications) : son nom est celui que montre le
+     * profil (« Joue à … »). Vide : pas de présence Discord, sauf -Datclaude.discordId ou ATCLAUDE_DISCORD_ID.
+     */
+    private static final String DISCORD_APP_ID = "1565444479274459317";
+
     private DesktopMain() { }
 
     public static void main(final String[] args) throws IOException {
@@ -69,6 +75,11 @@ public final class DesktopMain {
                 c.queue.offer(json);
             }
         });
+        // Présence riche Discord : ce que fait le joueur s'affiche sur son profil (si Discord est ouvert).
+        final String discordId = DiscordRpc.configuredId(DISCORD_APP_ID);
+        if (!discordId.isEmpty()) {
+            atclaude.bridge.Presence.setSink(new DiscordRpc(discordId));
+        }
 
         final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.setExecutor(Executors.newCachedThreadPool());

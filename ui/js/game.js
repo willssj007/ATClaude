@@ -10,6 +10,7 @@ import {cardElement, hoverCard, onLongPress, showZoom} from './cards.js';
 import {fillRewardCards, rewardHtml} from './career.js';
 import {confirmBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
+import {boardFx} from './themes.js';
 import {icon} from './icons.js';
 import {esc, el, manaHtml, avatarHtml, ownPhotoUrl, cutoutRects, PHASES, prefs, rulesHtml, toast, debounce, translatePrompt} from './util.js';
 
@@ -84,11 +85,15 @@ const CARD_STATUS = {
   RING: {icon: 'ring', label: 'Porteur de l\'Anneau'},
 };
 const PLAYER_KEYWORDS = {Hexproof: 'Défense talismanique', Shroud: 'Linceul', 'Protection from everything': 'Protection contre tout'};
-// Panneaux de côté : largeur réglable (px), largeur du mode compact, réglage gardé sur l'appareil.
-const RAILS = {
-  l: {min: 78, max: 300, compact: 86, pref: 'railWidth', side: '.side-l'},
-  r: {min: 112, max: 360, compact: 124, pref: 'railWidthR', side: '.side-r'},
-};
+
+/** Pose une propriété CSS seulement si elle change (chaque écriture fait recalculer le style de ce qu'il y a dessous). */
+function setProp(node, prop, value) {
+  node._props = node._props || {};
+  if (node._props[prop] !== value) {
+    node._props[prop] = value;
+    node.style.setProperty(prop, value);
+  }
+}
 
 function counterLabel(name) {
   // Forge nomme ses marqueurs « Loyalty », « Charge »... (majuscule puis minuscules).
@@ -213,9 +218,10 @@ export class Game {
 
   // ------------------------------------------------------------------ squelette
 
-  // Disposition (paysage) : à gauche les adversaires puis mes infos et mes zones, au centre un plateau
-  // commun (adversaire en haut, moi en bas, séparés par une ligne qu'on peut glisser pour agrandir un
-  // côté), ma main qui dépasse en bas, et à droite les outils, l'invite et les boutons.
+  // Disposition façon Arena : le plateau prend tout l'écran, sans panneau de côté. L'adversaire en haut, moi en bas,
+  // séparés par une ligne (tour, phases, outils) qu'on peut glisser pour agrandir un côté. Chaque joueur a une petite
+  // plaque posée sur son plateau, entre ses terrains et ses autres permanents (la place lui est réservée : elle ne
+  // cache jamais de carte). En bas : mes piles à gauche, ma main au milieu, l'invite et les boutons à droite.
   build(state) {
     const me = state.players.find(p => p.me) || state.players[0];
     const opponents = this.opponentsOf(state, me);
@@ -223,52 +229,47 @@ export class Game {
       this.focusPid = opponents.length ? opponents[0].id : null;
     }
     this.root.innerHTML = '';
+    const pile = (zone, ic, title, cls = '') => `<div class="pile ${cls}" data-zone="${zone}" data-pid="${me.id}" title="${title}"><div class="label">${icon(ic)}</div></div>`;
     const table = el(`<div class="table" data-opponents="${opponents.length}">
-      <div class="side-l">
-        <div class="rail-grip l" title="Glisser pour élargir ou rétrécir ce panneau · toucher : compact ou normal"></div>
-        <div class="opps">${opponents.length > 1 ? `<div class="opp-view seg" title="Plateaux adverses : un seul à la fois ou tous ensemble">
-          <button data-set-view="focus">Un</button><button data-set-view="all">Tous</button></div>` : ''}</div>
-        <div class="me-panel">
-          <div class="line">
-            <div class="player-hit" data-pid="${me.id}">${avatarHtml(me.name, 0, 34, ownPhotoUrl())}<div class="life"></div></div>
-            <div class="mana-pool"></div>
-          </div>
-          <div class="stats"></div>
-          <div class="zones">
-            <div class="pile" data-zone="graveyard" data-pid="${me.id}"><div class="label">${icon('graveyard')}<span>Cimet.</span></div></div>
-            <div class="pile" data-zone="exile" data-pid="${me.id}"><div class="label">${icon('exile')}<span>Exil</span></div></div>
-            <div class="pile command" data-zone="command" data-pid="${me.id}"><div class="label">${icon('crown')}<span>Cmdt</span></div></div>
-          </div>
-        </div>
-      </div>
       <div class="board">
         <div class="half opp-half"></div>
         <div class="divider" title="Glisser pour agrandir un côté du plateau · double-touche : moitié-moitié">
-          <div class="turn-label"></div><div class="phases"></div><div class="div-end"><span class="grip">⇕</span></div>
+          <div class="div-start"><div class="turn-label"></div></div>
+          <div class="phases"></div>
+          <div class="div-end">
+            <span class="pill-host"></span>
+            ${opponents.length > 1 ? `<button class="tool" data-set-view="all">${icon('cards')}</button>` : ''}
+            <button class="tool" data-open="cheat" title="Menu de triche">${icon('wand')}</button>
+            <button class="tool" data-open="log" title="Journal de la partie">${icon('scroll')}</button>
+            <button class="tool" data-open="menu" title="Menu">${icon('menu')}</button>
+          </div>
         </div>
         <div class="half me-half">
           <div class="row front"></div>
-          <div class="row back"><div class="nonlands row"></div><div class="spacer"></div><div class="lands row"></div></div>
+          <div class="row back"><div class="nonlands row"></div><div class="spacer"><div class="plates">
+            <div class="plate me" data-pid="${me.id}">
+              <div class="player-hit" data-pid="${me.id}">${avatarHtml(me.name, 0, 34, ownPhotoUrl())}<div class="life"></div></div>
+              <div class="info"><div class="mana-pool"></div><div class="stats"></div></div>
+            </div>
+          </div></div><div class="lands row"></div></div>
         </div>
-        <div class="hand-band"><div class="hand"></div>
+        <div class="hand-band">
+          <div class="my-piles">
+            <div class="pile lib" data-zone="library" data-pid="${me.id}" title="Bibliothèque (touche pour la voir)"><div class="mcard back"><div class="face"></div></div><div class="seen">${icon('eye')}</div></div>
+            ${pile('graveyard', 'graveyard', 'Cimetière')}
+            ${pile('exile', 'exile', 'Exil')}
+            ${pile('command', 'crown', 'Zone de commandement', 'command')}
+          </div>
+          <div class="hand"></div>
           <div class="hand-scroller"><button class="btn small ghost" data-hs="-1" title="Cartes précédentes">${icon('chevronLeft')}</button><input type="range" min="0" max="1000" value="0" aria-label="Faire défiler la main"><button class="btn small ghost" data-hs="1" title="Cartes suivantes">${icon('chevronRight')}</button></div>
         </div>
       </div>
-      <div class="side-r">
-        <div class="rail-grip r" title="Glisser pour élargir ou rétrécir ce panneau · toucher : compact ou normal"></div>
-        <div class="toolbar">
-          <button class="btn small" data-open="cheat" title="Menu de triche">${icon('wand')}<span class="lbl"> Triche</span></button>
-          <button class="btn small" data-open="log" title="Journal de la partie">${icon('scroll')}</button>
-          <button class="btn small" data-open="menu" title="Menu">${icon('menu')}</button>
-        </div>
-        <div class="hud-actions">
-          <div class="prompt"></div>
-          <div class="btn-row extra"></div>
-          <div class="btn-row main">
-            <button class="btn cancel-btn"></button>
-            <button class="btn gold main-action ok-btn"></button>
-          </div>
-          <span class="toggle hold" title="Après avoir lancé un sort, garder la priorité pour pouvoir y répondre soi-même"><i></i>Garder la priorité</span>
+      <div class="actions">
+        <div class="prompt-row"><div class="prompt"></div></div>
+        <div class="btn-row extra"></div>
+        <div class="btn-row main">
+          <button class="btn cancel-btn"></button>
+          <button class="btn gold main-action ok-btn"></button>
         </div>
       </div>
       <div class="preview"></div>
@@ -279,36 +280,34 @@ export class Game {
       </defs><g></g></svg>
       <div class="drawer" data-drawer></div>
     </div>`);
-    const opps = table.querySelector('.opps');
+    // Fond mythique animé : son calque passe derrière tout le plateau.
+    const fx = boardFx(document.documentElement.dataset.boardTheme);
+    if (fx) {
+      table.prepend(fx);
+    }
     const half = table.querySelector('.opp-half');
+    this.plates = new Map();
     opponents.forEach((p, i) => {
-      opps.appendChild(el(`<div class="opp-card" data-pid="${p.id}">
-        <div class="line">
-          <div class="player-hit" data-pid="${p.id}">${avatarHtml(p.name, i + 1, 30)}<div class="who"><div class="player-name">${esc(p.name)}</div><div class="life"></div></div></div>
-        </div>
-        <div class="stats"></div>
-        <div class="zones">
-          <div class="pile" data-zone="graveyard" data-pid="${p.id}"><div class="label">${icon('graveyard')}<span>Cimet.</span></div></div>
-          <div class="pile" data-zone="exile" data-pid="${p.id}"><div class="label">${icon('exile')}<span>Exil</span></div></div>
-          <div class="pile command" data-zone="command" data-pid="${p.id}"><div class="label">${icon('crown')}<span>Cmdt</span></div></div>
-        </div>
-      </div>`));
-      half.appendChild(el(`<div class="opp-field" data-pid="${p.id}">
-        <div class="field-tag">${esc(p.name)}</div>
-        <div class="row back"><div class="lands row"></div><div class="spacer"></div><div class="nonlands row"></div></div>
+      const field = el(`<div class="opp-field" data-pid="${p.id}">
+        <div class="row back"><div class="lands row"></div><div class="spacer"><div class="plates"></div></div><div class="nonlands row"></div></div>
         <div class="row front"></div>
-      </div>`));
+      </div>`);
+      const plate = el(`<div class="plate opp" data-pid="${p.id}">
+        <div class="player-hit" data-pid="${p.id}">${avatarHtml(p.name, i + 1, 34)}<div class="life"></div></div>
+        <div class="info"><div class="player-name">${esc(p.name)}</div><div class="stats"></div></div>
+      </div>`);
+      field.querySelector('.plates').appendChild(plate);
+      this.plates.set(p.id, plate);
+      half.appendChild(field);
     });
     this.root.appendChild(table);
     this.table = table;
     this.board = table.querySelector('.board');
-    this.applyRail('l', prefs.get(RAILS.l.pref));
-    this.applyRail('r', prefs.get(RAILS.r.pref));
     this.slots.clear();
     this.handOpen = false;
     this.applySplit(this.split());
-    // Taille des moitiés du plateau, suivie sans forcer de calcul de mise en page : la taille de base de leurs
-    // cartes en dépend (voir fitRows).
+    // Taille des moitiés du plateau et des plaques des joueurs, suivie sans forcer de calcul de mise en page : la
+    // taille de base des cartes et la place laissée aux plaques en dépendent (voir fitRows).
     this.halfObserver && this.halfObserver.disconnect();
     this.halfObserver = new ResizeObserver((entries) => {
       for (const e of entries) {
@@ -318,11 +317,11 @@ export class Game {
         this.fitRows();
       }
     });
-    table.querySelectorAll('.me-half, .opp-field').forEach(h => this.halfObserver.observe(h));
+    table.querySelectorAll('.me-half, .opp-field, .plates').forEach(h => this.halfObserver.observe(h));
     this.cardMax = 0;
     this.stackPanel = new StackPanel(table, {
       anchor: this.board,
-      pillHost: table.querySelector('.div-end'),
+      pillHost: table.querySelector('.pill-host'),
     });
     this.bindEvents(table);
   }
@@ -417,8 +416,6 @@ export class Game {
     this.bindHandSwipe(table.querySelector('.hand'));
     this.bindHandScroller(table.querySelector('.hand'), table.querySelector('.hand-scroller'));
     this.bindDivider(table.querySelector('.divider'));
-    this.bindRailGrip(table, 'l');
-    this.bindRailGrip(table, 'r');
 
     table.addEventListener('click', (e) => {
       if (consumed()) {
@@ -458,14 +455,9 @@ export class Game {
         this.openZone(Number(handOf.dataset.handOf), 'hand');
         return;
       }
-      const lib = e.target.closest('.stat.lib');
-      if (lib) {
-        this.openZone(Number(lib.dataset.pid), 'library');
-        return;
-      }
-      const pile = e.target.closest('.pile');
-      if (pile) {
-        this.openZone(Number(pile.dataset.pid), pile.dataset.zone);
+      const zone = e.target.closest('.pile, .stat[data-zone]');
+      if (zone) {
+        this.openZone(Number(zone.dataset.pid), zone.dataset.zone);
         return;
       }
       const slot = e.target.closest('.slot');
@@ -482,20 +474,18 @@ export class Game {
         this.setHandOpen(!this.handOpen);
         return;
       }
+      // Plaque d'un adversaire dont le plateau est masqué (vue « un seul ») : on montre son plateau, sauf s'il faut
+      // le choisir (cible...).
       const hit = e.target.closest('.player-hit');
-      const oppCard = e.target.closest('.opp-card');
-      if (hit) {
-        const pid = Number(hit.dataset.pid);
+      const plate = e.target.closest('.plate.opp');
+      if (hit || plate) {
+        const pid = Number((hit || plate).dataset.pid);
         const player = this.state && this.state.players.find(p => p.id === pid);
-        if (oppCard && player && !player.selectable && pid !== this.focusPid) {
+        if (plate && table.dataset.oppview === 'focus' && pid !== this.focusPid && !(player && player.selectable)) {
           this.focus(pid);
-        } else {
+        } else if (hit) {
           bridge.send('player', {id: pid});
         }
-        return;
-      }
-      if (oppCard) {
-        this.focus(Number(oppCard.dataset.pid));
         return;
       }
       const mana = e.target.closest('[data-mana]');
@@ -511,13 +501,7 @@ export class Game {
 
     table.querySelector('.ok-btn').addEventListener('click', () => this.primary());
     table.querySelector('.cancel-btn').addEventListener('click', () => this.secondary());
-    table.querySelector('.hold').addEventListener('click', () => {
-      const value = !(this.state && this.state.settings && this.state.settings.holdPriority);
-      prefs.set('holdPriority', value);
-      bridge.send('settings', {settings: {holdPriority: value}});
-      toast(value ? 'Tu gardes la priorité après tes sorts : tu pourras y répondre.' : 'Tes sorts se résolvent sans s\'arrêter (sauf réponse adverse).');
-    });
-    table.querySelector('.hud-actions .extra').addEventListener('click', (e) => {
+    table.querySelector('.actions .extra').addEventListener('click', (e) => {
       const b = e.target.closest('[data-act]');
       if (b) {
         bridge.send(b.dataset.act);
@@ -567,6 +551,7 @@ export class Game {
     };
     document.addEventListener('keydown', this.keyHandler);
     window.addEventListener('resize', this.onResize = debounce(() => {
+      this.cardMax = 0;
       if (this.state) {
         this.render(this.state, true);
       }
@@ -868,8 +853,9 @@ export class Game {
     const hand = table.querySelector('.hand');
     place(hand, me.zones.hand, {hand: true});
     // Main dépliée d'office quand Forge demande d'y choisir des cartes (défausse, etc.), et pendant le choix
-    // de garder sa main ou de faire un mulligan : on voit bien les cartes ; elle se replie une fois décidé.
-    const needed = me.zones.hand.some(c => c.selectable) || (state.prompt && state.prompt.input === 'InputConfirmMulligan');
+    // de garder sa main ou de faire un mulligan, et de choisir les cartes à remettre en dessous : on voit bien les
+    // cartes ; elle se replie une fois décidé.
+    const needed = me.zones.hand.some(c => c.selectable) || (state.prompt && ['InputConfirmMulligan', 'InputLondonMulligan'].includes(state.prompt.input));
     if (needed !== !!this.handNeeded) {
       this.handNeeded = needed;
       this.handOpen = needed;
@@ -881,7 +867,14 @@ export class Game {
     this.updateFocus(state, me);
     const view = this.opponentsOf(state, me).length > 1 ? this.oppView() : 'all';
     table.dataset.oppview = view;
-    table.querySelectorAll('[data-set-view]').forEach(b => b.classList.toggle('on', b.dataset.setView === view));
+    const toggleView = table.querySelector('[data-set-view]');
+    if (toggleView) {
+      // Un seul bouton : il passe à l'autre vue.
+      toggleView.dataset.setView = view === 'all' ? 'focus' : 'all';
+      toggleView.title = view === 'all' ? 'Un seul plateau adverse à la fois (toucher une plaque pour changer)' : 'Tous les plateaux adverses côte à côte';
+      toggleView.classList.toggle('on', view === 'all');
+    }
+    const focusField = table.querySelector(`.opp-field[data-pid="${this.focusPid}"]`);
     this.cardController = new Map();
     for (const p of state.players) {
       for (const c of p.zones.battlefield) {
@@ -891,8 +884,8 @@ export class Game {
         continue;
       }
       const field = table.querySelector(`.opp-field[data-pid="${p.id}"]`);
-      const card = table.querySelector(`.opp-card[data-pid="${p.id}"]`);
-      if (!field || !card) {
+      const plate = this.plates.get(p.id);
+      if (!field || !plate) {
         continue;
       }
       const f = splitField(p);
@@ -901,29 +894,45 @@ export class Game {
       place(field.querySelector('.back .lands'), f.lands);
       const focused = p.id === this.focusPid;
       field.classList.toggle('focused', focused);
-      card.classList.toggle('focused', focused);
-      for (const box of [field, card]) {
+      plate.classList.toggle('focused', focused);
+      // Vue « un seul » : toutes les plaques sur le plateau montré (réduites pour les autres) ; sinon chacune sur le sien.
+      const host = ((view === 'focus' && focusField) || field).querySelector('.plates');
+      if (plate.parentElement !== host) {
+        host.appendChild(plate);
+      }
+      plate.classList.toggle('mini', view === 'focus' && !focused);
+      for (const box of [field, plate]) {
         box.classList.toggle('active', state.game.activePlayer === p.id);
         box.classList.toggle('lost', !!p.lost);
       }
-      // Un plateau masqué où il y a quelque chose à choisir : sa fiche s'allume.
-      card.classList.toggle('has-selectable', !focused && view === 'focus' && p.zones.battlefield.some(c => c.selectable));
-      this.renderPlayerHead(card, p, false);
-      this.renderPile(card.querySelector('[data-zone="graveyard"]'), p.zones.graveyard, used);
-      this.renderPile(card.querySelector('[data-zone="exile"]'), p.zones.exile, used);
-      const cmd = card.querySelector('[data-zone="command"]');
-      this.renderPile(cmd, p.zones.command, used, null, true);
-      cmd.classList.toggle('hidden', p.zones.command.length === 0);
+      // Un plateau masqué où il y a quelque chose à choisir : sa plaque s'allume.
+      plate.classList.toggle('has-selectable', !focused && view === 'focus' && p.zones.battlefield.some(c => c.selectable));
+      this.renderPlayerHead(plate, p, false);
+    }
+    if (focusField) {
+      // Plaques dans l'ordre du tour, quel que soit l'ordre des changements de vue.
+      const host = focusField.querySelector('.plates');
+      const order = this.opponentsOf(state, me).map(p => this.plates.get(p.id)).filter(pl => pl && pl.parentElement === host);
+      if (order.some((pl, i) => host.children[i] !== pl)) {
+        host.append(...order);
+      }
     }
 
-    // Mes zones.
-    const panel = table.querySelector('.me-panel');
-    this.renderPlayerHead(panel, me, true);
-    this.renderPile(panel.querySelector('[data-zone="graveyard"]'), me.zones.graveyard, used);
-    this.renderPile(panel.querySelector('[data-zone="exile"]'), me.zones.exile, used);
-    const command = panel.querySelector('[data-zone="command"]');
+    // Ma plaque et mes piles.
+    const myPlate = table.querySelector('.plate.me');
+    myPlate.classList.toggle('active', state.game.activePlayer === me.id);
+    this.renderPlayerHead(myPlate, me, true);
+    const piles = table.querySelector('.my-piles');
+    this.renderLibraryPile(piles.querySelector('[data-zone="library"]'), me);
+    this.renderPile(piles.querySelector('[data-zone="graveyard"]'), me.zones.graveyard, used);
+    const exile = piles.querySelector('[data-zone="exile"]');
+    this.renderPile(exile, me.zones.exile, used);
+    exile.classList.toggle('hidden', me.zones.exile.length === 0);
+    const command = piles.querySelector('[data-zone="command"]');
     this.renderPile(command, me.zones.command, used, null, true);
     command.classList.toggle('hidden', me.zones.command.length === 0);
+    const shownPiles = 2 + (me.zones.exile.length > 0) + (me.zones.command.length > 0);
+    setProp(table.querySelector('.hand-band'), '--piles', String(shownPiles));
 
     const cardNames = new Map();
     for (const p of state.players) {
@@ -1125,17 +1134,27 @@ export class Game {
     const stats = box.querySelector('.stats');
     let html = '';
     const chip = (cls, ic, value, title, extra = '') => `<span class="stat ${cls}" title="${esc(title)}"${extra}>${icon(ic)}${value === '' ? '' : `<b>${value}</b>`}</span>`;
-    if (!isMe && p.controlledByMe) {
-      html += chip('ctrl', 'puppet', '', 'Tu contrôles ce joueur');
-      html += chip('hand-of', 'hand', p.handSize, 'Ouvrir sa main', ` data-hand-of="${p.id}"`);
-    } else if (!isMe) {
-      html += chip('', 'hand', p.handSize, 'Cartes en main');
+    if (!isMe) {
+      if (p.controlledByMe) {
+        html += chip('ctrl', 'puppet', '', 'Tu contrôles ce joueur');
+        html += chip('hnd hand-of', 'hand', p.handSize, 'Ouvrir sa main', ` data-hand-of="${p.id}"`);
+      } else {
+        html += chip('hnd', 'hand', p.handSize, 'Cartes en main');
+      }
+      // Bibliothèque : œil quand le dessus est visible, en surbrillance quand on peut le jouer (Futur aperçu...).
+      const top = p.libraryTop || [];
+      const libPlayable = top.some(c => c.playable || c.selectable);
+      html += chip(`lib${top.length ? ' seen' : ''}${libPlayable ? ' playable' : ''}`, 'library', top.length ? `${p.library}${icon('eye')}` : p.library,
+        top.length ? `Bibliothèque : le dessus est visible${libPlayable ? ' et jouable' : ''} (touche pour la voir)` : 'Bibliothèque (touche pour la voir)', ` data-zone="library" data-pid="${p.id}"`);
+      // Cimetière, exil et zone de commandement : seulement s'il y a quelque chose dedans ; touche pour les voir.
+      for (const [zone, ic, label] of [['graveyard', 'graveyard', 'Cimetière'], ['exile', 'exile', 'Exil'], ['command', 'crown', 'Zone de commandement']]) {
+        const cards = p.zones[zone] || [];
+        if (cards.length) {
+          const pick = cards.some(c => c.selectable || c.playable);
+          html += chip(`zone${pick ? ' playable' : ''}`, ic, cards.length, `${label} (touche pour voir)`, ` data-zone="${zone}" data-pid="${p.id}"`);
+        }
+      }
     }
-    // Bibliothèque : œil quand le dessus est visible, en surbrillance quand on peut le jouer (Futur aperçu...).
-    const top = p.libraryTop || [];
-    const libPlayable = top.some(c => c.playable || c.selectable);
-    html += chip(`lib${top.length ? ' seen' : ''}${libPlayable ? ' playable' : ''}`, 'library', top.length ? `${p.library}${icon('eye')}` : p.library,
-      top.length ? `Bibliothèque : le dessus est visible${libPlayable ? ' et jouable' : ''} (touche pour la voir)` : 'Bibliothèque (touche pour la voir)', ` data-zone="library" data-pid="${p.id}"`);
     // Marqueurs du joueur, mis en valeur quand leur nombre change.
     const prev = (this.prevCounters || (this.prevCounters = new Map())).get(p.id) || {};
     const counters = p.counters || {};
@@ -1169,6 +1188,20 @@ export class Game {
     }
   }
 
+  /** Ma bibliothèque : un dos de carte et le nombre de cartes ; œil quand le dessus est visible, halo s'il est jouable. */
+  renderLibraryPile(pile, p) {
+    let count = pile.querySelector('.count');
+    if (!count) {
+      count = el('<div class="count"></div>');
+      pile.appendChild(count);
+    }
+    count.textContent = p.library;
+    const top = p.libraryTop || [];
+    pile.classList.toggle('seen', top.length > 0);
+    pile.classList.toggle('has-selectable', top.some(c => c.playable || c.selectable));
+    pile.classList.toggle('empty', !p.library);
+  }
+
   renderMana(me) {
     const pool = this.table.querySelector('.mana-pool');
     const html = MANA_ORDER.filter(c => me.mana[c] > 0)
@@ -1200,13 +1233,10 @@ export class Game {
     const waiting = !p.okEnabled && !p.cancelEnabled && (!p.input || /^Waiting for/i.test(message));
     message = translatePrompt(message);
     if (p.input === 'InputPassPriority' && /^Priorit/.test(message)) {
-      // Forge répète tour, phase et pile, déjà affichés sur la ligne du milieu : on dit plutôt quoi faire.
-      const active = state.players.find(pl => pl.id === state.game.activePlayer);
+      // Forge répète tour, phase et pile, déjà affichés sur la ligne du milieu, et le bouton dit déjà « Passer » ou
+      // « Résoudre » : pas d'invite, sauf quand on joue pour un autre joueur.
       const ruled = state.players.find(pl => pl.controlledByMe && pl.priority);
-      message = ruled ? `Tu joues pour ${ruled.name} : ${state.stack.length ? 'réponds avec ses cartes ou laisse résoudre.' : 'joue une de ses cartes (main sur sa fiche) ou passe.'}`
-        : state.stack.length ? 'Un sort est sur la pile : réponds ou laisse-le se résoudre.'
-        : state.game.activePlayer === me.id ? 'À toi : joue une carte ou passe.'
-          : `Tour de ${active ? active.name : 'l\'adversaire'} : tu peux répondre ou passer.`;
+      message = ruled ? `Tu joues pour ${ruled.name} : ${state.stack.length ? 'réponds avec ses cartes ou laisse résoudre.' : 'joue une de ses cartes (main sur sa plaque) ou passe.'}` : '';
     }
     if (!message && waiting) {
       message = state.game.activePlayer === me.id ? '' : 'L\'adversaire joue…';
@@ -1259,7 +1289,6 @@ export class Game {
       extra.innerHTML = html;
       extra._html = html;
     }
-    this.table.querySelector('.hold').classList.toggle('on', !!(state.settings && state.settings.holdPriority));
   }
 
   /**
@@ -1310,6 +1339,9 @@ export class Game {
    * lignes, leur rangée prend plus de hauteur si celle du fond peut en céder sans trop rétrécir.
    * Tout est calculé d'après les classes des cartes (droite, engagée, empilée, attachée), comme le fait le CSS, sans
    * aucune mesure : pas de calcul de mise en page forcé, même avec des centaines de cartes.
+   * La rangée du fond laisse la place des plaques des joueurs et, chez moi, celle de l'invite et des boutons à droite :
+   * rien ne passe dessous. La plaque se met entre terrains et autres permanents (elle prend de la largeur) ou au
+   * bord du plateau, au-dessus d'eux (elle prend de la hauteur) : on garde la place qui laisse les plus grandes cartes.
    */
   fitRows() {
     const table = this.table;
@@ -1318,14 +1350,22 @@ export class Game {
     const R = 88 / 63;   // hauteur / largeur d'une carte (et largeur d'une carte engagée)
     const halves = [...table.querySelectorAll('.me-half, .opp-field')];
     if (!this.cardMax) {
-      this.cardMax = parseFloat(getComputedStyle(table).getPropertyValue('--card-max')) || 124;
+      const style = getComputedStyle(table);
+      this.cardMax = parseFloat(style.getPropertyValue('--card-max')) || 124;
+      this.actW = parseFloat(style.getPropertyValue('--act-w')) || 0;
     }
     const hiddenOpp = (h) => table.dataset.oppview === 'focus' && h.classList.contains('opp-field') && !h.classList.contains('focused');
     const slotsOf = (row) => row ? [...row.children].filter(x => x.classList.contains('slot')) : [];
     const sizeOf = (half) => half._size || {w: half.clientWidth, h: half.clientHeight};
+    // Place prise par les plaques posées sur cette moitié (mesurée par l'observateur ; estimée avant la 1re mesure).
+    const platesOf = (half) => {
+      const box = half.querySelector('.plates');
+      const n = box ? box.children.length : 0;
+      return box && n ? (box._size ? {w: box._size.w, h: box._size.h} : {w: 150 * n, h: 40}) : {w: 0, h: 0};
+    };
     // Rien n'a changé sur le plateau (vie, phase, invite, mana...) : les tailles en place restent bonnes.
-    const sig = [this.cardMax, ...halves.map(h => {
-      let k = hiddenOpp(h) ? 'masqué' : JSON.stringify(sizeOf(h));
+    const sig = [this.cardMax, this.actW, ...halves.map(h => {
+      let k = hiddenOpp(h) ? 'masqué' : JSON.stringify(sizeOf(h)) + JSON.stringify(platesOf(h));
       for (const row of h.querySelectorAll('.row.front, .nonlands, .lands')) {
         k += '|';
         for (const slot of slotsOf(row)) {
@@ -1341,10 +1381,13 @@ export class Game {
       return;
     }
     this.fitSig = sig;
-    // Largeur d'une rangée à --fit = 1 : en largeurs de carte (u), plus des pixels fixes (espaces entre cartes).
+    // Largeur d'une rangée à --fit = 1 : en largeurs de carte (u), plus des pixels fixes (espaces entre cartes) ;
+    // j : nombre de jointures que le resserrement (--squeeze) peut rapprocher (pas dans une pile, pas après une pièce
+    // jointe, comme dans le CSS).
     const natural = (slots, stackShift) => {
       let u = 0;
       let px = 0;
+      let j = 0;
       slots.forEach((slot, i) => {
         const c = slot.classList;
         const attached = c.contains('attached');
@@ -1354,6 +1397,8 @@ export class Game {
           px += GAP;
           if (c.contains('stacked')) {
             u -= stackShift * (c.contains('tapped') ? R : 1);
+          } else if (!slots[i - 1].classList.contains('attached')) {
+            j++;
           }
         }
         if (attached) {
@@ -1362,16 +1407,9 @@ export class Game {
           px -= GAP;
         }
       });
-      return {u, px, n: slots.length};
+      return {u, px, j, n: slots.length};
     };
-    // Écrit une propriété seulement si elle change (chaque écriture fait recalculer le style des cartes).
-    const write = (el, prop, value) => {
-      el._props = el._props || {};
-      if (el._props[prop] !== value) {
-        el._props[prop] = value;
-        el.style.setProperty(prop, value);
-      }
-    };
+    const write = setProp;
     for (const half of halves) {
       if (hiddenOpp(half)) {
         continue; // plateau adverse masqué
@@ -1388,10 +1426,15 @@ export class Game {
       const B1 = natural(slotsOf(nonlands), 0.74);
       const B2 = natural(slotsOf(lands), 0.8);
       const backU = B1.u + B2.u;
-      const backFixed = PAD + B1.px + B2.px + 4 + 2 * GAP;
+      const plates = platesOf(half);
+      const plateH = Math.ceil(plates.h + 4);
+      // Entre les deux groupes : la plaque et ses marges en mode « inline » (au moins 4 px) ; chez moi, la colonne
+      // des boutons.
+      const inset = half.classList.contains('me-half') ? this.actW + 8 : 0;
+      const backFixedOf = (mode) => PAD + B1.px + B2.px + (mode === 'inline' ? Math.max(4, plates.w + 8) : 4) + 2 * GAP + inset;
       const frontFixed = PAD + F.px;
-      // Taille de base d'une rangée qui a la part share de la hauteur (cartes droites, 90 % de la rangée).
-      const base = (share) => Math.max(20, Math.min(this.cardMax, (H - 10) * share * 0.9 / R, W / 5));
+      // Taille de base d'une rangée qui a la part share de la hauteur, moins minus pixels (cartes droites, 90 %).
+      const base = (share, minus = 0) => Math.max(20, Math.min(this.cardMax, ((H - 10) * share - minus) * 0.9 / R, W / 5));
       const fitFront = (share) => {
         const b = base(share);
         const one = F.u ? Math.min(1, (W - frontFixed) / (F.u * b)) : 1;
@@ -1408,30 +1451,55 @@ export class Game {
         fit = Math.max(wrap ? 0.3 : 0.5, fit);
         return {b, fit, wrap, size: b * fit};
       };
-      const fitBack = (share) => {
-        const b = base(share);
-        const fit = Math.max(0.5, backU ? Math.min(1, (W - backFixed) / (backU * b)) : 1);
-        return {b, fit, size: b * fit};
+      // eff : taille qu'auraient les cartes pour tenir sans se chevaucher (sous la réduction minimale, elles se
+      // chevauchent : c'est ce qui compte pour comparer deux dispositions).
+      const fitBack = (share, mode) => {
+        const b = base(share, mode === 'edge' ? plateH : 0);
+        const raw = backU ? Math.min(1, (W - backFixedOf(mode)) / (backU * b)) : 1;
+        const fit = Math.max(0.5, raw);
+        return {b, fit, size: b * fit, eff: b * Math.max(0.05, raw)};
       };
       // Part de la hauteur pour les créatures : la moitié, ou plus quand elles sont sur deux lignes (en largeur, une
       // ligne ne gagne rien à être plus haute). On garde la part où la plus petite des deux tailles est la plus grande,
-      // les terrains et autres permanents comptant un peu moins (0,8) que les créatures.
-      const score = (f, b) => (backU ? Math.min(f.size, 0.8 * b.size) : f.size);
-      let share = 0.5;
-      let fr = fitFront(0.5);
-      if (fr.wrap) {
-        let best = score(fr, fitBack(0.5));
-        for (const s of [0.56, 0.62, 0.68, 0.75]) {
-          const f = fitFront(s);
-          const value = score(f, fitBack(1 - s));
-          if (value > best * 1.02) {
-            best = value;
-            share = s;
-            fr = f;
+      // les terrains et autres permanents comptant un peu moins (0,8) que les créatures. Le fond garde la hauteur de
+      // la plaque (et de quoi poser des cartes en dessous quand elle est au bord).
+      const score = (f, b) => (backU ? Math.min(f.size, 0.8 * b.eff) : f.size);
+      const layout = (mode) => {
+        const room = (s) => (H - 10) * (1 - s) >= (mode === 'edge' ? plateH + 30 : plates.h + 2);
+        let share = 0.5;
+        let fr = fitFront(0.5);
+        let best = score(fr, fitBack(0.5, mode));
+        if (fr.wrap) {
+          for (const s of [0.56, 0.62, 0.68, 0.75]) {
+            const f = fitFront(s);
+            const value = score(f, fitBack(1 - s, mode));
+            if (value > best * 1.02 && room(s)) {
+              best = value;
+              share = s;
+              fr = f;
+            }
           }
         }
+        return {mode, share, fr, bf: fitBack(1 - share, mode), score: best};
+      };
+      // Plaque au bord seulement si les cartes y gagnent nettement (pas d'aller-retour pour un pixel).
+      const better = (a, b) => a.score > b.score * 1.03 || (a.score > b.score * 0.999 && a.bf.eff > b.bf.eff * 1.05);
+      let lay = layout(half._plateMode || 'inline');
+      if (plates.w) {
+        const other = layout(lay.mode === 'inline' ? 'edge' : 'inline');
+        if (better(other, lay)) {
+          lay = other;
+        }
+      } else {
+        lay = lay.mode === 'inline' ? lay : layout('inline');
       }
-      const bf = fitBack(1 - share);
+      half._plateMode = lay.mode;
+      if (half.dataset.plate !== lay.mode) {
+        half.dataset.plate = lay.mode;
+      }
+      write(half, '--plate-h', plateH + 'px');
+      const {share, fr, bf} = lay;
+      const backFixed = backFixedOf(lay.mode);
       const rows = `minmax(0, ${share.toFixed(3)}fr) minmax(0, ${(1 - share).toFixed(3)}fr)`;
       if (half._rows !== rows) {
         half._rows = rows;
@@ -1444,7 +1512,7 @@ export class Game {
         write(front, '--fit', fr.fit.toFixed(3));
         front.classList.toggle('wrap', fr.wrap);
         const over = F.u * fr.b * fr.fit + F.px + PAD - W;
-        write(front, '--squeeze', fr.wrap || F.n < 2 ? '0px' : squeezeOf(over, F.n - 1, fr.b * fr.fit));
+        write(front, '--squeeze', fr.wrap || !F.j ? '0px' : squeezeOf(over, F.j, fr.b * fr.fit));
       }
       if (back) {
         write(back, '--bf-base', bf.b.toFixed(2) + 'px');
@@ -1455,7 +1523,7 @@ export class Game {
         const over = backU * bf.b * bf.fit + backFixed - W;
         for (const [row, nat] of [[nonlands, B1], [lands, B2]]) {
           const part = backU ? over * nat.u / backU : 0;
-          write(row, '--squeeze', nat.n < 2 ? '0px' : squeezeOf(part, nat.n - 1, bf.b * bf.fit));
+          write(row, '--squeeze', !nat.j ? '0px' : squeezeOf(part, nat.j, bf.b * bf.fit));
         }
       }
     }
@@ -1463,118 +1531,41 @@ export class Game {
   }
 
   /**
-   * Encoche de la caméra (Android) : le plateau va jusqu'au bord de l'écran ; seuls les blocs des colonnes
-   * qui passeraient dessous s'en écartent. Chaque bloc est jugé sur la place qu'il peut occuper (toute la colonne
-   * sous la barre d'outils pour l'invite et les boutons), pas sur sa position du moment : une invite qui grandit
-   * ou rétrécit ne fait plus sauter les boutons de côté.
+   * Encoche de la caméra (Android) : le plateau va jusqu'au bord de l'écran ; seules les bandes qui passent devant
+   * l'encoche (moitiés du plateau, ligne du milieu, bas de l'écran, boutons) s'en écartent, de son côté seulement.
+   * Les cartes des moitiés concernées se resserrent d'elles-mêmes (leur largeur utile diminue).
    */
   dodgeCutout() {
     const holes = cutoutRects();
     if (!holes.length && !this.dodged) {
       return;
     }
-    const t = this.table;
-    const sideR = t.querySelector('.side-r');
-    const toolbar = t.querySelector('.side-r .toolbar');
-    const blocks = [
-      [t.querySelector('.side-l .opps')],
-      [t.querySelector('.side-l .me-panel')],
-      [toolbar],
-      [t.querySelector('.side-r .hud-actions'), () => {
-        const col = sideR.getBoundingClientRect();
-        return col.width ? {top: toolbar.getBoundingClientRect().bottom, bottom: col.bottom, left: col.left, right: col.right} : null;
-      }],
-    ].filter(([b]) => b);
-    // Anciennes marges, posées bloc par bloc dans les colonnes.
-    t.querySelectorAll('.side-l .opps > *, .side-r .hud-actions > *').forEach(b => {
-      b.style.marginLeft = '';
-      b.style.marginRight = '';
-    });
-    blocks.forEach(([b]) => {
-      b.style.marginLeft = '';
-      b.style.marginRight = '';
-    });
     this.dodged = holes.length > 0;
+    const t = this.table;
     const middle = window.innerWidth / 2;
-    blocks.forEach(([b, area]) => {
-      const r = (area && area()) || b.getBoundingClientRect();
+    for (const b of t.querySelectorAll('.opp-half, .me-half, .divider, .hand-band, .actions')) {
+      // Décalages horizontaux seulement : la position verticale des bandes n'en dépend pas.
+      const r = b.getBoundingClientRect();
+      let left = 0;
+      let right = 0;
       for (const h of holes) {
-        if (h.t < r.bottom && h.b > r.top && h.l < r.right && h.r > r.left) {
+        if (h.t < r.bottom && h.b > r.top) {
           if (h.l < middle) {
-            b.style.marginLeft = Math.ceil(h.r - r.left + 4) + 'px';
+            left = Math.max(left, Math.ceil(h.r + 4));
           } else {
-            b.style.marginRight = Math.ceil(r.right - h.l + 4) + 'px';
+            right = Math.max(right, Math.ceil(window.innerWidth - h.l + 4));
           }
         }
       }
-    });
-  }
-
-  /** Largeur d'un panneau de côté, 'l' ou 'r' (null : largeur normale, selon l'écran). */
-  applyRail(which, width) {
-    if (width) {
-      this.table.style.setProperty('--rail-' + which, Math.round(width) + 'px');
-    } else {
-      this.table.style.removeProperty('--rail-' + which);
+      setProp(b, '--dodge-l', left + 'px');
+      setProp(b, '--dodge-r', right + 'px');
     }
-  }
-
-  /** Poignée d'un panneau de côté : on la glisse pour régler sa largeur ; un toucher passe en compact ou revient. */
-  bindRailGrip(table, which) {
-    const rail = RAILS[which];
-    const grip = table.querySelector('.rail-grip.' + which);
-    const side = table.querySelector(rail.side);
-    if (!grip || !side) {
-      return;
-    }
-    let drag = null;
-    grip.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      grip.setPointerCapture(e.pointerId);
-      const box = side.getBoundingClientRect();
-      drag = {id: e.pointerId, x: e.clientX, left: box.left, right: box.right, moved: false, width: null};
-      grip.classList.add('dragging');
-    });
-    grip.addEventListener('pointermove', (e) => {
-      if (!drag || e.pointerId !== drag.id) {
-        return;
-      }
-      if (Math.abs(e.clientX - drag.x) > 6) {
-        drag.moved = true;
-      }
-      if (drag.moved) {
-        const width = which === 'l' ? e.clientX - drag.left + 6 : drag.right - e.clientX + 6;
-        drag.width = Math.max(rail.min, Math.min(rail.max, width));
-        this.applyRail(which, drag.width);
-        this.afterResize();
-      }
-    });
-    const end = (e) => {
-      if (!drag || e.pointerId !== drag.id) {
-        return;
-      }
-      grip.classList.remove('dragging');
-      if (drag.moved && drag.width) {
-        prefs.set(rail.pref, Math.round(drag.width));
-      } else {
-        // Toucher : compact, ou retour à la largeur normale.
-        const compact = side.getBoundingClientRect().width > rail.compact + 8;
-        prefs.set(rail.pref, compact ? rail.compact : null);
-        this.applyRail(which, compact ? rail.compact : null);
-      }
-      drag = null;
-      this.afterResize();
-    };
-    grip.addEventListener('pointerup', end);
-    grip.addEventListener('pointercancel', end);
-    grip.addEventListener('click', (e) => e.stopPropagation());
   }
 
   // ------------------------------------------------------------------ animations
 
   flip(before, me, prev) {
-    const libraryPile = this.table.querySelector('.me-panel .stat.lib');
+    const libraryPile = this.table.querySelector('.my-piles .pile.lib');
     const libRect = libraryPile ? libraryPile.getBoundingClientRect() : null;
     // Toutes les positions d'abord, les animations ensuite : lancer une animation entre deux lectures forçait
     // un calcul complet de la mise en page par carte (des centaines de millisecondes avec un plateau chargé).
@@ -2044,6 +2035,7 @@ export class Game {
         <section>
           <h3>Priorité</h3>
           <label class="check"><input type="checkbox" data-set="autoPass" ${s.autoPass ? 'checked' : ''}> Passer automatiquement quand je ne peux rien faire</label>
+          <label class="check"><input type="checkbox" data-set="holdPriority" ${s.holdPriority ? 'checked' : ''}> Garder la priorité après mes sorts (pour y répondre moi-même)</label>
           <p class="muted small">Les arrêts cochés donnent la main même sans action possible sur mon propre tour.</p>
         </section>
         <section>
@@ -2063,8 +2055,11 @@ export class Game {
         </section>
       </div>`;
     const send = () => {
+      const hold = drawer.querySelector('[data-set="holdPriority"]').checked;
+      prefs.set('holdPriority', hold);
       bridge.send('settings', {settings: {
         autoPass: drawer.querySelector('[data-set="autoPass"]').checked,
+        holdPriority: hold,
         myStops: [...drawer.querySelectorAll('[data-stop="my"]:checked')].map(i => i.value),
         theirStops: [...drawer.querySelectorAll('[data-stop="their"]:checked')].map(i => i.value),
       }});

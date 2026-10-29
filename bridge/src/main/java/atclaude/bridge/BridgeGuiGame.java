@@ -178,6 +178,7 @@ final class BridgeGuiGame extends AbstractGuiGame {
             bridge.sendJson(json);
             if (s != null) {
                 s.afterStateSent();
+                s.presence();
             }
         } catch (final RuntimeException e) {
             // Une photo ratée sera remplacée par la suivante.

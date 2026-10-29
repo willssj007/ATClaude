@@ -7,6 +7,8 @@ import {bridge} from './bridge.js';
 import {isPlaneswalker, loadCareer, manaAmount, setCareer, wildcardsHtml} from './career.js';
 import {icon} from './icons.js';
 import {openPack, openPacks, packElement} from './packopen.js';
+import {packScene, webglOk} from './pack3d.js';
+import {shopHtml, themeClicked} from './themes.js';
 import {el, esc, prefs, toast} from './util.js';
 
 const SET_TYPES = {CORE: 'Édition de base', EXPANSION: 'Extension', DRAFT: 'Draft', REPRINT: 'Réédition', STARTER: 'Initiation',
@@ -91,11 +93,46 @@ export class BoostersScreen {
       <div class="shelf-head"><h2 class="shelf-h">Tes boosters <span class="muted small">(${owned.length})</span></h2>
         ${owned.length > 1 ? `<button class="btn gold" data-open-all>${icon('booster')} Tout ouvrir (${owned.length})</button>` : ''}</div>
       <div class="pack-shelf">${owned.length ? '' : '<p class="muted">Aucun booster à ouvrir. Gagne des duels ou achète-en un ci-dessus.</p>'}</div>
+      <div class="theme-shop"></div>
     </div>`;
+    const themeShop = this.root.querySelector('.theme-shop');
+    shopHtml().then(html => {
+      themeShop.innerHTML = html;
+    }).catch(() => {});
+    themeShop.addEventListener('click', async (e) => {
+      if (await themeClicked(e.target)) {
+        // Achat : le mana affiché en haut change.
+        const next = await loadCareer(true);
+        if (next.mana !== c.mana) {
+          this.render(next, list);
+        }
+      }
+    });
     const fill = (set) => {
       this.set = set;
       const slot = this.root.querySelector('.shop-pack');
       slot.replaceChildren(packElement(set, {cls: 'big'}));
+      slot.classList.remove('has-3d');
+      // Vitrine en 3D : le booster tourne lentement, on le fait pivoter du doigt (le dessin CSS reste en attendant).
+      if (this.shop3d) {
+        this.shop3d.dispose();
+        this.shop3d = null;
+      }
+      if (webglOk()) {
+        const host = el('<div class="shop-pack3d"></div>');
+        slot.appendChild(host);
+        const token = this.shopToken = {};
+        packScene(host, [set], {spin: true, arrive: false}).then((scene) => {
+          if (!scene) {
+            host.remove();
+          } else if (this.shopToken !== token || !host.isConnected) {
+            scene.dispose();
+          } else {
+            this.shop3d = scene;
+            slot.classList.add('has-3d');
+          }
+        }).catch(() => host.remove());
+      }
       this.root.querySelector('.shop-name').textContent = set.name;
       this.root.querySelector('.shop-meta').textContent = `${set.code} · ${set.year} · ${SET_TYPES[set.type] || set.type}`;
       const buy = this.root.querySelector('[data-buy]');

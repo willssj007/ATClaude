@@ -13,6 +13,7 @@ import {bridge} from './bridge.js';
 import {cardElement, showZoom} from './cards.js';
 import {forgetCareer, RARITY_FR, wildcardHtml} from './career.js';
 import {icon} from './icons.js';
+import {packScene, webglOk} from './pack3d.js';
 import {el, esc, prefs, toast} from './util.js';
 
 const RANK = {BasicLand: 0, Common: 1, Uncommon: 2, Rare: 3, Special: 3, MythicRare: 4};
@@ -433,23 +434,56 @@ function summary(cards) {
  * Ouvre un booster. {@code more} (facultatif) renvoie la suite à proposer à la fin : {next: {booster, set}, rest: [...]}
  * où rest sont les boosters encore fermés (pour « Tout ouvrir »).
  */
+/** Booster(s) en 3D dans la scène, si l'appareil le permet ; null : on garde les boosters dessinés en CSS. */
+async function scene3d(stage, sets, options) {
+  if (!webglOk()) {
+    return null;
+  }
+  const host = el(`<div class="bo-pack3d${options.fan ? ' fan' : ''}"></div>`);
+  stage.appendChild(host);
+  const pending = packScene(host, sets, options).catch(() => null);
+  const scene = await Promise.race([pending, wait(3000).then(() => null)]);
+  if (!scene) {
+    pending.then(s => s && s.dispose());
+    host.remove();
+    return null;
+  }
+  scene.host = host;
+  return scene;
+}
+
+/** Coordonnées d'un point de l'écran dans la scène (et à l'écran), comme center(). */
+function stagePoint(p, stage) {
+  const s = stage.getBoundingClientRect();
+  return {x: p.x - s.left, y: p.y - s.top, sx: p.x, sy: p.y};
+}
+
 export function openPack(booster, set, more) {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const view = overlay(set.name);
     const {ov, fx, stage, actions, hint} = view;
-    hint.textContent = 'Touche le booster (ou glisse dessus) pour l\'ouvrir';
+    const pack3d = await scene3d(stage, [set], {});
+    hint.textContent = pack3d ? 'Touche le booster pour l\'ouvrir · fais-le tourner du doigt' : 'Touche le booster (ou glisse dessus) pour l\'ouvrir';
     const wrap = el(`<div class="bo-pack-wrap"><div class="bo-pack-float"><div class="bo-pack">
       <div class="bo-part body"></div><div class="bo-part flap"></div><i class="bo-seam"></i><i class="bo-pack-light"></i>
     </div></div></div>`);
-    wrap.querySelector('.body').appendChild(packElement(set, {cls: 'big'}));
-    wrap.querySelector('.flap').appendChild(packElement(set, {cls: 'big'}));
-    stage.appendChild(wrap);
     const packEl = wrap.querySelector('.bo-pack');
-    play(wrap, [
-      {transform: 'translateY(70vh) rotate(9deg) scale(.6)', opacity: 0},
-      {transform: 'translateY(-4%) rotate(-2deg) scale(1.03)', opacity: 1, offset: 0.7},
-      {transform: 'none', opacity: 1},
-    ], {duration: 720, easing: 'cubic-bezier(.2,.85,.3,1)'}).then(() => wrap.classList.add('idle'));
+    if (pack3d) {
+      pack3d.host.addEventListener('click', () => {
+        if (!pack3d.dragged()) {
+          tear();
+        }
+      });
+    } else {
+      wrap.querySelector('.body').appendChild(packElement(set, {cls: 'big'}));
+      wrap.querySelector('.flap').appendChild(packElement(set, {cls: 'big'}));
+      stage.appendChild(wrap);
+      play(wrap, [
+        {transform: 'translateY(70vh) rotate(9deg) scale(.6)', opacity: 0},
+        {transform: 'translateY(-4%) rotate(-2deg) scale(1.03)', opacity: 1, offset: 0.7},
+        {transform: 'none', opacity: 1},
+      ], {duration: 720, easing: 'cubic-bezier(.2,.85,.3,1)'}).then(() => wrap.classList.add('idle'));
+    }
 
     // Le paquet s'incline vers le doigt ; glisser dessus l'ouvre aussi.
     let down = null;
@@ -477,6 +511,9 @@ export function openPack(booster, set, more) {
       if (controls) {
         controls.cleanup();
       }
+      if (pack3d) {
+        pack3d.dispose();
+      }
       resolve();
     };
     const later = el('<button class="btn">Plus tard</button>');
@@ -498,15 +535,26 @@ export function openPack(booster, set, more) {
       const request = bridge.request('openBooster', {id: booster.id})
         .then(r => (result = r), e => (result = {error: e.message}))
         .then(() => result.cards && preload(result.cards));
-      wrap.classList.remove('idle');
       sfx('booster_open');
-      // Le paquet se tasse, la soudure s'illumine d'un bord à l'autre, puis le haut s'arrache.
-      await play(packEl, [{transform: 'scale(1)'}, {transform: 'scale(1.04, .96)', offset: 0.5}, {transform: 'scale(1)'}],
-        {duration: 260, easing: 'ease-in-out'});
-      packEl.classList.add('torn');
-      const c = center(wrap, stage);
-      fx.burst(c.sx, c.sy - wrap.offsetHeight * 0.36, {count: 36, colors: LIGHT, speed: 8, size: 15, up: true, life: 1200});
-      await Promise.all([request, wait(animated() ? 560 : 0)]);
+      let c;
+      if (pack3d) {
+        // En 3D : la soudure s'illumine, la bande du haut s'arrache et la lumière jaillit du paquet.
+        await pack3d.tear(0, () => {
+          const top = pack3d.screenPoint(0, 'top');
+          fx.burst(top.x, top.y, {count: 40, colors: LIGHT, speed: 8, size: 16, up: true, life: 1300});
+        });
+        await Promise.all([request, wait(animated() ? 150 : 0)]);
+        c = stagePoint(pack3d.screenPoint(0, 'center'), stage);
+      } else {
+        wrap.classList.remove('idle');
+        // Le paquet se tasse, la soudure s'illumine d'un bord à l'autre, puis le haut s'arrache.
+        await play(packEl, [{transform: 'scale(1)'}, {transform: 'scale(1.04, .96)', offset: 0.5}, {transform: 'scale(1)'}],
+          {duration: 260, easing: 'ease-in-out'});
+        packEl.classList.add('torn');
+        c = center(wrap, stage);
+        fx.burst(c.sx, c.sy - wrap.offsetHeight * 0.36, {count: 36, colors: LIGHT, speed: 8, size: 15, up: true, life: 1200});
+        await Promise.all([request, wait(animated() ? 560 : 0)]);
+      }
       if (result.error) {
         toast(result.error, {error: true});
         close();
@@ -514,8 +562,15 @@ export function openPack(booster, set, more) {
       }
       forgetCareer();
       flash(stage);
-      play(wrap, [{transform: 'none', opacity: 1}, {transform: 'translateY(26%) scale(.9)', opacity: 0}],
-        {duration: 520, delay: 200, easing: 'cubic-bezier(.5,0,.8,.6)'}).then(() => wrap.remove());
+      if (pack3d) {
+        pack3d.exit().then(() => {
+          pack3d.dispose();
+          pack3d.host.remove();
+        });
+      } else {
+        play(wrap, [{transform: 'none', opacity: 1}, {transform: 'translateY(26%) scale(.9)', opacity: 0}],
+          {duration: 520, delay: 200, easing: 'cubic-bezier(.5,0,.8,.6)'}).then(() => wrap.remove());
+      }
       deal(result.cards, c);
     };
 
@@ -577,6 +632,9 @@ export function openPack(booster, set, more) {
           allBtn.addEventListener('click', () => {
             done = true;
             controls.cleanup();
+            if (pack3d) {
+              pack3d.dispose();
+            }
             ov.remove();
             openPacks(after.rest, after.setFor).then(resolve);
           });
@@ -587,6 +645,9 @@ export function openPack(booster, set, more) {
           again.addEventListener('click', () => {
             done = true;
             controls.cleanup();
+            if (pack3d) {
+              pack3d.dispose();
+            }
             ov.remove();
             openPack(after.next.booster, after.next.set, more).then(resolve);
           });
@@ -624,15 +685,19 @@ function merge(packs) {
  * Les rares et mythiques arrivent face cachée, les autres face visible ; tout se range par rareté.
  */
 export function openPacks(boosters, setFor) {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const list = boosters.slice(0, 100);
     const view = overlay(`${list.length} boosters`);
     const {ov, fx, stage, actions, hint} = view;
     hint.textContent = 'Touche les boosters pour tous les ouvrir';
-    // Éventail de paquets (au plus 7 montrés).
+    // Éventail de paquets (au plus 7 montrés), en 3D si possible.
     const fan = el('<div class="bo-fan"></div>');
     const shown = list.slice(0, 7);
+    const packs3d = await scene3d(stage, shown.map(b => setFor(b.set)), {fan: true});
     shown.forEach((b, i) => {
+      if (packs3d) {
+        return;
+      }
       const k = i - (shown.length - 1) / 2;
       const p = el(`<div class="bo-fan-pack" style="--k:${k};--i:${i}"><div class="bo-pack"><div class="bo-part body"></div>
         <div class="bo-part flap"></div><i class="bo-seam"></i><i class="bo-pack-light"></i></div></div>`);
@@ -642,11 +707,13 @@ export function openPacks(boosters, setFor) {
       fan.appendChild(p);
     });
     if (list.length > shown.length) {
-      fan.appendChild(el(`<span class="bo-fan-more">+${list.length - shown.length}</span>`));
+      (packs3d ? stage : fan).appendChild(el(`<span class="bo-fan-more${packs3d ? ' on3d' : ''}">+${list.length - shown.length}</span>`));
     }
-    stage.appendChild(fan);
-    play(fan, [{transform: 'translateY(60vh) scale(.7)', opacity: 0}, {transform: 'translateY(-3%) scale(1.02)', opacity: 1, offset: 0.72},
-      {transform: 'none', opacity: 1}], {duration: 720, easing: 'cubic-bezier(.2,.85,.3,1)'}).then(() => fan.classList.add('idle'));
+    if (!packs3d) {
+      stage.appendChild(fan);
+      play(fan, [{transform: 'translateY(60vh) scale(.7)', opacity: 0}, {transform: 'translateY(-3%) scale(1.02)', opacity: 1, offset: 0.72},
+        {transform: 'none', opacity: 1}], {duration: 720, easing: 'cubic-bezier(.2,.85,.3,1)'}).then(() => fan.classList.add('idle'));
+    }
 
     let controls = null;
     let done = false;
@@ -658,6 +725,9 @@ export function openPacks(boosters, setFor) {
       view.close();
       if (controls) {
         controls.cleanup();
+      }
+      if (packs3d) {
+        packs3d.dispose();
       }
       resolve();
     };
@@ -681,15 +751,23 @@ export function openPacks(boosters, setFor) {
       fan.classList.remove('idle');
       sfx('booster_open');
       // Les paquets s'ouvrent l'un après l'autre, en rafale.
-      const packs = [...fan.querySelectorAll('.bo-pack')];
-      for (const [i, p] of packs.entries()) {
-        setTimeout(() => {
-          p.classList.add('torn');
-          const c = center(p, stage);
-          fx.burst(c.sx, c.sy - p.offsetHeight * 0.36, {count: 18, colors: LIGHT, speed: 7, size: 13, up: true, life: 1000});
-        }, i * 110);
+      if (packs3d) {
+        const tears = shown.map((b, i) => wait(i * 140).then(() => packs3d.tear(i, () => {
+          const top = packs3d.screenPoint(i, 'top');
+          fx.burst(top.x, top.y, {count: 18, colors: LIGHT, speed: 7, size: 13, up: true, life: 1000});
+        })));
+        await Promise.all([request, ...tears]);
+      } else {
+        const packs = [...fan.querySelectorAll('.bo-pack')];
+        for (const [i, p] of packs.entries()) {
+          setTimeout(() => {
+            p.classList.add('torn');
+            const c = center(p, stage);
+            fx.burst(c.sx, c.sy - p.offsetHeight * 0.36, {count: 18, colors: LIGHT, speed: 7, size: 13, up: true, life: 1000});
+          }, i * 110);
+        }
+        await Promise.all([request, wait(animated() ? 420 + packs.length * 110 : 0)]);
       }
-      await Promise.all([request, wait(animated() ? 420 + packs.length * 110 : 0)]);
       if (result.error) {
         toast(result.error, {error: true});
         close();
@@ -697,12 +775,26 @@ export function openPacks(boosters, setFor) {
       }
       forgetCareer();
       flash(stage);
-      await play(fan, [{transform: 'none', opacity: 1}, {transform: 'translateY(20%) scale(.9)', opacity: 0}],
-        {duration: 420, easing: 'cubic-bezier(.5,0,.8,.6)'});
-      fan.remove();
+      if (packs3d) {
+        stage.querySelector('.bo-fan-more.on3d')?.remove();
+        await packs3d.exit();
+        packs3d.dispose();
+        packs3d.host.remove();
+      } else {
+        await play(fan, [{transform: 'none', opacity: 1}, {transform: 'translateY(20%) scale(.9)', opacity: 0}],
+          {duration: 420, easing: 'cubic-bezier(.5,0,.8,.6)'});
+        fan.remove();
+      }
       results(result.packs);
     };
     fan.addEventListener('click', tear);
+    if (packs3d) {
+      packs3d.host.addEventListener('click', () => {
+        if (!packs3d.dragged()) {
+          tear();
+        }
+      });
+    }
     go.addEventListener('click', tear);
 
     const results = (packs) => {

@@ -185,6 +185,10 @@ public final class Bridge {
             answerDialog(message);
             return;
         }
+        if ("presence".equals(type)) {
+            Presence.fromInterface(message);
+            return;
+        }
         if ("hello".equals(type)) {
             // Lecture seule : jamais en attente derrière un dialogue ouvert depuis l'EDT (page rechargée pendant une question).
             dispatch(type, message);
@@ -223,7 +227,7 @@ public final class Bridge {
             "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
             "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster", "openBoosters",
-            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust");
+            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -419,6 +423,8 @@ public final class Bridge {
                         m.has("art") ? m.get("art").getAsInt() : 0);
             case "careerAdjust":
                 return Career.adjust(catalog, m);
+            case "careerBuyCosmetic":
+                return Career.buyCosmetic(catalog, m.get("id").getAsString());
             case "careerReset":
                 if (session != null && session.isCareer()) {
                     throw new IllegalStateException("Termine d'abord le duel en cours.");

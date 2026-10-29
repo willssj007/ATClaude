@@ -30,6 +30,8 @@ final class Mulligans {
     private static final int AI_UNLIMITED_CAP = 30;
     /** Règle de Forge : un mulligan gratuit à plus de deux joueurs, aucun en duel. */
     static final int FORGE_DEFAULT = -2;
+    /** Mode Planeswalker : un mulligan gratuit par joueur. */
+    static final int CAREER_FREE = 1;
 
     private Mulligans() { }
 

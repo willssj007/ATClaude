@@ -103,6 +103,7 @@ const DEFAULTS = {
   animations: true,
   holdPriority: false,
   autoPass: true,
+  discordPresence: true,
   showEnglish: false,
   lastSetup: null,
   menuTheme: 'arcane',

@@ -228,6 +228,7 @@ function pickPrecon(title, intro, list, yes, opts = {}) {
 const RULES = `<ul class="pw-rules">
   <li>${icon('cards')} Tu choisis ton premier deck parmi les préconstruits Commander de bracket 2 : ses cartes sont ta collection.</li>
   <li>${icon('swords')} Des duels contre l'IA, un adversaire à la fois, de même bracket et de puissance proche de ton deck, sans triche ni réglages.</li>
+  <li>${icon('undo')} Le premier mulligan est gratuit (tu gardes 7 cartes), pour toi comme pour l'IA ; les suivants coûtent une carte.</li>
   <li>${icon('mana')} Chaque victoire : 200 mana, quelques cartes du deck adverse que tu n'as pas, et un booster.</li>
   <li>${icon('crown')} 5 victoires d'affilée (une série) : 5 boosters d'extensions au hasard et un nouveau préconstruit au choix.</li>
   <li>${icon('cards')} D'autres préconstruits s'achètent avec du mana (bouton « Acheter un deck » de l'écran Duel), de 2 000 mana (bracket 1) à 7 000 (bracket 5).</li>

@@ -7,6 +7,7 @@ import {esc, el, debounce, toast} from './util.js';
 import {icon} from './icons.js';
 import {RARITY_FR, rarityKey, setCareer, wildcardHtml} from './career.js';
 
+const COLOR_NAMES = {W: 'Blanc', U: 'Bleu', B: 'Noir', R: 'Rouge', G: 'Vert', C: 'Incolore'};
 const TYPES = [
   ['creature', 'Créature'], ['instant', 'Éphémère'], ['sorcery', 'Rituel'], ['artifact', 'Artefact'],
   ['enchantment', 'Enchantement'], ['planeswalker', 'Planeswalker'], ['land', 'Terrain'], ['battle', 'Bataille'], ['legendary', 'Légendaire'],
@@ -96,28 +97,26 @@ export class SearchPanel {
     // Les filtres se replient sur les écrans bas ; le bouton dit combien sont actifs.
     this.root.innerHTML = `<div class="search-head">
         <div class="search-bar main">
-          <input type="search" class="q" placeholder="Nom de carte (français ou anglais)…">
-          <button class="btn small filters-btn" title="Afficher ou masquer les filtres">${icon('filter')}<span>Filtres</span><b class="n"></b></button>
-          ${this.owned ? '<label class="check small missing-toggle" title="Montrer aussi les cartes que tu n\'as pas, à acheter avec un jeton de leur rareté"><input type="checkbox" class="missing"> Cartes manquantes</label>' : ''}
-          <span class="muted small total"></span>
+          <label class="sh-q">${icon('search')}<input type="search" class="q" placeholder="Nom de carte (français ou anglais)…"><span class="total"></span></label>
+          <button class="sh-pill filters-btn" title="Afficher ou masquer les filtres">${icon('filter')}<span>Filtres</span><b class="n"></b></button>
+          ${this.owned ? '<label class="tchip missing-toggle" title="Montrer aussi les cartes que tu n\'as pas, à acheter avec un jeton de leur rareté"><input type="checkbox" class="missing"><i></i><span>Manquantes</span></label>' : ''}
         </div>
         <div class="search-filters">
-          <div class="search-bar">
-            <div class="color-filter">${['W', 'U', 'B', 'R', 'G', 'C'].map(c => `<span class="ms ${c === 'C' ? '' : 'ms-' + c}" data-color="${c}" title="${c}">${c === 'C' ? '◇' : ''}</span>`).join('')}</div>
-            <select class="mode">
+          <div class="sh-row">
+            <div class="color-filter">${['W', 'U', 'B', 'R', 'G', 'C'].map(c => `<span class="ms ${c === 'C' ? '' : 'ms-' + c}" data-color="${c}" title="${COLOR_NAMES[c]}">${c === 'C' ? '◇' : ''}</span>`).join('')}</div>
+            <select class="mode" title="Comment comparer les couleurs choisies">
               <option value="any">Au moins une de ces couleurs</option>
               <option value="identity">Dans cette identité</option>
               <option value="exact">Exactement ces couleurs</option>
             </select>
-            <input type="number" class="cmin" placeholder="VM ≥" title="Valeur de mana minimale" min="0" style="width:76px">
-            <input type="number" class="cmax" placeholder="VM ≤" title="Valeur de mana maximale" min="0" style="width:76px">
+            <div class="sh-cmc" title="Valeur de mana (coût converti)"><span>VM</span><input type="number" class="cmin" placeholder="min" min="0" aria-label="Valeur de mana minimale"><i>–</i><input type="number" class="cmax" placeholder="max" min="0" aria-label="Valeur de mana maximale"></div>
           </div>
-          <div class="search-bar"><button class="btn small set-btn" title="N'afficher que les cartes d'une extension">${icon('book')}<span>Extension : toutes</span></button></div>
-          <div class="search-bar chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}</div>
-          <div class="search-bar">
-            <label class="check small"><input type="checkbox" class="intext"> Chercher aussi dans le texte</label>
-            <label class="check small"><input type="checkbox" class="legal"> Légales en Commander</label>
-            <label class="check small"><input type="checkbox" class="cmdonly"> Peuvent être commandant</label>
+          <div class="sh-row chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}</div>
+          <div class="sh-row">
+            <button class="sh-pill set-btn" title="N'afficher que les cartes d'une extension">${icon('book')}<span>Extension : toutes</span></button>
+            <label class="tchip" title="Chercher le mot aussi dans le texte des cartes"><input type="checkbox" class="intext"><i></i><span>Dans le texte</span></label>
+            <label class="tchip"><input type="checkbox" class="legal"><i></i><span>Légales en Commander</span></label>
+            <label class="tchip"><input type="checkbox" class="cmdonly"><i></i><span>Peuvent être commandant</span></label>
           </div>
         </div>
       </div>
@@ -266,7 +265,9 @@ export class SearchPanel {
       for (const card of result.cards) {
         grid.appendChild(this.cell(card));
       }
-      this.root.querySelector('.total').textContent = `${result.total.toLocaleString('fr-FR')} carte(s)${this.owned ? ' dans ta collection' : ''}`;
+      const total = this.root.querySelector('.total');
+      total.textContent = `${result.total.toLocaleString('fr-FR')} carte${result.total > 1 ? 's' : ''}`;
+      total.title = this.owned ? 'Cartes de ta collection qui correspondent' : 'Cartes qui correspondent';
       this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : (result.total ? '' : 'Aucune carte ne correspond.');
       this.refreshCounts();
     } catch (e) {

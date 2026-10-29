@@ -4,6 +4,8 @@
 const PATHS = {
   // Main : gantelet.
   hand: '<path d="M7.2 18.6c-1.1-1.1-3.3-3.9-3.9-4.8-.7-1 .5-2.3 1.6-1.6L8 14.2V5.4a1.4 1.4 0 0 1 2.8 0V11V4a1.4 1.4 0 0 1 2.8 0v7-6a1.4 1.4 0 0 1 2.8 0v6.2-3.6a1.4 1.4 0 0 1 2.8 0v6.6c0 2.7-1.4 4.4-3 5.4"/><path d="M6.3 18.4h10.6v3.1H6.3z"/><path d="M8.2 9.6h2.6M13.6 9.6h2.8"/>',
+  // Recherche : loupe.
+  search: '<circle cx="10.4" cy="10.4" r="6.4"/><path d="m15.2 15.2 5.4 5.4"/><path d="M7.4 8.8a3.6 3.6 0 0 1 2.8-2.4" opacity=".55"/>',
   // Bibliothèque : grimoire fermé à fermoir.
   library: '<path d="M5 4.6A1.6 1.6 0 0 1 6.6 3H19v15.2H6.6A1.6 1.6 0 0 0 5 19.8z"/><path d="M5 19.8A1.6 1.6 0 0 0 6.6 21.4H19v-3.2"/><path d="M8.4 3v15.2"/><path d="M11.4 7.4h4.6M11.4 10.4h3.2"/><path d="M19 11h1.6v3.4H19"/>',
   // Cimetière : pierre tombale.

@@ -127,8 +127,10 @@ final class MatchSession {
         }
         final List<RegisteredPlayer> players = new ArrayList<>();
         RegisteredPlayer human = null;
-        // Mulligans gratuits choisis dans le salon (absent : règle de Forge).
-        final int freeMulligans = !career && setup.has("mulligans") ? setup.get("mulligans").getAsInt() : Mulligans.FORGE_DEFAULT;
+        // Mulligans gratuits choisis dans le salon (absent : règle de Forge). Planeswalker : le premier mulligan de
+        // chaque joueur est gratuit (on garde 7 cartes), les suivants coûtent une carte.
+        final int freeMulligans = career ? Mulligans.CAREER_FREE
+                : setup.has("mulligans") ? setup.get("mulligans").getAsInt() : Mulligans.FORGE_DEFAULT;
         int aiIndex = 0;
         // Le salon tel quel, avec chaque deck écrit en entier : la sauvegarde ne dépend plus des decks enregistrés.
         final JsonObject resolved = setup.deepCopy();
@@ -366,6 +368,7 @@ final class MatchSession {
     }
 
     void close() {
+        Presence.leftGame();
         // Sous le verrou des sauvegardes : une photo en cours d'écriture ne ramène pas la partie abandonnée.
         synchronized (SaveGame.class) {
             closed = true;
@@ -785,6 +788,64 @@ final class MatchSession {
                 }
             }
         }, 250, TimeUnit.MILLISECONDS);
+    }
+
+    private final long startedAt = System.currentTimeMillis() / 1000;
+
+    /**
+     * Ce que montrent les amis du joueur (Discord sur ordinateur) : mode et format, deck et commandant, points de vie,
+     * tour, adversaires restants ; à la fin, le résultat. Calculé après chaque photo, envoyé seulement s'il change.
+     */
+    void presence() {
+        if (closed || !Presence.active()) {
+            return;
+        }
+        try {
+            final Game game = game();
+            final Player me = game == null ? null : humanPlayer(game);
+            if (me == null) {
+                return;
+            }
+            final JsonObject a = new JsonObject();
+            final int players = game.getRegisteredPlayers().size();
+            final String format = commanderFormat ? (players > 2 ? "Commander à " + players : "Duel Commander") : (players > 2 ? "Partie à " + players : "Duel");
+            a.addProperty("details", (career ? "Planeswalker · " : "Sandbox · ") + format);
+            final Deck deck = me.getRegisteredPlayer().getDeck();
+            final List<String> commanders = new ArrayList<>();
+            if (deck.has(forge.deck.DeckSection.Commander)) {
+                deck.get(forge.deck.DeckSection.Commander).toFlatList().forEach(pc -> commanders.add(pc.getName()));
+            }
+            final GameView gv = gui.getGameView();
+            final GameOutcome outcome = gv == null ? null : gv.getOutcome();
+            String state;
+            if (game.isGameOver() && outcome != null) {
+                state = outcome.isDraw() ? "Match nul" : outcome.isWinner(me.getLobbyPlayer()) ? "Victoire !" : "Défaite";
+                state += " · tour " + outcome.getLastTurnNumber();
+            } else {
+                final long alive = game.getRegisteredPlayers().stream().filter(p -> p != me && !p.hasLost()).count();
+                state = me.getLife() + " PV · tour " + Math.max(1, game.getPhaseHandler().getTurn());
+                final int poison = me.getPoisonCounters();
+                if (poison > 0) {
+                    state += " · " + poison + " poison";
+                }
+                if (players > 2) {
+                    state += " · " + alive + " adversaire" + (alive > 1 ? "s" : "");
+                }
+            }
+            a.addProperty("state", state);
+            a.addProperty("since", startedAt);
+            a.addProperty("mode", career ? "planeswalker" : "sandbox");
+            // Nom du deck sans les codes des préconstruits (« Abzan Armor [TDC] [2025] » → « Abzan Armor »).
+            final String raw = deck.getName() == null ? "" : deck.getName().replaceAll("\\s*\\[[^\\]]*\\]", "").trim();
+            final String deckName = raw.isEmpty() ? String.join(" & ", commanders) : raw;
+            if (!commanders.isEmpty()) {
+                a.addProperty("image", commanders.get(0));
+            }
+            a.addProperty("imageText", deckName.isEmpty() ? "Arcane Table" : "Deck : " + deckName);
+            Presence.game(a);
+        } catch (final RuntimeException e) {
+            // Partie en train de changer pendant la lecture : la prochaine photo réessaiera.
+        }
     }
 
     /** Après chaque photo envoyée à l'interface : la partie a pu changer sans nouvelle invite (triche, sort résolu). */

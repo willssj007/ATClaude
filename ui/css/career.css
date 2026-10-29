@@ -220,3 +220,8 @@
 .shelf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .shelf-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .shelf-item .shelf-all { align-self: center; }
+
+/* Vitrine de la boutique en 3D : le booster tourne au-dessus de son dessin CSS, qui disparaît une fois la 3D prête. */
+.shop-pack { position: relative; }
+.shop-pack3d { position: absolute; inset: -4% -30%; z-index: 2; touch-action: pan-y; cursor: grab; }
+.shop-pack.has-3d > .pack { visibility: hidden; }
