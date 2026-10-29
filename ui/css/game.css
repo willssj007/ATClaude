@@ -354,11 +354,11 @@
 .pile.has-selectable { box-shadow: 0 0 0 2px var(--playable), 0 0 12px rgba(91, 224, 143, 0.6); border-color: transparent; }
 
 /* ---------- Invite et boutons : en bas à droite, dans la place que le plateau leur laisse ---------- */
-.actions {
+.table > .actions {
   position: absolute; right: calc(8px + var(--dodge-r, 0px)); bottom: calc(4px + var(--safe-bottom) * 0.5); z-index: 14; width: var(--act-w);
   display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; pointer-events: none;
 }
-.actions > * { pointer-events: auto; }
+.table > .actions > * { pointer-events: auto; }
 .prompt {
   background: rgb(10 12 22 / 0.9); border: 1px solid var(--line-strong); border-radius: 12px; padding: 6px 9px;
   font-size: 12px; line-height: 1.35; max-height: 7em; overflow: auto; white-space: pre-line; min-height: 0;

@@ -440,8 +440,13 @@ export class Game {
         this.render(this.state, true);
         return;
       }
-      const inHand = e.target.closest('.hand-band');
-      if (this.handOpen && !inHand) {
+      // Mes piles (bibliothèque, cimetière, exil, commandant) sont dans la bande de la main mais n'en font pas
+      // partie : les toucher agit tout de suite (et replie la main), sans d'abord la déplier.
+      const inPiles = e.target.closest('.my-piles');
+      const inHand = !inPiles && e.target.closest('.hand-band');
+      if (inPiles && this.handOpen && !this.handNeeded) {
+        this.setHandOpen(false);
+      } else if (this.handOpen && !inHand && !inPiles) {
         // Main dépliée : toucher le plateau la replie, sans rien jouer.
         this.setHandOpen(false);
         return;
