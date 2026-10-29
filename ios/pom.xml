@@ -16,6 +16,8 @@
     <properties>
         <robovm.version>2.3.24</robovm.version>
         <jvmdg.version>1.3.6</jvmdg.version>
+        <!-- arm64 : iPhone et iPad ; -Drobovm.arch=arm64-simulator pour le simulateur (scripts/ios-sim-test.sh). -->
+        <robovm.arch>arm64</robovm.arch>
     </properties>
 
     <dependencies>
@@ -119,7 +121,7 @@
                     <configFile>robovm.xml</configFile>
                     <iosInfoPList>Info.plist.xml</iosInfoPList>
                     <iosSkipSigning>true</iosSkipSigning>
-                    <arch>arm64</arch>
+                    <arch>${robovm.arch}</arch>
                 </configuration>
             </plugin>
         </plugins>
