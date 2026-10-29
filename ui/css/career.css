@@ -334,3 +334,15 @@
 .lg-now { min-width: 60px; text-align: right; font-weight: 700; }
 .lg-row .lg-n { width: 90px; }
 .lg-row .csel, .lg-row .lg-set { flex: 1 1 100%; }
+
+/* Préconstruits : progression des brackets et achat avec du mana. */
+.deck-shop { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px; }
+.deck-shop > .ic { flex: none; width: 26px; height: 26px; color: var(--gold); }
+.deck-shop > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.deck-shop .btn { flex: none; }
+.pp-list .deck-tile.locked { opacity: 0.45; filter: grayscale(0.7); }
+.pp-list .deck-tile.too-dear .info span { color: var(--bad); }
+@media (max-width: 560px) {
+  .deck-shop { flex-wrap: wrap; }
+  .deck-shop .btn { width: 100%; }
+}

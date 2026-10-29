@@ -190,7 +190,7 @@ public final class Bridge {
             "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
             "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster",
-            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerDuel", "careerBuyCard", "careerAdjust");
+            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -341,6 +341,8 @@ public final class Bridge {
                 return Career.deckChoices();
             case "careerChooseDeck":
                 return Career.chooseDeck(catalog, m.get("key").getAsString());
+            case "careerBuyDeck":
+                return Career.buyDeck(catalog, m.get("key").getAsString());
             case "careerDuel": {
                 final String deck = m.get("deck").getAsString();
                 return Career.duelInfo(catalog, deck.startsWith(Career.KEY_PREFIX) ? deck.substring(Career.KEY_PREFIX.length()) : deck);

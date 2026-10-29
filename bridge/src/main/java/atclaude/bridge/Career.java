@@ -33,23 +33,29 @@ import java.util.Set;
  * Mode Planeswalker : une carrière avec sa collection de cartes, ses decks, sa réserve de « mana » (la monnaie du jeu),
  * ses boosters et ses jetons de rareté. On commence avec un préconstruit Commander de bracket 2, choisi ; chaque duel
  * gagné rapporte du mana, quelques cartes du deck adverse (jamais une carte déjà possédée) et un booster ; 5 victoires
- * d'affilée, 5 boosters et un nouveau préconstruit au choix. L'adversaire a le même bracket et une puissance proche du
- * deck joué. Une carte reçue en double devient un jeton de sa rareté, qui achète une carte manquante de même rareté.
+ * d'affilée (une série), 5 boosters et un nouveau préconstruit au choix ; d'autres s'achètent avec du mana. Les
+ * préconstruits de bracket 3 et plus se débloquent au fil des séries : un bracket de plus toutes les 2 séries.
+ * L'adversaire a le même bracket et une puissance proche du deck joué. Une carte reçue en double devient un jeton de sa
+ * rareté, qui achète une carte manquante de même rareté.
  *
  * Tout est décidé ici, pas dans l'interface : récompenses, achats, contenu des boosters et cartes autorisées dans les decks.
  * Le fichier suit le compte (synchronisation) : la version la plus récente gagne.
  */
 final class Career {
 
-    static final int WIN_MANA = 100;
+    static final int WIN_MANA = 200;
     static final int BOOSTER_PRICE = 750;
     static final int CARDS_PER_WIN = 3;
     static final int STREAK_BONUS_EVERY = 5;
     static final int STREAK_BONUS_BOOSTERS = 5;
     static final int PACK_SIZE = 14;
+    /** Séries terminées pour débloquer chaque bracket au-dessus du 2 (bracket 3 après 2 séries, 4 après 4...). */
+    static final int SERIES_PER_BRACKET = 2;
+    /** Prix d'un préconstruit en mana, par bracket (1 à 5). */
+    private static final int[] DECK_PRICES = {0, 2000, 2500, 3500, 5000, 7000};
     static final String KEY_PREFIX = "career:";
     static final List<String> RARITIES = List.of("common", "uncommon", "rare", "mythic");
-    private static final List<String> COUNTERS = List.of("mana", "wins", "losses", "streak", "bestStreak", "opened", "mythics", "duels", "deckChoices");
+    private static final List<String> COUNTERS = List.of("mana", "wins", "losses", "streak", "bestStreak", "opened", "mythics", "duels", "deckChoices", "series");
 
     private static final Random RANDOM = new Random();
 
@@ -121,6 +127,9 @@ final class Career {
         for (final String k : COUNTERS) {
             o.addProperty(k, num(c, k));
         }
+        o.addProperty("series", series(c));
+        o.addProperty("maxBracket", maxBracket(c));
+        o.addProperty("seriesPerBracket", SERIES_PER_BRACKET);
         o.addProperty("price", BOOSTER_PRICE);
         o.addProperty("winMana", WIN_MANA);
         o.addProperty("cardsPerWin", CARDS_PER_WIN);
@@ -191,10 +200,15 @@ final class Career {
         return summary(catalog);
     }
 
-    /** Préconstruits qu'on peut prendre avec un choix gagné (série de victoires) : tous ceux qu'on n'a pas encore. */
+    /**
+     * Préconstruits qu'on n'a pas encore, à prendre avec un choix gagné (série de victoires) ou à acheter : chacun avec
+     * son prix, et « locked » si son bracket n'est pas encore débloqué (avec le nombre de séries qu'il faut).
+     */
     static synchronized JsonArray deckChoices() {
+        final JsonObject c = load();
+        final int max = maxBracket(c);
         final Set<String> taken = new HashSet<>();
-        for (final JsonElement e : array(load(), "precons")) {
+        for (final JsonElement e : array(c, "precons")) {
             taken.add(e.getAsString());
         }
         final List<Precons.Info> list = new ArrayList<>();
@@ -205,16 +219,58 @@ final class Career {
         }
         list.sort(Comparator.comparingInt(Precons.Info::bracket).thenComparingDouble(Precons.Info::power).thenComparing(Precons.Info::name));
         final JsonArray a = new JsonArray();
-        list.forEach(i -> a.add(i.json()));
+        for (final Precons.Info i : list) {
+            final JsonObject o = i.json();
+            o.addProperty("price", deckPrice(i.bracket()));
+            if (i.bracket() > max) {
+                o.addProperty("locked", true);
+                o.addProperty("unlockSeries", (i.bracket() - 2) * SERIES_PER_BRACKET);
+            }
+            a.add(o);
+        }
         return a;
     }
 
-    /** Prend un préconstruit avec un choix gagné : son deck et ses cartes (les doublons deviennent des jetons). */
-    static synchronized JsonObject chooseDeck(final Catalog catalog, final String preconKey) {
-        final JsonObject c = load();
-        if (!bool(c, "started") || num(c, "deckChoices") <= 0) {
-            throw new IllegalStateException("Pas de nouveau deck à choisir : gagne 5 duels d'affilée pour en obtenir un.");
+    /** Bracket le plus haut qu'on peut prendre ou acheter : 2 au départ, un de plus toutes les 2 séries terminées. */
+    static int maxBracket(final JsonObject c) {
+        return (int) Math.min(5, 2 + series(c) / SERIES_PER_BRACKET);
+    }
+
+    /** Séries de 5 victoires terminées (déduites des decks gagnés pour une carrière d'avant ce compteur). */
+    private static long series(final JsonObject c) {
+        if (c.has("series")) {
+            return num(c, "series");
         }
+        return Math.max(0, array(c, "precons").size() - 1 + num(c, "deckChoices"));
+    }
+
+    static int deckPrice(final int bracket) {
+        return DECK_PRICES[Math.max(1, Math.min(5, bracket))];
+    }
+
+    /** Achète un préconstruit avec du mana (bracket débloqué) : son deck et ses cartes, comme un deck gagné. */
+    static synchronized JsonObject buyDeck(final Catalog catalog, final String preconKey) {
+        final JsonObject c = load();
+        if (!bool(c, "started")) {
+            throw new IllegalStateException("Commence d'abord ta carrière de Planeswalker.");
+        }
+        final Precons.Info info = takeable(c, preconKey);
+        final int price = deckPrice(info.bracket());
+        if (num(c, "mana") < price) {
+            throw new IllegalStateException("Il te faut " + price + " mana pour ce deck.");
+        }
+        c.addProperty("mana", num(c, "mana") - price);
+        c.addProperty("series", series(c));
+        final JsonObject dupes = addPrecon(catalog, c, info);
+        save(c);
+        final JsonObject o = summary(catalog);
+        o.add("dupes", dupes);
+        o.addProperty("chosen", KEY_PREFIX + uniqueDeckName(c, info.name(), true));
+        return o;
+    }
+
+    /** Le préconstruit demandé, s'il existe, n'est pas déjà possédé et son bracket est débloqué. */
+    private static Precons.Info takeable(final JsonObject c, final String preconKey) {
         final Precons.Info info = Precons.get(preconKey);
         if (info == null) {
             throw new IllegalArgumentException("Préconstruit introuvable.");
@@ -224,6 +280,23 @@ final class Career {
                 throw new IllegalArgumentException("Tu as déjà ce deck.");
             }
         }
+        final int max = maxBracket(c);
+        if (info.bracket() > max) {
+            final long need = (info.bracket() - 2L) * SERIES_PER_BRACKET - series(c);
+            throw new IllegalStateException("Le bracket " + info.bracket() + " se débloque après " + need
+                    + (need > 1 ? " séries" : " série") + " de 5 victoires de plus.");
+        }
+        return info;
+    }
+
+    /** Prend un préconstruit avec un choix gagné : son deck et ses cartes (les doublons deviennent des jetons). */
+    static synchronized JsonObject chooseDeck(final Catalog catalog, final String preconKey) {
+        final JsonObject c = load();
+        if (!bool(c, "started") || num(c, "deckChoices") <= 0) {
+            throw new IllegalStateException("Pas de nouveau deck à choisir : gagne 5 duels d'affilée pour en obtenir un.");
+        }
+        final Precons.Info info = takeable(c, preconKey);
+        c.addProperty("series", series(c));
         final JsonObject dupes = addPrecon(catalog, c, info);
         c.addProperty("deckChoices", num(c, "deckChoices") - 1);
         save(c);
@@ -652,6 +725,11 @@ final class Career {
             won1.add(newBooster(boosters, randomSet()));
             reward.add("boosters", won1);
             if (streak % STREAK_BONUS_EVERY == 0) {
+                final int before = maxBracket(c);
+                c.addProperty("series", series(c) + 1);
+                if (maxBracket(c) > before) {
+                    reward.addProperty("newBracket", maxBracket(c));
+                }
                 final JsonArray bonus = new JsonArray();
                 for (int i = 0; i < STREAK_BONUS_BOOSTERS; i++) {
                     bonus.add(newBooster(boosters, randomSet()));
@@ -927,6 +1005,7 @@ final class Career {
                 c.addProperty("bestStreak", Math.max(num(c, "bestStreak"), n));
             }
             case "deckChoice" -> c.addProperty("deckChoices", Math.max(0, num(c, "deckChoices") + n));
+            case "series" -> c.addProperty("series", Math.max(0, series(c) + n));
             case "rerollOpponents" -> c.add("opponents", new JsonObject());
             default -> throw new IllegalArgumentException("Réglage inconnu : " + op);
         }

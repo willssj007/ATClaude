@@ -208,7 +208,7 @@ function homeScreen() {
             <button class="btn primary" data-go="lobby">Créer un salon</button>
             <button class="btn" data-go="decks">Mes decks</button>`;
       const tiles = pw ? `
-          <div class="tile panel" data-go="duel">${icon('swords', 'tile-ic')}<h3>Duel</h3><p class="muted">Un adversaire à la fois : 100 mana, des cartes et un booster par victoire.</p></div>
+          <div class="tile panel" data-go="duel">${icon('swords', 'tile-ic')}<h3>Duel</h3><p class="muted">Un adversaire à la fois : 200 mana, des cartes et un booster par victoire.</p></div>
           <div class="tile panel" data-go="boosters">${icon('booster', 'tile-ic')}<h3>Boosters</h3><p class="muted">Ouvre tes boosters, ou achètes-en de n'importe quelle extension.</p></div>
           <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">Construis tes decks avec les cartes de ta collection.</p></div>
           <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Collection</h3><p class="muted">${c && c.started ? `${c.unique} cartes différentes, ${c.cards} au total.` : 'Les cartes que tu possèdes.'}</p></div>`

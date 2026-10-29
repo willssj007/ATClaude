@@ -83,6 +83,7 @@ export function rewardHtml(r) {
       : '<div class="muted small">Tu possèdes déjà toutes les cartes de ce deck adverse.</div>'}
     <div class="rw-h">${icon('booster')} ${boosters.map(b => `Booster ${esc(b.name)}`).join(', ')}</div>
     ${r.bonus ? `<div class="rw-bonus">${icon('crown')} ${r.streak} victoires d'affilée : ${plural(r.bonus.length, 'booster', 'boosters')} en bonus${r.deckChoice ? ' et un nouveau deck à choisir dans Duel' : ''} !</div>` : ''}
+    ${r.newBracket ? `<div class="rw-bonus">${icon('crown')} Préconstruits de bracket ${r.newBracket} débloqués : à choisir ou à acheter dans Duel.</div>` : ''}
     <div class="muted small">Série en cours : ${plural(r.streak || 0, 'victoire', 'victoires')}.</div>
   </div>`;
 }
@@ -131,24 +132,33 @@ function measureHtml(p) {
  * Choix d'un préconstruit (début de carrière ou deck gagné) : grille filtrable par nom et par couleur,
  * avec le bracket et la puissance de chacun. Renvoie la clé choisie, ou null.
  */
-function pickPrecon(title, intro, list, yes) {
+function pickPrecon(title, intro, list, yes, opts = {}) {
   return new Promise((resolve) => {
     let done = false;
     const box = customBox(title, (body, footer, close) => {
+      const brackets = [...new Set(list.map(p => p.bracket))].sort();
       body.innerHTML = `<p class="muted small">${intro} Touche un deck pour le choisir.</p>
         <div class="pp-bar"><input type="search" class="pp-q" placeholder="Nom du deck ou du commandant…">
-          <span class="color-filter pp-colors">${ID_ORDER.split('').map(c => `<span class="ms ms-${c}" data-color="${c}" title="${c}"></span>`).join('')}</span></div>
+          <span class="color-filter pp-colors">${ID_ORDER.split('').map(c => `<span class="ms ms-${c}" data-color="${c}" title="${c}"></span>`).join('')}</span>
+          ${brackets.length > 1 ? `<span class="seg pp-brackets"><button class="on" data-b="">Tous</button>${brackets.map(b => `<button data-b="${b}">B${b}</button>`).join('')}</span>` : ''}</div>
         <div class="deck-list pp-list"></div>`;
       const listEl = body.querySelector('.pp-list');
       const q = body.querySelector('.pp-q');
       const colors = new Set();
+      let bracket = '';
+      // Brackets ouverts d'abord, puis ceux qui restent à débloquer.
+      const ordered = [...list.filter(p => !p.locked), ...list.filter(p => p.locked)];
       const render = () => {
         const t = q.value.trim().toLowerCase();
-        const shown = list.filter(p => (!t || p.name.toLowerCase().includes(t) || (p.commanders || []).some(c => c.toLowerCase().includes(t)))
-          && [...colors].every(c => (p.identity || '').includes(c)));
-        listEl.replaceChildren(...shown.slice(0, 120).map(p => {
-          const tile = deckTile(p, '', 'Préconstruit Commander');
+        const shown = ordered.filter(p => (!t || p.name.toLowerCase().includes(t) || (p.commanders || []).some(c => c.toLowerCase().includes(t)))
+          && [...colors].every(c => (p.identity || '').includes(c)) && (!bracket || String(p.bracket) === bracket));
+        listEl.replaceChildren(...shown.slice(0, 300).map(p => {
+          const sub = p.locked ? `Débloqué après ${plural(p.unlockSeries, 'série', 'séries')} de 5 victoires`
+            : opts.buy ? `${Number(p.price).toLocaleString('fr-FR')} mana` : 'Préconstruit Commander';
+          const tile = deckTile(p, '', sub);
           tile.querySelector('.deck-art').insertAdjacentHTML('beforeend', measureHtml(p));
+          tile.classList.toggle('locked', !!p.locked);
+          tile.classList.toggle('too-dear', !p.locked && !!opts.buy && p.price > opts.mana);
           return tile;
         }));
         if (!shown.length) {
@@ -157,6 +167,17 @@ function pickPrecon(title, intro, list, yes) {
       };
       render();
       q.addEventListener('input', render);
+      const seg = body.querySelector('.pp-brackets');
+      if (seg) {
+        seg.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-b]');
+          if (b) {
+            seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+            bracket = b.dataset.b;
+            render();
+          }
+        });
+      }
       body.querySelector('.pp-colors').addEventListener('click', (e) => {
         const c = e.target.closest('[data-color]');
         if (c) {
@@ -171,7 +192,17 @@ function pickPrecon(title, intro, list, yes) {
           return;
         }
         const p = list.find(x => x.key === tile.dataset.key);
-        if (p && await confirmBox(`${p.name} ?`, `${(p.commanders || []).join(' & ')} · bracket ${p.bracket} · puissance ${String(p.power).replace('.', ',')}/10.`, {yes})) {
+        if (p && p.locked) {
+          toast(`Le bracket ${p.bracket} se débloque après ${plural(p.unlockSeries, 'série', 'séries')} de 5 victoires d'affilée.`, {title: 'Pas encore'});
+          return;
+        }
+        if (p && opts.buy && p.price > opts.mana) {
+          toast(`Il te faut ${Number(p.price).toLocaleString('fr-FR')} mana pour ce deck (tu en as ${Number(opts.mana).toLocaleString('fr-FR')}).`, {title: 'Pas assez de mana'});
+          return;
+        }
+        const what = `${(p.commanders || []).join(' & ')} · bracket ${p.bracket} · puissance ${String(p.power).replace('.', ',')}/10.`;
+        if (p && await confirmBox(opts.buy ? `Acheter ${p.name} ?` : `${p.name} ?`,
+          opts.buy ? `${what} Prix : ${Number(p.price).toLocaleString('fr-FR')} mana.` : what, {yes})) {
           done = true;
           resolve(p.key);
           close();
@@ -197,8 +228,10 @@ function pickPrecon(title, intro, list, yes) {
 const RULES = `<ul class="pw-rules">
   <li>${icon('cards')} Tu choisis ton premier deck parmi les préconstruits Commander de bracket 2 : ses cartes sont ta collection.</li>
   <li>${icon('swords')} Des duels contre l'IA, un adversaire à la fois, de même bracket et de puissance proche de ton deck, sans triche ni réglages.</li>
-  <li>${icon('mana')} Chaque victoire : 100 mana, quelques cartes du deck adverse que tu n'as pas, et un booster.</li>
-  <li>${icon('crown')} 5 victoires d'affilée : 5 boosters d'extensions au hasard et un nouveau préconstruit au choix.</li>
+  <li>${icon('mana')} Chaque victoire : 200 mana, quelques cartes du deck adverse que tu n'as pas, et un booster.</li>
+  <li>${icon('crown')} 5 victoires d'affilée (une série) : 5 boosters d'extensions au hasard et un nouveau préconstruit au choix.</li>
+  <li>${icon('cards')} D'autres préconstruits s'achètent avec du mana (bouton « Acheter un deck » de l'écran Duel), de 2 000 mana (bracket 1) à 7 000 (bracket 5).</li>
+  <li>${icon('swords')} Au départ, les préconstruits vont jusqu'au bracket 2 ; chaque fois que tu termines 2 séries, le bracket suivant se débloque (3, puis 4, puis 5).</li>
   <li>${icon('booster')} La boutique vend des boosters de toutes les extensions, 750 mana pièce.</li>
   <li>${icon('gem')} Une carte en double devient un jeton de sa rareté ; un jeton achète une carte manquante de même rareté (Collection, deck builder).</li>
 </ul>`;
@@ -267,7 +300,8 @@ export class DuelScreen {
   async chooseNewDeck() {
     try {
       const list = await bridge.request('careerDeckChoices');
-      const key = await pickPrecon('Un nouveau deck', 'Ta série t\'a valu un nouveau préconstruit : prends celui que tu veux (bracket et puissance indiqués ; tes adversaires s\'adaptent au deck que tu joues). Les cartes que tu as déjà deviennent des jetons.', list, 'Prendre ce deck');
+      const c0 = await loadCareer();
+      const key = await pickPrecon('Un nouveau deck', `Ta série t'a valu un nouveau préconstruit : prends celui que tu veux, jusqu'au bracket ${c0.maxBracket} (bracket et puissance indiqués ; tes adversaires s'adaptent au deck que tu joues). Les cartes que tu as déjà deviennent des jetons.`, list, 'Prendre ce deck');
       if (!key) {
         return;
       }
@@ -276,6 +310,27 @@ export class DuelScreen {
       const d = c.dupes || {};
       const n = Object.values(d).reduce((a, b) => a + b, 0);
       toast(n ? `Cartes déjà possédées changées en jetons : ${Object.entries(d).filter(([, k]) => k).map(([r, k]) => wildcardCount(r, k)).join(', ')}.` : 'Toutes ses cartes sont nouvelles.', {title: 'Deck ajouté'});
+      this.deckKey = c.chosen || this.deckKey;
+      this.render(c);
+    } catch (e) {
+      toast(e.message, {error: true});
+    }
+  }
+
+  /** Achat d'un préconstruit avec du mana, parmi les brackets débloqués. */
+  async buyDeck() {
+    try {
+      const [list, c0] = await Promise.all([bridge.request('careerDeckChoices'), loadCareer(true)]);
+      const key = await pickPrecon('Acheter un deck', `Tu as ${Number(c0.mana).toLocaleString('fr-FR')} mana. Brackets débloqués : jusqu'au ${c0.maxBracket}. Les cartes que tu as déjà deviennent des jetons.`,
+        list, 'Acheter', {buy: true, mana: c0.mana});
+      if (!key) {
+        return;
+      }
+      const c = await bridge.request('careerBuyDeck', {key});
+      setCareer(c);
+      const d = c.dupes || {};
+      const n = Object.values(d).reduce((a, b) => a + b, 0);
+      toast(n ? `Cartes déjà possédées changées en jetons : ${Object.entries(d).filter(([, k]) => k).map(([r, k]) => wildcardCount(r, k)).join(', ')}.` : 'Toutes ses cartes sont nouvelles.', {title: 'Deck acheté'});
       this.deckKey = c.chosen || this.deckKey;
       this.render(c);
     } catch (e) {
@@ -311,6 +366,10 @@ export class DuelScreen {
           <span class="muted small">${toBonus === c.bonusEvery && c.streak ? 'Bonus obtenu ! ' : ''}Encore ${plural(toBonus, 'victoire', 'victoires')} d'affilée pour ${c.bonusBoosters} boosters et un nouveau deck.</span></div>
         <div class="streak-pips">${Array.from({length: c.bonusEvery}, (_, i) => `<i class="${i < c.streak % c.bonusEvery ? 'on' : ''}"></i>`).join('')}</div>
       </div>
+      <div class="deck-shop panel">${icon('cards')}<div><b>Préconstruits jusqu'au bracket ${c.maxBracket}</b>
+        <span class="muted small">${c.maxBracket >= 5 ? 'Tous les brackets sont débloqués.'
+          : `Bracket ${c.maxBracket + 1} après ${plural(c.seriesPerBracket - (c.series % c.seriesPerBracket), 'série terminée', 'séries terminées')} de plus (${plural(c.series, 'série', 'séries')} jusqu'ici).`}</span></div>
+        <button class="btn" data-buy-deck>${icon('mana')} Acheter un deck</button></div>
       <div class="versus">
         <div class="vs-side me"><div class="vs-label">Ton deck</div><div class="vs-tile mine"></div>
           <select class="vs-deck">${decks.map(d => `<option value="${esc(d.key)}"${d.key === this.deckKey ? ' selected' : ''}${d.legal ? '' : ' disabled'}>${esc(d.name)}${d.legal ? '' : ' (incomplet)'}</option>`).join('')}</select></div>
@@ -359,6 +418,7 @@ export class DuelScreen {
     if (gift) {
       gift.addEventListener('click', () => this.chooseNewDeck());
     }
+    this.root.querySelector('[data-buy-deck]').addEventListener('click', () => this.buyDeck());
     this.root.querySelector('.vs-deck').addEventListener('change', (e) => {
       this.deckKey = e.target.value;
       prefs.set('careerDeck', this.deckKey);
