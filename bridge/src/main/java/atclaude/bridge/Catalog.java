@@ -65,6 +65,7 @@ final class Catalog {
                          String typeEn, int cmc, String identity, boolean commanderLegal, boolean canBeCommander) { }
 
     private volatile List<Entry> index;
+    /** Nom français (et nom de chaque autre face) normalisé → nom anglais de la carte dans Forge. */
     private volatile Map<String, String> frenchToEnglish;
 
     // ------------------------------------------------------------------ recherche
@@ -101,7 +102,8 @@ final class Catalog {
                     texts.append(normalize(face.getOracleText())).append('\n')
                             .append(normalize(CardTranslation.getTranslatedOracle(face.getName()))).append('\n');
                     types.append(face.getType().toString().toLowerCase(Locale.ROOT)).append(" // ");
-                    if (face != rules.getMainPart() && !faceFr.equals(face.getName())) {
+                    if (face != rules.getMainPart()) {
+                        fr.putIfAbsent(normalize(face.getName()), nameEn);
                         fr.putIfAbsent(normalize(faceFr), nameEn);
                     }
                 }
@@ -451,16 +453,31 @@ final class Catalog {
         return fr == null || fr.isEmpty() ? name : fr;
     }
 
-    /** Trouve une carte par son nom anglais ou français, avec ou sans accents. */
+    /** Séparateur des deux faces dans les listes : « // » (Forge, Archidekt), « / » (Moxfield) ou « /// ». */
+    private static final Pattern FACE_SEPARATOR = Pattern.compile("\\s+/{1,3}\\s+");
+
+    /**
+     * Trouve une carte par son nom anglais ou français, avec ou sans accents, ou par celui de l'une de ses faces :
+     * « Emeria's Call / Emeria, Shattered Skyclave » (export Moxfield), « Agadeem's Awakening // Agadeem, the
+     * Undercrypt », ou la face arrière seule (« Insectile Aberration »).
+     */
     PaperCard resolve(final String rawName) {
         final String name = rawName == null ? "" : rawName.trim();
         if (name.isEmpty()) {
             return null;
         }
-        PaperCard pc = tryCard(name);
-        if (pc == null && name.contains(" // ")) {
-            pc = tryCard(name.substring(0, name.indexOf(" // ")));
+        PaperCard pc = lookup(name);
+        if (pc == null) {
+            final String[] faces = FACE_SEPARATOR.split(name);
+            for (int i = 0; pc == null && faces.length > 1 && i < faces.length; i++) {
+                pc = lookup(faces[i]);
+            }
         }
+        return pc;
+    }
+
+    private PaperCard lookup(final String name) {
+        PaperCard pc = tryCard(name);
         if (pc == null) {
             index();
             final String english = frenchToEnglish.get(normalize(name));
