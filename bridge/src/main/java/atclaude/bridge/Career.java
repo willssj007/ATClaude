@@ -901,6 +901,32 @@ final class Career {
      */
     static synchronized JsonObject open(final String id) {
         final JsonObject c = load();
+        final JsonObject o = openOne(c, id);
+        save(c);
+        o.add("wildcards", wildcards(c));
+        return o;
+    }
+
+    /**
+     * Ouvre plusieurs boosters d'un coup (dans l'ordre donné, 100 au plus) : un résultat par booster, comme
+     * {@link #open}, et la carrière enregistrée une seule fois. Une carte déjà sortie d'un booster précédent du lot
+     * compte comme un doublon.
+     */
+    static synchronized JsonObject openMany(final JsonArray ids) {
+        final JsonObject c = load();
+        final JsonArray packs = new JsonArray();
+        for (int i = 0; i < Math.min(100, ids.size()); i++) {
+            packs.add(openOne(c, ids.get(i).getAsString()));
+        }
+        save(c);
+        final JsonObject o = new JsonObject();
+        o.add("packs", packs);
+        o.add("wildcards", wildcards(c));
+        return o;
+    }
+
+    /** Ouvre un booster de la carrière (sans l'enregistrer) : ses cartes, dans l'ordre de révélation. */
+    private static JsonObject openOne(final JsonObject c, final String id) {
         final JsonArray boosters = array(c, "boosters");
         JsonObject booster = null;
         final JsonArray rest = new JsonArray();
@@ -962,12 +988,11 @@ final class Career {
         c.add("boosters", rest);
         c.addProperty("opened", num(c, "opened") + 1);
         c.addProperty("mythics", num(c, "mythics") + mythics);
-        save(c);
         final JsonObject o = new JsonObject();
+        o.addProperty("id", id);
         o.addProperty("set", ed.getCode());
         o.addProperty("name", ed.getName());
         o.add("cards", out);
-        o.add("wildcards", wildcards(c));
         return o;
     }
 

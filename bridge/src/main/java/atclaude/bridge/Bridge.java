@@ -189,7 +189,7 @@ public final class Bridge {
     private static final java.util.Set<String> CATALOG_REQUESTS = java.util.Set.of(
             "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
-            "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster",
+            "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster", "openBoosters",
             "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
@@ -365,6 +365,8 @@ public final class Bridge {
                 return Career.buy(catalog, m.get("set").getAsString());
             case "openBooster":
                 return Career.open(m.get("id").getAsString());
+            case "openBoosters":
+                return Career.openMany(m.getAsJsonArray("ids"));
             case "startMatch":
                 startMatch(m.getAsJsonObject("setup"));
                 return null;

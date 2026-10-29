@@ -1,0 +1,174 @@
+/* Ouverture des boosters (js/packopen.js). Tout ce qui bouge n'anime que transform et opacity : la carte graphique s'en
+   charge seule, sans redessiner la page. Les lueurs sont des dégradés posés une fois, dont on fait varier l'opacité. */
+
+.bo {
+  position: fixed; inset: 0; z-index: 75; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.26s;
+  background: radial-gradient(80% 70% at 50% 42%, #2b2456, #0d0b1d 68%, #050409);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.bo.in { opacity: 1; }
+.bo-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.bo-glow {
+  position: absolute; left: 50%; top: 42%; width: 120vmin; height: 120vmin; margin: -60vmin 0 0 -60vmin; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 214 140 / 0.22), rgb(140 110 255 / 0.08) 55%, transparent);
+  animation: bo-breathe 5s ease-in-out infinite; will-change: transform, opacity;
+}
+.bo-rays {
+  position: absolute; left: 50%; top: 42%; width: 140vmax; height: 140vmax; margin: -70vmax 0 0 -70vmax; opacity: 0.22;
+  background: repeating-conic-gradient(from 0deg, rgb(255 225 160 / 0.14) 0deg 4deg, transparent 4deg 14deg);
+  -webkit-mask: radial-gradient(closest-side, #000, transparent 72%); mask: radial-gradient(closest-side, #000, transparent 72%);
+  animation: bo-spin 80s linear infinite; will-change: transform; transition: opacity 0.4s;
+}
+.bo.dim .bo-rays { opacity: 0.05; }
+.bo::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; background: #000; opacity: 0; transition: opacity 0.3s; }
+.bo.dim::after { opacity: 0.5; }
+@keyframes bo-spin { to { transform: rotate(360deg); } }
+@keyframes bo-breathe { 50% { transform: scale(1.08); opacity: 0.8; } }
+
+.bo-stage { position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
+.bo-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; pointer-events: none; }
+.bo-flash {
+  position: absolute; inset: -10%; z-index: 7; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 50% 44%, #fff, rgb(255 240 200 / 0.55) 32%, transparent 68%);
+}
+.bo-flash.on { animation: bo-flash 0.65s ease-out; }
+.bo-flash.mythic { background: radial-gradient(circle at 50% 50%, rgb(255 200 140 / 0.85), rgb(255 110 50 / 0.4) 40%, transparent 72%); animation-duration: 1.05s; }
+@keyframes bo-flash { 0% { opacity: 0; } 14% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---------- le booster ---------- */
+.bo-pack-wrap { position: absolute; z-index: 4; width: min(250px, 44cqw, 44cqh); cursor: pointer; perspective: 900px; touch-action: none; }
+.bo-pack-wrap::before {
+  content: ""; position: absolute; inset: -38%; z-index: -1; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--gold-rgb) / 0.42), transparent); animation: bo-halo 2.8s ease-in-out infinite;
+}
+.bo-pack-wrap.idle .bo-pack-float { animation: bo-float 3.4s ease-in-out infinite; }
+@keyframes bo-float { 50% { transform: translateY(-12px); } }
+@keyframes bo-halo { 50% { transform: scale(1.14); opacity: 0.65; } }
+.bo-pack { position: relative; transform-style: preserve-3d; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform 0.25s ease-out; }
+.bo-pack .pack { width: 100%; }
+/* Deux copies du paquet : le corps et le haut (la soudure, à 17 % de la hauteur), qui s'arrache à l'ouverture. */
+.bo-part.body { clip-path: inset(17% 0 0 0); }
+.bo-part.flap { position: absolute; inset: 0; clip-path: inset(0 0 83% 0); transform-origin: 85% 17%; }
+.bo-seam {
+  position: absolute; left: 0; right: 0; top: 17%; height: 3px; margin-top: -1.5px; z-index: 3; pointer-events: none; transform: scaleX(0); transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, #fff 15%, #fff7d8 50%, #fff 85%, transparent); box-shadow: 0 0 12px 3px rgb(255 236 180 / 0.9);
+}
+.bo-pack-light {
+  position: absolute; left: -30%; right: -30%; top: -40%; height: 90%; z-index: 2; pointer-events: none; opacity: 0;
+  background: radial-gradient(50% 45% at 50% 62%, #fff, rgb(255 230 160 / 0.7) 35%, transparent 70%);
+}
+.bo-pack.torn .bo-seam { animation: bo-seam 0.22s ease-in forwards; }
+.bo-pack.torn .bo-part.flap { animation: bo-flap 0.62s cubic-bezier(.3,.6,.3,1) 0.18s forwards; }
+.bo-pack.torn .bo-pack-light { animation: bo-light 0.9s ease-out 0.2s forwards; }
+@keyframes bo-seam { to { transform: scaleX(1); } }
+@keyframes bo-flap { to { transform: translate(18%, -150%) rotate(28deg); opacity: 0; } }
+@keyframes bo-light { 0% { opacity: 0; transform: scale(.6); } 30% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.85; transform: scale(1.3); } }
+
+/* Éventail de plusieurs boosters. */
+.bo-fan { position: absolute; z-index: 4; width: min(230px, 34cqw, 40cqh); aspect-ratio: 0.62; cursor: pointer; }
+.bo-fan-pack {
+  position: absolute; inset: 0; transform-origin: 50% 120%;
+  transform: translateX(calc(var(--k) * 18%)) rotate(calc(var(--k) * 7deg));
+}
+.bo-fan.idle .bo-fan-pack { animation: bo-fanfloat 3.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.4s); }
+@keyframes bo-fanfloat {
+  0%, 100% { transform: translateX(calc(var(--k) * 18%)) rotate(calc(var(--k) * 7deg)); }
+  50% { transform: translateX(calc(var(--k) * 18%)) translateY(-10px) rotate(calc(var(--k) * 7deg)); }
+}
+.bo-fan-more {
+  position: absolute; right: -14%; bottom: -6%; z-index: 9; padding: 3px 10px; border-radius: 999px; font-weight: 800;
+  background: rgb(var(--gold-rgb) / 0.95); color: #1d1406;
+}
+
+/* ---------- les cartes ---------- */
+.bo-grid { position: relative; z-index: 5; display: grid; grid-template-columns: repeat(var(--cols, 7), var(--cw, 100px)); gap: 10px; justify-content: center; align-content: safe center; max-height: 100%; }
+.bo-card { position: relative; z-index: 1; width: var(--cw, 120px); aspect-ratio: 63 / 88; cursor: pointer; perspective: 1000px; touch-action: manipulation; }
+.bo-card .mcard { --w: var(--cw, 120px); cursor: pointer; transition: none; }
+.bo-lift, .bo-tilt, .bo-flip { position: absolute; inset: 0; transform-style: preserve-3d; }
+.bo-tilt { transition: transform 0.22s ease-out; }
+.bo-card:hover:not(.revealing) .bo-tilt { transform: translateY(-6px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+.bo-flip { transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.bo-card.flipped .bo-flip { transform: rotateY(180deg); }
+.bo-back, .bo-front { position: absolute; inset: 0; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: calc(var(--cw, 120px) * 0.055); }
+.bo-front { transform: rotateY(180deg); overflow: hidden; }
+.bo-sweep { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transform: translateX(-120%);
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.5) 50%, transparent 70%); }
+.bo-card.flipped .bo-sweep { animation: bo-sweep 0.85s ease-out 0.28s both; }
+@keyframes bo-sweep { 0% { opacity: 1; transform: translateX(-120%); } 100% { opacity: 1; transform: translateX(120%); } }
+
+/* Face cachée, la rareté se devine à la lueur, comme sur Arena ; elle monte avant la révélation. */
+.bo-aura {
+  position: absolute; inset: -22%; z-index: -1; border-radius: 20%; pointer-events: none; opacity: 0;
+  transition: opacity 0.35s, transform 0.35s; will-change: transform, opacity;
+}
+.bo-card.r-uncommon .bo-aura { background: radial-gradient(closest-side, rgb(205 222 240 / 0.55), transparent); opacity: 0.55; }
+.bo-card.r-rare .bo-aura { background: radial-gradient(closest-side, rgb(255 214 110 / 0.95), rgb(246 190 70 / 0.35) 55%, transparent); opacity: 0.8; animation: bo-pulse 1.6s ease-in-out infinite; }
+.bo-card.r-mythic .bo-aura { background: radial-gradient(closest-side, rgb(255 140 70 / 1), rgb(255 80 40 / 0.45) 55%, transparent); opacity: 0.9; animation: bo-pulse 1s ease-in-out infinite; }
+.bo-card.charging .bo-aura { opacity: 1; animation: none; transform: scale(1.35); }
+.bo-card.flipped .bo-aura { animation: none; transform: scale(1.05); opacity: 0.45; }
+.bo-card.flipped.r-common .bo-aura, .bo-card.flipped.r-uncommon .bo-aura { opacity: 0; }
+@keyframes bo-pulse { 50% { transform: scale(1.12); opacity: 1; } }
+.bo-card.r-uncommon:not(.flipped) .bo-back .mcard { outline: 1px solid rgb(213 224 238 / 0.8); }
+.bo-card.r-rare:not(.flipped) .bo-back .mcard { outline: 2px solid #f6d27a; }
+.bo-card.r-mythic:not(.flipped) .bo-back .mcard { outline: 2px solid #ff9a4a; }
+.bo-card.revealing { z-index: 6; }
+.bo-card.flipped.r-rare { z-index: 2; }
+.bo-card.flipped.r-mythic { z-index: 3; }
+.bo-card.foil .bo-front::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.7;
+  background: linear-gradient(125deg, rgb(255 0 128 / 0.25), rgb(255 200 0 / 0.2), rgb(0 255 170 / 0.22), rgb(0 140 255 / 0.25), rgb(200 0 255 / 0.22), rgb(255 0 128 / 0.25));
+  background-size: 300% 300%; animation: bo-foil 5s linear infinite;
+}
+@keyframes bo-foil { to { background-position: 300% 300%; } }
+.bo-tag, .bo-count {
+  position: absolute; z-index: 7; white-space: nowrap; pointer-events: none; display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; opacity: 0; transition: opacity 0.3s 0.45s;
+}
+.bo-tag { top: -9px; left: 50%; transform: translateX(-50%); background: var(--good); color: #06140c; }
+.bo-tag.dupe { background: #2a2f4a; color: #e8e4ff; border: 1px solid rgb(255 255 255 / 0.25); font-weight: 700; }
+.bo-count { right: -6px; bottom: -6px; background: rgb(10 12 22 / 0.92); color: var(--gold-2); border: 1px solid rgb(var(--gold-rgb) / 0.6); font-size: 12px; }
+.bo-card.flipped .bo-tag, .bo-card.flipped .bo-count { opacity: 1; }
+
+.bo-burst { position: absolute; inset: -55%; pointer-events: none; z-index: 5; display: grid; place-items: center; }
+.bo-burst .rays {
+  position: absolute; inset: 0; border-radius: 50%; opacity: 0;
+  background: repeating-conic-gradient(rgb(255 225 140 / 0.6) 0deg 6deg, transparent 6deg 20deg);
+  -webkit-mask: radial-gradient(closest-side, #000 25%, transparent 100%); mask: radial-gradient(closest-side, #000 25%, transparent 100%);
+  animation: bo-rays 1.4s ease-out forwards;
+}
+.bo-burst .ring { position: absolute; width: 36%; aspect-ratio: 1; border-radius: 50%; border: 3px solid rgb(255 230 160 / 0.95); animation: bo-ring 0.85s ease-out forwards; }
+.bo-burst .ring.two { animation-delay: 0.16s; opacity: 0; border-width: 2px; }
+.bo-burst.mythic { inset: -85%; }
+.bo-burst.mythic .rays { background: repeating-conic-gradient(rgb(255 140 60 / 0.7) 0deg 7deg, transparent 7deg 18deg); animation-duration: 1.8s; }
+.bo-burst.mythic .ring { border-color: rgb(255 150 80 / 0.95); border-width: 4px; }
+@keyframes bo-rays { 0% { transform: scale(0.2) rotate(0deg); opacity: 1; } 100% { transform: scale(1.15) rotate(80deg); opacity: 0; } }
+@keyframes bo-ring { from { transform: scale(0.3); opacity: 1; } to { transform: scale(3.4); opacity: 0; } }
+
+/* ---------- plusieurs boosters : cartes rangées par rareté ---------- */
+.bo-results {
+  position: absolute; inset: 0; z-index: 5; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 30px;
+  --cw: clamp(84px, 12vw, 150px);
+}
+.bo-sec + .bo-sec { margin-top: 20px; }
+.bo-sec h3 { margin: 0 0 12px; font-family: var(--title-font); font-weight: 600; color: var(--gold-2); }
+.bo-sec.r-mythic h3 { color: #ffb27a; }
+.bo-sec-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--cw)); gap: 14px 10px; justify-content: center; }
+.bo-sec.r-common .bo-sec-grid, .bo-sec.r-uncommon .bo-sec-grid { --cw: clamp(70px, 9vw, 120px); }
+@media (max-width: 560px) { .bo-results { --cw: 30vw; } .bo-sec.r-common .bo-sec-grid, .bo-sec.r-uncommon .bo-sec-grid { --cw: 22vw; } }
+
+/* ---------- loupe : la carte agrandie tant qu'on appuie ---------- */
+.bo-inspect { position: absolute; inset: 0; z-index: 9; display: none; align-items: center; justify-content: center; pointer-events: none; }
+.bo-inspect.on { display: flex; background: rgb(0 0 0 / 0.35); }
+.bo-inspect .mcard { --w: min(72vw, 52vh, 420px); box-shadow: 0 24px 60px rgb(0 0 0 / 0.7); }
+
+/* ---------- barre du bas ---------- */
+.bo-bar { position: relative; z-index: 4; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 20px 14px; }
+.bo-title { display: flex; flex-direction: column; min-width: 0; }
+.bo-title b { font-family: var(--title-font); color: var(--gold-2); font-size: 19px; }
+.bo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-height: 460px) { .bo-bar { padding: 6px 16px 8px; } .bo-title b { font-size: 16px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bo-rays, .bo-glow, .bo-pack-wrap::before, .bo-pack-float, .bo-fan-pack, .bo-aura { animation: none !important; }
+}
