@@ -32,6 +32,7 @@ const PROBLEMS = [
   [/should have no more than (\d+) cards/i, 'ne doit pas dépasser $1 cartes'],
   [/must not contain more than (\d+) copies of the card (.+)/i, 'ne doit pas contenir plus de $1 exemplaire(s) de $2'],
   [/contains the following illegal cards:/i, 'contient des cartes interdites ou hors identité :'],
+  [/contains one or more cards that do not match the commanders color identity:?/i, 'contient des cartes hors de l\'identité de couleur du commandant :'],
   [/contains the nonexisting card (.+)/i, 'contient une carte inconnue : $1'],
   [/has an illegal commander partnership/i, 'a des commandants qui ne peuvent pas être associés'],
   [/has an illegal commander/i, 'a un commandant non valide'],
@@ -399,8 +400,12 @@ export class Decks {
     const right = this.root.querySelector('.right');
     const d = this.deck;
     const s = d.sections;
-    const total = [...s.commander, ...s.main].reduce((a, l) => a + l.count, 0);
-    const target = d.format === 'commander' ? 100 : 60;
+    const {total, target} = this.totals();
+    const tabCount = this.root.querySelector('.tab-count');
+    if (tabCount) {
+      tabCount.textContent = `${total}/${target}`;
+    }
+    const images = prefs.get('deckView') === 'images';
     const curve = Array(8).fill(0);
     let lands = 0;
     for (const l of s.main) {
@@ -421,35 +426,58 @@ export class Decks {
       <button class="price" data-pk="${esc(priceKey(l.card))}" title="Prix Cardmarket (toucher : ouvrir la page Cardmarket)"></button>
       <span class="acts"><button data-act="art" title="Choisir l'illustration (impression)">${icon('brush')}</button>${section === 'main' && d.format === 'commander' && l.card.canBeCommander ? '<button data-act="cmd" title="Définir comme commandant">♛</button>' : ''}
       <button data-act="minus" title="Retirer">−</button><button data-act="plus" title="Ajouter">+</button></span></div>`;
+    // Vue en images : la carte, son nombre d'exemplaires et les mêmes boutons.
+    const tile = (l, section) => `<div class="db-card" data-name="${esc(l.card.name)}" data-section="${section}">
+      <div class="db-art"></div>${l.count > 1 ? `<span class="db-qty">×${l.count}</span>` : ''}
+      <span class="db-acts">${section === 'main' && d.format === 'commander' && l.card.canBeCommander ? '<button data-act="cmd" title="Définir comme commandant">♛</button>' : ''}<button data-act="minus" title="Retirer">−</button><button data-act="plus" title="Ajouter">+</button></span></div>`;
+    const lines = (list, section) => images ? `<div class="db-grid">${list.map(l => tile(l, section)).join('')}</div>` : list.map(l => row(l, section)).join('');
+    const status = total === target ? 'full' : total > target ? 'over' : '';
     right.innerHTML = `
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <button class="btn small ghost" data-act="back">← Decks</button>
-        <input type="text" class="deck-name" placeholder="Nom du deck" value="${esc(d.name)}" style="flex:1;min-width:0">
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="db-head">
+        <button class="btn small ghost" data-act="back" title="Retour à mes decks">←</button>
+        <input type="text" class="deck-name" placeholder="Nom du deck" value="${esc(d.name)}">
         <button class="btn small gold" data-act="save">Enregistrer</button>
-        <button class="btn small" data-act="play">Jouer</button>
-        ${d.format === 'commander' && !d.career ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
+      </div>
+      <div class="db-progress ${status}" title="${total} cartes sur ${target}"><i style="width:${Math.min(100, Math.round(total / target * 100))}%"></i>
+        <span><b>${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</span></div>
+      <div class="db-actions">
+        <button class="btn small" data-act="play">${icon('swords')} Jouer</button>
         <button class="btn small" data-act="analysis">Analyse</button>
-        ${d.previousName ? '<button class="btn small" data-act="stats">Stats</button>' : ''}
-        <button class="btn small" data-act="export">Exporter</button>
-        <button class="btn small" data-act="import">Importer</button>
-        ${d.previousName ? '<button class="btn small danger" data-act="delete">Supprimer</button>' : ''}
+        ${d.format === 'commander' && !d.career ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
+        <details class="db-more"><summary class="btn small" title="Autres actions">⋯ Plus</summary>
+          <div class="db-menu panel">
+            ${d.previousName ? '<button class="btn small" data-act="stats">Statistiques du deck</button>' : ''}
+            <button class="btn small" data-act="export">Exporter la liste</button>
+            <button class="btn small" data-act="import">Importer une liste</button>
+            ${d.previousName ? '<button class="btn small danger" data-act="delete">Supprimer le deck</button>' : ''}
+          </div></details>
       </div>
       ${d.career ? '<div class="builder-wc" style="margin-bottom:6px"></div>' : ''}
-      <div class="muted small">${d.career ? 'Planeswalker · ' : ''}${d.format === 'commander' ? 'Commander' : 'Construit'} · <b style="color:var(--text)">${total}</b> / ${target} cartes · ${lands} terrains · identité ${identityHtml(this.identity())}</div>
+      <div class="muted small">${d.career ? 'Planeswalker · ' : ''}${d.format === 'commander' ? 'Commander' : 'Construit'}${d.format === 'commander' ? ' · 99 cartes et un commandant, un seul exemplaire de chaque (sauf terrains de base)' : ' · 60 cartes, 4 exemplaires au plus'}</div>
       <div class="deck-price"></div>
       <div class="analysis-slot">${summaryLineHtml(this.analysis)}</div>
       <div class="problems ok">Vérification…</div>
       ${d.format === 'commander' ? `<div class="deck-section"><h4>Commandant</h4>
-        <div class="commander-slot">${s.commander.length ? '' : '<span class="muted small">Ajoute une créature légendaire, puis touche ♛ pour en faire le commandant.</span>'}</div></div>` : ''}
+        <div class="commander-slot">${s.commander.length ? '' : `<div class="cmd-empty"><span class="muted small">Pas encore de commandant : cherche une créature légendaire, ajoute-la, puis touche ♛ à côté d'elle dans le deck.</span>
+          <button class="btn small gold" data-act="findcmd">${icon('crown')} Chercher un commandant</button></div>`}</div></div>` : ''}
       <div class="deck-section"><h4>Courbe de mana <span>${s.main.length ? '' : ''}</span></h4>
         <div class="curve">${curve.map((n, i) => `<div class="bar" style="height:${Math.round(n / maxBar * 100)}%"><i>${n || ''}</i><span>${i === 7 ? '7+' : i}</span></div>`).join('')}</div>
       </div>
-      <div style="height:16px"></div>
-      ${groups.filter(([, list]) => list.length).map(([label, list]) => `<div class="deck-section"><h4>${label}<span>${list.reduce((a, l) => a + l.count, 0)}</span></h4>${list.map(l => row(l, 'main')).join('')}</div>`).join('')}
-      ${s.side.length ? `<div class="deck-section"><h4>Réserve<span>${s.side.reduce((a, l) => a + l.count, 0)}</span></h4>${s.side.map(l => row(l, 'side')).join('')}</div>` : ''}
-      ${s.main.length ? '' : '<p class="muted">Le deck est vide : ajoute des cartes avec le bouton + de la recherche.</p>'}`;
+      ${s.main.length || s.side.length ? `<div class="db-view"><span class="muted small">Cartes du deck</span>
+        <span class="seg small"><button data-view="list"${images ? '' : ' class="on"'}>Liste</button><button data-view="images"${images ? ' class="on"' : ''}>Images</button></span></div>` : ''}
+      ${groups.filter(([, list]) => list.length).map(([label, list]) => `<div class="deck-section"><h4>${label}<span>${list.reduce((a, l) => a + l.count, 0)}</span></h4>${lines(list, 'main')}</div>`).join('')}
+      ${s.side.length ? `<div class="deck-section"><h4>Réserve<span>${s.side.reduce((a, l) => a + l.count, 0)}</span></h4>${lines(s.side, 'side')}</div>` : ''}
+      ${s.main.length ? '' : '<p class="muted">Le deck est vide : cherche des cartes à gauche (onglet Recherche sur téléphone) et touche le bouton + d\'une carte pour l\'ajouter.</p>'}`;
+    if (images) {
+      for (const cell of right.querySelectorAll('.db-card')) {
+        const card = this.lineCard(cell.dataset.name);
+        if (card) {
+          const c = cardElement(card);
+          c._card = card;
+          cell.querySelector('.db-art').appendChild(c);
+        }
+      }
+    }
     const wcSlot = right.querySelector('.builder-wc');
     if (wcSlot) {
       loadCareer().then(c => {
@@ -491,10 +519,20 @@ export class Decks {
         }
         return;
       }
+      const viewBtn = e.target.closest('[data-view]');
+      if (viewBtn) {
+        prefs.set('deckView', viewBtn.dataset.view);
+        this.renderDeck();
+        return;
+      }
       const act = e.target.closest('[data-act]');
-      const rowEl = e.target.closest('.deck-row');
+      const rowEl = e.target.closest('.deck-row, .db-card');
       if (act) {
         const a = act.dataset.act;
+        const menu = act.closest('details.db-more');
+        if (menu) {
+          menu.open = false;
+        }
         if (a === 'plus') {
           this.add(this.lineCard(rowEl.dataset.name), rowEl.dataset.section);
         } else if (a === 'minus') {
@@ -507,6 +545,13 @@ export class Decks {
           this.pickArt(act.closest('[data-cmd]').dataset.cmd);
         } else if (a === 'uncmd') {
           this.unsetCommander(act.closest('[data-cmd]').dataset.cmd);
+        } else if (a === 'findcmd') {
+          this.search.commandersOnly(true);
+          const tab = this.root.querySelector('.tabs-mobile [data-tab="left"]');
+          if (getComputedStyle(this.root.querySelector('.tabs-mobile')).display !== 'none') {
+            tab.click();
+          }
+          toast('Seules les cartes qui peuvent être commandant sont affichées : ajoute la tienne avec +, puis touche ♛ dans le deck.', {duration: 4000});
         } else if (a === 'prices') {
           this.loadPrices(true);
         } else if (a === 'save') {
