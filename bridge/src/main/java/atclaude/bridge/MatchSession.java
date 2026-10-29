@@ -968,15 +968,23 @@ final class MatchSession {
                             case Graveyard -> game.getAction().moveToGraveyard(card, null);
                             case Exile -> game.getAction().exile(card, null, null);
                             default -> {
-                                game.getAction().moveTo(ZoneType.Battlefield, card, null, AbilityKey.newMap());
-                                card.setSickness(false);
-                                // Posée directement sur le champ de bataille (sans être lancée), une carte n'a pas les
-                                // marqueurs avec lesquels elle arrive : un planeswalker sans loyauté, une bataille
-                                // sans défense.
-                                startingCounters(card, card.isPlaneswalker(), forge.game.card.CounterEnumType.LOYALTY, card.getBaseLoyalty());
-                                startingCounters(card, card.isBattle(), forge.game.card.CounterEnumType.DEFENSE, card.getCurrentState().getBaseDefense());
+                                // Comme le mode développeur de Forge pour les terrains : passée par la main puis mise en
+                                // jeu, la carte arrive vraiment sur le champ de bataille et déclenche ce qui doit l'être
+                                // (ses « quand … arrive », Daxos et les autres « chaque fois qu'une créature arrive »).
+                                game.getAction().moveToHand(card, null);
+                                final Card played = game.getAction().moveToPlay(card, null, AbilityKey.newMap());
+                                final Card put = played != null ? played : card;
+                                put.setSickness(false);
+                                // Sans être lancée, une carte peut arriver sans les marqueurs avec lesquels elle entre :
+                                // un planeswalker sans loyauté, une bataille sans défense.
+                                startingCounters(put, put.isPlaneswalker(), forge.game.card.CounterEnumType.LOYALTY, put.getBaseLoyalty());
+                                startingCounters(put, put.isBattle(), forge.game.card.CounterEnumType.DEFENSE, put.getCurrentState().getBaseDefense());
                             }
                         }
+                    }
+                    if (zone == ZoneType.Battlefield) {
+                        game.getTriggerHandler().runWaitingTriggers();
+                        game.getStack().addAllTriggeredAbilitiesToStack();
                     }
                 });
             }

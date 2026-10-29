@@ -317,15 +317,19 @@ final class BridgeGuiGame extends AbstractGuiGame {
     // ------------------------------------------------------------------ dialogues
 
     /**
-     * Capacité à jouer en touchant une carte. Pour un clic, Forge propose aussi les capacités qui ne peuvent pas être
-     * jouées maintenant (à griser) et ne vérifie plus ensuite : seules les jouables sont gardées. Sans ce tri, une
-     * capacité de loyauté (une par tour et par planeswalker) ou une capacité limitée s'activait autant qu'on voulait.
+     * Capacité à jouer. Pour un clic sur une carte (triggerEvent donné), Forge propose aussi les capacités qui ne
+     * peuvent pas être jouées maintenant (à griser) et ne vérifie plus ensuite : seules les jouables sont gardées. Sans
+     * ce tri, une capacité de loyauté (une par tour et par planeswalker) ou une capacité limitée s'activait autant
+     * qu'on voulait.
+     * Sans triggerEvent, Forge a déjà fait le tri, ou demande autre chose : il passe ici chaque sort et chaque capacité
+     * déclenchée qu'il met sur la pile (choix d'un coût additionnel), et une capacité déclenchée n'est jamais
+     * « jouable » au sens d'une activation. La trier ici la faisait disparaître sans effet (Daxos, « quand … arrive »...).
      */
     @Override
     public SpellAbilityView getAbilityToPlay(final CardView hostCard, final List<SpellAbilityView> abilities, final ITriggerEvent triggerEvent) {
         final List<SpellAbilityView> playable = new java.util.ArrayList<>();
         for (final SpellAbilityView sa : abilities) {
-            if (sa.canPlay()) {
+            if (triggerEvent == null || sa.canPlay()) {
                 playable.add(sa);
             }
         }
