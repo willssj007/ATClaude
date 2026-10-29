@@ -1,0 +1,12 @@
+total 156944
+drwxr-xr-x   3 runner  staff        96 Oct 29 09:52 _CodeSignature
+drwxr-xr-x  11 runner  staff       352 Oct 29 09:52 .
+drwxr-xr-x   4 runner  staff       128 Oct 29 09:52 ..
+-rw-r--r--   1 runner  staff     17161 Oct 29 09:51 AppIcon60x60@2x.png
+-rw-r--r--   1 runner  staff     24239 Oct 29 09:51 AppIcon76x76@2x~ipad.png
+-rwxr-xr-x   1 runner  staff  79118176 Oct 29 09:52 ArcaneTable
+-rw-r--r--   1 runner  staff   1184024 Oct 29 09:52 Assets.car
+drwxr-xr-x   3 runner  staff        96 Oct 29 09:51 forge
+-rw-r--r--   1 runner  staff      1395 Oct 29 09:52 Info.plist
+drwxr-xr-x  77 runner  staff      2464 Oct 29 09:51 lib
+drwxr-xr-x   8 runner  staff       256 Oct 29 09:51 ui

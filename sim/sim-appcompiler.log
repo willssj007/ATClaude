@@ -1,0 +1,23 @@
+Warning: org.jupnp.UpnpServiceConfiguration is a phantom class!
+Warning: java.lang.invoke.StringConcatFactory is a phantom class!
+Warning: java.lang.invoke.SerializedLambda is a phantom class!
+Warning: xyz.wagyourtail.jvmdg.version.Stub is a phantom class!
+Warning: xyz.wagyourtail.jvmdg.version.Adapter is a phantom class!
+Warning: java.nio.file.attribute.PosixFilePermission is a phantom class!
+Warning: java.util.concurrent.atomic.LongAdder is a phantom class!
+Warning: xyz.wagyourtail.jvmdg.version.CoverageIgnore is a phantom class!
+Warning: sun.reflect.ReflectionFactory is a phantom class!
+Warning: java.lang.reflect.AnnotatedType is a phantom class!
+Warning: xyz.wagyourtail.jvmdg.shade.asm.Type is a phantom class!
+Warning: xyz.wagyourtail.jvmdg.version.RequiresResource is a phantom class!
+Warning: org.jetbrains.annotations.NotNull is a phantom class!
+Warning: org.jetbrains.annotations.ApiStatus$Internal is a phantom class!
+Warning: org.jetbrains.annotations.Nullable is a phantom class!
+Warning: org.jetbrains.annotations.ApiStatus is a phantom class!
+Warning: org.jetbrains.annotations.ApiStatus$Experimental is a phantom class!
+Warning: org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement is a phantom class!
+Warning: java.lang.ProcessHandle is a phantom class!
+Warning: sun.reflect.Reflection is a phantom class!
+Warning: java.lang.StackWalker is a phantom class!
+Warning: java.lang.StackWalker$StackFrame is a phantom class!
+Skipping code signing. The resulting app will be unsigned and will not run on unjailbroken devices
