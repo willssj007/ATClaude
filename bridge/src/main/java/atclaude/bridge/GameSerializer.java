@@ -180,7 +180,7 @@ final class GameSerializer {
         o.addProperty("id", c.getId());
         Texts.remember(c);
         final boolean canShow = gui.mayView(c);
-        o.addProperty("hidden", !canShow);
+        flag(o, "hidden", !canShow);
         if (c.getController() != null) {
             o.addProperty("controller", c.getController().getId());
         }
@@ -190,22 +190,24 @@ final class GameSerializer {
         if (c.getZone() != null) {
             o.addProperty("zone", c.getZone().name().toLowerCase());
         }
-        o.addProperty("tapped", c.isTapped());
-        o.addProperty("selectable", gui.isSelectable(c));
-        o.addProperty("playable", gui.isWeaklySelectable(c));
-        o.addProperty("highlighted", gui.isHighlighted(c));
-        o.addProperty("attacking", c.isAttacking());
-        o.addProperty("blocking", c.isBlocking());
+        flag(o, "tapped", c.isTapped());
+        flag(o, "selectable", gui.isSelectable(c));
+        flag(o, "playable", gui.isWeaklySelectable(c));
+        flag(o, "highlighted", gui.isHighlighted(c));
+        flag(o, "attacking", c.isAttacking());
+        flag(o, "blocking", c.isBlocking());
         if (!canShow) {
-            o.addProperty("faceDown", c.isFaceDown());
+            flag(o, "faceDown", c.isFaceDown());
             return o;
         }
         describe(o, c.getCurrentState(), gv, true);
-        o.addProperty("sick", c.isSick());
-        o.addProperty("damage", c.getDamage());
-        o.addProperty("token", c.isToken());
-        o.addProperty("commander", c.isCommander());
-        o.addProperty("faceDown", c.isFaceDown());
+        flag(o, "sick", c.isSick());
+        if (c.getDamage() != 0) {
+            o.addProperty("damage", c.getDamage());
+        }
+        flag(o, "token", c.isToken());
+        flag(o, "commander", c.isCommander());
+        flag(o, "faceDown", c.isFaceDown());
         if (c.hasAlternateState() && c.getAlternateState() != null) {
             final JsonObject back = new JsonObject();
             describe(back, c.getAlternateState(), gv, true);
@@ -214,7 +216,7 @@ final class GameSerializer {
         final GameEntityView attachedTo = c.getEntityAttachedTo();
         if (attachedTo != null) {
             o.addProperty("attachedTo", attachedTo.getId());
-            o.addProperty("attachedToPlayer", attachedTo instanceof PlayerView);
+            flag(o, "attachedToPlayer", attachedTo instanceof PlayerView);
         }
         final JsonObject counters = counters(c.getCounters());
         if (counters.size() > 0) {
@@ -269,14 +271,14 @@ final class GameSerializer {
         o.addProperty("colors", colors(s.getColors()));
         o.addProperty("image", s.getImageKey());
         o.addProperty("set", s.getSetCode());
-        o.addProperty("creature", s.isCreature());
-        o.addProperty("land", s.isLand());
-        o.addProperty("planeswalker", s.isPlaneswalker());
-        o.addProperty("artifact", s.isArtifact());
-        o.addProperty("enchantment", s.isEnchantment());
-        o.addProperty("instant", s.isInstant());
-        o.addProperty("sorcery", s.isSorcery());
-        o.addProperty("battle", s.isBattle());
+        flag(o, "creature", s.isCreature());
+        flag(o, "land", s.isLand());
+        flag(o, "planeswalker", s.isPlaneswalker());
+        flag(o, "artifact", s.isArtifact());
+        flag(o, "enchantment", s.isEnchantment());
+        flag(o, "instant", s.isInstant());
+        flag(o, "sorcery", s.isSorcery());
+        flag(o, "battle", s.isBattle());
         if (s.isCreature()) {
             o.addProperty("power", s.getPower());
             o.addProperty("toughness", s.getToughness());
@@ -286,6 +288,16 @@ final class GameSerializer {
         }
         if (s.isBattle()) {
             o.addProperty("defense", s.getDefense());
+        }
+    }
+
+    /**
+     * Drapeau d'une carte, écrit seulement s'il est vrai : l'interface lit l'absence comme « faux ». Avec un plateau
+     * chargé, les « false » répétés sur chaque carte faisaient plus de la moitié de chaque photo de la partie.
+     */
+    static void flag(final JsonObject o, final String key, final boolean value) {
+        if (value) {
+            o.addProperty(key, true);
         }
     }
 

@@ -56,6 +56,7 @@ public final class ForgeRuntime {
         if (ready) {
             return;
         }
+        final long started = System.nanoTime();
         final String assets = Paths.withSlash(paths.assetsDir());
         final String user = Paths.withSlash(paths.userDir());
         final String cache = Paths.withSlash(paths.cacheDir());
@@ -101,6 +102,9 @@ public final class ForgeRuntime {
             prefs.setPref(FPref.UI_ENABLE_AI_CHEATS, "false");
             prefs.setPref(FPref.MULLIGAN_RULE, "London");
             prefs.setPref(FPref.LOAD_CARD_SCRIPTS_LAZILY, "false");
+            // Pas de decks générés « d'après les cartes » (matrices de res/deckgendecks, dont un fichier sérialisé de
+            // 7 Mo lu au démarrage, très lent sur téléphone) : l'application tire ses decks aléatoires autrement.
+            prefs.setPref(FPref.DECKGEN_CARDBASED, "false");
             // Cartes jouables en surbrillance, comme sur Arena.
             prefs.setPref(FPref.UI_SHOW_ACTIONABLE_HIGHLIGHTS, "true");
             // Choix dans la bibliothèque, le cimetière, l'exil... par une fenêtre de choix : sinon Forge attend
@@ -116,7 +120,10 @@ public final class ForgeRuntime {
             prefs.save();
             return null;
         });
+        final long forgeDone = System.nanoTime();
         French.prebuildVariantMappings();
+        System.out.println("Démarrage : Forge " + (forgeDone - started) / 1_000_000 + " ms, traductions "
+                + (System.nanoTime() - forgeDone) / 1_000_000 + " ms");
         ImageService.onLateImage = key -> bridge.sendEvent("imageReady", m -> m.addProperty("key", key));
         status = "Prêt";
         ready = true;

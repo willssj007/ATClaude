@@ -19,7 +19,8 @@ import java.util.zip.ZipInputStream;
 
 /**
  * Installe les ressources de Forge (res.zip, embarqué dans l'APK) dans le stockage privé de
- * l'application, au premier lancement et après chaque mise à jour.
+ * l'application, au premier lancement et quand elles changent (empreinte res.sha, écrite par
+ * scripts/package-res.sh) : une mise à jour qui ne touche que l'interface ou le pont démarre tout de suite.
  */
 final class ResInstaller {
 
@@ -33,7 +34,7 @@ final class ResInstaller {
     static File ensure(final Context context, final Progress progress) throws IOException {
         final File root = new File(context.getFilesDir(), "forge");
         final File stamp = new File(root, "res.version");
-        final String version = installedVersion(context);
+        final String version = resVersion(context);
         if (stamp.isFile() && new File(root, "res").isDirectory()
                 && version.equals(new String(Files.readAllBytes(stamp.toPath()), StandardCharsets.UTF_8))) {
             return root;
@@ -89,6 +90,29 @@ final class ResInstaller {
         }
         Files.write(stamp.toPath(), version.getBytes(StandardCharsets.UTF_8));
         return root;
+    }
+
+    /** Empreinte du contenu de res.zip ; à défaut (ancienne construction), la version installée de l'application. */
+    private static String resVersion(final Context context) {
+        try (InputStream in = context.getAssets().open("res.sha")) {
+            final String sha = new String(readAll(in), StandardCharsets.UTF_8).trim();
+            if (!sha.isEmpty()) {
+                return "sha:" + sha;
+            }
+        } catch (final IOException e) {
+            // pas d'empreinte dans cet APK
+        }
+        return installedVersion(context);
+    }
+
+    private static byte[] readAll(final InputStream in) throws IOException {
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        final byte[] buffer = new byte[256];
+        int n;
+        while ((n = in.read(buffer)) > 0) {
+            out.write(buffer, 0, n);
+        }
+        return out.toByteArray();
     }
 
     private static String installedVersion(final Context context) {

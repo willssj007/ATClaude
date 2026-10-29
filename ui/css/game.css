@@ -33,7 +33,6 @@
   --w: var(--bf-w, 64px); --h: calc(var(--w) * 88 / 63);
   position: relative; flex: none; width: var(--w); height: var(--h);
   display: flex; align-items: center; justify-content: center;
-  transition: width 0.22s ease;
 }
 .slot.tapped { width: var(--h); }
 .slot > .mcard {
@@ -57,7 +56,7 @@
 .slot.stacked { margin-left: calc(var(--w) * -0.8) !important; }
 .slot.stacked.tapped { margin-left: calc(var(--h) * -0.8) !important; }
 .slot.leaving { pointer-events: none; }
-.table.measuring .slot { transition: none !important; }
+.slot.moving { z-index: 30; }
 
 /* États d'une carte en jeu */
 .mcard.sick .face::after {
@@ -65,7 +64,14 @@
   background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 6px, transparent 6px 12px);
 }
 .mcard.playable { box-shadow: 0 0 0 2px var(--playable), 0 0 14px rgba(91, 224, 143, 0.65); }
-.mcard.selectable { box-shadow: 0 0 0 3px var(--select), 0 0 18px rgba(79, 182, 255, 0.8); animation: pulse 1.4s ease-in-out infinite; }
+/* Carte à choisir : liseré fixe, et un halo qui pulse en transparence sur un calque à part (composité : pas de
+   repeinte à chaque image, même avec des dizaines de cartes à choisir). */
+.mcard.selectable { box-shadow: 0 0 0 3px var(--select), 0 0 6px rgba(79, 182, 255, 0.35); }
+.mcard.selectable::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+  box-shadow: 0 0 18px 2px rgba(79, 182, 255, 0.85); animation: halo 1.4s ease-in-out infinite;
+}
+@keyframes halo { 50% { opacity: 0.15; } }
 .mcard.highlighted { box-shadow: 0 0 0 3px var(--chosen), 0 0 20px rgba(255, 182, 72, 0.85); }
 .slot.attacking > .mcard { box-shadow: 0 0 0 2px var(--bad), 0 0 18px rgba(239, 90, 90, 0.75); }
 .slot.blocking > .mcard { box-shadow: 0 0 0 2px var(--select), 0 0 14px rgba(79, 182, 255, 0.6); }
@@ -115,10 +121,12 @@
 .board { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr) var(--band); }
 .half { position: relative; min-height: 0; min-width: 0; }
 /* Taille des cartes : deux rangées par moitié, plafonnée pour que cinq cartes tiennent en largeur. */
-/* --fit (posé par le script) réduit toutes les cartes d'une moitié quand elle est trop pleine. */
+/* --bf-base (posé par le script quand la moitié change de taille) : la plus petite de --card-max, de ce qui tient
+   en hauteur (deux rangées) et du cinquième de la largeur. Des unités de conteneur (cqh, cqw) faisaient pareil,
+   mais rendaient chaque calcul de mise en page six à huit fois plus lent avec un plateau chargé.
+   --fit (posé par le script) réduit toutes les cartes d'une moitié quand elle est trop pleine. */
 .me-half, .opp-field {
-  container-type: size;
-  --bf-w: calc(min(var(--card-max), calc((100cqh - 10px) * 0.5 * 0.9 * 63 / 88), calc(100cqw / 5)) * var(--fit, 1));
+  --bf-w: calc(var(--bf-base, 64px) * var(--fit, 1));
   display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; min-width: 0;
 }
 .me-half > .row.front { align-items: center; }

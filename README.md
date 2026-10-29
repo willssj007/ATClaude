@@ -13,7 +13,7 @@ Chaque push sur `main` construit l'application et la publie dans la release **[a
 
 Toutes les versions sont signées avec la même clé (`android/app/arcane-debug.keystore`) : une nouvelle version s'installe par-dessus l'ancienne sans perdre les decks.
 
-Au premier lancement, l'application installe les cartes (une trentaine de secondes) puis Forge charge sa base (quelques dizaines de secondes selon le téléphone).
+Au premier lancement, l'application installe les cartes (une trentaine de secondes) puis Forge charge sa base (quelques dizaines de secondes selon le téléphone). Les mises à jour suivantes ne réinstallent les cartes que si les données de Forge ont changé.
 
 ## Ce que fait l'application
 

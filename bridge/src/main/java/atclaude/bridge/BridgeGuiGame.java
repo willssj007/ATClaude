@@ -135,10 +135,21 @@ final class BridgeGuiGame extends AbstractGuiGame {
 
     // ------------------------------------------------------------------ envoi de l'état
 
+    /** -Datclaude.profile=true : durée et taille de chaque photo de la partie dans le journal. */
+    private static final boolean PROFILE = Boolean.getBoolean("atclaude.profile");
+
+    private volatile long lastFlushAt;
+    private volatile int lastSize;
+
     void markDirty() {
         if (flushScheduled.compareAndSet(false, true)) {
             try {
-                flusher.schedule(this::flush, 40, TimeUnit.MILLISECONDS);
+                // 40 ms d'habitude. Pendant une rafale (tour de l'IA, combat) avec un plateau chargé, les photos sont
+                // espacées selon leur taille (jusqu'à 160 ms) : l'écran n'en montrerait de toute façon qu'une partie,
+                // et chacune coûte à construire, à transmettre et à lire, surtout sur téléphone.
+                final boolean burst = System.currentTimeMillis() - lastFlushAt < 250;
+                final long delay = burst ? Math.min(160, 40 + lastSize / 2048) : 40;
+                flusher.schedule(this::flush, delay, TimeUnit.MILLISECONDS);
             } catch (final RuntimeException e) {
                 flushScheduled.set(false);
             }
@@ -151,13 +162,20 @@ final class BridgeGuiGame extends AbstractGuiGame {
             return;
         }
         try {
+            final long t0 = PROFILE ? System.nanoTime() : 0;
             final JsonObject state = new GameSerializer(this).snapshot();
+            if (PROFILE) {
+                System.out.println("[profil] photo " + (System.nanoTime() - t0) / 1_000_000 + " ms, précédente " + lastSize / 1024 + " Ko");
+            }
             state.add("prompt", prompt());
             final MatchSession s = session;
             if (s != null) {
                 state.add("settings", s.settingsJson());
             }
-            bridge.send(state);
+            final String json = Bridge.GSON.toJson(state);
+            lastSize = json.length();
+            lastFlushAt = System.currentTimeMillis();
+            bridge.sendJson(json);
             if (s != null) {
                 s.afterStateSent();
             }

@@ -113,6 +113,39 @@ public final class Bridge {
         transport.send(GSON.toJson(message));
     }
 
+    /** Message déjà mis en JSON (photo de la partie, dont on a voulu connaître la taille). */
+    void sendJson(final String json) {
+        transport.send(json);
+    }
+
+    /**
+     * Photo complète de la partie ? Dans un lot de messages encore à livrer à la page, seule la dernière photo compte :
+     * les précédentes, déjà dépassées, sont retirées (Android, iPhone et ordinateur).
+     */
+    public static boolean isState(final String json) {
+        return json.startsWith("{\"type\":\"state\"");
+    }
+
+    /** Retire d'un lot les photos de la partie dépassées par une plus récente, dans l'ordre d'arrivée. */
+    public static java.util.List<String> dropStaleStates(final java.util.List<String> batch) {
+        int last = -1;
+        for (int i = batch.size() - 1; i >= 0 && last < 0; i--) {
+            if (isState(batch.get(i))) {
+                last = i;
+            }
+        }
+        if (last < 0) {
+            return batch;
+        }
+        final java.util.List<String> out = new java.util.ArrayList<>(batch.size());
+        for (int i = 0; i < batch.size(); i++) {
+            if (i == last || !isState(batch.get(i))) {
+                out.add(batch.get(i));
+            }
+        }
+        return out;
+    }
+
     void sendEvent(final String type, final Consumer<JsonObject> body) {
         final JsonObject message = new JsonObject();
         message.addProperty("type", type);
@@ -216,7 +249,8 @@ public final class Bridge {
 
     /**
      * Juste après le démarrage : prépare en fond ce que les premiers écrans demandent (index de recherche, liste des
-     * decks, analyse des préconstruits pour les duels Planeswalker), une étape à la fois sur le fil du catalogue :
+     * decks, analyse des préconstruits pour les duels Planeswalker, decks aléatoires des parties rapides), une étape à
+     * la fois sur le fil du catalogue :
      * une demande de l'interface passe entre deux étapes, et chaque écran s'ouvre ensuite sans attendre.
      */
     void warmUp() {
@@ -224,7 +258,8 @@ public final class Bridge {
                 () -> catalog.search(new JsonObject()),
                 catalog::listDecks,
                 Precons::all,
-                Career::boosterSets);
+                Career::boosterSets,
+                () -> catalog.refillRandomPool(0));
         warmStep(steps, 0);
     }
 

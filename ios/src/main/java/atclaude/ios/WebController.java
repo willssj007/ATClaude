@@ -203,7 +203,7 @@ final class WebController extends UIViewController {
             if (!pageReady || outbox.isEmpty()) {
                 return;
             }
-            batch = new ArrayList<>(outbox);
+            batch = atclaude.bridge.Bridge.dropStaleStates(new ArrayList<>(outbox));
             outbox.clear();
         }
         final StringBuilder js = new StringBuilder("window.__atReceiveMany && window.__atReceiveMany([");

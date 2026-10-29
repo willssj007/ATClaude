@@ -269,6 +269,19 @@ export class Game {
     this.slots.clear();
     this.handOpen = false;
     this.applySplit(this.split());
+    // Taille des moitiés du plateau, suivie sans forcer de calcul de mise en page : la taille de base de leurs
+    // cartes en dépend (voir sizeHalves).
+    this.halfObserver && this.halfObserver.disconnect();
+    this.halfObserver = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        e.target._size = {w: e.contentRect.width, h: e.contentRect.height};
+      }
+      if (this.state) {
+        this.fitRows();
+      }
+    });
+    table.querySelectorAll('.me-half, .opp-field').forEach(h => this.halfObserver.observe(h));
+    this.cardMax = 0;
     this.stackPanel = new StackPanel(table, {
       anchor: this.board,
       pillHost: table.querySelector('.div-end'),
@@ -650,6 +663,7 @@ export class Game {
 
   /** Après un changement de taille du plateau : resserre les rangées et redessine les flèches. */
   afterResize() {
+    this.cardMax = 0;
     this.fitRows();
     const hand = this.table.querySelector('.hand');
     this.fanHand(hand, hand.querySelectorAll(':scope > .slot').length);
@@ -660,6 +674,7 @@ export class Game {
   }
 
   destroy() {
+    this.halfObserver && this.halfObserver.disconnect();
     document.removeEventListener('keydown', this.keyHandler);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('cutout', this.onCutout);
@@ -1231,45 +1246,105 @@ export class Game {
   /**
    * Plateau trop plein : les cartes de chaque moitié rétrécissent ensemble (jusqu'à la moitié de leur taille)
    * pour que chaque rangée tienne dans sa largeur ; au-delà seulement, elles se chevauchent.
-   * Les mesures se font sans transition, sinon on lirait des largeurs en cours d'animation.
+   * Lectures et écritures groupées : deux calculs de mise en page en tout, quel que soit le nombre de rangées
+   * (une lecture après chaque écriture en forçait un par rangée, coûteux avec beaucoup de cartes).
    */
   fitRows() {
     const table = this.table;
-    table.classList.add('measuring');
     const slotsOf = (row) => row ? [...row.querySelectorAll(':scope > .slot')] : [];
     // Largeur occupée par les cartes d'une rangée, d'un bord à l'autre (marges négatives comprises).
-    const extent = (row) => {
-      const s = slotsOf(row);
-      return s.length ? s[s.length - 1].offsetLeft + s[s.length - 1].offsetWidth - s[0].offsetLeft : 0;
-    };
+    const extent = (slots) => slots.length ? slots[slots.length - 1].offsetLeft + slots[slots.length - 1].offsetWidth - slots[0].offsetLeft : 0;
     const ROW_GAP = 6;
     const ROW_PAD = 8;
-    table.querySelectorAll('.row').forEach(r => r.style.setProperty('--squeeze', '0px'));
-    for (const half of table.querySelectorAll('.me-half, .opp-field')) {
-      if (!half.offsetWidth) {
-        continue; // plateau adverse masqué
+    const rows = [...table.querySelectorAll('.board .row')];
+    const halves = [...table.querySelectorAll('.me-half, .opp-field')];
+    this.sizeHalves(halves);
+    // Rien n'a changé sur le plateau (vie, phase, invite, mana...) : les réductions en place restent bonnes (les
+    // recalculer coûterait des mesures et un recalcul de style de toutes les cartes).
+    const hiddenOpp = (h) => table.dataset.oppview === 'focus' && h.classList.contains('opp-field') && !h.classList.contains('focused');
+    const sig = [this.cardMax, ...halves.map(h => `${h._size ? h._size.w + 'x' + h._size.h : '?'}|${hiddenOpp(h) ? 0 : 1}`), ...rows.map(r => {
+      let k = '';
+      for (const slot of r.children) {
+        if (slot.classList.contains('slot')) {
+          k += slot.dataset.key + (slot.classList.contains('tapped') ? 't' : '') + (slot.classList.contains('stacked') ? 's' : '')
+            + (slot.classList.contains('attached') ? 'a' : '') + ',';
+        }
       }
-      half.style.setProperty('--fit', '1');
+      return k;
+    })].join(';');
+    if (sig === this.fitSig) {
+      this.dodgeCutout();
+      return;
+    }
+    this.fitSig = sig;
+    const halfOf = (row) => row.closest('.me-half, .opp-field');
+    // 1. Les moitiés où des cartes se chevauchent ou passent sur deux lignes sont remises à la taille normale ; les
+    //    autres sont mesurées telles quelles (leurs largeurs sont proportionnelles à --fit, aux espaces près), ce qui
+    //    évite de recalculer le style de toutes leurs cartes deux fois.
+    const reset = new Set();
+    for (const row of rows) {
+      if (row._squeeze) {
+        reset.add(halfOf(row));
+      }
+    }
+    for (const half of halves) {
+      const front = half.querySelector(':scope > .row.front');
+      if (front && front.classList.contains('wrap')) {
+        reset.add(half);
+      }
+    }
+    for (const half of reset) {
+      if (!half) {
+        continue;
+      }
+      if ((half._fit || 1) !== 1) {
+        half._fit = 1;
+        half.style.setProperty('--fit', '1');
+      }
+      const front = half.querySelector(':scope > .row.front');
+      front && front.classList.remove('wrap');
+      half.querySelectorAll('.row').forEach(r => {
+        if (r._squeeze) {
+          r._squeeze = 0;
+          r.style.setProperty('--squeeze', '0px');
+        }
+      });
+    }
+    // 2. Mesurer chaque moitié et décider de sa réduction (lectures seulement).
+    const plans = halves.map(half => {
+      if (hiddenOpp(half) || !half.offsetWidth) {
+        return null; // plateau adverse masqué
+      }
+      const cur = half._fit || 1;
       const front = half.querySelector(':scope > .row.front');
       const back = half.querySelector(':scope > .row.back');
-      front && front.classList.remove('wrap');
+      // Largeur à --fit = 1 de la partie qui se réduit : tout sauf les espaces fixes entre les cartes (une carte
+      // attachée en rend un, sa marge droite le compensant).
+      const natural = (slots) => {
+        if (!slots.length) {
+          return 0;
+        }
+        const attached = slots.filter(x => x.classList.contains('attached')).length;
+        return (extent(slots) - (slots.length - 1) * ROW_GAP + attached * ROW_GAP) / cur - attached * ROW_GAP;
+      };
       let fit = 1;
       let frontFit = 1;
       // Rangée de devant : ses cartes seules. Rangée du fond : non-terrains + terrains, séparés par un vide.
       const lines = [
-        {avail: front ? front.clientWidth : 0, parts: [front]},
-        {avail: back ? back.clientWidth : 0, parts: back ? [back.querySelector('.nonlands'), back.querySelector('.lands')] : [], extra: 4 + 2 * ROW_GAP},
+        {avail: front ? front.clientWidth : 0, parts: [slotsOf(front)], front: true},
+        {avail: back ? back.clientWidth : 0, parts: back ? [slotsOf(back.querySelector('.nonlands')), slotsOf(back.querySelector('.lands'))] : [], extra: 4 + 2 * ROW_GAP},
       ];
       for (const line of lines) {
-        const n = line.parts.reduce((a, r) => a + slotsOf(r).length, 0);
+        const n = line.parts.reduce((a, s) => a + s.length, 0);
         if (!n || !line.avail) {
           continue;
         }
-        const fixed = ROW_PAD + (line.extra || 0) + line.parts.reduce((a, r) => a + Math.max(0, slotsOf(r).length - 1) * ROW_GAP, 0);
-        const scalable = line.parts.reduce((a, r) => a + extent(r), 0) - line.parts.reduce((a, r) => a + Math.max(0, slotsOf(r).length - 1) * ROW_GAP, 0);
+        const gaps = line.parts.reduce((a, s) => a + Math.max(0, s.length - 1) * ROW_GAP, 0);
+        const fixed = ROW_PAD + (line.extra || 0) + gaps;
+        const scalable = line.parts.reduce((a, s) => a + natural(s), 0);
         if (scalable + fixed > line.avail && scalable > 0) {
           const f = (line.avail - fixed) / scalable;
-          if (line.parts[0] === front) {
+          if (line.front) {
             frontFit = f;
           } else {
             fit = Math.min(fit, f);
@@ -1278,36 +1353,78 @@ export class Game {
       }
       // Créatures trop nombreuses pour une ligne, même réduites de moitié : deux lignes, dans la hauteur que
       // la réduction a libérée (plus lisible que des cartes qui se chevauchent).
-      const slotH = front && slotsOf(front).length ? Math.max(...slotsOf(front).map(x => x.offsetHeight)) : 0;
+      let wrap = false;
+      const frontSlots = slotsOf(front);
+      const slotH = frontSlots.length ? Math.max(...frontSlots.map(x => x.offsetHeight)) / cur : 0;
       if (frontFit < 0.5 && slotH) {
         const byHeight = (front.clientHeight - 8) / (2 * slotH);
         const twoLines = Math.min(1, byHeight, frontFit * 2 * 0.95);
         if (twoLines > frontFit) {
-          front.classList.add('wrap');
+          wrap = true;
           frontFit = twoLines;
         }
       }
       fit = Math.min(fit, frontFit);
-      fit = Math.max(front && front.classList.contains('wrap') ? 0.3 : 0.5, Math.min(1, fit));
-      if (fit < 1) {
-        half.style.setProperty('--fit', fit.toFixed(3));
-      }
-    }
-    // Toujours trop large à la taille minimale : les cartes se chevauchent.
-    for (const row of table.querySelectorAll('.board .row')) {
-      const slots = slotsOf(row);
-      if (slots.length < 2 || row.classList.contains('back') || row.classList.contains('wrap')) {
+      const min = wrap ? 0.3 : 0.5;
+      fit = Math.max(min, Math.min(1, fit));
+      return {half, front, fit, wrap, atMin: fit <= min + 0.001};
+    });
+    // 3. Appliquer les réductions (seulement celles qui changent).
+    for (const p of plans) {
+      if (!p) {
         continue;
       }
-      const over = extent(row) + (row.parentElement.classList.contains('back') ? 0 : ROW_PAD) - row.clientWidth;
-      if (over > 0) {
-        const w = slots[0].offsetWidth;
-        row.style.setProperty('--squeeze', `${-Math.min(w * 0.82, over / (slots.length - 1) + 2)}px`);
+      if (p.wrap) {
+        p.front.classList.add('wrap');
+      }
+      const value = Math.round(p.fit * 1000) / 1000;
+      if (Math.abs(value - (p.half._fit || 1)) > 0.002) {
+        p.half._fit = value;
+        p.half.style.setProperty('--fit', value.toFixed(3));
       }
     }
-    void table.offsetWidth;
-    table.classList.remove('measuring');
+    // 4. Toujours trop large à la taille minimale : les cartes se chevauchent (mesures, puis écritures).
+    const atMin = new Set(plans.filter(p => p && p.atMin).map(p => p.half));
+    const squeezes = [];
+    for (const row of rows) {
+      const slots = slotsOf(row);
+      if (!atMin.has(halfOf(row)) || slots.length < 2 || row.classList.contains('back') || row.classList.contains('wrap')) {
+        continue;
+      }
+      const over = extent(slots) + (row.parentElement.classList.contains('back') ? 0 : ROW_PAD) - row.clientWidth;
+      if (over > 0) {
+        const w = slots[0].offsetWidth;
+        squeezes.push([row, -Math.min(w * 0.82, over / (slots.length - 1) + 2)]);
+      }
+    }
+    for (const [row, px] of squeezes) {
+      row._squeeze = px;
+      row.style.setProperty('--squeeze', `${px}px`);
+    }
     this.dodgeCutout();
+  }
+
+  /**
+   * Taille de base des cartes de chaque moitié : la plus petite de --card-max, de ce qui tient en hauteur (deux
+   * rangées de cartes droites, 90 % de la demi-hauteur) et du cinquième de la largeur. La taille des moitiés vient
+   * de l'observateur (sans mesure forcée) ; avant sa première réponse, on la lit.
+   */
+  sizeHalves(halves) {
+    if (!this.cardMax) {
+      this.cardMax = parseFloat(getComputedStyle(this.table).getPropertyValue('--card-max')) || 124;
+    }
+    for (const half of halves) {
+      const size = half._size || {w: half.clientWidth, h: half.clientHeight};
+      if (!size.w || !size.h) {
+        continue;
+      }
+      const base = Math.max(20, Math.min(this.cardMax, (size.h - 10) * 0.5 * 0.9 * 63 / 88, size.w / 5));
+      const value = base.toFixed(2) + 'px';
+      if (half._base !== value) {
+        half._base = value;
+        half.style.setProperty('--bf-base', value);
+      }
+    }
   }
 
   /**
@@ -1424,11 +1541,15 @@ export class Game {
   flip(before, me, prev) {
     const libraryPile = this.table.querySelector('.me-panel .stat.lib');
     const libRect = libraryPile ? libraryPile.getBoundingClientRect() : null;
+    // Toutes les positions d'abord, les animations ensuite : lancer une animation entre deux lectures forçait
+    // un calcul complet de la mise en page par carte (des centaines de millisecondes avec un plateau chargé).
+    const placed = [];
     for (const [k, slot] of this.slots) {
-      if (!slot.isConnected) {
-        continue;
+      if (slot.isConnected) {
+        placed.push([k, slot, slot.getBoundingClientRect()]);
       }
-      const now = slot.getBoundingClientRect();
+    }
+    for (const [k, slot, now] of placed) {
       if (!now.width) {
         // Plateau adverse masqué (vue « un seul ») : rien à animer.
         continue;
@@ -1441,8 +1562,10 @@ export class Game {
         const dy = old.top + old.height / 2 - (now.top + now.height / 2);
         const scale = old.width && now.width ? old.width / now.width : 1;
         if (Math.abs(dx) > 2 || Math.abs(dy) > 2 || Math.abs(scale - 1) > 0.05) {
-          slot.animate([{transform: `translate(${dx}px, ${dy}px) scale(${scale})`, zIndex: 30}, {transform: 'none', zIndex: 30}],
-            {duration: 420, easing: 'cubic-bezier(.2,.75,.25,1)'});
+          // Au-dessus des autres pendant le trajet (classe plutôt qu'un z-index animé, qui n'est pas composité).
+          slot.classList.add('moving');
+          slot.animate([{transform: `translate(${dx}px, ${dy}px) scale(${scale})`}, {transform: 'none'}],
+            {duration: 420, easing: 'cubic-bezier(.2,.75,.25,1)'}).onfinish = () => slot.classList.remove('moving');
         }
       } else if (prev) {
         // Nouvelle carte : depuis la bibliothèque pour ma main, sinon apparition.

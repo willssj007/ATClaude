@@ -118,7 +118,11 @@ public final class DesktopMain {
             out.write(": ok\n\n".getBytes(StandardCharsets.UTF_8));
             out.flush();
             while (true) {
-                final String json = client.queue.poll(15, TimeUnit.SECONDS);
+                String json = client.queue.poll(15, TimeUnit.SECONDS);
+                // Une photo de la partie déjà suivie d'une autre dans la file ne sert plus.
+                while (json != null && atclaude.bridge.Bridge.isState(json) && client.queue.stream().anyMatch(atclaude.bridge.Bridge::isState)) {
+                    json = client.queue.poll();
+                }
                 final String frame = json == null ? ": ping\n\n" : "data: " + json.replace("\n", "\ndata: ") + "\n\n";
                 out.write(frame.getBytes(StandardCharsets.UTF_8));
                 out.flush();

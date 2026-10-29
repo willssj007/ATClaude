@@ -14,8 +14,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 rm -rf "$OUT"
 mkdir -p "$OUT/res"
 
-# Dossiers lus par le moteur, l'IA et les decks préconstruits.
-for dir in ai blockdata cube defaults editions effects formats lists setlookup tokenscripts deckgendecks; do
+# Dossiers lus par le moteur, l'IA et les decks préconstruits. Pas de deckgendecks : les matrices des decks générés
+# « d'après les cartes » ne servent pas (DECKGEN_CARDBASED désactivé, voir ForgeRuntime).
+for dir in ai blockdata cube defaults editions effects formats lists setlookup tokenscripts; do
   cp -r "$SRC/$dir" "$OUT/res/$dir"
 done
 mkdir -p "$OUT/res/quest"
@@ -47,6 +48,9 @@ if [ -n "$ZIP" ]; then
   ZIP_ABS="$(cd "$(dirname "$ZIP")" && pwd)/$(basename "$ZIP")"
   # Les fichiers déjà compressés sont stockés tels quels (-n .zip).
   (cd "$OUT" && zip -q -r -9 -n .zip "$ZIP_ABS" res)
+  # Empreinte du contenu, à côté de l'archive : Android ne réinstalle les ressources que si elle change (et non à
+  # chaque mise à jour de l'application, dont la plupart ne touchent que l'interface ou le pont).
+  if command -v sha256sum > /dev/null; then sha256sum "$ZIP_ABS"; else shasum -a 256 "$ZIP_ABS"; fi | cut -c1-64 > "$(dirname "$ZIP_ABS")/res.sha"
   echo "Ressources : $(du -sh "$ZIP_ABS" | cut -f1) dans $ZIP_ABS"
 fi
 echo "Ressources prêtes dans $OUT"

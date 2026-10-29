@@ -184,7 +184,8 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
   opacity: 0; transition: opacity 0.25s;
 }
 .mcard.has-img img.art { opacity: 1; }
-.mcard.has-img .frame { visibility: hidden; }
+/* Image affichée : le cadre dessiné sort de la mise en page (sinon son texte est recalculé à chaque mise à jour du plateau). */
+.mcard.has-img .frame { display: none; }
 
 /* Cadre dessiné quand l'image n'est pas (encore) disponible. */
 .frame {

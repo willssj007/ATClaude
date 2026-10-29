@@ -573,10 +573,52 @@ final class Catalog {
         return precons;
     }
 
+    // ------------------------------------------------------------------ decks aléatoires préparés d'avance
+
+    /**
+     * Decks Commander aléatoires générés d'avance, en fond : Forge passe toute la base de cartes au crible pour chacun
+     * (une demi-seconde sur ordinateur, plusieurs sur téléphone), et une partie à quatre en demande quatre. La partie
+     * démarre ainsi tout de suite ; la réserve se reconstitue un peu après, pendant que l'on joue.
+     */
+    private static final int RANDOM_POOL = 4;
+    private final java.util.concurrent.ConcurrentLinkedQueue<Deck> randomPool = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final java.util.concurrent.atomic.AtomicBoolean refilling = new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.ScheduledExecutorService deckMaker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+        final Thread t = new Thread(r, "atclaude-decks");
+        t.setDaemon(true);
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
+
+    /** Un deck Commander aléatoire : de la réserve s'il y en a, sinon généré tout de suite. */
+    Deck randomCommander() {
+        final Deck deck = randomPool.poll();
+        refillRandomPool(20);
+        return deck != null ? deck : DeckgenUtil.generateCommanderDeck(true, GameType.Commander);
+    }
+
+    /** Complète la réserve de decks aléatoires, dans delaySeconds secondes (0 : tout de suite). */
+    void refillRandomPool(final int delaySeconds) {
+        if (!refilling.compareAndSet(false, true)) {
+            return;
+        }
+        deckMaker.schedule(() -> {
+            try {
+                while (randomPool.size() < RANDOM_POOL && ForgeRuntime.isReady()) {
+                    randomPool.add(DeckgenUtil.generateCommanderDeck(true, GameType.Commander));
+                }
+            } catch (final RuntimeException e) {
+                e.printStackTrace();
+            } finally {
+                refilling.set(false);
+            }
+        }, delaySeconds, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
     /** Clé « commander:Nom », « constructed:Nom », « precon:Nom » ou « random ». */
     Deck deckFromKey(final String key) {
         if ("random".equals(key)) {
-            return DeckgenUtil.generateCommanderDeck(true, GameType.Commander);
+            return randomCommander();
         }
         if ("randomConstructed".equals(key)) {
             return DeckgenUtil.getRandomColorDeck(true);
@@ -612,7 +654,7 @@ final class Catalog {
     }
 
     JsonElement randomCommanderDeck() {
-        return deckJson(DeckgenUtil.generateCommanderDeck(true, GameType.Commander), "commander");
+        return deckJson(randomCommander(), "commander");
     }
 
     static JsonObject deckJson(final Deck deck, final String format) {
