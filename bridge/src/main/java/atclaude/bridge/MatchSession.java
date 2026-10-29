@@ -380,8 +380,7 @@ final class MatchSession {
                     // Partie finie : Forge attend de savoir s'il faut en lancer une autre.
                     c.nextGameDecision(forge.gamemodes.match.NextGameDecision.QUIT);
                 } else {
-                    releaseControl();
-                    c.concede();
+                    concede(c);
                 }
             }
         } catch (final RuntimeException e) {
@@ -424,10 +423,7 @@ final class MatchSession {
             case "cancelPass" -> c.autoPassCancel();
             case "alphaStrike" -> c.alphaStrike();
             case "undo" -> c.undoLastAction();
-            case "concede" -> {
-                releaseControl();
-                c.concede();
-            }
+            case "concede" -> concede(c);
             case "settings" -> updateSettings(m.getAsJsonObject("settings"));
             case "prefetchImages" -> prefetchImages(str(m, "lang"));
             case "cheat" -> cheat(c, m);
@@ -466,6 +462,28 @@ final class MatchSession {
      * Rend les adversaires contrôlés par triche avant d'abandonner : sinon Forge les fait perdre avec nous
      * (la partie finirait en nulle au lieu d'une défaite).
      */
+    /**
+     * Abandon. À deux, la partie s'arrête d'elle-même ; à trois ou quatre, Forge retire le joueur et laisse les IA
+     * jouer entre elles, sans fin pour l'écran, qui attendait encore une réponse du joueur (et la partie tournait en
+     * fond après avoir quitté). Comme Forge sur ordinateur, on termine alors la partie : « tous les humains ont perdu ».
+     */
+    private void concede(final PlayerControllerHuman c) {
+        releaseControl();
+        c.concede();
+        final Game game = game();
+        if (game == null || game.isGameOver()) {
+            return;
+        }
+        game.getAction().invoke(() -> {
+            game.setGameOver(forge.game.GameEndReason.AllHumansLost);
+            for (final Player p : game.getRegisteredPlayers()) {
+                if (p.getController() instanceof PlayerControllerHuman human) {
+                    human.getInputQueue().onGameOver(true);
+                }
+            }
+        });
+    }
+
     private void releaseControl() {
         final Game game = game();
         final Player me = game == null ? null : humanPlayer(game);

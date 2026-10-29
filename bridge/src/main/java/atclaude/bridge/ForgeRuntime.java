@@ -121,6 +121,7 @@ public final class ForgeRuntime {
         status = "Prêt";
         ready = true;
         bridge.sendEvent("ready", m -> m.addProperty("version", version()));
+        bridge.warmUp();
     }
 
     private static void sendProgress(final Bridge bridge, final String text, final int percent) {

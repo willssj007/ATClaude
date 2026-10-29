@@ -48,9 +48,28 @@ const android = typeof window.AndroidBridge !== 'undefined';
 // iPhone et iPad : l'application native (WKWebView) reçoit les messages par window.webkit.messageHandlers.
 const iosHandlers = !android && window.webkit && window.webkit.messageHandlers;
 const ios = !!(iosHandlers && iosHandlers.atclaude);
-// Ordinateur : les images viennent de « localhost » et l'interface de « 127.0.0.1 ». Le navigateur limite les
-// connexions par adresse (6) ; des images lentes à télécharger ne retiennent ainsi jamais les requêtes du moteur.
-const IMAGE_BASE = !android && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
+// Ordinateur : l'interface vient de « 127.0.0.1 » et les images de quatre adresses « imgN.localhost » (toujours
+// la machine elle-même). Le navigateur limite les connexions par adresse (6) : des images lentes à télécharger ne
+// retiennent ni les requêtes du moteur ni les images déjà en cache, qui passent par une autre file.
+let imageHosts = !android && location.hostname === '127.0.0.1' && location.port
+  ? [0, 1, 2, 3].map(i => `${location.protocol}//img${i}.localhost:${location.port}/`) : null;
+if (imageHosts) {
+  // Navigateur qui ne connaîtrait pas les sous-adresses de localhost : une seule adresse d'images.
+  fetch(imageHosts[0] + 'cardimg', {mode: 'no-cors'}).catch(() => {
+    imageHosts = [`${location.protocol}//localhost:${location.port}/`];
+  });
+}
+
+function imageBase(key) {
+  if (!imageHosts) {
+    return '';
+  }
+  let h = 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 31 + key.charCodeAt(i)) | 0;
+  }
+  return imageHosts[Math.abs(h) % imageHosts.length];
+}
 
 function post(message) {
   const json = JSON.stringify(message);
@@ -147,6 +166,6 @@ export const bridge = {
    * La langue fait partie de l'adresse pour que le cache du navigateur ne mélange pas les deux.
    */
   imageUrl(key, lang = 'fr') {
-    return key ? IMAGE_BASE + 'cardimg?key=' + encodeURIComponent(key) + '&lang=' + (lang === 'en' ? 'en' : 'fr') : '';
+    return key ? imageBase(key) + 'cardimg?key=' + encodeURIComponent(key) + '&lang=' + (lang === 'en' ? 'en' : 'fr') : '';
   },
 };

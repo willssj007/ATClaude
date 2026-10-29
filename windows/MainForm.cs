@@ -39,6 +39,10 @@ namespace ArcaneTable
         private string logPath;
         private string baseUrl;
         private bool closing;
+        private bool running;
+        private bool restarting;
+        private int restarts;
+        private DateTime firstRestart;
         private FormWindowState stateBeforeFullscreen;
         private FormBorderStyle borderBeforeFullscreen;
 
@@ -92,10 +96,11 @@ namespace ArcaneTable
             try
             {
                 Directory.CreateDirectory(dataDir);
-                var port = FreePort();
+                var port = PickPort();
                 baseUrl = "http://127.0.0.1:" + port + "/";
                 StartEngine(port);
                 await WaitForEngineAsync(TimeSpan.FromMinutes(2));
+                running = true;
                 await ShowInterfaceAsync();
             }
             catch (WebView2RuntimeNotFoundException)
@@ -128,6 +133,19 @@ namespace ArcaneTable
                 throw new FileNotFoundException("moteur introuvable (" + exe + "). Décompresse tout le dossier ArcaneTable avant de lancer l'application.");
             }
             logPath = Path.Combine(dataDir, "moteur.log");
+            log?.Dispose();
+            // Après un arrêt imprévu, le journal de la fois d'avant est gardé à côté (moteur-precedent.log).
+            if (restarts > 0 && File.Exists(logPath))
+            {
+                try
+                {
+                    File.Copy(logPath, Path.Combine(dataDir, "moteur-precedent.log"), true);
+                }
+                catch (IOException)
+                {
+                    // journal verrouillé : on écrase
+                }
+            }
             log = new StreamWriter(logPath, false) { AutoFlush = true };
             var psi = new ProcessStartInfo(exe, "--port " + port + " --no-browser --no-window")
             {
@@ -135,21 +153,77 @@ namespace ArcaneTable
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8,
                 WorkingDirectory = Path.GetDirectoryName(exe),
             };
             engine = new Process { StartInfo = psi, EnableRaisingEvents = true };
             engine.OutputDataReceived += (s, e) => Log(e.Data);
             engine.ErrorDataReceived += (s, e) => Log(e.Data);
+            var process = engine;
             engine.Exited += (s, e) =>
             {
-                if (!closing)
+                if (!closing && running && !restarting && process == engine)
                 {
-                    BeginInvoke((Action)(() => Fail("Le moteur s'est arrêté (code " + SafeExitCode() + ").")));
+                    BeginInvoke((Action)(async () => await RestartAsync()));
                 }
             };
             engine.Start();
             engine.BeginOutputReadLine();
             engine.BeginErrorReadLine();
+        }
+
+        /// <summary>
+        /// Arrêt imprévu du moteur (mémoire épuisée, plantage de Java) : on le relance et on recharge l'interface,
+        /// qui reprend la partie sauvegardée. Au-delà de trois arrêts en dix minutes, on s'arrête là avec un message.
+        /// </summary>
+        private async Task RestartAsync()
+        {
+            if (closing)
+            {
+                return;
+            }
+            var code = SafeExitCode();
+            if (restarts == 0 || DateTime.UtcNow - firstRestart > TimeSpan.FromMinutes(10))
+            {
+                restarts = 0;
+                firstRestart = DateTime.UtcNow;
+            }
+            if (++restarts > 3)
+            {
+                Fail("Le moteur s'est arrêté plusieurs fois (code " + code + "). Relance Arcane Table ; si cela recommence, "
+                     + "envoie le journal du moteur (moteur.log et moteur-precedent.log, dans le même dossier).");
+                return;
+            }
+            restarting = true;
+            web.Visible = false;
+            status.Visible = true;
+            status.Text = "Le moteur s'est arrêté (code " + code + ") : redémarrage…\nLa partie en cours reprendra là où elle a été sauvegardée.";
+            try
+            {
+                var port = PickPort();
+                baseUrl = "http://127.0.0.1:" + port + "/";
+                StartEngine(port);
+                await WaitForEngineAsync(TimeSpan.FromMinutes(2));
+                if (web.CoreWebView2 != null)
+                {
+                    web.CoreWebView2.Navigate(baseUrl);
+                    web.Visible = true;
+                    status.Visible = false;
+                }
+                else
+                {
+                    await ShowInterfaceAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Fail("Arcane Table n'a pas pu redémarrer le moteur : " + ex.Message);
+            }
+            finally
+            {
+                restarting = false;
+            }
         }
 
         private async Task WaitForEngineAsync(TimeSpan timeout)
@@ -312,6 +386,55 @@ namespace ArcaneTable
                 // arrêt refusé : il s'arrêtera avec la session
             }
             log?.Dispose();
+        }
+
+        /// <summary>
+        /// Toujours le même port quand il est libre : la page garde ses réglages (mode, images, musique, thèmes) par
+        /// adresse, port compris. Le port choisi est noté pour les fois suivantes ; s'il est pris, un autre est noté.
+        /// </summary>
+        private int PickPort()
+        {
+            var file = Path.Combine(dataDir, "port.txt");
+            var port = 47615;
+            try
+            {
+                if (File.Exists(file) && int.TryParse(File.ReadAllText(file).Trim(), out var saved) && saved > 1024 && saved < 65536)
+                {
+                    port = saved;
+                }
+            }
+            catch (IOException)
+            {
+                // fichier illisible : port par défaut
+            }
+            if (!IsFree(port))
+            {
+                port = FreePort();
+            }
+            try
+            {
+                File.WriteAllText(file, port.ToString());
+            }
+            catch (IOException)
+            {
+                // pas grave : on choisira de nouveau la prochaine fois
+            }
+            return port;
+        }
+
+        private static bool IsFree(int port)
+        {
+            try
+            {
+                var listener = new TcpListener(IPAddress.Loopback, port);
+                listener.Start();
+                listener.Stop();
+                return true;
+            }
+            catch (SocketException)
+            {
+                return false;
+            }
         }
 
         private static int FreePort()

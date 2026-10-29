@@ -214,6 +214,38 @@ public final class Bridge {
         return t;
     });
 
+    /**
+     * Juste après le démarrage : prépare en fond ce que les premiers écrans demandent (index de recherche, liste des
+     * decks, analyse des préconstruits pour les duels Planeswalker), une étape à la fois sur le fil du catalogue :
+     * une demande de l'interface passe entre deux étapes, et chaque écran s'ouvre ensuite sans attendre.
+     */
+    void warmUp() {
+        final java.util.List<Runnable> steps = java.util.List.of(
+                () -> catalog.search(new JsonObject()),
+                catalog::listDecks,
+                Precons::all,
+                Career::boosterSets);
+        warmStep(steps, 0);
+    }
+
+    private void warmStep(final java.util.List<Runnable> steps, final int i) {
+        if (i >= steps.size()) {
+            return;
+        }
+        catalogThread.execute(() -> {
+            final Thread t = Thread.currentThread();
+            t.setPriority(Thread.MIN_PRIORITY);
+            try {
+                steps.get(i).run();
+            } catch (final RuntimeException e) {
+                // simple préparation : l'écran refera le calcul et montrera l'erreur s'il y en a une
+            } finally {
+                t.setPriority(Thread.NORM_PRIORITY);
+            }
+            warmStep(steps, i + 1);
+        });
+    }
+
     private void dispatch(final String type, final JsonObject message) {
         final JsonElement rid = message.get("rid");
         try {

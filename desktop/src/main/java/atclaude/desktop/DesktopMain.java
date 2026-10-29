@@ -74,10 +74,11 @@ public final class DesktopMain {
         server.setExecutor(Executors.newCachedThreadPool());
         // Seule l'interface servie ici peut parler au moteur : une page web quelconque ouverte dans le navigateur
         // ne doit pas pouvoir envoyer de commandes (relier un compte, synchroniser, jouer...) au serveur local.
-        final com.sun.net.httpserver.Filter localOnly = new LocalOnly(port);
+        final com.sun.net.httpserver.Filter localOnly = new LocalOnly(port, false);
         server.createContext("/api/events", DesktopMain::events).getFilters().add(localOnly);
         server.createContext("/api/send", exchange -> send(exchange, bridge)).getFilters().add(localOnly);
-        server.createContext("/cardimg", DesktopMain::cardImage).getFilters().add(localOnly);
+        // Images : aussi par img0 à img3.localhost (voir ui/js/bridge.js), pour plus de connexions en parallèle.
+        server.createContext("/cardimg", DesktopMain::cardImage).getFilters().add(new LocalOnly(port, true));
         server.createContext("/", exchange -> serveStatic(exchange, ui)).getFilters().add(localOnly);
         server.start();
 
@@ -160,8 +161,14 @@ public final class DesktopMain {
         private final List<String> hosts;
         private final List<String> origins;
 
-        LocalOnly(final int port) {
-            hosts = List.of("127.0.0.1:" + port, "localhost:" + port);
+        LocalOnly(final int port, final boolean imageHosts) {
+            final List<String> list = new java.util.ArrayList<>(List.of("127.0.0.1:" + port, "localhost:" + port));
+            if (imageHosts) {
+                for (int i = 0; i < 4; i++) {
+                    list.add("img" + i + ".localhost:" + port);
+                }
+            }
+            hosts = List.copyOf(list);
             origins = List.of("http://127.0.0.1:" + port, "http://localhost:" + port);
         }
 

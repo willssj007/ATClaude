@@ -117,7 +117,10 @@ jobs:
         run: |
           jpackage --type app-image --input dist --main-jar desktop-0.1.0.jar --main-class atclaude.desktop.DesktopMain `
             --name ArcaneTableMoteur --app-version ${{ needs.apk.outputs.version }} --vendor "Arcane Table" `
-            --icon windows/ArcaneTable.ico --java-options "-Xmx2g" --dest out
+            --icon windows/ArcaneTable.ico --dest out `
+            --java-options "-XX:MaxRAMPercentage=50" --java-options "-XX:+ExitOnOutOfMemoryError" `
+            --java-options "-Djava.awt.headless=true" --java-options "-Dfile.encoding=UTF-8" `
+            --java-options "-Dsun.stdout.encoding=UTF-8" --java-options "-Dsun.stderr.encoding=UTF-8"
 
       - name: Fenêtre de l'application (WebView2)
         shell: pwsh
