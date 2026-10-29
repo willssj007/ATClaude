@@ -1,0 +1,75 @@
+<config>
+  <executableName>${app.executable}</executableName>
+  <mainClass>${app.mainclass}</mainClass>
+  <os>ios</os>
+  <arch>arm64</arch>
+  <target>ios</target>
+  <iosInfoPList>Info.plist.xml</iosInfoPList>
+  <resources>
+    <!-- Ressources de Forge (sortie de scripts/package-res.sh, copiée là par scripts/build-ios.sh) : lues sur
+         place, dans le paquet. Les PNG ne sont lus que par la page : pas de conversion CgBI. -->
+    <resource>
+      <directory>build/forge</directory>
+      <targetPath>forge</targetPath>
+      <skipPngCrush>true</skipPngCrush>
+    </resource>
+    <!-- L'interface, servie à la WebView sous atclaude://app/ (LocalScheme). -->
+    <resource>
+      <directory>../ui</directory>
+      <targetPath>ui</targetPath>
+      <skipPngCrush>true</skipPngCrush>
+    </resource>
+    <!-- Icône (catalogue d'images compilé par actool). -->
+    <resource>
+      <directory>resources</directory>
+    </resource>
+  </resources>
+  <!-- Classes atteintes par réflexion ou par le code réécrit pour MobiVM, que l'éditeur de liens ne voit pas :
+       la liste de forge-gui-ios (Forge sur iOS), sans ce qui ne sert qu'à libGDX. -->
+  <forceLinkClasses>
+    <pattern>com.android.okhttp.HttpHandler</pattern>
+    <pattern>com.android.okhttp.HttpsHandler</pattern>
+    <pattern>com.android.org.conscrypt.**</pattern>
+    <pattern>com.android.org.bouncycastle.jce.provider.BouncyCastleProvider</pattern>
+    <pattern>com.android.org.bouncycastle.jcajce.provider.keystore.BC$Mappings</pattern>
+    <pattern>com.android.org.bouncycastle.jcajce.provider.keystore.bc.BcKeyStoreSpi</pattern>
+    <pattern>com.android.org.bouncycastle.jcajce.provider.keystore.bc.BcKeyStoreSpi$Std</pattern>
+    <pattern>com.android.org.bouncycastle.jce.provider.PKIXCertPathValidatorSpi</pattern>
+    <pattern>com.android.org.bouncycastle.crypto.digests.AndroidDigestFactoryOpenSSL</pattern>
+    <pattern>org.apache.harmony.security.provider.cert.DRLCertFactory</pattern>
+    <pattern>org.apache.harmony.security.provider.crypto.CryptoProvider</pattern>
+    <pattern>org.apache.xalan.processor.TransformerFactoryImpl</pattern>
+    <pattern>org.apache.xml.serializer.**</pattern>
+    <pattern>java.util.logging.**</pattern>
+    <pattern>com.thoughtworks.xstream.**</pattern>
+    <pattern>java.io.ObjectInputStream</pattern>
+    <pattern>java.io.ObjectOutputStream</pattern>
+    <pattern>java.io.ObjectStreamClass</pattern>
+    <pattern>java.io.ObjectStreamField</pattern>
+    <pattern>net.jpountz.lz4.**</pattern>
+    <pattern>net.jpountz.xxhash.**</pattern>
+    <pattern>io.netty.**</pattern>
+    <pattern>forge.gamemodes.net.**</pattern>
+    <pattern>forge.gamemodes.match.LobbySlot</pattern>
+    <pattern>forge.gamemodes.match.LobbySlotType</pattern>
+    <pattern>org.robovm.rt.GC</pattern>
+    <pattern>java8.**</pattern>
+    <pattern>xyz.wagyourtail.jvmdg.**</pattern>
+    <pattern>java.time.**</pattern>
+    <pattern>java.nio.file.**</pattern>
+    <pattern>java.io.UncheckedIOException</pattern>
+    <pattern>forge.compat.**</pattern>
+    <pattern>io.sentry.**</pattern>
+    <!-- Arcane Table : le pont et Gson (adaptateurs par réflexion). -->
+    <pattern>atclaude.**</pattern>
+    <pattern>com.google.gson.**</pattern>
+  </forceLinkClasses>
+  <frameworks>
+    <framework>UIKit</framework>
+    <framework>WebKit</framework>
+    <framework>Foundation</framework>
+    <framework>CoreGraphics</framework>
+    <framework>QuartzCore</framework>
+    <framework>Security</framework>
+  </frameworks>
+</config>

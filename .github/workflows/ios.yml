@@ -1,0 +1,79 @@
+name: Application iPhone (essai)
+
+# Mise au point de l'application iPhone sur la branche ios-dev : IPA en artefact, journal et rapports de conversion
+# sur la branche ios-build-results (les journaux des travaux ne sont pas toujours consultables).
+on:
+  push:
+    branches: [ios-dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-latest
+    timeout-minutes: 150
+    env:
+      FORGE_DIR: ${{ github.workspace }}/../forge-src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # Cache de la compilation native de MobiVM (indexé par contenu : seules les classes changées sont recompilées).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.robovm/cache
+          key: robovm-${{ github.sha }}
+          restore-keys: robovm-
+
+      - name: Compiler Forge et le pont
+        run: |
+          scripts/build-forge.sh "$FORGE_DIR"
+          mvn -B -q install -DskipTests
+
+      - name: Ressources de Forge
+        run: scripts/package-res.sh "$FORGE_DIR/forge-gui/res" "$RUNNER_TEMP/forge-assets"
+
+      - name: Application iPhone
+        run: |
+          set -o pipefail
+          xcodebuild -version | tee ios-build.log
+          scripts/build-ios.sh "$FORGE_DIR" "$RUNNER_TEMP/forge-assets" "0.2.${{ github.run_number }}" "ArcaneTable-iOS.ipa" 2>&1 | tee -a ios-build.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ArcaneTable-iOS
+          path: |
+            ArcaneTable-iOS.ipa
+            ios-build.log
+            ios/build/pipeline/*.txt
+          retention-days: 7
+
+      - name: Publier le journal (branche ios-build-results)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p results
+          cp ios-build.log results/ 2>/dev/null || true
+          cp ios/build/pipeline/*.txt results/ 2>/dev/null || true
+          find ios/target -name '*.log' -exec cp {} results/ \; 2>/dev/null || true
+          ls -la ArcaneTable-iOS.ipa > results/ipa.txt 2>&1 || true
+          cd results
+          git init -q -b ios-build-results
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Build iPhone (${{ github.sha }})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" ios-build-results

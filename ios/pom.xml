@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Application iPhone et iPad (MobiVM). Hors du build habituel : construite sur macOS par scripts/build-ios.sh,
+         qui convertit d'abord Forge et le pont pour l'environnement Java de MobiVM (voir ce script). -->
+    <parent>
+        <groupId>atclaude</groupId>
+        <artifactId>atclaude-parent</artifactId>
+        <version>0.1.0</version>
+    </parent>
+
+    <artifactId>ios</artifactId>
+    <name>ATClaude iOS</name>
+
+    <properties>
+        <robovm.version>2.3.24</robovm.version>
+        <jvmdg.version>1.3.6</jvmdg.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>atclaude</groupId>
+            <artifactId>bridge</artifactId>
+            <exclusions>
+                <!-- jeu en réseau (découverte UPnP, serveur) : inutile ici, comme dans forge-gui-ios -->
+                <exclusion>
+                    <groupId>org.jupnp</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.mobidevelop.robovm</groupId>
+            <artifactId>robovm-rt</artifactId>
+            <version>${robovm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mobidevelop.robovm</groupId>
+            <artifactId>robovm-objc</artifactId>
+            <version>${robovm.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mobidevelop.robovm</groupId>
+            <artifactId>robovm-cocoatouch</artifactId>
+            <version>${robovm.version}</version>
+        </dependency>
+        <!-- Ce qui manque à MobiVM pour du code Java 8 à 17 (voir scripts/build-ios.sh et forge-gui-ios) -->
+        <dependency>
+            <groupId>net.sourceforge.streamsupport</groupId>
+            <artifactId>streamsupport</artifactId>
+            <version>1.7.4</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sourceforge.streamsupport</groupId>
+            <artifactId>streamsupport-cfuture</artifactId>
+            <version>1.7.4</version>
+        </dependency>
+        <dependency>
+            <groupId>xyz.wagyourtail.jvmdowngrader</groupId>
+            <artifactId>jvmdowngrader-java-api</artifactId>
+            <version>${jvmdg.version}-mobivm</version>
+        </dependency>
+        <dependency>
+            <groupId>forge.stubs</groupId>
+            <artifactId>java-time-supply</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>forge.stubs</groupId>
+            <artifactId>java-nio-supply</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>forge.stubs</groupId>
+            <artifactId>java-function-stubs</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jupnp</groupId>
+            <artifactId>org.jupnp</artifactId>
+            <version>3.0.5</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <!-- forge.compat (cibles de la réécriture pour MobiVM), copié depuis forge-gui-ios par build-ios.sh -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>forge-compat</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>build/forge-compat</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.mobidevelop.robovm</groupId>
+                <artifactId>robovm-maven-plugin</artifactId>
+                <version>${robovm.version}</version>
+                <configuration>
+                    <propertiesFile>robovm.properties</propertiesFile>
+                    <configFile>robovm.xml</configFile>
+                    <iosInfoPList>Info.plist.xml</iosInfoPList>
+                    <iosSkipSigning>true</iosSkipSigning>
+                    <arch>arm64</arch>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
