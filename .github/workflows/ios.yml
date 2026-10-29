@@ -51,6 +51,10 @@ jobs:
           xcodebuild -version | tee ios-build.log
           scripts/build-ios.sh "$FORGE_DIR" "$RUNNER_TEMP/forge-assets" "0.2.${{ github.run_number }}" "ArcaneTable-iOS.ipa" 2>&1 | tee -a ios-build.log
 
+      - name: Essai dans le simulateur
+        timeout-minutes: 45
+        run: scripts/ios-sim-test.sh sim-results 480
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -59,6 +63,7 @@ jobs:
             ArcaneTable-iOS.ipa
             ios-build.log
             ios/build/pipeline/*.txt
+            sim-results
           retention-days: 7
 
       - name: Publier le journal (branche ios-build-results)
@@ -71,6 +76,7 @@ jobs:
           cp ios/build/pipeline/*.txt results/ 2>/dev/null || true
           find ios/target -name '*.log' -exec cp {} results/ \; 2>/dev/null || true
           ls -la ArcaneTable-iOS.ipa > results/ipa.txt 2>&1 || true
+          cp -R sim-results results/sim 2>/dev/null || true
           cd results
           git init -q -b ios-build-results
           git add -A

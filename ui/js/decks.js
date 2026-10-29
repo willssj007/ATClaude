@@ -220,7 +220,7 @@ export class Decks {
     this.dirty = false;
     // Un deck sans nom (ou nommé d'après son commandant) prend le nom de son commandant, et le suit.
     this.autoName = !deck.name || deck.name === commanderNames(deck) ? deck.name || '' : null;
-    this.root.innerHTML = `<div class="tabs-mobile seg"><button data-tab="left" class="on">Recherche</button><button data-tab="right">Deck</button></div>
+    this.root.innerHTML = `<div class="tabs-mobile seg"><button data-tab="left" class="on">${icon('search')} Recherche</button><button data-tab="right">${icon('cards')} Deck <b class="tab-count"></b></button></div>
       <div class="builder">
         <div class="left"></div>
         <div class="right panel"></div>
@@ -230,7 +230,8 @@ export class Decks {
     right.classList.add('mobile-hidden');
     this.search = new SearchPanel(left, {
       owned: !!deck.career,
-      onAdd: (card) => this.add(card),
+      onAdd: (card) => this.add(card, 'main', true),
+      onRemove: (card) => this.remove(card.name, this.count(card.name, 'main') ? 'main' : 'side'),
       onPick: (card) => showZoom(card, card.canBeCommander && this.deck.format === 'commander'
         ? '<p class="muted small">Ajoute la carte puis touche ♛ dans le deck pour en faire le commandant.</p>' : ''),
       counts: (name) => this.count(name),
@@ -263,12 +264,19 @@ export class Decks {
     return 'WUBRG'.split('').filter(c => set.has(c)).join('');
   }
 
-  count(name) {
+  count(name, only) {
     const s = this.deck.sections;
-    return [...s.commander, ...s.main].filter(l => l.card.name === name).reduce((a, l) => a + l.count, 0);
+    const lines = only ? s[only] : [...s.commander, ...s.main];
+    return lines.filter(l => l.card.name === name).reduce((a, l) => a + l.count, 0);
   }
 
-  add(card, section = 'main') {
+  /** Nombre de cartes du deck (commandant compris) et le compte visé par le format. */
+  totals() {
+    const s = this.deck.sections;
+    return {total: [...s.commander, ...s.main].reduce((a, l) => a + l.count, 0), target: this.deck.format === 'commander' ? 100 : 60};
+  }
+
+  add(card, section = 'main', fromSearch = false) {
     // Mode Planeswalker : pas plus d'exemplaires que dans la collection (terrains de base illimités).
     if (this.deck.career && !card.basic && card.owned !== undefined && card.owned >= 0 && this.count(card.name) >= card.owned) {
       toast(card.owned ? `Tu n'as que ${card.owned} exemplaire${card.owned > 1 ? 's' : ''} de ${card.nameFr}.` : `${card.nameFr} n'est pas dans ta collection.`, {error: true});
@@ -283,6 +291,10 @@ export class Decks {
     }
     if (this.deck.format === 'commander' && section === 'main' && !card.basic && this.count(card.name) > 1 && !/any number|up to/i.test(card.textEn || '')) {
       toast(`${card.nameFr} est déjà dans le deck (Commander : un seul exemplaire).`);
+    } else if (fromSearch && this.root.querySelector('.right.mobile-hidden') && getComputedStyle(this.root.querySelector('.tabs-mobile')).display !== 'none') {
+      // Sur téléphone, le deck n'est pas à l'écran pendant la recherche : on dit où on en est.
+      const {total, target} = this.totals();
+      toast(`${card.nameFr} ajoutée · ${total + 1} / ${target}`, {duration: 1300});
     }
     this.changed();
   }

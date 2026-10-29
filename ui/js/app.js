@@ -434,6 +434,9 @@ function onReady(hello) {
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
   checkUnlocks();
   $('#loading').classList.add('hidden');
+  if (/[?&]autotest=1\b/.test(location.search)) {
+    import('./autotest.js').then(m => m.runAutotest());
+  }
   screens.lobby.setProfiles(hello && hello.aiProfiles);
   if (hello && hello.inMatch) {
     inMatch = true;

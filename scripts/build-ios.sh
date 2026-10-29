@@ -16,7 +16,8 @@ set -euo pipefail
 FORGE="$(cd "$1" && pwd)"
 ASSETS="$(cd "$2" && pwd)"
 VERSION="$3"
-OUT_IPA="$4"
+mkdir -p "$(dirname "$4")"
+OUT_IPA="$(cd "$(dirname "$4")" && pwd)/$(basename "$4")"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IOS="$ROOT/ios"
 PIPE="$FORGE/forge-gui-ios/pipeline"
@@ -190,7 +191,6 @@ if [ "$SDK_MAJOR" -gt 26 ]; then
   vtool -set-build-version 2 15.0 26.0 -replace -output "$EXE.tmp" "$EXE" && mv -f "$EXE.tmp" "$EXE"
   codesign --force --sign - --timestamp=none "$APP"
 fi
-mkdir -p "$(dirname "$OUT_IPA")"
 rm -f "$OUT_IPA"
-(cd "$STAGE" && zip -qry "$(cd "$(dirname "$OUT_IPA")" && pwd)/$(basename "$OUT_IPA")" Payload)
+(cd "$STAGE" && zip -qry "$OUT_IPA" Payload)
 echo "IPA prêt : $OUT_IPA ($(du -h "$OUT_IPA" | cut -f1))"

@@ -93,6 +93,8 @@ export function debounce(fn, ms) {
 /** Préférences locales de l'interface (le stockage peut être indisponible : on garde alors les valeurs par défaut). */
 const DEFAULTS = {
   images: true,
+  /** Deck builder : le deck en liste ('list') ou en images ('images'). */
+  deckView: 'list',
   imageLang: 'fr',
   musicOn: true,
   musicVolume: 0.35,

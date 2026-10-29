@@ -71,14 +71,16 @@ export class SearchPanel {
    * @param options.onPick   clic sur une carte
    * @param options.addLabel si présent, un bouton « + » ajoute la carte (onAdd)
    * @param options.counts   fonction nom -> exemplaires déjà dans le deck
+   * @param options.onRemove si présent, un bouton « − » retire un exemplaire (cartes déjà dans le deck)
    */
-  constructor(root, {onPick, onAdd, counts, identityLock, owned = false, onBought} = {}) {
+  constructor(root, {onPick, onAdd, onRemove, counts, identityLock, owned = false, onBought} = {}) {
     this.root = root;
     this.onBought = onBought;
     // Mode Planeswalker : seulement les cartes de la collection, avec le nombre d'exemplaires possédés.
     this.owned = owned;
     this.onPick = onPick;
     this.onAdd = onAdd;
+    this.onRemove = onRemove;
     this.counts = counts || (() => 0);
     this.identityLock = identityLock || (() => null);
     this.query = {text: '', inText: false, colors: [], colorMode: 'any', types: [], commanderLegal: false, commandersOnly: false};
@@ -218,6 +220,11 @@ export class SearchPanel {
         this.refreshCounts();
         return;
       }
+      if (e.target.closest('.rm')) {
+        this.onRemove && this.onRemove(cell._card);
+        this.refreshCounts();
+        return;
+      }
       if (this.onPick) {
         this.onPick(cell._card);
       } else {
@@ -280,7 +287,10 @@ export class SearchPanel {
       const r = rarityKey(card);
       cell.appendChild(el(`<button class="buy" title="Acheter avec un jeton ${RARITY_FR[r]}">${wildcardHtml(r)}<span>Acheter</span></button>`));
     } else if (this.onAdd) {
-      cell.appendChild(el('<button class="add" title="Ajouter au deck">+</button>'));
+      cell.appendChild(el('<button class="add" title="Ajouter au deck" aria-label="Ajouter au deck">+</button>'));
+      if (this.onRemove) {
+        cell.appendChild(el('<button class="rm" title="Retirer un exemplaire du deck" aria-label="Retirer du deck">−</button>'));
+      }
     }
     return cell;
   }
@@ -313,6 +323,7 @@ export class SearchPanel {
   refreshCounts() {
     for (const cell of this.root.querySelectorAll('.cell')) {
       const n = this.counts(cell._card.name);
+      cell.classList.toggle('in-deck', n > 0);
       let badge = cell.querySelector('.count');
       if (n > 0) {
         if (!badge) {
@@ -328,6 +339,15 @@ export class SearchPanel {
 
   focus() {
     this.root.querySelector('.q').focus();
+  }
+
+  /** N'affiche que les cartes qui peuvent être commandant (bouton « Chercher un commandant » du deck builder). */
+  commandersOnly(on = true) {
+    const box = this.root.querySelector('.cmdonly');
+    if (box.checked !== on) {
+      box.checked = on;
+      box.dispatchEvent(new Event('change'));
+    }
   }
 }
 

@@ -17,6 +17,10 @@ import org.robovm.apple.uikit.UIScreen;
 import org.robovm.apple.uikit.UIWindow;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.SimpleTimeZone;
 import java.util.TimeZone;
 
@@ -85,7 +89,53 @@ public final class Main extends UIApplicationDelegateAdapter {
         return NSPathUtilities.getSearchPathForDirectoriesInDomains(which, NSSearchPathDomainMask.UserDomainMask, true).get(0);
     }
 
+    /**
+     * Sorties de Java (System.out, System.err) recopiées dans Application Support/atclaude/app.log, refait à chaque
+     * lancement : le journal d'iOS masque les messages des applications, ce fichier sert au diagnostic.
+     */
+    private static void logToFile() {
+        try {
+            final File dir = new File(directory(NSSearchPathDirectory.ApplicationSupportDirectory), "atclaude");
+            dir.mkdirs();
+            final OutputStream file = new FileOutputStream(new File(dir, "app.log"));
+            System.setOut(new PrintStream(new Tee(System.out, file), true, "UTF-8"));
+            System.setErr(new PrintStream(new Tee(System.err, file), true, "UTF-8"));
+        } catch (final IOException | RuntimeException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** Écrit dans deux flux à la fois. */
+    private static final class Tee extends OutputStream {
+        private final OutputStream a;
+        private final OutputStream b;
+
+        Tee(final OutputStream a, final OutputStream b) {
+            this.a = a;
+            this.b = b;
+        }
+
+        @Override
+        public void write(final int c) throws IOException {
+            a.write(c);
+            b.write(c);
+        }
+
+        @Override
+        public void write(final byte[] buf, final int off, final int len) throws IOException {
+            a.write(buf, off, len);
+            b.write(buf, off, len);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            a.flush();
+            b.flush();
+        }
+    }
+
     public static void main(final String[] args) {
+        logToFile();
         // Le fuseau horaire de l'appareil, sans lire /usr/share/zoneinfo (interdit par le bac à sable d'iOS).
         try {
             final NSTimeZone tz = NSTimeZone.getSystemTimeZone();

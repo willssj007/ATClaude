@@ -3,6 +3,7 @@ package atclaude.ios;
 import atclaude.bridge.Bridge;
 import com.google.gson.Gson;
 import org.robovm.apple.dispatch.DispatchQueue;
+import org.robovm.apple.foundation.NSProcessInfo;
 import org.robovm.apple.foundation.NSURL;
 import org.robovm.apple.foundation.NSURLRequest;
 import org.robovm.apple.uikit.UIApplication;
@@ -22,6 +23,8 @@ import org.robovm.apple.webkit.WKNavigationDelegateAdapter;
 import org.robovm.apple.webkit.WKScriptMessage;
 import org.robovm.apple.webkit.WKScriptMessageHandlerAdapter;
 import org.robovm.apple.webkit.WKUserContentController;
+import org.robovm.apple.webkit.WKUserScript;
+import org.robovm.apple.webkit.WKUserScriptInjectionTime;
 import org.robovm.apple.webkit.WKWebView;
 import org.robovm.apple.webkit.WKWebViewConfiguration;
 import org.robovm.objc.block.VoidBlock1;
@@ -66,13 +69,20 @@ final class WebController extends UIViewController {
                     }
                     case "atclaudeUrl" -> openExternal(body);
                     case "atclaudeOrientation" -> setAnyOrientation("any".equals(body));
+                    case "atclaudeLog" -> System.out.println("[page] " + body);
                     default -> { }
                 }
             }
         };
-        for (final String name : new String[] {"atclaude", "atclaudeUrl", "atclaudeOrientation"}) {
+        for (final String name : new String[] {"atclaude", "atclaudeUrl", "atclaudeOrientation", "atclaudeLog"}) {
             content.addScriptMessageHandler(messages, name);
         }
+        // Erreurs de la page dans le journal de l'application (app.log).
+        content.addUserScript(new WKUserScript("(function(){var h=window.webkit.messageHandlers.atclaudeLog;"
+                + "window.addEventListener('error',function(e){h.postMessage('erreur : '+e.message+' ('+e.filename+':'+e.lineno+')');});"
+                + "window.addEventListener('unhandledrejection',function(e){h.postMessage('promesse rejetée : '+(e.reason&&e.reason.message||e.reason));});"
+                + "var ce=console.error;console.error=function(){h.postMessage('console : '+Array.prototype.join.call(arguments,' '));ce.apply(console,arguments);};})();",
+                WKUserScriptInjectionTime.AtDocumentStart, true));
 
         final WKWebViewConfiguration config = new WKWebViewConfiguration();
         config.setUserContentController(content);
@@ -114,7 +124,9 @@ final class WebController extends UIViewController {
             }
         });
         setView(web);
-        web.loadRequest(new NSURLRequest(new NSURL(SCHEME + "://app/index.html")));
+        // « -autotest » (essai dans le simulateur, scripts/ios-sim-test.sh) : la page joue seule une partie.
+        final boolean autotest = NSProcessInfo.getSharedProcessInfo().getArguments().contains("-autotest");
+        web.loadRequest(new NSURLRequest(new NSURL(SCHEME + "://app/index.html" + (autotest ? "?autotest=1" : ""))));
     }
 
     @Override
