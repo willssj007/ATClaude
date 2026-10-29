@@ -42,6 +42,7 @@ final class LocalScheme extends WKURLSchemeHandlerAdapter {
         TYPES.put("svg", "image/svg+xml");
         TYPES.put("png", "image/png");
         TYPES.put("jpg", "image/jpeg");
+        TYPES.put("webp", "image/webp");
         TYPES.put("json", "application/json");
         TYPES.put("webmanifest", "application/manifest+json");
         TYPES.put("woff2", "font/woff2");

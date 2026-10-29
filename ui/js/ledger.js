@@ -5,7 +5,7 @@ import {bridge} from './bridge.js';
 import {boosterSets} from './boosters.js';
 import {RARITY_FR, loadCareer, manaAmount, setCareer, wildcardHtml} from './career.js';
 import {customBox} from './dialogs.js';
-import {appearanceHtml, applyThemes} from './themes.js';
+import {appearanceHtml, applyThemes, livePreviews} from './themes.js';
 import {el, esc, prefs, toast} from './util.js';
 
 const RARITIES = ['common', 'uncommon', 'rare', 'mythic'];
@@ -88,6 +88,7 @@ export async function openLedger() {
         const grid = document.querySelector('#screen-settings .appearance');
         grid && appearanceHtml().then((html) => {
           grid.innerHTML = html;
+          livePreviews(grid);
         });
       }
     });

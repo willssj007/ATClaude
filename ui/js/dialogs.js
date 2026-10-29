@@ -505,13 +505,31 @@ const handlers = {
     let toDefender = 0;
     const total = el('<span class="muted" style="margin-right:auto"></span>');
     const ok = button('Valider', 'gold');
-    const head = el(`<div class="message">${esc(d.attacker.name)} inflige ${d.damage} blessure(s).</div>`);
+    const head = el(`<div class="message">${esc(d.attacker.name)} inflige ${d.damage} blessure(s)${d.deathtouch ? ' (contact mortel : 1 blessure suffit à tuer)' : ''}.</div>`);
     s.body.appendChild(head);
+    const rule = el('<div class="muted small" style="color:var(--bad)"></div>');
     const rows = [];
+    // Règles (vérifiées aussi par le moteur) : tout répartir ; le joueur défenseur ne reçoit rien tant qu'un bloqueur
+    // n'a pas ses blessures mortelles (piétinement) ; dans l'ordre des bloqueurs si la partie l'impose.
+    const problem = () => {
+      const sum = values.reduce((a, b) => a + b, 0) + toDefender;
+      if (sum !== d.damage) {
+        return '';
+      }
+      if (toDefender > 0 && !d.freeDefender && blockers.some((b, i) => values[i] < b.lethal)) {
+        return 'Le joueur ne reçoit des blessures qu\'une fois chaque bloqueur mortellement blessé.';
+      }
+      if (d.ordered && blockers.some((b, i) => i > 0 && values[i] > 0 && values[i - 1] < blockers[i - 1].lethal)) {
+        return 'Dans l\'ordre des bloqueurs : le précédent doit d\'abord recevoir de quoi mourir.';
+      }
+      return null;
+    };
     const refresh = () => {
       const sum = values.reduce((a, b) => a + b, 0) + toDefender;
       total.textContent = `${sum} / ${d.damage} réparties`;
-      ok.disabled = sum !== d.damage;
+      const why = problem();
+      ok.disabled = why !== null;
+      rule.textContent = why || '';
       rows.forEach(r => r());
     };
     const row = (label, card, get, set) => {
@@ -542,6 +560,7 @@ const handlers = {
         toDefender = v;
       });
     }
+    s.body.appendChild(rule);
     const auto = button('Répartition automatique');
     auto.addEventListener('click', () => {
       let left = d.damage;

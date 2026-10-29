@@ -214,10 +214,11 @@ final class Dialogs {
             d.add("card", new GameSerializer(g).card(card, g.getGameView()));
         }
         final JsonElement answer = bridge.ask("option", d);
-        if (answer == null || answer.isJsonNull()) {
+        if (answer == null || !answer.isJsonPrimitive()) {
             return defaultOption;
         }
-        return answer.getAsInt();
+        final int i = answer.getAsInt();
+        return i >= 0 && i < options.size() ? i : defaultOption;
     }
 
     boolean confirm(final String title, final String message, final String yes, final String no, final boolean defaultYes, final CardView card) {
@@ -296,7 +297,19 @@ final class Dialogs {
             }
             return new Ordered<>(fallback, false);
         }
-        return new Ordered<>(pick(all, order), remember);
+        final List<T> picked = new ArrayList<>(pick(all, order));
+        // Au plus remainingMax éléments laissés de côté (0 : tout est ordonné, comme les déclencheurs simultanés ;
+        // négatif : pas de limite) :
+        // un élément oublié par la réponse n'est jamais perdu, il est rendu à la fin dans son ordre d'origine.
+        for (final T item : all) {
+            if (remainingMax < 0 || all.size() - picked.size() <= remainingMax) {
+                break;
+            }
+            if (!picked.contains(item)) {
+                picked.add(item);
+            }
+        }
+        return new Ordered<>(picked, remember);
     }
 
     /** Résultat du regard : cartes laissées dessus (la première sera piochée en premier) et cartes déplacées. */
@@ -342,51 +355,118 @@ final class Dialogs {
         });
     }
 
-    /** Répartition des blessures d'un attaquant entre ses bloqueurs (et le défenseur s'il a le piétinement). */
+    /**
+     * Répartition des blessures d'un attaquant entre ses bloqueurs (et le défenseur s'il a le piétinement). Forge
+     * applique la répartition reçue telle quelle : elle est vérifiée ici selon les règles (total exact, blessures
+     * mortelles sur chaque bloqueur avant d'en donner au joueur, contact mortel : 1 blessure suffit ; ordre des
+     * bloqueurs si la partie l'impose). Une réponse invalide est remplacée par la répartition par défaut.
+     */
     Map<CardView, Integer> assignCombatDamage(final CardView attacker, final List<CardView> blockers, final int damage,
-                                              final GameEntityView defender, final boolean maySkip) {
+                                              final GameEntityView defender, final boolean overrideOrder, final boolean maySkip) {
         final BridgeGuiGame g = gui.get();
         final GameSerializer serializer = new GameSerializer(g);
         final JsonObject d = dialog("Répartir les blessures", "");
         d.add("attacker", serializer.card(attacker, g.getGameView()));
-        // Le joueur défenseur ne reçoit des blessures que si l'attaquant a le piétinement.
-        final boolean trample = attacker.getCurrentState() != null && attacker.getCurrentState().hasTrample();
+        final forge.game.card.CardView.CardStateView st = attacker.getCurrentState();
+        final boolean deathtouch = st != null && st.hasDeathtouch();
+        // Le joueur (ou planeswalker) défenseur ne reçoit des blessures qu'avec le piétinement, ou si l'attaquant peut
+        // répartir ses blessures comme s'il n'était pas bloqué (sans condition alors).
+        final boolean divide = st != null && st.hasDivideDamage() && overrideOrder && defender != null;
+        final boolean trample = st != null && st.hasTrample() && defender != null;
+        final int[] lethal = new int[blockers.size()];
         final JsonArray list = new JsonArray();
-        for (final CardView b : blockers) {
+        for (int i = 0; i < blockers.size(); i++) {
+            final CardView b = blockers.get(i);
+            lethal[i] = lethalDamage(b, deathtouch);
             final JsonObject o = serializer.card(b, g.getGameView());
-            o.addProperty("lethal", b.getLethalDamage());
+            o.addProperty("lethal", lethal[i]);
             list.add(o);
         }
         d.add("blockers", list);
         d.addProperty("damage", damage);
         d.addProperty("maySkip", maySkip);
-        if (defender != null && trample) {
+        d.addProperty("deathtouch", deathtouch);
+        d.addProperty("ordered", !overrideOrder && !divide);
+        if (defender != null && (trample || divide)) {
             d.addProperty("defender", defender.getId());
             d.addProperty("defenderName", Texts.clean(defender.toString()));
+            d.addProperty("freeDefender", divide);
         }
         final JsonElement answer = bridge.ask("assignDamage", d);
-        final Map<CardView, Integer> result = new HashMap<>();
-        if (answer == null || !answer.isJsonObject()) {
-            // Répartition par défaut : blessures mortelles dans l'ordre, le reste au dernier bloqueur.
-            int left = damage;
+        if (answer != null && answer.isJsonObject()) {
+            final JsonObject map = answer.getAsJsonObject();
+            final int[] given = new int[blockers.size()];
+            int toDefender = 0;
+            boolean ok = true;
+            int sum = 0;
             for (int i = 0; i < blockers.size(); i++) {
-                final CardView b = blockers.get(i);
-                final int amount = i == blockers.size() - 1 ? left : Math.min(left, Math.max(0, b.getLethalDamage()));
-                result.put(b, amount);
-                left -= amount;
+                final JsonElement v = map.get(String.valueOf(blockers.get(i).getId()));
+                given[i] = v == null || !v.isJsonPrimitive() ? 0 : v.getAsInt();
+                ok &= given[i] >= 0;
+                sum += given[i];
             }
-            return result;
+            if ((trample || divide) && map.has("defender") && map.get("defender").isJsonPrimitive()) {
+                toDefender = map.get("defender").getAsInt();
+                ok &= toDefender >= 0;
+                sum += toDefender;
+            }
+            ok &= sum == damage;
+            if (ok && toDefender > 0 && !divide) {
+                for (int i = 0; i < blockers.size(); i++) {
+                    ok &= given[i] >= lethal[i];
+                }
+            }
+            if (ok && !overrideOrder && !divide) {
+                // Ordre des bloqueurs : rien au suivant tant que le précédent n'a pas reçu de quoi mourir.
+                for (int i = 1; i < blockers.size(); i++) {
+                    ok &= given[i] == 0 || given[i - 1] >= lethal[i - 1];
+                }
+            }
+            if (ok) {
+                final Map<CardView, Integer> result = new HashMap<>();
+                for (int i = 0; i < blockers.size(); i++) {
+                    result.put(blockers.get(i), given[i]);
+                }
+                if (toDefender > 0) {
+                    // Forge attend la part du joueur défenseur sous la clé null.
+                    result.put(null, toDefender);
+                }
+                return result;
+            }
+            System.err.println("Répartition des blessures refusée (contraire aux règles) : " + map);
         }
-        final JsonObject map = answer.getAsJsonObject();
-        for (final CardView b : blockers) {
-            final JsonElement v = map.get(String.valueOf(b.getId()));
-            result.put(b, v == null ? 0 : v.getAsInt());
+        // Répartition par défaut : blessures mortelles dans l'ordre, le reste au défenseur (piétinement) ou au dernier.
+        final Map<CardView, Integer> result = new HashMap<>();
+        int left = damage;
+        for (int i = 0; i < blockers.size(); i++) {
+            final int amount = Math.min(left, lethal[i]);
+            result.put(blockers.get(i), amount);
+            left -= amount;
         }
-        if (defender != null && trample && map.has("defender")) {
-            // Forge attend la part du joueur défenseur sous la clé null.
-            result.put(null, map.get("defender").getAsInt());
+        if (left > 0) {
+            if (trample || divide) {
+                result.put(null, left);
+            } else if (!blockers.isEmpty()) {
+                result.merge(blockers.get(blockers.size() - 1), left, Integer::sum);
+            }
         }
         return result;
+    }
+
+    /** Blessures qui suffisent à tuer ce bloqueur (comme l'interface de Forge sur ordinateur). */
+    private static int lethalDamage(final CardView b, final boolean deathtouch) {
+        int lethal = Math.max(0, b.getLethalDamage());
+        final forge.game.card.CardView.CardStateView s = b.getCurrentState();
+        if (s != null && s.isPlaneswalker()) {
+            try {
+                lethal = Integer.parseInt(s.getLoyalty());
+            } catch (final NumberFormatException e) {
+                // loyauté inconnue : on garde les blessures mortelles
+            }
+        } else if (deathtouch) {
+            lethal = Math.min(lethal, 1);
+        }
+        return lethal;
     }
 
     /** Répartir une quantité entre plusieurs cibles (blessures divisées, compteurs, mana). */
@@ -413,9 +493,28 @@ final class Dialogs {
             }
             return result;
         }
+        // Vérifiée comme sur ordinateur : tout est réparti, au moins 1 chacun si demandé, sans dépasser le maximum.
         final JsonArray values = answer.getAsJsonArray();
+        int sum = 0;
+        boolean ok = values.size() == keys.size();
+        for (int i = 0; i < keys.size() && ok; i++) {
+            final int v = values.get(i).isJsonPrimitive() ? values.get(i).getAsInt() : -1;
+            final Integer cap = targets.get(keys.get(i));
+            ok = v >= (atLeastOne ? 1 : 0) && v <= (cap == null ? amount : cap);
+            sum += v;
+            result.put(keys.get(i), v);
+        }
+        if (ok && sum == amount) {
+            return result;
+        }
+        System.err.println("Répartition refusée : " + values + " pour " + amount);
+        result.clear();
+        int left = amount;
         for (int i = 0; i < keys.size(); i++) {
-            result.put(keys.get(i), i < values.size() ? values.get(i).getAsInt() : 0);
+            final Integer cap = targets.get(keys.get(i));
+            final int share = Math.min(cap == null ? left : cap, i == keys.size() - 1 ? left : (atLeastOne ? 1 : 0));
+            result.put(keys.get(i), share);
+            left -= share;
         }
         return result;
     }

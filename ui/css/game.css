@@ -219,6 +219,15 @@
 .tool .ic { width: 15px; height: 15px; }
 .tool:hover { border-color: rgb(var(--gold-rgb) / 0.6); color: var(--gold-2); }
 .tool.on { color: var(--gold-2); border-color: rgb(var(--gold-rgb) / 0.5); }
+/* Garder la priorité : bouton allumé (doré) quand mes sorts s'arrêtent sur la pile ; son nom s'affiche s'il y a la place. */
+.hold-tool { grid-auto-flow: column; gap: 4px; }
+.hold-tool .tool-label { display: none; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; }
+.hold-tool.on { background: linear-gradient(180deg, #f1cd7c, #c9973d); border-color: transparent; color: #241500; box-shadow: 0 0 10px rgb(var(--gold-rgb) / 0.45); }
+.hold-tool.on:hover { color: #241500; }
+@container (min-width: 700px) {
+  .hold-tool { width: auto; padding: 0 9px 0 7px; }
+  .hold-tool .tool-label { display: inline; }
+}
 .phases { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); border: 1px solid var(--line); }
 .phases .ph { font-size: 10px; padding: 2px 6px; border-radius: 999px; color: #75778f; white-space: nowrap; }
 .phases .ph.stop { color: #b4b6cc; }
@@ -391,6 +400,8 @@
 .stack-panel[data-size="s"] { --sp-card: 34px; }
 .stack-panel[data-size="l"] { --sp-card: 64px; }
 .stack-panel.dragging { box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7); transition: none; }
+/* Pile vide : la fenêtre s'efface en fondu (l'opacité réglée est en style direct, d'où !important). */
+.stack-panel.leaving { opacity: 0 !important; transition: opacity 0.22s ease; pointer-events: none; }
 .sp-head { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 8px; cursor: grab; touch-action: none; border-bottom: 1px solid var(--line); background: rgb(var(--gold-rgb) / 0.06); }
 .stack-panel.dragging .sp-head { cursor: grabbing; }
 .sp-grip { color: var(--muted); font-size: 14px; }
@@ -565,6 +576,8 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
   .btn-row .btn { font-size: 12px; padding: 5px 8px; min-height: 0; }
   .btn.main-action { min-height: 36px; font-size: 13.5px; }
   .tool { width: 26px; height: 22px; }
+  .hold-tool .tool-label { display: none; }
+  .hold-tool { width: 26px; padding: 0; }
 }
 @media (min-width: 1500px) and (min-height: 800px) {
   .table { --act-w: 210px; }

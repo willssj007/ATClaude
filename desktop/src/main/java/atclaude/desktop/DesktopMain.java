@@ -36,7 +36,7 @@ public final class DesktopMain {
     private static final Map<String, String> TYPES = Map.ofEntries(
             Map.entry("html", "text/html; charset=utf-8"), Map.entry("js", "text/javascript; charset=utf-8"),
             Map.entry("css", "text/css; charset=utf-8"), Map.entry("svg", "image/svg+xml"), Map.entry("png", "image/png"),
-            Map.entry("jpg", "image/jpeg"), Map.entry("json", "application/json"),
+            Map.entry("jpg", "image/jpeg"), Map.entry("webp", "image/webp"), Map.entry("json", "application/json"),
             Map.entry("webmanifest", "application/manifest+json"), Map.entry("woff2", "font/woff2"),
             Map.entry("ico", "image/x-icon"), Map.entry("mp3", "audio/mpeg"));
 

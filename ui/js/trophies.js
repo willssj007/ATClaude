@@ -4,7 +4,7 @@ import {bridge} from './bridge.js';
 import {sfx} from './audio.js';
 import {esc, el} from './util.js';
 import {icon} from './icons.js';
-import {challengesHtml} from './themes.js';
+import {challengesHtml, livePreviews} from './themes.js';
 
 const LEVELS = {common: 'Bronze', uncommon: 'Argent', rare: 'Or', mythic: 'Mythique', special: 'Spécial'};
 
@@ -37,6 +37,7 @@ export class Trophies {
       const box = this.root.querySelector('.challenges');
       if (box) {
         box.innerHTML = html;
+        livePreviews(box);
       }
     }).catch(() => {});
   }

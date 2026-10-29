@@ -239,6 +239,7 @@ export class Game {
           <div class="div-end">
             <span class="pill-host"></span>
             ${opponents.length > 1 ? `<button class="tool" data-set-view="all">${icon('cards')}</button>` : ''}
+            <button class="tool hold-tool" data-hold aria-pressed="false" title="Garder la priorité : après mes sorts, m'arrêter pour pouvoir y répondre">${icon('hourglass')}<span class="tool-label">Priorité</span></button>
             <button class="tool" data-open="cheat" title="Menu de triche">${icon('wand')}</button>
             <button class="tool" data-open="log" title="Journal de la partie">${icon('scroll')}</button>
             <button class="tool" data-open="menu" title="Menu">${icon('menu')}</button>
@@ -424,6 +425,10 @@ export class Game {
       const toolbarBtn = e.target.closest('[data-open]');
       if (toolbarBtn) {
         this.openDrawer(toolbarBtn.dataset.open);
+        return;
+      }
+      if (e.target.closest('[data-hold]')) {
+        this.toggleHold();
         return;
       }
       const stackItem = e.target.closest('.stack-item');
@@ -949,6 +954,11 @@ export class Game {
         }
       }
     }
+    // Sort ou déclencheur à moi, sans garder la priorité : le pont le résout tout seul aussitôt. La fenêtre ne
+    // s'ouvre que s'il reste sur la pile (choix à faire, réponse adverse...), pas pour un éclair d'une demi-seconde.
+    const topItem = state.stack[0];
+    const owner = topItem && state.players.find(p => p.id === topItem.controller);
+    const selfResolving = owner && (owner.id === me.id || owner.controlledByMe) && !(state.settings && state.settings.holdPriority);
     this.stackPanel.update(state.stack, state.players, (item) => {
       // La carte elle-même est sur la pile pour un sort ; pour une capacité, on montre une copie de sa source.
       const key = item.source.zone === 'stack' && !item.ability ? 'c' + item.source.id : 's' + item.id;
@@ -956,7 +966,7 @@ export class Game {
     }, (item) => [
       ...(item.targetPlayers || []).map(id => (state.players.find(p => p.id === id) || {}).name),
       ...(item.targetCards || []).map(id => cardNames.get(id) || 'carte cachée'),
-    ].filter(Boolean).join(', '));
+    ].filter(Boolean).join(', '), selfResolving ? 1500 : 0);
     this.renderMana(me);
     this.renderPhases(state, me);
     this.renderPrompt(state, me);
@@ -1231,7 +1241,29 @@ export class Game {
     this.table.querySelector('.turn-label').innerHTML = `Tour <b>${state.game.turn}</b> · ${myTurn ? 'à vous' : esc(active ? active.name : '')}`;
   }
 
+  /** Bouton « Garder la priorité » de la ligne du milieu : allumé quand mes sorts s'arrêtent sur la pile. */
+  toggleHold() {
+    const value = !(this.state && this.state.settings && this.state.settings.holdPriority);
+    prefs.set('holdPriority', value);
+    bridge.send('settings', {settings: {holdPriority: value}});
+    if (this.state && this.state.settings) {
+      this.state.settings.holdPriority = value;
+    }
+    this.renderHold(value);
+    toast(value ? 'Après tes sorts, tu gardes la main pour y répondre.' : 'Tes sorts et tes déclencheurs se résolvent tout seuls.',
+      {title: value ? 'Priorité gardée' : 'Priorité rendue', duration: 2200});
+  }
+
+  renderHold(on) {
+    const b = this.table && this.table.querySelector('[data-hold]');
+    if (b && b.classList.contains('on') !== !!on) {
+      b.classList.toggle('on', !!on);
+      b.setAttribute('aria-pressed', String(!!on));
+    }
+  }
+
   renderPrompt(state, me) {
+    this.renderHold(state.settings && state.settings.holdPriority);
     const p = state.prompt || {};
     const promptBox = this.table.querySelector('.prompt');
     let message = (p.message || '').trim();
@@ -1617,6 +1649,8 @@ export class Game {
     const r = slot.getBoundingClientRect();
     const ghost = slot.cloneNode(true);
     ghost.classList.add('fly-ghost');
+    // Hors de sa rangée (ou de la pile), la carte garderait la taille par défaut : on lui laisse la sienne.
+    ghost.style.setProperty('--w', getComputedStyle(slot).getPropertyValue('--w').trim());
     Object.assign(ghost.style, {left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: 0});
     document.body.appendChild(ghost);
     slot.remove();
@@ -2040,7 +2074,6 @@ export class Game {
         <section>
           <h3>Priorité</h3>
           <label class="check"><input type="checkbox" data-set="autoPass" ${s.autoPass ? 'checked' : ''}> Passer automatiquement quand je ne peux rien faire</label>
-          <label class="check"><input type="checkbox" data-set="holdPriority" ${s.holdPriority ? 'checked' : ''}> Garder la priorité après mes sorts (pour y répondre moi-même)</label>
           <p class="muted small">Les arrêts cochés donnent la main même sans action possible sur mon propre tour.</p>
         </section>
         <section>
@@ -2060,11 +2093,8 @@ export class Game {
         </section>
       </div>`;
     const send = () => {
-      const hold = drawer.querySelector('[data-set="holdPriority"]').checked;
-      prefs.set('holdPriority', hold);
       bridge.send('settings', {settings: {
         autoPass: drawer.querySelector('[data-set="autoPass"]').checked,
-        holdPriority: hold,
         myStops: [...drawer.querySelectorAll('[data-stop="my"]:checked')].map(i => i.value),
         theirStops: [...drawer.querySelectorAll('[data-stop="their"]:checked')].map(i => i.value),
       }});

@@ -276,6 +276,31 @@ function cardHtml(kind, t, p, current) {
   </button>`;
 }
 
+// Aperçus animés : seulement ceux qui sont à l'écran (classe « live »), et rien pendant un défilement (classe
+// « scrolling » sur la page) ; une trentaine d'animations à la fois faisait ramer la liste sur téléphone.
+let previewObserver = null;
+let scrollTimer = 0;
+
+/** À appeler après avoir inséré des aperçus d'apparences (Réglages, boutique, défis). */
+export function livePreviews(container) {
+  if (!container) {
+    return;
+  }
+  if (!previewObserver) {
+    previewObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        e.target.classList.toggle('live', e.isIntersecting);
+      }
+    }, {rootMargin: '40px'});
+    document.addEventListener('scroll', () => {
+      document.documentElement.classList.add('scrolling');
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => document.documentElement.classList.remove('scrolling'), 160);
+    }, {capture: true, passive: true});
+  }
+  container.querySelectorAll('.th-prev').forEach(n => previewObserver.observe(n));
+}
+
 /** Rayon « Apparences mythiques » de la boutique (mode Planeswalker) : fonds et dos à acheter, sans doublon. */
 export async function shopHtml() {
   const p = await progress();

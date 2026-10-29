@@ -6,6 +6,9 @@ import {icon} from './icons.js';
 
 const DEFAULTS = {x: null, y: null, size: null, opacity: 1, compact: false, autoOpen: true, minimized: false};
 const SIZES = {s: 200, m: 260, l: 340};
+// Une fois montrée, la fenêtre reste au moins ce temps (ms), puis s'efface en fondu quand la pile se vide.
+const MIN_VISIBLE = 700;
+const FADE = 220;
 
 function load() {
   const saved = prefs.get('stackPanel');
@@ -24,6 +27,11 @@ export class StackPanel {
     this.settings = load();
     this.lastTop = null;
     this.count = 0;
+    // Pile non vide depuis (ms) et délai avant de la montrer : un sort ou un déclencheur qui se résout tout seul
+    // aussitôt ne fait pas apparaître la fenêtre une fraction de seconde.
+    this.since = 0;
+    this.delay = 0;
+    this.showTimer = null;
     this.node = el(`<div class="stack-panel hidden">
       <header class="sp-head" title="Glisser pour déplacer la pile">
         <span class="sp-grip">⠿</span>
@@ -142,17 +150,63 @@ export class StackPanel {
   setMinimized(value) {
     this.settings.minimized = value;
     this.save();
-    this.refreshVisibility();
+    this.refreshVisibility(true);
   }
 
-  refreshVisibility() {
-    const empty = this.count === 0;
-    this.node.classList.toggle('hidden', empty || this.settings.minimized);
-    this.pill.classList.toggle('hidden', empty || !this.settings.minimized);
+  /** Fenêtre (ou pastille) visible : pile non vide depuis assez longtemps, ou tout de suite si `now`. */
+  refreshVisibility(now = false) {
+    clearTimeout(this.showTimer);
+    this.showTimer = null;
+    if (!this.count) {
+      this.since = 0;
+      if (this.shown && !this.settings.minimized) {
+        // Pile vide : la fenêtre garde ses derniers éléments un instant, puis s'efface (sans clignoter).
+        const left = Math.max(0, MIN_VISIBLE - (performance.now() - this.shownAt));
+        this.showTimer = setTimeout(() => this.fadeAway(), left);
+        return;
+      }
+      this.hideNow();
+      return;
+    }
+    if (!this.since) {
+      this.since = performance.now();
+    }
+    this.node.classList.remove('leaving');
+    const wait = now || this.shown ? 0 : this.delay - (performance.now() - this.since);
+    if (wait > 0) {
+      this.showTimer = setTimeout(() => this.refreshVisibility(true), wait);
+      this.node.classList.add('hidden');
+      this.pill.classList.add('hidden');
+      return;
+    }
+    if (!this.shown) {
+      this.shown = true;
+      this.shownAt = performance.now();
+    }
+    this.node.classList.toggle('hidden', this.settings.minimized);
+    this.pill.classList.toggle('hidden', !this.settings.minimized);
     this.pill.textContent = `Pile (${this.count}) ▸`;
     if (!this.node.classList.contains('hidden')) {
       this.place();
     }
+  }
+
+  fadeAway() {
+    this.node.classList.add('leaving');
+    this.showTimer = setTimeout(() => {
+      this.showTimer = null;
+      if (!this.count) {
+        this.hideNow();
+      }
+    }, FADE);
+  }
+
+  hideNow() {
+    this.shown = false;
+    this.node.classList.remove('leaving');
+    this.node.classList.add('hidden');
+    this.pill.classList.add('hidden');
+    this.items.replaceChildren();
   }
 
   toggleSettings() {
@@ -204,10 +258,10 @@ export class StackPanel {
    * Affiche les éléments de la pile. makeSlot(item) renvoie l'emplacement (.slot) de la carte source,
    * géré par le plateau pour garder les animations d'une zone à l'autre.
    */
-  update(stack, players, makeSlot, targetsOf = () => '') {
+  update(stack, players, makeSlot, targetsOf = () => '', delay = 0) {
     this.count = stack.length;
+    this.delay = delay;
     if (!stack.length) {
-      this.items.replaceChildren();
       this.lastTop = null;
       this.refreshVisibility();
       return;
@@ -249,7 +303,7 @@ export class StackPanel {
 
   /** Élément affiché pour un élément de la pile (pour les flèches de ciblage). */
   itemNode(id) {
-    if (this.node.classList.contains('hidden')) {
+    if (this.node.classList.contains('hidden') || this.node.classList.contains('leaving')) {
       return this.pill.classList.contains('hidden') ? null : this.pill;
     }
     return this.items.querySelector(`.stack-item[data-sid="${id}"]`);

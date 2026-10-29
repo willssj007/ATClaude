@@ -381,7 +381,7 @@ final class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public Map<CardView, Integer> assignCombatDamage(final CardView attacker, final List<CardView> blockers, final int damage, final GameEntityView defender, final boolean overrideOrder, final boolean maySkip) {
-        return dialogs.assignCombatDamage(attacker, blockers, damage, defender, maySkip);
+        return dialogs.assignCombatDamage(attacker, blockers, damage, defender, overrideOrder, maySkip);
     }
 
     @Override

@@ -962,21 +962,21 @@ body.in-game #menu-fx { display: none; }
 .theme-grid.backs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .th-prev[class*="th-back-"] { background-color: #0b0d17; background-size: auto 86%; background-position: center; background-repeat: no-repeat; }
 .th-back-magic { background-image: url("../cardimg?key=back%3Amagic&lang=en"), url("../img/backs/back-classic.svg"); }
-.th-back-arcane { background-image: url("../img/backs/back-arcane.svg"); }
-.th-back-grimoire { background-image: url("../img/backs/back-grimoire.svg"); }
-.th-back-sylvan { background-image: url("../img/backs/back-sylvan.svg"); }
-.th-back-frost { background-image: url("../img/backs/back-frost.svg"); }
-.th-back-heraldic { background-image: url("../img/backs/back-heraldic.svg"); }
-.th-back-dragon { background-image: url("../img/backs/back-dragon.svg"); }
-.th-back-astral { background-image: url("../img/backs/back-astral.svg"); }
-.th-back-kraken { background-image: url("../img/backs/back-kraken.svg"); }
-.th-back-phoenix { background-image: url("../img/backs/back-phoenix.svg"); }
-.th-back-compass { background-image: url("../img/backs/back-compass.svg"); }
-.th-back-skull { background-image: url("../img/backs/back-skull.svg"); }
-.th-back-spark { background-image: url("../img/backs/back-spark.svg"); }
-.th-back-prism { background-image: url("../img/backs/back-prism.svg"); }
-.th-menu-aurora { background-image: url("../img/themes/menu-aurora.svg"); }
-.th-menu-godforge { background-image: url("../img/themes/menu-godforge.svg"); }
+.th-back-arcane { background-image: url("../img/backs/thumbs/back-arcane.webp"); }
+.th-back-grimoire { background-image: url("../img/backs/thumbs/back-grimoire.webp"); }
+.th-back-sylvan { background-image: url("../img/backs/thumbs/back-sylvan.webp"); }
+.th-back-frost { background-image: url("../img/backs/thumbs/back-frost.webp"); }
+.th-back-heraldic { background-image: url("../img/backs/thumbs/back-heraldic.webp"); }
+.th-back-dragon { background-image: url("../img/backs/thumbs/back-dragon.webp"); }
+.th-back-astral { background-image: url("../img/backs/thumbs/back-astral.webp"); }
+.th-back-kraken { background-image: url("../img/backs/thumbs/back-kraken.webp"); }
+.th-back-phoenix { background-image: url("../img/backs/thumbs/back-phoenix.webp"); }
+.th-back-compass { background-image: url("../img/backs/thumbs/back-compass.webp"); }
+.th-back-skull { background-image: url("../img/backs/thumbs/back-skull.webp"); }
+.th-back-spark { background-image: url("../img/backs/thumbs/back-spark.webp"); }
+.th-back-prism { background-image: url("../img/backs/thumbs/back-prism.webp"); }
+.th-menu-aurora { background-image: url("../img/themes/thumbs/menu-aurora.webp"); }
+.th-menu-godforge { background-image: url("../img/themes/thumbs/menu-godforge.webp"); }
 
 /* Dos mythiques : un reflet qui passe (étincelle) ou des couleurs holographiques (prisme). */
 :root[data-card-back="spark"] .mcard.back .face::after, :root[data-card-back="prism"] .mcard.back .face::after,
@@ -1009,25 +1009,25 @@ body.in-game #menu-fx { display: none; }
   padding: 2px 8px; border-radius: 999px; color: #1a0e04; background: linear-gradient(90deg, #ffb070, #ffe29a, #d8a8ff); box-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
 .challenge.mythic .th-myth { display: none; }
 .th-board-classic { background-image: radial-gradient(ellipse 60% 45% at 50% 50%, rgb(124 108 242 / 0.14), transparent 70%), linear-gradient(180deg, #121022 0%, #0f1424 50%, #0c1020 100%); }
-.th-menu-citadel { background-image: url("../img/themes/menu-citadel.svg"); }
-.th-menu-sylvan { background-image: url("../img/themes/menu-sylvan.svg"); }
-.th-menu-ember { background-image: url("../img/themes/menu-ember.svg"); }
-.th-menu-frost { background-image: url("../img/themes/menu-frost.svg"); }
-.th-menu-royal { background-image: url("../img/themes/menu-royal.svg"); }
-.th-menu-astral { background-image: url("../img/themes/menu-astral.svg"); }
-.th-menu-abyss { background-image: url("../img/themes/menu-abyss.svg"); }
-.th-menu-desert { background-image: url("../img/themes/menu-desert.svg"); }
-.th-menu-necro { background-image: url("../img/themes/menu-necro.svg"); }
-.th-board-battlefield { background-image: url("../img/themes/board-battlefield.svg"); }
-.th-board-forest { background-image: url("../img/themes/board-forest.svg"); }
-.th-board-throne { background-image: url("../img/themes/board-throne.svg"); }
-.th-board-dragon { background-image: url("../img/themes/board-dragon.svg"); }
-.th-board-ether { background-image: url("../img/themes/board-ether.svg"); }
-.th-board-library { background-image: url("../img/themes/board-library.svg"); }
-.th-board-arena { background-image: url("../img/themes/board-arena.svg"); }
-.th-board-swamp { background-image: url("../img/themes/board-swamp.svg"); }
-.th-board-vortex { background-image: url("../img/themes/board-vortex.svg"); }
-.th-board-celestial { background-image: url("../img/themes/board-celestial.svg"); }
+.th-menu-citadel { background-image: url("../img/themes/thumbs/menu-citadel.webp"); }
+.th-menu-sylvan { background-image: url("../img/themes/thumbs/menu-sylvan.webp"); }
+.th-menu-ember { background-image: url("../img/themes/thumbs/menu-ember.webp"); }
+.th-menu-frost { background-image: url("../img/themes/thumbs/menu-frost.webp"); }
+.th-menu-royal { background-image: url("../img/themes/thumbs/menu-royal.webp"); }
+.th-menu-astral { background-image: url("../img/themes/thumbs/menu-astral.webp"); }
+.th-menu-abyss { background-image: url("../img/themes/thumbs/menu-abyss.webp"); }
+.th-menu-desert { background-image: url("../img/themes/thumbs/menu-desert.webp"); }
+.th-menu-necro { background-image: url("../img/themes/thumbs/menu-necro.webp"); }
+.th-board-battlefield { background-image: url("../img/themes/thumbs/board-battlefield.webp"); }
+.th-board-forest { background-image: url("../img/themes/thumbs/board-forest.webp"); }
+.th-board-throne { background-image: url("../img/themes/thumbs/board-throne.webp"); }
+.th-board-dragon { background-image: url("../img/themes/thumbs/board-dragon.webp"); }
+.th-board-ether { background-image: url("../img/themes/thumbs/board-ether.webp"); }
+.th-board-library { background-image: url("../img/themes/thumbs/board-library.webp"); }
+.th-board-arena { background-image: url("../img/themes/thumbs/board-arena.webp"); }
+.th-board-swamp { background-image: url("../img/themes/thumbs/board-swamp.webp"); }
+.th-board-vortex { background-image: url("../img/themes/thumbs/board-vortex.webp"); }
+.th-board-celestial { background-image: url("../img/themes/thumbs/board-celestial.webp"); }
 /* Aperçus animés des apparences mythiques. */
 .th-prev.th-board-vortex, .th-prev.th-board-celestial, .th-prev.th-menu-aurora, .th-prev.th-menu-godforge { overflow: hidden; }
 .th-board-vortex::after, .th-board-celestial::after, .th-menu-aurora::after, .th-menu-godforge::after {
@@ -1198,45 +1198,45 @@ body.in-game #menu-fx { display: none; }
   --menu-art: url("../img/themes/bg-blizzard.svg"); --art-veil: 0.3;
 }
 .th-menu-nebula, .th-board-nebula, .th-menu-tempest, .th-board-tempest, .th-menu-spirits, .th-board-spirits, .th-menu-crystal, .th-board-crystal, .th-menu-inferno, .th-board-inferno, .th-menu-chrono, .th-board-chrono, .th-menu-leyline, .th-board-leyline, .th-menu-reef, .th-board-reef, .th-menu-eclipse, .th-board-eclipse, .th-menu-blizzard, .th-board-blizzard { background-position: center; }
-.th-menu-nebula, .th-board-nebula { background-image: url("../img/themes/bg-nebula.svg"); }
-.th-menu-tempest, .th-board-tempest { background-image: url("../img/themes/bg-tempest.svg"); }
-.th-menu-spirits, .th-board-spirits { background-image: url("../img/themes/bg-spirits.svg"); }
-.th-menu-crystal, .th-board-crystal { background-image: url("../img/themes/bg-crystal.svg"); }
-.th-menu-inferno, .th-board-inferno { background-image: url("../img/themes/bg-inferno.svg"); }
-.th-menu-chrono, .th-board-chrono { background-image: url("../img/themes/bg-chrono.svg"); }
-.th-menu-leyline, .th-board-leyline { background-image: url("../img/themes/bg-leyline.svg"); }
-.th-menu-reef, .th-board-reef { background-image: url("../img/themes/bg-reef.svg"); }
-.th-menu-eclipse, .th-board-eclipse { background-image: url("../img/themes/bg-eclipse.svg"); }
-.th-menu-blizzard, .th-board-blizzard { background-image: url("../img/themes/bg-blizzard.svg"); }
+.th-menu-nebula, .th-board-nebula { background-image: url("../img/themes/thumbs/bg-nebula.webp"); }
+.th-menu-tempest, .th-board-tempest { background-image: url("../img/themes/thumbs/bg-tempest.webp"); }
+.th-menu-spirits, .th-board-spirits { background-image: url("../img/themes/thumbs/bg-spirits.webp"); }
+.th-menu-crystal, .th-board-crystal { background-image: url("../img/themes/thumbs/bg-crystal.webp"); }
+.th-menu-inferno, .th-board-inferno { background-image: url("../img/themes/thumbs/bg-inferno.webp"); }
+.th-menu-chrono, .th-board-chrono { background-image: url("../img/themes/thumbs/bg-chrono.webp"); }
+.th-menu-leyline, .th-board-leyline { background-image: url("../img/themes/thumbs/bg-leyline.webp"); }
+.th-menu-reef, .th-board-reef { background-image: url("../img/themes/thumbs/bg-reef.webp"); }
+.th-menu-eclipse, .th-board-eclipse { background-image: url("../img/themes/thumbs/bg-eclipse.webp"); }
+.th-menu-blizzard, .th-board-blizzard { background-image: url("../img/themes/thumbs/bg-blizzard.webp"); }
 :root[data-card-back="rune"] { --card-back: url("../img/backs/back-rune.svg"); }
-.th-back-rune { background-image: url("../img/backs/back-rune.svg"); }
+.th-back-rune { background-image: url("../img/backs/thumbs/back-rune.webp"); }
 :root[data-card-back="rune"] .mcard.back .face::after, .th-back-rune::after { background-image: url("../img/backs/fxb-rune.svg"); }
 :root[data-card-back="galaxy"] { --card-back: url("../img/backs/back-galaxy.svg"); }
-.th-back-galaxy { background-image: url("../img/backs/back-galaxy.svg"); }
+.th-back-galaxy { background-image: url("../img/backs/thumbs/back-galaxy.webp"); }
 :root[data-card-back="galaxy"] .mcard.back .face::after, .th-back-galaxy::after { background-image: url("../img/backs/fxb-galaxy.svg"); }
 :root[data-card-back="eye"] { --card-back: url("../img/backs/back-eye.svg"); }
-.th-back-eye { background-image: url("../img/backs/back-eye.svg"); }
+.th-back-eye { background-image: url("../img/backs/thumbs/back-eye.webp"); }
 :root[data-card-back="eye"] .mcard.back .face::after, .th-back-eye::after { background-image: url("../img/backs/fxb-eye.svg"); }
 :root[data-card-back="lava"] { --card-back: url("../img/backs/back-lava.svg"); }
-.th-back-lava { background-image: url("../img/backs/back-lava.svg"); }
+.th-back-lava { background-image: url("../img/backs/thumbs/back-lava.webp"); }
 :root[data-card-back="lava"] .mcard.back .face::after, .th-back-lava::after { background-image: url("../img/backs/fxb-lava.svg"); }
 :root[data-card-back="storm"] { --card-back: url("../img/backs/back-storm.svg"); }
-.th-back-storm { background-image: url("../img/backs/back-storm.svg"); }
+.th-back-storm { background-image: url("../img/backs/thumbs/back-storm.webp"); }
 :root[data-card-back="storm"] .mcard.back .face::after, .th-back-storm::after { background-image: url("../img/backs/fxb-storm.svg"); }
 :root[data-card-back="hourglass"] { --card-back: url("../img/backs/back-hourglass.svg"); }
-.th-back-hourglass { background-image: url("../img/backs/back-hourglass.svg"); }
+.th-back-hourglass { background-image: url("../img/backs/thumbs/back-hourglass.webp"); }
 :root[data-card-back="hourglass"] .mcard.back .face::after, .th-back-hourglass::after { background-image: url("../img/backs/fxb-hourglass.svg"); }
 :root[data-card-back="bloodmoon"] { --card-back: url("../img/backs/back-bloodmoon.svg"); }
-.th-back-bloodmoon { background-image: url("../img/backs/back-bloodmoon.svg"); }
+.th-back-bloodmoon { background-image: url("../img/backs/thumbs/back-bloodmoon.webp"); }
 :root[data-card-back="bloodmoon"] .mcard.back .face::after, .th-back-bloodmoon::after { background-image: url("../img/backs/fxb-bloodmoon.svg"); }
 :root[data-card-back="vitrail"] { --card-back: url("../img/backs/back-vitrail.svg"); }
-.th-back-vitrail { background-image: url("../img/backs/back-vitrail.svg"); }
+.th-back-vitrail { background-image: url("../img/backs/thumbs/back-vitrail.webp"); }
 :root[data-card-back="vitrail"] .mcard.back .face::after, .th-back-vitrail::after { background-image: url("../img/backs/fxb-vitrail.svg"); }
 :root[data-card-back="ghostflame"] { --card-back: url("../img/backs/back-ghostflame.svg"); }
-.th-back-ghostflame { background-image: url("../img/backs/back-ghostflame.svg"); }
+.th-back-ghostflame { background-image: url("../img/backs/thumbs/back-ghostflame.webp"); }
 :root[data-card-back="ghostflame"] .mcard.back .face::after, .th-back-ghostflame::after { background-image: url("../img/backs/fxb-ghostflame.svg"); }
 :root[data-card-back="aurora"] { --card-back: url("../img/backs/back-aurora.svg"); }
-.th-back-aurora { background-image: url("../img/backs/back-aurora.svg"); }
+.th-back-aurora { background-image: url("../img/backs/thumbs/back-aurora.webp"); }
 :root[data-card-back="aurora"] .mcard.back .face::after, .th-back-aurora::after { background-image: url("../img/backs/fxb-aurora.svg"); }
 
 /* Calques animés des fonds mythiques (#menu-fx derrière les menus, .table-fx derrière le plateau). Seulement des
@@ -1385,3 +1385,22 @@ body.in-game #menu-fx { display: none; }
 .th-goal.th-price { color: var(--gold-2); font-weight: 700; }
 .theme-card.for-sale .th-prev { filter: grayscale(0.4) brightness(0.75); }
 .theme-card.for-sale:hover .th-prev { filter: none; }
+
+/* Aperçus des apparences : animés seulement à l'écran (classe « live », voir livePreviews), immobiles s'ils sont
+   verrouillés (le filtre gris forcerait à tout redessiner à chaque image) et pendant un défilement. Le fond animé des
+   menus se fige lui aussi le temps du défilement. */
+.th-prev:not(.live)::before, .th-prev:not(.live)::after,
+.theme-card.locked .th-prev::before, .theme-card.locked .th-prev::after { animation: none !important; }
+:root.scrolling .th-prev::before, :root.scrolling .th-prev::after,
+:root.scrolling #menu-fx i { animation-play-state: paused !important; }
+/* Aperçus des dos mythiques : calques animés en vignettes (le dos en jeu garde ses SVG). */
+.th-back-rune::after { background-image: url("../img/backs/thumbs/fxb-rune.webp"); }
+.th-back-galaxy::after { background-image: url("../img/backs/thumbs/fxb-galaxy.webp"); }
+.th-back-eye::after { background-image: url("../img/backs/thumbs/fxb-eye.webp"); }
+.th-back-lava::after { background-image: url("../img/backs/thumbs/fxb-lava.webp"); }
+.th-back-storm::after { background-image: url("../img/backs/thumbs/fxb-storm.webp"); }
+.th-back-hourglass::after { background-image: url("../img/backs/thumbs/fxb-hourglass.webp"); }
+.th-back-bloodmoon::after { background-image: url("../img/backs/thumbs/fxb-bloodmoon.webp"); }
+.th-back-vitrail::after { background-image: url("../img/backs/thumbs/fxb-vitrail.webp"); }
+.th-back-ghostflame::after { background-image: url("../img/backs/thumbs/fxb-ghostflame.webp"); }
+.th-back-aurora::after { background-image: url("../img/backs/thumbs/fxb-aurora.webp"); }

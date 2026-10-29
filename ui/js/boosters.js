@@ -8,7 +8,7 @@ import {isPlaneswalker, loadCareer, manaAmount, setCareer, wildcardsHtml} from '
 import {icon} from './icons.js';
 import {openPack, openPacks, packElement} from './packopen.js';
 import {packScene, webglOk} from './pack3d.js';
-import {shopHtml, themeClicked} from './themes.js';
+import {livePreviews, shopHtml, themeClicked} from './themes.js';
 import {el, esc, prefs, toast} from './util.js';
 
 const SET_TYPES = {CORE: 'Édition de base', EXPANSION: 'Extension', DRAFT: 'Draft', REPRINT: 'Réédition', STARTER: 'Initiation',
@@ -98,6 +98,7 @@ export class BoostersScreen {
     const themeShop = this.root.querySelector('.theme-shop');
     shopHtml().then(html => {
       themeShop.innerHTML = html;
+      livePreviews(themeShop);
     }).catch(() => {});
     themeShop.addEventListener('click', async (e) => {
       if (await themeClicked(e.target)) {

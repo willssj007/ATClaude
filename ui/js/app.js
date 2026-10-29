@@ -15,7 +15,7 @@ import {enhanceSelects} from './select.js';
 import {icon} from './icons.js';
 import {StatsScreen} from './stats.js';
 import {openLedger} from './ledger.js';
-import {announceUnlocks, appearanceHtml, applyThemes, themeClicked} from './themes.js';
+import {announceUnlocks, appearanceHtml, applyThemes, livePreviews, themeClicked} from './themes.js';
 import {announceTrophy, Trophies} from './trophies.js';
 import {$, $$, avatarHtml, debounce, esc, prefs, toast} from './util.js';
 
@@ -406,6 +406,7 @@ function settingsScreen() {
       });
       appearanceHtml().then((html) => {
         root.querySelector('.appearance').innerHTML = html;
+        livePreviews(root.querySelector('.appearance'));
       });
       root.onclick = (e) => {
         if (e.target.closest('[data-a]') && isPlaneswalker()) {
