@@ -151,7 +151,14 @@ jobs:
 
   ios:
     needs: apk
-    runs-on: macos-latest
+    # Deux sortes de Mac de GitHub à la fois (Apple Silicon et Intel) : les premiers sont parfois saturés, et la tâche
+    # est annulée faute de machine au bout d'un quart d'heure. Chacune construit le même IPA ; la dernière arrivée
+    # remplace celui de la première dans la release.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     env:
       FORGE_DIR: ${{ github.workspace }}/../forge-src
@@ -169,8 +176,8 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.robovm/cache
-          key: robovm-${{ github.sha }}
-          restore-keys: robovm-
+          key: robovm-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: robovm-${{ runner.arch }}-
 
       - name: Compiler Forge et le pont
         run: |
@@ -185,11 +192,15 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ArcaneTable-ios
+          name: ArcaneTable-ios-${{ runner.arch }}
           path: ArcaneTable-iOS-*.ipa
 
       - name: Ajouter à la dernière version
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload apk-latest ArcaneTable-iOS-*.ipa --clobber --repo ${{ github.repository }}
+        run: |
+          # Les deux Mac peuvent finir en même temps : un envoi refusé ne compte pas si l'IPA est déjà dans la release.
+          IPA="$(ls ArcaneTable-iOS-*.ipa)"
+          gh release upload apk-latest "$IPA" --clobber --repo ${{ github.repository }} \
+            || gh release view apk-latest --repo ${{ github.repository }} --json assets -q '.assets[].name' | grep -qx "$IPA"

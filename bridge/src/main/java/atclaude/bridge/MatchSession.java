@@ -970,6 +970,11 @@ final class MatchSession {
                             default -> {
                                 game.getAction().moveTo(ZoneType.Battlefield, card, null, AbilityKey.newMap());
                                 card.setSickness(false);
+                                // Posée directement sur le champ de bataille (sans être lancée), une carte n'a pas les
+                                // marqueurs avec lesquels elle arrive : un planeswalker sans loyauté, une bataille
+                                // sans défense.
+                                startingCounters(card, card.isPlaneswalker(), forge.game.card.CounterEnumType.LOYALTY, card.getBaseLoyalty());
+                                startingCounters(card, card.isBattle(), forge.game.card.CounterEnumType.DEFENSE, card.getCurrentState().getBaseDefense());
                             }
                         }
                     }
@@ -1061,6 +1066,20 @@ final class MatchSession {
             default -> throw new IllegalArgumentException("Triche inconnue : " + op);
         }
         gui.markDirty();
+    }
+
+    private static void startingCounters(final Card card, final boolean applies, final forge.game.card.CounterType type, final String base) {
+        if (!applies || card.getCounters(type) > 0 || base == null) {
+            return;
+        }
+        try {
+            final int n = Integer.parseInt(base.trim());
+            if (n > 0) {
+                card.setCounters(type, n);
+            }
+        } catch (final NumberFormatException e) {
+            // loyauté « X » : rien à poser
+        }
     }
 
     private static ZoneType zone(final String name) {

@@ -38,8 +38,8 @@ function showScreen(name) {
     name = 'home';
   }
   current = name;
-  // Téléphone et tablette : portrait permis sur les écrans des decks seulement, paysage partout ailleurs.
-  bridge.orientation(name === 'decks' ? 'any' : 'landscape');
+  // Téléphone et tablette : portrait permis sur les écrans des decks et des cartes, paysage partout ailleurs.
+  bridge.orientation(name === 'decks' || name === 'cards' ? 'any' : 'landscape');
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
   document.body.classList.toggle('in-game', name === 'game');

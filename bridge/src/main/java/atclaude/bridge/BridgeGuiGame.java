@@ -316,15 +316,26 @@ final class BridgeGuiGame extends AbstractGuiGame {
 
     // ------------------------------------------------------------------ dialogues
 
+    /**
+     * Capacité à jouer en touchant une carte. Pour un clic, Forge propose aussi les capacités qui ne peuvent pas être
+     * jouées maintenant (à griser) et ne vérifie plus ensuite : seules les jouables sont gardées. Sans ce tri, une
+     * capacité de loyauté (une par tour et par planeswalker) ou une capacité limitée s'activait autant qu'on voulait.
+     */
     @Override
     public SpellAbilityView getAbilityToPlay(final CardView hostCard, final List<SpellAbilityView> abilities, final ITriggerEvent triggerEvent) {
-        if (abilities.isEmpty()) {
+        final List<SpellAbilityView> playable = new java.util.ArrayList<>();
+        for (final SpellAbilityView sa : abilities) {
+            if (sa.canPlay()) {
+                playable.add(sa);
+            }
+        }
+        if (playable.isEmpty()) {
             return null;
         }
-        if (abilities.size() == 1) {
-            return abilities.get(0);
+        if (playable.size() == 1) {
+            return playable.get(0);
         }
-        return dialogs.one("Choisir la capacité à jouer", abilities, null, true, "Annuler");
+        return dialogs.one("Choisir la capacité à jouer", playable, null, true, "Annuler");
     }
 
     /** Le joueur a renoncé au sort en choisissant ses modes : le paiement qui suit est annulé (MatchSession). */

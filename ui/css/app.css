@@ -1023,6 +1023,12 @@ body.in-game #menu-fx { display: none; }
 .db-qty { position: absolute; left: 4px; top: 4px; z-index: 2; background: rgba(0, 0, 0, 0.78); border: 1px solid var(--gold); color: var(--gold-2);
   border-radius: 8px; padding: 0 6px; font-weight: 800; font-size: 13px; }
 .db-acts { position: absolute; right: 4px; bottom: 4px; z-index: 2; display: flex; gap: 4px; }
+.db-art-btn {
+  position: absolute; right: 4px; top: 4px; z-index: 3; width: 28px; height: 28px; border-radius: 50%; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--line-strong); background: rgba(16, 18, 30, 0.9); color: var(--gold-2);
+}
+.db-art-btn .ic { width: 15px; height: 15px; }
 .db-acts button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); background: rgba(16, 18, 30, 0.9); color: var(--text);
   font-weight: 900; font-size: 16px; padding: 0; cursor: pointer; display: grid; place-items: center; }
 .db-acts button[data-act="plus"] { background: var(--gold); color: #241500; border: none; }

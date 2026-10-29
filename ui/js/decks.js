@@ -426,9 +426,10 @@ export class Decks {
       <button class="price" data-pk="${esc(priceKey(l.card))}" title="Prix Cardmarket (toucher : ouvrir la page Cardmarket)"></button>
       <span class="acts"><button data-act="art" title="Choisir l'illustration (impression)">${icon('brush')}</button>${section === 'main' && d.format === 'commander' && l.card.canBeCommander ? '<button data-act="cmd" title="Définir comme commandant">♛</button>' : ''}
       <button data-act="minus" title="Retirer">−</button><button data-act="plus" title="Ajouter">+</button></span></div>`;
-    // Vue en images : la carte, son nombre d'exemplaires et les mêmes boutons.
+    // Vue en images : la carte, son nombre d'exemplaires, le pinceau (choix de l'illustration) et les mêmes boutons.
     const tile = (l, section) => `<div class="db-card" data-name="${esc(l.card.name)}" data-section="${section}">
       <div class="db-art"></div>${l.count > 1 ? `<span class="db-qty">×${l.count}</span>` : ''}
+      <button class="db-art-btn" data-act="art" title="Choisir l'illustration (impression)" aria-label="Choisir l'illustration">${icon('brush')}</button>
       <span class="db-acts">${section === 'main' && d.format === 'commander' && l.card.canBeCommander ? '<button data-act="cmd" title="Définir comme commandant">♛</button>' : ''}<button data-act="minus" title="Retirer">−</button><button data-act="plus" title="Ajouter">+</button></span></div>`;
     const lines = (list, section) => images ? `<div class="db-grid">${list.map(l => tile(l, section)).join('')}</div>` : list.map(l => row(l, section)).join('');
     const status = total === target ? 'full' : total > target ? 'over' : '';

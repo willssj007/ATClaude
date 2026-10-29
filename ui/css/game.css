@@ -55,6 +55,19 @@
 .row > .slot.attached + .slot { margin-left: 0; }
 .slot.stacked { margin-left: calc(var(--w) * -0.8) !important; }
 .slot.stacked.tapped { margin-left: calc(var(--h) * -0.8) !important; }
+/* Créatures et autres permanents identiques (jetons, Trésors...) : un peu plus de chaque carte visible, pour pouvoir
+   toucher chacune (attaquer avec, la choisir). */
+.row.front > .slot.stacked, .nonlands > .slot.stacked { margin-left: calc(var(--w) * -0.74) !important; }
+.row.front > .slot.stacked.tapped, .nonlands > .slot.stacked.tapped { margin-left: calc(var(--h) * -0.74) !important; }
+.slot.under .badges { display: none; }
+/* Nombre de cartes de la pile, sur celle du dessus. */
+.slot[data-stack]::after {
+  content: "×" attr(data-stack); position: absolute; left: 2px; top: 2px; z-index: 6; pointer-events: none;
+  min-width: 1.6em; padding: 0 0.35em; border-radius: 999px; text-align: center;
+  font-size: max(10px, calc(var(--w) * 0.17)); font-weight: 800; line-height: 1.45;
+  background: rgba(8, 10, 20, 0.88); color: var(--gold-2); border: 1px solid rgb(var(--gold-rgb) / 0.7);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
 .slot.leaving { pointer-events: none; }
 .slot.moving { z-index: 30; }
 
@@ -121,12 +134,11 @@
 .board { position: relative; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr) var(--band); }
 .half { position: relative; min-height: 0; min-width: 0; }
 /* Taille des cartes : deux rangées par moitié, plafonnée pour que cinq cartes tiennent en largeur. */
-/* --bf-base (posé par le script quand la moitié change de taille) : la plus petite de --card-max, de ce qui tient
-   en hauteur (deux rangées) et du cinquième de la largeur. Des unités de conteneur (cqh, cqw) faisaient pareil,
-   mais rendaient chaque calcul de mise en page six à huit fois plus lent avec un plateau chargé.
-   --fit (posé par le script) réduit toutes les cartes d'une moitié quand elle est trop pleine. */
+/* Taille des cartes, rangée par rangée (voir fitRows dans game.js) : --bf-base, la taille de base tirée de la part
+   de hauteur de la rangée, et --fit, sa réduction quand elle est trop pleine. La répartition de la hauteur entre les
+   deux rangées (grid-template-rows) est posée par le script aussi. */
+.me-half > .row, .opp-field > .row { --bf-w: calc(var(--bf-base, 64px) * var(--fit, 1)); }
 .me-half, .opp-field {
-  --bf-w: calc(var(--bf-base, 64px) * var(--fit, 1));
   display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; min-width: 0;
 }
 .me-half > .row.front { align-items: center; }

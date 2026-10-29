@@ -91,7 +91,17 @@ const RAILS = {
 };
 
 function counterLabel(name) {
-  return COUNTER_LABELS[name] || name.charAt(0) + name.slice(1).toLowerCase();
+  // Forge nomme ses marqueurs « Loyalty », « Charge »... (majuscule puis minuscules).
+  return COUNTER_LABELS[name.toUpperCase()] || name.charAt(0) + name.slice(1).toLowerCase();
+}
+
+/** Nombre de marqueurs d'un type sur une carte (« LOYALTY » trouve « Loyalty »), undefined s'il n'y en a pas. */
+function counterCount(card, type) {
+  if (!card.counters) {
+    return undefined;
+  }
+  const key = Object.keys(card.counters).find(k => k.toUpperCase() === type);
+  return key === undefined ? undefined : card.counters[key];
 }
 
 /** Marqueurs sur une carte : « +6/+6 » plutôt que « +1/+1 ×6 » pour les marqueurs de force et d'endurance. */
@@ -103,6 +113,34 @@ function counterBadge(name, count) {
     return `${part(pt[1], pt[2])}/${part(pt[3], pt[4])}`;
   }
   return counterLabel(name) + (count > 1 ? ' ×' + count : '');
+}
+
+/**
+ * Clé d'empilement d'un permanent : des cartes en jeu identiques (même carte, même état, mêmes marqueurs, mêmes
+ * blessures, même rôle dans le combat, même possibilité d'action) se rangent en une pile, comme sur Arena. Null :
+ * jamais empilée (carte avec une aura ou un équipement, ou attachée elle-même).
+ */
+function stackKey(card, hasAttachments) {
+  if (hasAttachments || card.attachedTo || card.hidden) {
+    return null;
+  }
+  return [card.name, card.image, card.tapped ? 1 : 0, card.sick ? 1 : 0, card.power, card.toughness, card.loyalty,
+    card.damage || 0, card.counters ? JSON.stringify(card.counters) : '', card.token ? 1 : 0, card.commander ? 1 : 0,
+    card.attacking ? 1 : 0, card.blocking ? 1 : 0, card.selectable ? 1 : 0, card.highlighted ? 1 : 0, card.playable ? 1 : 0,
+    (card.status || []).join(',')].join('|');
+}
+
+/** Rangée triée par arrivée, les cartes identiques regroupées à la place de la première d'entre elles. */
+function groupIdentical(cards, attached) {
+  const groups = new Map();
+  for (const c of [...cards].sort((a, b) => a.id - b.id)) {
+    const key = stackKey(c, attached.has(c.id)) ?? 'seul:' + c.id;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(c);
+  }
+  return [...groups.values()].flat();
 }
 
 function isFront(card) {
@@ -270,7 +308,7 @@ export class Game {
     this.handOpen = false;
     this.applySplit(this.split());
     // Taille des moitiés du plateau, suivie sans forcer de calcul de mise en page : la taille de base de leurs
-    // cartes en dépend (voir sizeHalves).
+    // cartes en dépend (voir fitRows).
     this.halfObserver && this.halfObserver.disconnect();
     this.halfObserver = new ResizeObserver((entries) => {
       for (const e of entries) {
@@ -751,7 +789,7 @@ export class Game {
 
     const place = (container, cards, opts = {}) => {
       const list = [];
-      let prevLand = null;
+      let prevKey = null;
       for (const card of cards) {
         // Auras et équipements derrière leur hôte, parfaitement alignés, le haut dépassant (comme sur Arena) ;
         // toucher l'hôte les écarte de part et d'autre pour voir ce qui est attaché.
@@ -776,10 +814,11 @@ export class Game {
         slot.classList.remove('attached', 'spread', 'host-tapped');
         delete slot.dataset.host;
         slot.classList.toggle('has-attach', atts.length > 0);
-        const stack = opts.stackLands && card.land && prevLand && prevLand.name === card.name && prevLand.tapped === card.tapped
-          && !card.counters && !atts.length && !card.selectable && !card.highlighted;
-        slot.classList.toggle('stacked', !!stack);
-        prevLand = card.land ? card : null;
+        // Même carte, même état que la précédente : posée par-dessus, décalée (pile, avec un compteur sur la dernière).
+        const key = opts.hand ? null : stackKey(card, atts.length > 0);
+        const stack = key !== null && key === prevKey;
+        slot.classList.toggle('stacked', stack);
+        prevKey = key;
         list.push(slot);
       }
       if (!opts.hand) {
@@ -788,14 +827,35 @@ export class Game {
           slot.firstElementChild.style.removeProperty('--arc');
         }
       }
+      // Nombre de cartes de chaque pile, sur celle du dessus (la dernière, entièrement visible).
+      for (let i = 0; i < list.length; i++) {
+        let n = 1;
+        while (list[i + n] && list[i + n].classList.contains('stacked')) {
+          n++;
+        }
+        for (let k = 0; k < n; k++) {
+          const slot = list[i + k];
+          // Cartes recouvertes : leurs pastilles (force, marqueurs) dépasseraient sur la tranche ; celles du dessus suffisent.
+          slot.classList.toggle('under', k < n - 1);
+          if (k === n - 1 && n > 1) {
+            if (slot.dataset.stack !== String(n)) {
+              slot.dataset.stack = String(n);
+            }
+          } else if (slot.dataset.stack) {
+            delete slot.dataset.stack;
+          }
+        }
+        i += n - 1;
+      }
       this.reconcile(container, list);
     };
 
     const splitField = (p) => {
       const cards = p.zones.battlefield.filter(c => !(c.attachedTo && !c.attachedToPlayer && onBattlefield.has(c.attachedTo)));
-      const front = cards.filter(isFront).sort((a, b) => a.id - b.id);
+      const hosts = new Set(attachments.keys());
+      const front = groupIdentical(cards.filter(isFront), hosts);
       const others = cards.filter(c => !isFront(c));
-      const nonlands = others.filter(c => !c.land).sort((a, b) => a.id - b.id);
+      const nonlands = groupIdentical(others.filter(c => !c.land), hosts);
       const lands = others.filter(c => c.land).sort((a, b) => (a.name || '').localeCompare(b.name || '') || Number(a.tapped) - Number(b.tapped) || a.id - b.id);
       return {front, nonlands, lands};
     };
@@ -804,7 +864,7 @@ export class Game {
     const mine = splitField(me);
     place(table.querySelector('.me-half > .row.front'), mine.front);
     place(table.querySelector('.me-half .back .nonlands'), mine.nonlands);
-    place(table.querySelector('.me-half .back .lands'), mine.lands, {stackLands: true});
+    place(table.querySelector('.me-half .back .lands'), mine.lands);
     const hand = table.querySelector('.hand');
     place(hand, me.zones.hand, {hand: true});
     // Main dépliée d'office quand Forge demande d'y choisir des cartes (défausse, etc.), et pendant le choix
@@ -838,7 +898,7 @@ export class Game {
       const f = splitField(p);
       place(field.querySelector('.row.front'), f.front);
       place(field.querySelector('.back .nonlands'), f.nonlands);
-      place(field.querySelector('.back .lands'), f.lands, {stackLands: true});
+      place(field.querySelector('.back .lands'), f.lands);
       const focused = p.id === this.focusPid;
       field.classList.toggle('focused', focused);
       card.classList.toggle('focused', focused);
@@ -970,11 +1030,11 @@ export class Game {
     if (onField && card.creature && card.power !== undefined) {
       html += `<div class="b-pt${card.damage ? ' hurt' : ''}">${card.power}/${card.toughness}</div>`;
     } else if (onField && card.planeswalker) {
-      const loyalty = card.counters && card.counters.LOYALTY !== undefined ? card.counters.LOYALTY : card.loyalty;
+      const loyalty = counterCount(card, 'LOYALTY') ?? card.loyalty;
       html += `<div class="b-loyalty">${esc(loyalty ?? '')}</div>`;
     }
     if (card.counters) {
-      const entries = Object.entries(card.counters).filter(([k]) => !(card.planeswalker && k === 'LOYALTY'));
+      const entries = Object.entries(card.counters).filter(([k]) => !(card.planeswalker && k.toUpperCase() === 'LOYALTY'));
       if (entries.length) {
         html += `<div class="b-counters">${entries.map(([k, v]) => `<div class="b-counter">${esc(counterBadge(k, v))}</div>`).join('')}</div>`;
       }
@@ -1244,30 +1304,34 @@ export class Game {
   }
 
   /**
-   * Plateau trop plein : les cartes de chaque moitié rétrécissent ensemble (jusqu'à la moitié de leur taille)
-   * pour que chaque rangée tienne dans sa largeur ; au-delà seulement, elles se chevauchent.
-   * Lectures et écritures groupées : deux calculs de mise en page en tout, quel que soit le nombre de rangées
-   * (une lecture après chaque écriture en forçait un par rangée, coûteux avec beaucoup de cartes).
+   * Taille des cartes du plateau, rangée par rangée (créatures devant ; autres permanents et terrains au fond).
+   * Chaque rangée a sa taille de base, tirée de sa part de la hauteur de la moitié, et sa propre réduction : des
+   * créatures nombreuses ne rapetissent plus les terrains, et inversement. Quand les créatures passent sur deux
+   * lignes, leur rangée prend plus de hauteur si celle du fond peut en céder sans trop rétrécir.
+   * Tout est calculé d'après les classes des cartes (droite, engagée, empilée, attachée), comme le fait le CSS, sans
+   * aucune mesure : pas de calcul de mise en page forcé, même avec des centaines de cartes.
    */
   fitRows() {
     const table = this.table;
-    const slotsOf = (row) => row ? [...row.querySelectorAll(':scope > .slot')] : [];
-    // Largeur occupée par les cartes d'une rangée, d'un bord à l'autre (marges négatives comprises).
-    const extent = (slots) => slots.length ? slots[slots.length - 1].offsetLeft + slots[slots.length - 1].offsetWidth - slots[0].offsetLeft : 0;
-    const ROW_GAP = 6;
-    const ROW_PAD = 8;
-    const rows = [...table.querySelectorAll('.board .row')];
+    const GAP = 6;       // --gap des rangées
+    const PAD = 8;       // marges intérieures gauche et droite d'une rangée
+    const R = 88 / 63;   // hauteur / largeur d'une carte (et largeur d'une carte engagée)
     const halves = [...table.querySelectorAll('.me-half, .opp-field')];
-    this.sizeHalves(halves);
-    // Rien n'a changé sur le plateau (vie, phase, invite, mana...) : les réductions en place restent bonnes (les
-    // recalculer coûterait des mesures et un recalcul de style de toutes les cartes).
+    if (!this.cardMax) {
+      this.cardMax = parseFloat(getComputedStyle(table).getPropertyValue('--card-max')) || 124;
+    }
     const hiddenOpp = (h) => table.dataset.oppview === 'focus' && h.classList.contains('opp-field') && !h.classList.contains('focused');
-    const sig = [this.cardMax, ...halves.map(h => `${h._size ? h._size.w + 'x' + h._size.h : '?'}|${hiddenOpp(h) ? 0 : 1}`), ...rows.map(r => {
-      let k = '';
-      for (const slot of r.children) {
-        if (slot.classList.contains('slot')) {
-          k += slot.dataset.key + (slot.classList.contains('tapped') ? 't' : '') + (slot.classList.contains('stacked') ? 's' : '')
-            + (slot.classList.contains('attached') ? 'a' : '') + ',';
+    const slotsOf = (row) => row ? [...row.children].filter(x => x.classList.contains('slot')) : [];
+    const sizeOf = (half) => half._size || {w: half.clientWidth, h: half.clientHeight};
+    // Rien n'a changé sur le plateau (vie, phase, invite, mana...) : les tailles en place restent bonnes.
+    const sig = [this.cardMax, ...halves.map(h => {
+      let k = hiddenOpp(h) ? 'masqué' : JSON.stringify(sizeOf(h));
+      for (const row of h.querySelectorAll('.row.front, .nonlands, .lands')) {
+        k += '|';
+        for (const slot of slotsOf(row)) {
+          const c = slot.classList;
+          k += slot.dataset.key + (c.contains('tapped') ? 't' : '') + (c.contains('stacked') ? 's' : '')
+            + (c.contains('attached') ? 'a' : '') + (c.contains('host-tapped') ? 'h' : '') + ',';
         }
       }
       return k;
@@ -1277,154 +1341,125 @@ export class Game {
       return;
     }
     this.fitSig = sig;
-    const halfOf = (row) => row.closest('.me-half, .opp-field');
-    // 1. Les moitiés où des cartes se chevauchent ou passent sur deux lignes sont remises à la taille normale ; les
-    //    autres sont mesurées telles quelles (leurs largeurs sont proportionnelles à --fit, aux espaces près), ce qui
-    //    évite de recalculer le style de toutes leurs cartes deux fois.
-    const reset = new Set();
-    for (const row of rows) {
-      if (row._squeeze) {
-        reset.add(halfOf(row));
-      }
-    }
-    for (const half of halves) {
-      const front = half.querySelector(':scope > .row.front');
-      if (front && front.classList.contains('wrap')) {
-        reset.add(half);
-      }
-    }
-    for (const half of reset) {
-      if (!half) {
-        continue;
-      }
-      if ((half._fit || 1) !== 1) {
-        half._fit = 1;
-        half.style.setProperty('--fit', '1');
-      }
-      const front = half.querySelector(':scope > .row.front');
-      front && front.classList.remove('wrap');
-      half.querySelectorAll('.row').forEach(r => {
-        if (r._squeeze) {
-          r._squeeze = 0;
-          r.style.setProperty('--squeeze', '0px');
+    // Largeur d'une rangée à --fit = 1 : en largeurs de carte (u), plus des pixels fixes (espaces entre cartes).
+    const natural = (slots, stackShift) => {
+      let u = 0;
+      let px = 0;
+      slots.forEach((slot, i) => {
+        const c = slot.classList;
+        const attached = c.contains('attached');
+        const width = (attached ? c.contains('host-tapped') : c.contains('tapped')) ? R : 1;
+        u += width;
+        if (i > 0) {
+          px += GAP;
+          if (c.contains('stacked')) {
+            u -= stackShift * (c.contains('tapped') ? R : 1);
+          }
+        }
+        if (attached) {
+          // Derrière son hôte : sa marge droite reprend sa largeur et l'espace qui suit.
+          u -= width;
+          px -= GAP;
         }
       });
-    }
-    // 2. Mesurer chaque moitié et décider de sa réduction (lectures seulement).
-    const plans = halves.map(half => {
-      if (hiddenOpp(half) || !half.offsetWidth) {
-        return null; // plateau adverse masqué
+      return {u, px, n: slots.length};
+    };
+    // Écrit une propriété seulement si elle change (chaque écriture fait recalculer le style des cartes).
+    const write = (el, prop, value) => {
+      el._props = el._props || {};
+      if (el._props[prop] !== value) {
+        el._props[prop] = value;
+        el.style.setProperty(prop, value);
       }
-      const cur = half._fit || 1;
+    };
+    for (const half of halves) {
+      if (hiddenOpp(half)) {
+        continue; // plateau adverse masqué
+      }
+      const {w: W, h: H} = sizeOf(half);
+      if (!W || !H) {
+        continue;
+      }
       const front = half.querySelector(':scope > .row.front');
       const back = half.querySelector(':scope > .row.back');
-      // Largeur à --fit = 1 de la partie qui se réduit : tout sauf les espaces fixes entre les cartes (une carte
-      // attachée en rend un, sa marge droite le compensant).
-      const natural = (slots) => {
-        if (!slots.length) {
-          return 0;
+      const nonlands = back && back.querySelector('.nonlands');
+      const lands = back && back.querySelector('.lands');
+      const F = natural(slotsOf(front), 0.74);
+      const B1 = natural(slotsOf(nonlands), 0.74);
+      const B2 = natural(slotsOf(lands), 0.8);
+      const backU = B1.u + B2.u;
+      const backFixed = PAD + B1.px + B2.px + 4 + 2 * GAP;
+      const frontFixed = PAD + F.px;
+      // Taille de base d'une rangée qui a la part share de la hauteur (cartes droites, 90 % de la rangée).
+      const base = (share) => Math.max(20, Math.min(this.cardMax, (H - 10) * share * 0.9 / R, W / 5));
+      const fitFront = (share) => {
+        const b = base(share);
+        const one = F.u ? Math.min(1, (W - frontFixed) / (F.u * b)) : 1;
+        let fit = one;
+        let wrap = false;
+        // Trop nombreuses pour une ligne, même réduites de moitié : deux lignes, dans la hauteur de la rangée.
+        if (one < 0.5) {
+          const two = Math.min(1, ((H - 10) * share - 8) / (2 * b * R), one * 2 * 0.95);
+          if (two > one) {
+            fit = two;
+            wrap = true;
+          }
         }
-        const attached = slots.filter(x => x.classList.contains('attached')).length;
-        return (extent(slots) - (slots.length - 1) * ROW_GAP + attached * ROW_GAP) / cur - attached * ROW_GAP;
+        fit = Math.max(wrap ? 0.3 : 0.5, fit);
+        return {b, fit, wrap, size: b * fit};
       };
-      let fit = 1;
-      let frontFit = 1;
-      // Rangée de devant : ses cartes seules. Rangée du fond : non-terrains + terrains, séparés par un vide.
-      const lines = [
-        {avail: front ? front.clientWidth : 0, parts: [slotsOf(front)], front: true},
-        {avail: back ? back.clientWidth : 0, parts: back ? [slotsOf(back.querySelector('.nonlands')), slotsOf(back.querySelector('.lands'))] : [], extra: 4 + 2 * ROW_GAP},
-      ];
-      for (const line of lines) {
-        const n = line.parts.reduce((a, s) => a + s.length, 0);
-        if (!n || !line.avail) {
-          continue;
-        }
-        const gaps = line.parts.reduce((a, s) => a + Math.max(0, s.length - 1) * ROW_GAP, 0);
-        const fixed = ROW_PAD + (line.extra || 0) + gaps;
-        const scalable = line.parts.reduce((a, s) => a + natural(s), 0);
-        if (scalable + fixed > line.avail && scalable > 0) {
-          const f = (line.avail - fixed) / scalable;
-          if (line.front) {
-            frontFit = f;
-          } else {
-            fit = Math.min(fit, f);
+      const fitBack = (share) => {
+        const b = base(share);
+        const fit = Math.max(0.5, backU ? Math.min(1, (W - backFixed) / (backU * b)) : 1);
+        return {b, fit, size: b * fit};
+      };
+      // Part de la hauteur pour les créatures : la moitié, ou plus quand elles sont sur deux lignes (en largeur, une
+      // ligne ne gagne rien à être plus haute). On garde la part où la plus petite des deux tailles est la plus grande,
+      // les terrains et autres permanents comptant un peu moins (0,8) que les créatures.
+      const score = (f, b) => (backU ? Math.min(f.size, 0.8 * b.size) : f.size);
+      let share = 0.5;
+      let fr = fitFront(0.5);
+      if (fr.wrap) {
+        let best = score(fr, fitBack(0.5));
+        for (const s of [0.56, 0.62, 0.68, 0.75]) {
+          const f = fitFront(s);
+          const value = score(f, fitBack(1 - s));
+          if (value > best * 1.02) {
+            best = value;
+            share = s;
+            fr = f;
           }
         }
       }
-      // Créatures trop nombreuses pour une ligne, même réduites de moitié : deux lignes, dans la hauteur que
-      // la réduction a libérée (plus lisible que des cartes qui se chevauchent).
-      let wrap = false;
-      const frontSlots = slotsOf(front);
-      const slotH = frontSlots.length ? Math.max(...frontSlots.map(x => x.offsetHeight)) / cur : 0;
-      if (frontFit < 0.5 && slotH) {
-        const byHeight = (front.clientHeight - 8) / (2 * slotH);
-        const twoLines = Math.min(1, byHeight, frontFit * 2 * 0.95);
-        if (twoLines > frontFit) {
-          wrap = true;
-          frontFit = twoLines;
+      const bf = fitBack(1 - share);
+      const rows = `minmax(0, ${share.toFixed(3)}fr) minmax(0, ${(1 - share).toFixed(3)}fr)`;
+      if (half._rows !== rows) {
+        half._rows = rows;
+        half.style.gridTemplateRows = rows;
+      }
+      // Toujours trop large à la taille minimale : les cartes se chevauchent.
+      const squeezeOf = (over, gaps, w) => (over > 0 ? `${(-Math.min(w * 0.82, over / Math.max(1, gaps) + 2)).toFixed(2)}px` : '0px');
+      if (front) {
+        write(front, '--bf-base', fr.b.toFixed(2) + 'px');
+        write(front, '--fit', fr.fit.toFixed(3));
+        front.classList.toggle('wrap', fr.wrap);
+        const over = F.u * fr.b * fr.fit + F.px + PAD - W;
+        write(front, '--squeeze', fr.wrap || F.n < 2 ? '0px' : squeezeOf(over, F.n - 1, fr.b * fr.fit));
+      }
+      if (back) {
+        write(back, '--bf-base', bf.b.toFixed(2) + 'px');
+        write(back, '--fit', bf.fit.toFixed(3));
+      }
+      if (nonlands && lands) {
+        // Le fond : les deux rangées se partagent la largeur ; chacune rattrape sa part du dépassement.
+        const over = backU * bf.b * bf.fit + backFixed - W;
+        for (const [row, nat] of [[nonlands, B1], [lands, B2]]) {
+          const part = backU ? over * nat.u / backU : 0;
+          write(row, '--squeeze', nat.n < 2 ? '0px' : squeezeOf(part, nat.n - 1, bf.b * bf.fit));
         }
       }
-      fit = Math.min(fit, frontFit);
-      const min = wrap ? 0.3 : 0.5;
-      fit = Math.max(min, Math.min(1, fit));
-      return {half, front, fit, wrap, atMin: fit <= min + 0.001};
-    });
-    // 3. Appliquer les réductions (seulement celles qui changent).
-    for (const p of plans) {
-      if (!p) {
-        continue;
-      }
-      if (p.wrap) {
-        p.front.classList.add('wrap');
-      }
-      const value = Math.round(p.fit * 1000) / 1000;
-      if (Math.abs(value - (p.half._fit || 1)) > 0.002) {
-        p.half._fit = value;
-        p.half.style.setProperty('--fit', value.toFixed(3));
-      }
-    }
-    // 4. Toujours trop large à la taille minimale : les cartes se chevauchent (mesures, puis écritures).
-    const atMin = new Set(plans.filter(p => p && p.atMin).map(p => p.half));
-    const squeezes = [];
-    for (const row of rows) {
-      const slots = slotsOf(row);
-      if (!atMin.has(halfOf(row)) || slots.length < 2 || row.classList.contains('back') || row.classList.contains('wrap')) {
-        continue;
-      }
-      const over = extent(slots) + (row.parentElement.classList.contains('back') ? 0 : ROW_PAD) - row.clientWidth;
-      if (over > 0) {
-        const w = slots[0].offsetWidth;
-        squeezes.push([row, -Math.min(w * 0.82, over / (slots.length - 1) + 2)]);
-      }
-    }
-    for (const [row, px] of squeezes) {
-      row._squeeze = px;
-      row.style.setProperty('--squeeze', `${px}px`);
     }
     this.dodgeCutout();
-  }
-
-  /**
-   * Taille de base des cartes de chaque moitié : la plus petite de --card-max, de ce qui tient en hauteur (deux
-   * rangées de cartes droites, 90 % de la demi-hauteur) et du cinquième de la largeur. La taille des moitiés vient
-   * de l'observateur (sans mesure forcée) ; avant sa première réponse, on la lit.
-   */
-  sizeHalves(halves) {
-    if (!this.cardMax) {
-      this.cardMax = parseFloat(getComputedStyle(this.table).getPropertyValue('--card-max')) || 124;
-    }
-    for (const half of halves) {
-      const size = half._size || {w: half.clientWidth, h: half.clientHeight};
-      if (!size.w || !size.h) {
-        continue;
-      }
-      const base = Math.max(20, Math.min(this.cardMax, (size.h - 10) * 0.5 * 0.9 * 63 / 88, size.w / 5));
-      const value = base.toFixed(2) + 'px';
-      if (half._base !== value) {
-        half._base = value;
-        half.style.setProperty('--bf-base', value);
-      }
-    }
   }
 
   /**
