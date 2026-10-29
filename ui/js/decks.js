@@ -2,7 +2,7 @@
 
 import {bracketBadgeHtml, openAnalysis, openDeckStats, openEdhrec, summaryLineHtml} from './analysis.js';
 import {bridge} from './bridge.js';
-import {cardElement, loadImage, showZoom, onLongPress} from './cards.js';
+import {addFlipButton, cardElement, loadImage, showZoom, onLongPress} from './cards.js';
 import {isPlaneswalker, loadCareer, wildcardsHtml} from './career.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {icon} from './icons.js';
@@ -474,7 +474,9 @@ export class Decks {
         if (card) {
           const c = cardElement(card);
           c._card = card;
-          cell.querySelector('.db-art').appendChild(c);
+          const art = cell.querySelector('.db-art');
+          art.appendChild(c);
+          addFlipButton(art, card);
         }
       }
     }

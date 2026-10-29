@@ -1312,22 +1312,40 @@ export class Game {
 
   /**
    * Encoche de la caméra (Android) : le plateau va jusqu'au bord de l'écran ; seuls les blocs des colonnes
-   * qui passeraient dessous s'en écartent.
+   * qui passeraient dessous s'en écartent. Chaque bloc est jugé sur la place qu'il peut occuper (toute la colonne
+   * sous la barre d'outils pour l'invite et les boutons), pas sur sa position du moment : une invite qui grandit
+   * ou rétrécit ne fait plus sauter les boutons de côté.
    */
   dodgeCutout() {
     const holes = cutoutRects();
     if (!holes.length && !this.dodged) {
       return;
     }
-    const blocks = this.table.querySelectorAll('.side-l .opps > *, .side-l .me-panel, .side-r .toolbar, .side-r .hud-actions > *');
-    blocks.forEach(b => {
+    const t = this.table;
+    const sideR = t.querySelector('.side-r');
+    const toolbar = t.querySelector('.side-r .toolbar');
+    const blocks = [
+      [t.querySelector('.side-l .opps')],
+      [t.querySelector('.side-l .me-panel')],
+      [toolbar],
+      [t.querySelector('.side-r .hud-actions'), () => {
+        const col = sideR.getBoundingClientRect();
+        return col.width ? {top: toolbar.getBoundingClientRect().bottom, bottom: col.bottom, left: col.left, right: col.right} : null;
+      }],
+    ].filter(([b]) => b);
+    // Anciennes marges, posées bloc par bloc dans les colonnes.
+    t.querySelectorAll('.side-l .opps > *, .side-r .hud-actions > *').forEach(b => {
+      b.style.marginLeft = '';
+      b.style.marginRight = '';
+    });
+    blocks.forEach(([b]) => {
       b.style.marginLeft = '';
       b.style.marginRight = '';
     });
     this.dodged = holes.length > 0;
     const middle = window.innerWidth / 2;
-    blocks.forEach(b => {
-      const r = b.getBoundingClientRect();
+    blocks.forEach(([b, area]) => {
+      const r = (area && area()) || b.getBoundingClientRect();
       for (const h of holes) {
         if (h.t < r.bottom && h.b > r.top && h.l < r.right && h.r > r.left) {
           if (h.l < middle) {

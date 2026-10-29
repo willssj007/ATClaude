@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import forge.card.CardRules;
+import forge.card.CardSplitType;
 import forge.card.ColorSet;
 import forge.card.ICardFace;
 import forge.card.mana.ManaCost;
@@ -82,15 +83,30 @@ final class Catalog {
             final List<Entry> list = new ArrayList<>();
             final Map<String, String> fr = new HashMap<>();
             for (final PaperCard pc : FModel.getMagicDb().getCommonCards().getUniqueCards()) {
+                // Versions rééquilibrées d'Arena (« A-… ») : pas des cartes papier, elles doublaient l'original.
+                if (pc.getName().startsWith("A-") && FModel.getMagicDb().getCommonCards().getCard(pc.getName().substring(2)) != null) {
+                    continue;
+                }
                 final CardRules rules = pc.getRules();
                 final String nameEn = rules.getName();
                 final String nameFr = translated(nameEn);
-                final String textFr = CardTranslation.getTranslatedOracle(nameEn);
                 final ManaCost cost = rules.getManaCost();
-                list.add(new Entry(pc, nameEn, nameFr,
-                        normalize(nameEn) + "\n" + normalize(nameFr),
-                        normalize(rules.getOracleText()) + "\n" + normalize(textFr == null ? "" : textFr),
-                        rules.getType().toString().toLowerCase(Locale.ROOT),
+                // Toutes les faces (recto et verso, deux moitiés, aventure) : on trouve une carte par chacun de ses noms.
+                final StringBuilder names = new StringBuilder(normalize(nameEn)).append('\n').append(normalize(nameFr));
+                final StringBuilder texts = new StringBuilder();
+                final StringBuilder types = new StringBuilder();
+                for (final ICardFace face : faces(rules)) {
+                    final String faceFr = translated(face.getName());
+                    names.append('\n').append(normalize(face.getName())).append('\n').append(normalize(faceFr));
+                    texts.append(normalize(face.getOracleText())).append('\n')
+                            .append(normalize(CardTranslation.getTranslatedOracle(face.getName()))).append('\n');
+                    types.append(face.getType().toString().toLowerCase(Locale.ROOT)).append(" // ");
+                    if (face != rules.getMainPart() && !faceFr.equals(face.getName())) {
+                        fr.putIfAbsent(normalize(faceFr), nameEn);
+                    }
+                }
+                list.add(new Entry(pc, nameEn, nameFr, names.toString(), texts.toString(),
+                        types.length() > 0 ? types.toString() : rules.getType().toString().toLowerCase(Locale.ROOT),
                         cost == null ? 0 : cost.getCMC(),
                         GameSerializer.colors(rules.getColorIdentity()),
                         legal.test(pc), commander.test(pc)));
@@ -250,18 +266,39 @@ final class Catalog {
         o.addProperty("cost", cost == null || cost.isNoCost() ? "" : cost.toString());
         o.addProperty("cmc", cost == null ? 0 : cost.getCMC());
         final String typeEn = rules.getType().toString();
-        final String typeFr = CardTranslation.getTranslatedType(nameEn, typeEn);
-        o.addProperty("typeLine", typeFr == null || typeFr.isEmpty() ? typeEn : typeFr);
-        o.addProperty("typeEn", typeEn);
-        final String textFr = CardTranslation.getTranslatedOracle(nameEn);
-        o.addProperty("text", textFr == null || textFr.isEmpty() ? rules.getOracleText() : textFr);
-        o.addProperty("textEn", rules.getOracleText());
+        final CardSplitType split = rules.getSplitType();
+        final ICardFace other = rules.getOtherPart();
+        if (split == CardSplitType.Split && main != null && other != null) {
+            // Carte scindée (Feu // Glace) : les deux moitiés, chacune avec son coût, son type et son texte traduits.
+            final String t1 = faceType(main);
+            final String t2 = faceType(other);
+            o.addProperty("typeLine", t1.equals(t2) ? t1 : t1 + " // " + t2);
+            o.addProperty("typeEn", typeEn);
+            o.addProperty("text", halfText(main, true) + "\n\n" + halfText(other, true));
+            o.addProperty("textEn", halfText(main, false) + "\n\n" + halfText(other, false));
+        } else {
+            o.addProperty("typeLine", main != null ? faceType(main) : typeEn);
+            o.addProperty("typeEn", typeEn);
+            String text = main != null ? faceText(main, split == CardSplitType.Modal, true) : rules.getOracleText();
+            String textEn = main != null ? main.getOracleText() : rules.getOracleText();
+            if (other != null && SECONDARY_SPELLS.contains(split)) {
+                // Aventure (et cousines) : le sort imprimé dans la même carte, sous le texte principal.
+                text += "\n\n" + halfText(other, true);
+                textEn += "\n\n" + halfText(other, false);
+            }
+            o.addProperty("text", text);
+            o.addProperty("textEn", textEn);
+        }
         if (main != null && rules.getType().isCreature()) {
             o.addProperty("power", main.getPower());
             o.addProperty("toughness", main.getToughness());
         }
         if (main != null && rules.getType().isPlaneswalker()) {
             o.addProperty("loyalty", main.getInitialLoyalty());
+        }
+        if (other != null && (CardSplitType.DUAL_FACED_CARDS.contains(split) || split == CardSplitType.Flip)) {
+            // Recto verso (transformables, modales, fusion) et cartes retournables : l'autre face, à part.
+            o.add("back", faceJson(rules, other, split == CardSplitType.Flip ? "" : pc.getImageKey(true)));
         }
         o.addProperty("colors", GameSerializer.colors(rules.getColor()));
         o.addProperty("identity", GameSerializer.colors(rules.getColorIdentity()));
@@ -320,6 +357,92 @@ final class Catalog {
         } catch (final RuntimeException e) {
             // jeton sans impression connue : le cadre dessiné suffit
         }
+        return o;
+    }
+
+    /** Parties d'une carte imprimées sur la carte elle-même, à lire avec le texte principal. */
+    private static final java.util.EnumSet<CardSplitType> SECONDARY_SPELLS = java.util.EnumSet.of(
+            CardSplitType.Adventure, CardSplitType.Omen, CardSplitType.Prepare);
+
+    /** Les faces d'une carte qui en a plusieurs (recto et verso, deux moitiés, aventure) ; vide sinon. */
+    private static List<ICardFace> faces(final CardRules rules) {
+        final List<ICardFace> list = new ArrayList<>(2);
+        if (rules.getOtherPart() != null && rules.getMainPart() != null) {
+            list.add(rules.getMainPart());
+            list.add(rules.getOtherPart());
+        }
+        return list;
+    }
+
+    /**
+     * Traduction d'une face, null si elle manque ou est décalée dans le fichier de Forge (quelques moitiés de cartes
+     * scindées ont leur texte à la place du type : « Glace|Engagez le permanent ciblé.|Piochez une carte. »).
+     */
+    private static String frenchType(final ICardFace face) {
+        final String fr = CardTranslation.getTranslatedType(face.getName(), "");
+        return fr == null || fr.isEmpty() || fr.endsWith(".") ? null : fr.replace(" : - ", " : ");
+    }
+
+    private static String faceType(final ICardFace face) {
+        final String fr = frenchType(face);
+        return fr == null ? face.getType().toString() : fr;
+    }
+
+    /**
+     * Texte d'une face. modal : face d'une carte modale, dont la traduction de Forge reprend à la fin deux lignes de
+     * l'autre face (son type et son coût, ou sa capacité de mana) ; on les retire quand le texte anglais en a deux de moins.
+     */
+    private static String faceText(final ICardFace face, final boolean modal, final boolean french) {
+        if (!french || frenchType(face) == null) {
+            return face.getOracleText();
+        }
+        final String fr = CardTranslation.getTranslatedOracle(face.getName());
+        if (fr == null || fr.isEmpty()) {
+            return face.getOracleText();
+        }
+        if (modal) {
+            final int english = face.getOracleText().split("(\\\\n|\\r?\\n)+").length;
+            final List<Integer> starts = new ArrayList<>();
+            final Matcher m = Pattern.compile("(?m)^\\s*\\S").matcher(fr);
+            while (m.find()) {
+                starts.add(m.start());
+            }
+            if (starts.size() == english + 2) {
+                return fr.substring(0, starts.get(english)).stripTrailing();
+            }
+        }
+        return fr;
+    }
+
+    /** « Nom {coût} — type » puis le texte d'une moitié ou d'un sort d'aventure. */
+    private static String halfText(final ICardFace face, final boolean french) {
+        final ManaCost cost = face.getManaCost();
+        return (french ? translated(face.getName()) : face.getName())
+                + (cost == null || cost.isNoCost() ? "" : " " + cost)
+                + " — " + (french ? faceType(face) : face.getType().toString())
+                + "\n" + faceText(face, false, french);
+    }
+
+    /** Une face seule (le verso d'une carte recto verso), avec son image ("" : cadre dessiné). */
+    private static JsonObject faceJson(final CardRules rules, final ICardFace face, final String image) {
+        final JsonObject o = new JsonObject();
+        o.addProperty("name", face.getName());
+        o.addProperty("nameFr", translated(face.getName()));
+        final ManaCost cost = face.getManaCost();
+        o.addProperty("cost", cost == null || cost.isNoCost() ? "" : cost.toString());
+        o.addProperty("typeLine", faceType(face));
+        o.addProperty("typeEn", face.getType().toString());
+        o.addProperty("text", faceText(face, rules.getSplitType() == CardSplitType.Modal, true));
+        o.addProperty("textEn", face.getOracleText());
+        if (face.getType().isCreature()) {
+            o.addProperty("power", face.getPower());
+            o.addProperty("toughness", face.getToughness());
+        }
+        if (face.getType().isPlaneswalker()) {
+            o.addProperty("loyalty", face.getInitialLoyalty());
+        }
+        o.addProperty("colors", GameSerializer.colors(face.getColor()));
+        o.addProperty("image", image);
         return o;
     }
 

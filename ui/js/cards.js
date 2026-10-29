@@ -126,6 +126,7 @@ export function showZoom(card, extraHtml = '') {
     <div class="type">${esc(card.typeLine || '')}${pt ? ' · ' + esc(pt) : ''}</div>
     <div class="text">${rulesHtml(card.text || '')}</div>
     ${card.textEn && card.textEn !== card.text ? `<div class="en">${rulesHtml(card.textEn)}</div>` : ''}
+    ${card.back ? backInfoHtml(card.back) : ''}
     ${extraHtml}
     <p class="muted small" style="margin-top:14px">Touchez n'importe où pour fermer.</p>
   </div>`);
@@ -137,6 +138,37 @@ export function showZoom(card, extraHtml = '') {
   zoom.classList.toggle('two', !!card.back);
   zoom.classList.remove('hidden');
   zoomOpen = true;
+}
+
+/** L'autre face d'une carte recto verso, sous le texte du recto dans le zoom. */
+function backInfoHtml(back) {
+  const pt = ptText(back);
+  return `<div class="back-info"><div class="muted small">Autre face</div>
+    <div class="name">${esc(back.nameFr || back.name || '')} ${manaHtml(back.cost)}</div>
+    ${back.nameFr && back.name && back.name !== back.nameFr ? `<div class="muted small">${esc(back.name)}</div>` : ''}
+    <div class="type">${esc(back.typeLine || '')}${pt ? ' · ' + esc(pt) : ''}</div>
+    <div class="text">${rulesHtml(back.text || '')}</div></div>`;
+}
+
+/**
+ * Bouton « retourner » d'une carte recto verso (recherche, deck en images) : montre l'autre face à la place.
+ * node : l'élément qui contient la carte ; card : la carte, avec sa face arrière dans card.back.
+ */
+export function addFlipButton(node, card) {
+  if (!card.back) {
+    return;
+  }
+  const btn = el('<button class="flip" title="Voir l\'autre face" aria-label="Retourner la carte">⟲</button>');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const shown = node.querySelector('.mcard');
+    const backSide = !node.classList.contains('flipped');
+    const next = cardElement(backSide ? card.back : card);
+    next._card = card;
+    shown.replaceWith(next);
+    node.classList.toggle('flipped', backSide);
+  });
+  node.appendChild(btn);
 }
 
 export function hideZoom() {

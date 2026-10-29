@@ -1,7 +1,7 @@
 // Panneau de recherche de cartes, partagé par le navigateur de cartes et le deck builder.
 
 import {bridge} from './bridge.js';
-import {cardElement, onLongPress, showZoom} from './cards.js';
+import {addFlipButton, cardElement, onLongPress, showZoom} from './cards.js';
 import {customBox} from './dialogs.js';
 import {esc, el, debounce, toast} from './util.js';
 import {icon} from './icons.js';
@@ -280,6 +280,7 @@ export class SearchPanel {
     const cell = el(`<div class="cell${card.owned === 0 ? ' unowned' : ''}"></div>`);
     cell._card = card;
     cell.appendChild(cardElement(card));
+    addFlipButton(cell, card);
     if (card.owned > 0) {
       cell.appendChild(el(`<div class="owned-n" title="Exemplaires dans ta collection">${icon('book')}${card.owned}</div>`));
     }
