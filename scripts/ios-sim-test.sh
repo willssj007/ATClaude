@@ -89,5 +89,6 @@ DATA="$(xcrun simctl get_app_container "$UDID" "$APP_ID" data 2>/dev/null)"
 cp "$DATA/Library/Application Support/atclaude/app.log" "$OUT/app.log" 2>/dev/null || echo "(pas de app.log)" > "$OUT/app.log"
 xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate "process == \"$APP_EXEC\"" > "$OUT/sim-system.log" 2>/dev/null || true
 cp ~/Library/Logs/DiagnosticReports/"$APP_EXEC"* "$OUT/" 2>/dev/null || true
-grep -h 'autotest\|ÉCHEC\|erreur\|Exception' "$OUT/app.log" | head -80 > "$OUT/summary.txt" || true
+# Le journal de l'application passe aussi par le journal système du simulateur (sorties standard).
+grep -h 'autotest\|ÉCHEC\|erreur\|Exception' "$OUT/app.log" "$OUT/sim-system.log" | cut -c1-400 | head -120 > "$OUT/summary.txt" || true
 cat "$OUT/summary.txt"

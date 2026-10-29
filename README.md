@@ -1,6 +1,6 @@
 # Arcane Table
 
-Magic: The Gathering contre l'IA, sur Android et Windows, avec le moteur **Forge** pour les règles et l'automatisation, une base de toutes les cartes en français et en anglais, et un deck builder pensé pour le Commander.
+Magic: The Gathering contre l'IA, sur Android, Windows, iPhone et iPad, avec le moteur **Forge** pour les règles et l'automatisation, une base de toutes les cartes en français et en anglais, et un deck builder pensé pour le Commander.
 
 ## Télécharger
 
@@ -8,6 +8,8 @@ Chaque push sur `main` construit l'application et la publie dans la release **[a
 
 - **Android** : sur le téléphone, ouvrir ce lien, télécharger le fichier `.apk`, l'ouvrir et autoriser l'installation depuis cette source si Android le demande.
 - **Windows** : télécharger le `.zip` (il arrive quelques minutes après l'APK), le décompresser dans un dossier de votre choix (pas dans « Program Files »), puis lancer `ArcaneTable.exe`. Java est inclus. L'application s'ouvre dans sa propre fenêtre (WebView2, le moteur d'Edge fourni avec Windows 10 et 11), sans navigateur ; F11 passe en plein écran, et fermer la fenêtre arrête le moteur. Si le moteur s'arrête en cours de route, la fenêtre le relance d'elle-même et la partie reprend là où elle a été sauvegardée. Les decks et réglages sont dans `%USERPROFILE%\.atclaude`.
+
+- **iPhone et iPad** (iOS 15 ou plus) : télécharger le fichier `.ipa` (il arrive une vingtaine de minutes après l'APK). Hors App Store, Apple n'accepte une application que signée avec un identifiant Apple : installer le fichier avec **AltStore** ou **SideStore** (sur l'iPhone) ou **Sideloadly** (depuis un ordinateur), qui le signent avec le vôtre. Avec un identifiant gratuit, la signature dure 7 jours : AltStore et SideStore la renouvellent d'eux-mêmes, avec Sideloadly il faut réinstaller (les decks et la carrière restent). iOS demande d'activer le « Mode développeur » (Réglages → Confidentialité et sécurité) la première fois.
 
 Toutes les versions sont signées avec la même clé (`android/app/arcane-debug.keystore`) : une nouvelle version s'installe par-dessus l'ancienne sans perdre les decks.
 
@@ -110,6 +112,7 @@ Avec en plus Gradle 8.9 ou plus et le SDK Android (`ANDROID_HOME`) : `scripts/bu
 - **Traduction** : les cartes, les types, la pile, le journal et la plupart des invites sont en français (traductions de Forge, corrigées). Les cartes sans traduction française dans Forge (environ une sur six, surtout les plus récentes) et quelques invites de ciblage restent en anglais.
 - **Partie à 1 joueur** (bac à sable sans adversaire) : pas encore proposée.
 - **Windows** : le paquet est construit par GitHub Actions (la fenêtre `ArcaneTable.exe`, en C# avec WebView2 sur .NET Framework 4.8, et le moteur Java dans `moteur/`) mais n'a pas été essayé sur un vrai Windows : la fenêtre a seulement été compilée. Si le composant WebView2 manque (Windows ancien ou non à jour), l'application propose de l'installer et s'ouvre en attendant dans le navigateur. Le journal du moteur est dans `%LOCALAPPDATA%\ArcaneTable\moteur.log` (celui d'avant un redémarrage automatique dans `moteur-precedent.log`).
+- **iPhone et iPad** : Forge tourne en natif, compilé à l'avance par MobiVM (comme le portage iOS de Forge), et l'interface s'affiche dans une WKWebView. L'application a été essayée dans le simulateur d'iPhone de GitHub Actions (démarrage, chargement des cartes, partie jouée seule jusqu'au bout, images), pas sur un vrai iPhone. Le premier lancement installe les cartes (deux minutes environ dans le simulateur). L'IPA n'est pas signée pour l'App Store : il faut la signer soi-même à l'installation (voir « Télécharger »).
 - **Prix et dos de cartes** : lus chez Scryfall, bloqué dans l'environnement de développement ; testés contre une imitation locale de Scryfall seulement. Le dos Magic vient de l'adresse publique des dos de Scryfall (`backs.scryfall.io`).
 - **Version web** (deck builder et navigateur de cartes, sans partie, puisque Forge ne tourne pas dans un navigateur) : pas encore faite.
 
