@@ -112,7 +112,6 @@ const DEFAULTS = {
   mode: 'sandbox',
   boosterSet: '',
   careerDeck: null,
-  installHintShown: false,
 };
 
 export const prefs = {

@@ -9,8 +9,6 @@ Chaque push sur `main` construit l'application et la publie dans la release **[a
 - **Android** : sur le téléphone, ouvrir ce lien, télécharger le fichier `.apk`, l'ouvrir et autoriser l'installation depuis cette source si Android le demande.
 - **Windows** : télécharger le `.zip` (il arrive quelques minutes après l'APK), le décompresser dans un dossier de votre choix (pas dans « Program Files »), puis lancer `ArcaneTable.exe`. Java est inclus. L'application s'ouvre dans sa propre fenêtre (WebView2, le moteur d'Edge fourni avec Windows 10 et 11), sans navigateur ; F11 passe en plein écran, et fermer la fenêtre arrête le moteur. Les decks et réglages sont dans `%USERPROFILE%\.atclaude`.
 
-- **iPhone et iPad (PWA)** : ouvrir **https://willssj007.github.io/ATClaude/** dans Safari, puis bouton Partager › « Sur l'écran d'accueil » : l'application s'ouvre ensuite en plein écran depuis son icône. Forge tourne dans Safari grâce à [CheerpJ](https://cheerpj.com) (Java en WebAssembly, gratuit pour un usage personnel), téléchargé à chaque lancement : il faut Internet pour ouvrir l'application. Au premier lancement, les cartes s'installent dans le stockage de Safari (quelques minutes) ; les suivants sont plus rapides. Decks, carrière et réglages restent sur l'appareil (et suivent le compte s'il est relié à GitHub). Cette version est publiée par la même compilation que l'APK et Windows. *Expérimental : selon l'iPhone, le démarrage peut être long.* Pour la publier, GitHub Pages doit être activé une fois sur le dépôt (Settings › Pages › Source : « GitHub Actions »).
-
 Toutes les versions sont signées avec la même clé (`android/app/arcane-debug.keystore`) : une nouvelle version s'installe par-dessus l'ancienne sans perdre les decks.
 
 Au premier lancement, l'application installe les cartes (une trentaine de secondes) puis Forge charge sa base (quelques dizaines de secondes selon le téléphone).
@@ -69,7 +67,6 @@ bridge/      Pont Java : implémente l'interface graphique attendue par Forge et
 desktop/     Hôte ordinateur : Forge + serveur HTTP sur 127.0.0.1, l'interface s'ouvre dans le navigateur
 android/     Application Android : Forge + WebView, l'interface est servie depuis l'APK
 windows/     Fenêtre Windows (C#, WebView2) qui lance l'hôte ordinateur et affiche l'interface
-web/         Hôte navigateur (iPhone) : Forge dans la page via CheerpJ, réseau par le fetch du navigateur
 scripts/     Compilation de Forge, emballage des ressources, construction de l'APK
 tools/audio/ Synthétiseur (Python : numpy, scipy, numba ; ffmpeg) des musiques et bruitages de ui/snd/
 legacy/      Phase 1 en Python (base SQLite depuis Scryfall), remplacée par la base de Forge

@@ -11,7 +11,6 @@
     <modules>
         <module>bridge</module>
         <module>desktop</module>
-        <module>web</module>
     </modules>
 
     <properties>

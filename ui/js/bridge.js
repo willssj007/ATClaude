@@ -1,7 +1,6 @@
 // Communication avec le pont Java.
 // - Android : la WebView expose window.AndroidBridge.send() et appelle window.__atReceive(json).
 // - Ordinateur : flux Server-Sent Events sur /api/events et POST sur /api/send.
-// - iPhone (PWA) : Forge tourne dans la page (CheerpJ) ; pwa.js expose window.AT_WEB.
 
 const listeners = new Map();
 const pending = new Map();
@@ -45,19 +44,14 @@ function receive(json) {
 }
 
 const android = typeof window.AndroidBridge !== 'undefined';
-const web = !android && typeof window.AT_WEB !== 'undefined';
 // Ordinateur : les images viennent de « localhost » et l'interface de « 127.0.0.1 ». Le navigateur limite les
 // connexions par adresse (6) ; des images lentes à télécharger ne retiennent ainsi jamais les requêtes du moteur.
-const IMAGE_BASE = !android && !web && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
+const IMAGE_BASE = !android && location.hostname === '127.0.0.1' && location.port ? `${location.protocol}//localhost:${location.port}/` : '';
 
 function post(message) {
   const json = JSON.stringify(message);
   if (android) {
     window.AndroidBridge.send(json);
-    return;
-  }
-  if (web) {
-    window.AT_WEB.send(json);
     return;
   }
   fetch('api/send', {method: 'POST', body: json, headers: {'Content-Type': 'application/json'}})
@@ -66,8 +60,6 @@ function post(message) {
 
 export const bridge = {
   android,
-  /** Version iPhone : le moteur tourne dans la page (pas de serveur local). */
-  web,
 
   /** Écoute un type de message ('state', 'dialog', 'notice'...), ou '*' pour tous. */
   on(type, fn) {
@@ -100,12 +92,6 @@ export const bridge = {
     if (android) {
       window.__atReceive = receive;
       window.__atReceiveMany = (list) => list.forEach(receive);
-      connected = true;
-      emit('connection', {type: 'connection', connected: true});
-      return;
-    }
-    if (web) {
-      window.AT_WEB.connect(receive);
       connected = true;
       emit('connection', {type: 'connection', connected: true});
       return;
