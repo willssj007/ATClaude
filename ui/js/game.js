@@ -262,6 +262,7 @@ export class Game {
         <div class="divider" title="Glisser pour agrandir un côté du plateau · double-touche : moitié-moitié">
           <div class="div-start"><div class="turn-label"></div></div>
           <div class="phases"></div>
+          <div class="atk-bar hidden"></div>
           <div class="div-end">
             <span class="pill-host"></span>
             ${opponents.length > 1 ? `<button class="tool" data-set-view="all">${icon('cards')}</button>` : ''}
@@ -464,6 +465,17 @@ export class Game {
 
     table.addEventListener('click', (e) => {
       if (consumed()) {
+        return;
+      }
+      // Cible des attaques (à plusieurs) : ses créatures touchées ensuite l'attaquent ; son plateau est montré.
+      const chip = e.target.closest('.atk-chip');
+      if (chip) {
+        const id = Number(chip.dataset.id);
+        this.act(chip.dataset.kind === 'card' ? 'card' : 'player', {id});
+        const pid = chip.dataset.kind === 'card' ? Number(chip.dataset.controller) : id;
+        if (table.dataset.oppview === 'focus' && pid >= 0) {
+          this.focus(pid);
+        }
         return;
       }
       const toolbarBtn = e.target.closest('[data-open]');
@@ -1373,6 +1385,11 @@ export class Game {
     let message = (p.message || '').trim();
     const waiting = !p.okEnabled && !p.cancelEnabled && (!p.input || /^Waiting for/i.test(message));
     message = translatePrompt(message);
+    const targets = this.renderAttackTargets(state, p);
+    if (targets) {
+      const cur = targets.find(t => t.current) || targets[0];
+      message = `Touche tes créatures pour qu'elles attaquent ${this.targetLabel(state, cur)}. Autre cible : touche sa pastille au centre ou son portrait.`;
+    }
     if (p.input === 'InputPassPriority' && /^Priorit/.test(message)) {
       // Forge répète tour, phase et pile, déjà affichés sur la ligne du milieu, et le bouton dit déjà « Passer » ou
       // « Résoudre » : pas d'invite, sauf quand on joue pour un autre joueur.
@@ -1413,7 +1430,9 @@ export class Game {
     let cancelHtml = esc(p.cancelLabel || 'Annuler');
     if (p.input === 'InputAttack') {
       // Forge propose « Frappe Alpha » (tout le monde attaque) ou « Rappeler » (plus personne n'attaque).
-      cancelHtml = /rappel/i.test(p.cancelLabel || '') ? `${icon('undo')} Personne n'attaque` : `${icon('swords')} Tout attaquer`;
+      const cur = targets && (targets.find(t => t.current) || targets[0]);
+      cancelHtml = /rappel/i.test(p.cancelLabel || '') ? `${icon('undo')} Personne n'attaque`
+        : cur ? `${icon('swords')} Tout sur ${esc(cur.name)}` : `${icon('swords')} Tout attaquer`;
     }
     if (cancel._html !== cancelHtml) {
       setHtml(cancel, cancelHtml);
@@ -1431,6 +1450,52 @@ export class Game {
       extra.innerHTML = html;
       extra._html = html;
     }
+  }
+
+  /** « IA 2 », « Jace, l'arpenteur de IA 2 » : une cible d'attaque en clair. */
+  targetLabel(state, t) {
+    if (t.kind !== 'card') {
+      return t.name;
+    }
+    const owner = state.players.find(pl => pl.id === t.controller);
+    return `${t.battle ? 'la bataille' : 'le planeswalker'} ${t.name}${owner ? ` de ${owner.name}` : ''}`;
+  }
+
+  /**
+   * Déclaration des attaquants à plusieurs cibles : une pastille par cible possible à la place des phases (la cible
+   * en cours en rouge, avec le nombre d'attaquants de chacune), et le portrait ou la carte visés entourés.
+   * Renvoie les cibles, ou null hors de ce cas.
+   */
+  renderAttackTargets(state, p) {
+    const bar = this.table.querySelector('.atk-bar');
+    const phases = this.table.querySelector('.phases');
+    const targets = p.input === 'InputAttack' && p.attack && (p.attack.targets || []).length > 1 ? p.attack.targets : null;
+    for (const n of this.atkMarked || []) {
+      n.classList.remove('atk-current', 'atk-target');
+    }
+    this.atkMarked = [];
+    bar.classList.toggle('hidden', !targets);
+    phases.classList.toggle('hidden', !!targets);
+    if (!targets) {
+      return null;
+    }
+    const html = `<span class="atk-lbl">${icon('swords')} Attaquer :</span>${targets.map(t => {
+      const ic = t.kind === 'card' ? (t.battle ? 'banner' : 'spark') : 'portrait';
+      return `<button class="atk-chip${t.current ? ' on' : ''}" data-kind="${t.kind}" data-id="${t.id}" data-controller="${t.controller ?? -1}"
+        title="${esc(t.current ? 'Cible en cours' : 'Viser ' + this.targetLabel(state, t))}">${icon(ic)}<span>${esc(t.name)}</span>${t.count ? `<b>${t.count}</b>` : ''}</button>`;
+    }).join('')}`;
+    if (bar._html !== html) {
+      bar.innerHTML = html;
+      bar._html = html;
+    }
+    for (const t of targets) {
+      const node = t.kind === 'player' ? this.plates.get(t.id) : this.slots.get('c' + t.id);
+      if (node) {
+        node.classList.add(t.current ? 'atk-current' : 'atk-target');
+        this.atkMarked.push(node);
+      }
+    }
+    return targets;
   }
 
   /**

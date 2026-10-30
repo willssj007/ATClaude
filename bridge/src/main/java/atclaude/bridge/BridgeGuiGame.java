@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import forge.LobbyPlayer;
 import forge.deck.CardPool;
 import forge.game.GameEntityView;
+import forge.game.GameView;
 import forge.game.card.CardView;
 import forge.game.event.GameEvent;
 import forge.game.phase.PhaseType;
@@ -188,6 +189,46 @@ final class BridgeGuiGame extends AbstractGuiGame {
         }
     }
 
+    /**
+     * Déclaration des attaquants : les cibles possibles (joueurs, planeswalkers, batailles), celle que Forge vise en
+     * ce moment (les créatures touchées l'attaquent) et le nombre d'attaquants déjà envoyés sur chacune.
+     */
+    private JsonObject attackTargets() {
+        try {
+            final GameView gv = getGameView();
+            final forge.game.Game game = gv == null ? null : gv.getGame();
+            final forge.game.combat.Combat combat = game == null ? null : game.getPhaseHandler().getCombat();
+            if (combat == null) {
+                return null;
+            }
+            final com.google.gson.JsonArray list = new com.google.gson.JsonArray();
+            for (final forge.game.GameEntity d : new ArrayList<>(combat.getDefenders())) {
+                final JsonObject o = new JsonObject();
+                o.addProperty("id", d.getId());
+                o.addProperty("count", combat.getAttackersOf(d).size());
+                if (d instanceof forge.game.player.Player pl) {
+                    o.addProperty("kind", "player");
+                    o.addProperty("name", pl.getName());
+                    o.addProperty("current", isHighlighted(pl.getView()));
+                } else if (d instanceof forge.game.card.Card c) {
+                    o.addProperty("kind", "card");
+                    o.addProperty("name", GameSerializer.translatedName(c.getView().getCurrentState()));
+                    o.addProperty("controller", c.getController() == null ? -1 : c.getController().getId());
+                    o.addProperty("battle", c.isBattle());
+                    o.addProperty("current", isHighlighted(c.getView()));
+                } else {
+                    continue;
+                }
+                list.add(o);
+            }
+            final JsonObject a = new JsonObject();
+            a.add("targets", list);
+            return a;
+        } catch (final RuntimeException e) {
+            return null; // combat en train de changer : la prochaine photo réessaiera
+        }
+    }
+
     private JsonObject prompt() {
         final JsonObject p = new JsonObject();
         p.addProperty("message", promptMessage);
@@ -197,6 +238,12 @@ final class BridgeGuiGame extends AbstractGuiGame {
         p.addProperty("okEnabled", okEnabled);
         p.addProperty("cancelEnabled", cancelEnabled);
         p.addProperty("focusOk", focusOk);
+        if ("InputAttack".equals(inputKind())) {
+            final JsonObject attack = attackTargets();
+            if (attack != null) {
+                p.add("attack", attack);
+            }
+        }
         // « Défaire » : seulement quand Forge peut remettre la partie à la priorité précédente (sinon, la raison).
         final PlayerControllerHuman c = controller();
         if (c != null && c.getGame() != null) {

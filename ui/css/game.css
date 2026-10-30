@@ -673,3 +673,23 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 @media (max-height: 520px) { .scheme-reveal .sr-card { --w: min(330px, 56vw, 80vh); } }
 @keyframes sr-in { from { opacity: 0; transform: translate(-50%, -46%) scale(0.85); } }
 @keyframes sr-out { to { opacity: 0; transform: translate(-50%, -54%) scale(0.95); } }
+
+/* Déclaration des attaquants à plusieurs : la cible des créatures touchées */
+.atk-bar { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 999px; background: rgb(20 6 8 / 0.82);
+  border: 1px solid rgb(239 90 90 / 0.55); box-shadow: 0 0 16px rgb(239 90 90 / 0.25); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.atk-bar::-webkit-scrollbar { display: none; }
+.atk-lbl { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #ffb3a8; white-space: nowrap; padding: 0 2px; }
+.atk-lbl .ic { width: 14px; height: 14px; }
+.atk-chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--line-strong); background: rgb(255 255 255 / 0.06); color: var(--text); font-size: 12px; font-weight: 600; }
+.atk-chip .ic { width: 14px; height: 14px; color: var(--muted); }
+.atk-chip b { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #ef5a5a; color: #fff; font-size: 10.5px; display: inline-grid; place-items: center; }
+.atk-chip:hover { border-color: rgb(239 90 90 / 0.6); }
+.atk-chip.on { background: linear-gradient(180deg, #ef6a5a, #b8322c); border-color: #ffb3a8; color: #fff; box-shadow: 0 0 12px rgb(239 90 90 / 0.55); }
+.atk-chip.on .ic { color: #fff; }
+.atk-chip.on b { background: #fff; color: #b8322c; }
+.plate.atk-target { box-shadow: 0 0 0 2px rgb(239 90 90 / 0.35); cursor: pointer; }
+.plate.atk-current { box-shadow: 0 0 0 3px #ef5a5a, 0 0 20px rgb(239 90 90 / 0.6); animation: atk-pulse 1.4s ease-in-out infinite; }
+.slot.atk-current > .mcard { box-shadow: 0 0 0 3px #ef5a5a, 0 0 18px rgb(239 90 90 / 0.6); }
+.slot.atk-target > .mcard { box-shadow: 0 0 0 2px rgb(239 90 90 / 0.4); }
+@keyframes atk-pulse { 50% { box-shadow: 0 0 0 3px #ef5a5a, 0 0 30px rgb(239 90 90 / 0.85); } }
