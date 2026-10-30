@@ -94,6 +94,8 @@ final class MatchSession {
     private boolean commanderFormat;
     /** Duel du mode Planeswalker : pas de triche, récompenses à la fin. */
     private boolean career;
+    /** Variante Archenemy (Sandbox, à 4) : pas de sauvegarde, Forge ne garde pas la pile de manigances. */
+    private boolean archenemy;
     private static final Set<PhaseType> SAVE_PHASES = EnumSet.of(PhaseType.UPKEEP, PhaseType.DRAW, PhaseType.MAIN1, PhaseType.MAIN2, PhaseType.END_OF_TURN);
 
     private MatchSession(final Bridge bridge, final BridgeGuiGame gui, final HostedMatch match) {
@@ -127,6 +129,21 @@ final class MatchSession {
         if (seats == null || seats.size() < 2 || seats.size() > 4) {
             throw new IllegalArgumentException("Une partie se joue à 2, 3 ou 4 joueurs.");
         }
+        // Archenemy (règles officielles, 904) : un joueur, humain ou IA, contre une équipe de trois qui ne peuvent
+        // s'attaquer qu'à lui ; il a 40 points de vie (60 en Commander), joue en premier et met une manigance en
+        // œuvre au début de sa première phase principale, chaque tour.
+        final int archenemySeat = !career && setup.has("archenemy") && setup.get("archenemy").isJsonPrimitive() ? setup.get("archenemy").getAsInt() : -1;
+        final boolean archenemy = archenemySeat >= 0;
+        if (archenemy && (seats.size() != 4 || archenemySeat >= seats.size())) {
+            throw new IllegalArgumentException("Une partie Archenemy se joue à 4 : l'Archenemy contre une équipe de trois joueurs.");
+        }
+        final Set<GameType> variants = EnumSet.noneOf(GameType.class);
+        if (commander) {
+            variants.add(GameType.Commander);
+        }
+        if (archenemy) {
+            variants.add(GameType.Archenemy);
+        }
         final List<RegisteredPlayer> players = new ArrayList<>();
         RegisteredPlayer human = null;
         // Mulligans gratuits choisis dans le salon (absent : règle de Forge). Planeswalker : le premier mulligan de
@@ -137,13 +154,22 @@ final class MatchSession {
         // Le salon tel quel, avec chaque deck écrit en entier : la sauvegarde ne dépend plus des decks enregistrés.
         final JsonObject resolved = setup.deepCopy();
         final JsonArray resolvedSeats = new JsonArray();
+        int seatIndex = 0;
         for (final JsonElement e : seats) {
             final JsonObject seat = e.getAsJsonObject();
             final Deck deck = deckFor(catalog, seat);
             final JsonObject rs = seat.deepCopy();
             rs.add("deck", Catalog.deckJson(deck, commander ? "commander" : "constructed"));
             resolvedSeats.add(rs);
-            final RegisteredPlayer rp = commander ? RegisteredPlayer.forCommander(deck) : new RegisteredPlayer(deck);
+            final boolean isArchenemy = archenemy && seatIndex++ == archenemySeat;
+            final RegisteredPlayer rp;
+            if (archenemy) {
+                final List<PaperCard> schemes = isArchenemy ? Schemes.deck(str(setup, "schemes")) : null;
+                rp = RegisteredPlayer.forVariants(seats.size(), variants, deck, schemes, isArchenemy, null, null);
+                rp.setTeamNumber(isArchenemy ? 0 : 1);
+            } else {
+                rp = commander ? RegisteredPlayer.forCommander(deck) : new RegisteredPlayer(deck);
+            }
             final boolean ai = seat.has("ai") && seat.get("ai").getAsBoolean();
             final String name = str(seat, "name").isEmpty() ? (ai ? "IA " + (aiIndex + 1) : "Moi") : str(seat, "name");
             final LobbyPlayer lobby;
@@ -187,6 +213,7 @@ final class MatchSession {
         final MatchSession session = new MatchSession(bridge, gui, match);
         session.commanderFormat = commander;
         session.career = career;
+        session.archenemy = archenemy;
         session.setup = setup;
         session.savedSetup = resolved;
         if (save != null) {
@@ -222,8 +249,7 @@ final class MatchSession {
         }
         gui.attach(session);
         match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
-        final Set<GameType> variants = commander ? EnumSet.of(GameType.Commander) : null;
-        match.startMatch(type, variants, players, human, gui);
+        match.startMatch(type, variants.isEmpty() ? null : variants, players, human, gui);
         // La partie existe (son fil attend le mulligan du joueur) : on s'abonne à ses événements pour les statistiques.
         final Game game = match.getGame();
         final Player me = game == null ? null : humanPlayer(game);
@@ -747,6 +773,9 @@ final class MatchSession {
 
     /** Sauvegarde aux moments calmes : le joueur a la priorité, la pile est vide, hors combat. Une fois par phase. */
     private void maybeSave(final PlayerControllerHuman c, final Input input) {
+        if (archenemy) {
+            return; // la pile de manigances ne se sauvegarde pas : une partie Archenemy ne se reprend pas
+        }
         final Game game = game();
         if (game == null || game.isGameOver() || !game.getStack().isEmpty()) {
             return;
@@ -810,7 +839,8 @@ final class MatchSession {
             }
             final JsonObject a = new JsonObject();
             final int players = game.getRegisteredPlayers().size();
-            final String format = commanderFormat ? (players > 2 ? "Commander à " + players : "Duel Commander") : (players > 2 ? "Partie à " + players : "Duel");
+            final String format = archenemy ? (commanderFormat ? "Archenemy Commander" : "Archenemy")
+                    : commanderFormat ? (players > 2 ? "Commander à " + players : "Duel Commander") : (players > 2 ? "Partie à " + players : "Duel");
             a.addProperty("details", (career ? "Planeswalker · " : "Sandbox · ") + format);
             final Deck deck = me.getRegisteredPlayer().getDeck();
             final List<String> commanders = new ArrayList<>();
@@ -821,7 +851,7 @@ final class MatchSession {
             final GameOutcome outcome = gv == null ? null : gv.getOutcome();
             String state;
             if (game.isGameOver() && outcome != null) {
-                state = outcome.isDraw() ? "Match nul" : outcome.isWinner(me.getLobbyPlayer()) ? "Victoire !" : "Défaite";
+                state = outcome.isDraw() ? "Match nul" : won(game, outcome, me) ? "Victoire !" : "Défaite";
                 state += " · tour " + outcome.getLastTurnNumber();
             } else {
                 final long alive = game.getRegisteredPlayers().stream().filter(p -> p != me && !p.hasLost()).count();
@@ -909,12 +939,38 @@ final class MatchSession {
             m.addProperty("draw", outcome != null && outcome.isDraw());
             m.addProperty("reason", outcome == null || outcome.getWinCondition() == null ? "" : outcome.getWinCondition().name());
             m.addProperty("turns", outcome == null ? 0 : outcome.getLastTurnNumber());
+            final Game g = game();
+            final Player me = g == null ? null : humanPlayer(g);
+            if (me != null && outcome != null && !outcome.isDraw()) {
+                m.addProperty("won", won(g, outcome, me));
+                m.addProperty("teamWin", archenemy && !outcome.isWinner(me.getRegisteredPlayer()) && won(g, outcome, me));
+            }
+            m.addProperty("archenemy", archenemy);
             final JsonArray lines = new JsonArray();
             if (outcome != null) {
                 outcome.getOutcomeStrings().forEach(lines::add);
             }
             m.add("details", lines);
         });
+    }
+
+    /**
+     * Ce joueur a-t-il gagné ? En Archenemy, c'est son camp qui gagne (104.2b) : un allié éliminé gagne avec
+     * l'équipe qui a abattu l'Archenemy.
+     */
+    private boolean won(final Game game, final GameOutcome outcome, final Player p) {
+        if (outcome.isWinner(p.getRegisteredPlayer())) {
+            return true;
+        }
+        if (!archenemy) {
+            return false;
+        }
+        for (final Player other : game.getRegisteredPlayers()) {
+            if (other.getTeam() == p.getTeam() && outcome.isWinner(other.getRegisteredPlayer())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Le résumé du replay (joueurs, decks, résultat), puis le replay rejoint les 5 derniers. */
@@ -936,7 +992,8 @@ final class MatchSession {
         meta.addProperty("mode", career ? "planeswalker" : "sandbox");
         meta.addProperty("format", commanderFormat ? "commander" : "constructed");
         meta.addProperty("turns", outcome.getLastTurnNumber());
-        meta.addProperty("result", outcome.isDraw() ? "draw" : outcome.isWinner(me.getRegisteredPlayer()) ? "win" : "loss");
+        meta.addProperty("result", outcome.isDraw() ? "draw" : won(game, outcome, me) ? "win" : "loss");
+        meta.addProperty("archenemy", archenemy);
         meta.addProperty("conceded", me.getOutcome() != null && me.getOutcome().lossState == forge.game.player.GameLossReason.Conceded);
         meta.addProperty("me", me.getId());
         final JsonArray players = new JsonArray();
@@ -945,7 +1002,7 @@ final class MatchSession {
             o.addProperty("id", p.getId());
             o.addProperty("player", p.getName());
             o.addProperty("me", p == me);
-            o.addProperty("won", !outcome.isDraw() && outcome.isWinner(p.getRegisteredPlayer()));
+            o.addProperty("won", !outcome.isDraw() && won(game, outcome, p));
             players.add(o);
         }
         meta.add("players", players);
@@ -979,7 +1036,11 @@ final class MatchSession {
         g.addProperty("at", System.currentTimeMillis());
         g.addProperty("format", commanderFormat ? "commander" : "constructed");
         g.addProperty("players", game.getRegisteredPlayers().size());
-        final boolean won = !outcome.isDraw() && outcome.isWinner(me.getRegisteredPlayer());
+        if (archenemy) {
+            g.addProperty("archenemy", true);
+            g.addProperty("wasArchenemy", me.getTeam() == 0);
+        }
+        final boolean won = !outcome.isDraw() && won(game, outcome, me);
         g.addProperty("result", outcome.isDraw() ? "draw" : won ? "win" : "loss");
         g.addProperty("conceded", conceded);
         g.addProperty("reason", outcome.getWinCondition() == null ? "" : outcome.getWinCondition().name());
@@ -1006,7 +1067,7 @@ final class MatchSession {
             }
             final JsonObject o = deckSummary(p.getRegisteredPlayer().getDeck());
             o.addProperty("player", p.getName());
-            o.addProperty("won", !outcome.isDraw() && outcome.isWinner(p.getRegisteredPlayer()));
+            o.addProperty("won", !outcome.isDraw() && won(game, outcome, p));
             opponents.add(o);
         }
         g.add("opponents", opponents);

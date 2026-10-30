@@ -104,6 +104,20 @@ final class GameSerializer {
         return state;
     }
 
+    /** Le joueur de la partie derrière sa vue (null hors de la partie locale). */
+    private static forge.game.player.Player gamePlayer(final GameView gv, final PlayerView p) {
+        final forge.game.Game game = gv.getGame();
+        if (game == null) {
+            return null;
+        }
+        for (final forge.game.player.Player gp : game.getRegisteredPlayers()) {
+            if (gp.getId() == p.getId()) {
+                return gp;
+            }
+        }
+        return null;
+    }
+
     private JsonObject player(final PlayerView p, final GameView gv, final PlayerView me) {
         final JsonObject o = new JsonObject();
         o.addProperty("id", p.getId());
@@ -123,6 +137,13 @@ final class GameSerializer {
         }
         o.add("keywords", keywords);
         o.addProperty("lost", p.getHasLost());
+        // Archenemy : son camp (0 : l'Archenemy, 1 : l'équipe), ses manigances encore cachées.
+        final forge.game.player.Player gp = gamePlayer(gv, p);
+        if (gp != null && gv.getGame().getRules().hasAppliedVariant(forge.game.GameType.Archenemy)) {
+            o.addProperty("team", gp.getTeam());
+            o.addProperty("archenemy", gp.getTeam() == 0);
+            o.addProperty("schemeDeck", p.getZoneSize(ZoneType.SchemeDeck));
+        }
         o.addProperty("priority", p.getHasPriority());
         o.addProperty("avatar", p.getAvatarIndex());
         o.addProperty("landsPlayed", p.getNumLandThisTurn());
@@ -279,6 +300,8 @@ final class GameSerializer {
         flag(o, "instant", s.isInstant());
         flag(o, "sorcery", s.isSorcery());
         flag(o, "battle", s.isBattle());
+        flag(o, "scheme", s.getType() != null && s.getType().isScheme());
+        flag(o, "ongoing", s.getType() != null && s.getType().hasSupertype(forge.card.CardType.Supertype.Ongoing));
         if (s.isCreature()) {
             o.addProperty("power", s.getPower());
             o.addProperty("toughness", s.getToughness());

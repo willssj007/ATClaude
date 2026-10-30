@@ -154,7 +154,7 @@ function recentHtml(list) {
     return `<div class="rg">
       <span class="res ${esc(g.result)}" title="${RESULT_LABEL[g.result] || ''}">${RESULT_SHORT[g.result] || '?'}</span>
       <div class="rg-body"><b>${esc(deckLabel(g.deck))}</b> <span class="muted">contre ${esc(opp || '?')}</span>
-        <div class="muted small">${when.toLocaleDateString('fr-FR')} · ${g.players} joueurs · ${g.turns} tours · ${g.dealt} infligées / ${g.taken} reçues · ${g.lands} terrains${g.conceded ? ' · abandon' : ''}${g.cheated ? ' · triche' : ''}</div></div>
+        <div class="muted small">${when.toLocaleDateString('fr-FR')} · ${g.archenemy ? (g.wasArchenemy ? 'Archenemy (toi)' : 'contre l\'Archenemy') : `${g.players} joueurs`} · ${g.turns} tours · ${g.dealt} infligées / ${g.taken} reçues · ${g.lands} terrains${g.conceded ? ' · abandon' : ''}${g.cheated ? ' · triche' : ''}</div></div>
     </div>`;
   }).join('')}</div>`;
 }

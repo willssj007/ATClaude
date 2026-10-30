@@ -41,7 +41,7 @@ export function replayListHtml(list) {
       <div class="rt-body">
         <div class="rt-top"><b class="rt-result">${RESULT[r.result] || ''}${r.conceded ? ' (abandon)' : ''}</b><span class="muted small">${esc(when(r.at))}</span></div>
         <div class="rt-decks"><b>${esc(deckName(me))}</b> <span class="muted">contre</span> ${others.map(p => esc(deckName(p))).join(', ')}</div>
-        <div class="muted small">${r.mode === 'planeswalker' ? 'Planeswalker' : 'Sandbox'} · ${r.format === 'commander' ? 'Commander' : 'Construit'}${(r.players || []).length > 2 ? ` à ${r.players.length}` : ''} · ${r.turns} tours</div>
+        <div class="muted small">${r.mode === 'planeswalker' ? 'Planeswalker' : 'Sandbox'} · ${r.archenemy ? 'Archenemy · ' : ''}${r.format === 'commander' ? 'Commander' : 'Construit'}${(r.players || []).length > 2 ? ` à ${r.players.length}` : ''} · ${r.turns} tours</div>
       </div>
       <button class="btn small gold" data-watch="${esc(r.id)}">${icon('play')} Revoir</button>
     </div>`;

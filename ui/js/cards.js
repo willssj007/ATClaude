@@ -126,7 +126,8 @@ export function cardElement(card, extraClass = '') {
   if (!card || card.hidden) {
     return el(`<div class="mcard back ${extraClass}"><div class="face"></div></div>`);
   }
-  const node = el(`<div class="mcard ${extraClass}"><div class="face"><img class="art" alt="" draggable="false">${frameHtml(card)}</div></div>`);
+  // Manigance (Archenemy) : carte surdimensionnée, à l'horizontale.
+  const node = el(`<div class="mcard${card.scheme ? ' scheme' : ''} ${extraClass}"><div class="face"><img class="art" alt="" draggable="false">${frameHtml(card)}</div></div>`);
   node.title = card.nameFr || card.name || '';
   if (card.exactArt) {
     node.dataset.exact = '1';

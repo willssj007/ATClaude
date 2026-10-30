@@ -379,6 +379,13 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); margin-bottom: 10px;
 }
 .seat .avatar { width: 44px; height: 44px; }
+/* Archenemy : rôle de chaque place */
+.seat.archenemy { border-color: rgb(214 72 72 / 0.7); background: rgb(120 20 30 / 0.18); }
+.seat-role { position: absolute !important; right: 10px; top: 8px; z-index: 2 !important; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+  background: rgb(0 0 0 / 0.45); color: var(--muted); }
+.seat.archenemy .seat-role { color: #ff9a8a; }
+.seat-role .ic { width: 13px; height: 13px; }
 .seat { position: relative; overflow: hidden; }
 .seat > * { position: relative; z-index: 1; }
 .seat.has-art::before {
