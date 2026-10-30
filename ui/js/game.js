@@ -322,6 +322,11 @@ export class Game {
     });
     this.root.appendChild(table);
     this.table = table;
+    // L'écran de fin suit le nouveau plateau. À plusieurs, il arrive avant la dernière photo de la partie, où le
+    // dernier adversaire éliminé ramène tous les autres sur le plateau (voir opponentsOf), qui est alors refait.
+    if (this.over) {
+      table.appendChild(this.over);
+    }
     this.board = table.querySelector('.board');
     this.slots.clear();
     this.handOpen = false;
