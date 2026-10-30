@@ -63,7 +63,8 @@ for a in org.ow2.asm:asm:$ASM_VER org.ow2.asm:asm-commons:$ASM_VER \
 done
 # Classes de remplacement de JvmDowngrader (List.of, String.repeat, records...), déjà en Java 8.
 [ -f "$API8_JAR" ] || java -jar "$JVMDG_JAR" -c 52 debug downgradeApi "$API8_JAR"
-javac -nowarn -cp "$ASM:$ASMC" -d "$WORK/tools" "$PIPE/src/MobiVmBridge.java" "$PIPE/src/MobiVmLinkAudit.java"
+javac -nowarn -encoding UTF-8 -cp "$ASM:$ASMC" -d "$WORK/tools" "$PIPE/src/MobiVmBridge.java" "$PIPE/src/MobiVmLinkAudit.java" \
+  "$ROOT/scripts/ios/MobiVmCtorFix.java"
 # java.nio.file et UncheckedIOException minimaux, java.util.function (signatures attendues par MobiVM).
 supply() { # dossier-sources jar
   rm -rf "$WORK/supply" && mkdir -p "$WORK/supply"
@@ -138,6 +139,27 @@ fi
 # Classes d'exécution de JvmDowngrader appelées par ses remplacements (exc/*, util/*).
 (cd "$WORK" && unzip -oq "$JVMDG_JAR" 'xyz/wagyourtail/jvmdg/exc/*' 'xyz/wagyourtail/jvmdg/util/*' \
   && jar -uf out/jvmdg-java-api-mobivm.jar xyz && rm -rf xyz)
+# Constructeurs absents de MobiVM que l'audit de forge-gui-ios ne voit pas (il les cherche aussi dans les classes
+# parentes), réécrits sur place ; tout appel sans cible dans notre propre code arrête la construction.
+# streamsupport converti n'est pas corrigé : c'est l'original qui part dans l'application (plus bas).
+ctor_fix() { # rapport index arguments de MobiVmCtorFix...
+  local report="$1" index="$2"; shift 2
+  if ! java -Dfile.encoding=UTF-8 -cp "$TOOLS_CP" MobiVmCtorFix --index "$index" "$@" > "$report" 2>&1; then
+    grep -A50 'CTOR-GATE-FAIL' "$report" || tail -20 "$report"
+    exit 1
+  fi
+  grep -E '^(CTOR-FIX|FIXED)' "$report"
+}
+SHIPPED=()
+for j in "$WORK"/out/*.jar; do
+  case "$(basename "$j")" in streamsupport-*) ;; *) SHIPPED+=("$j") ;; esac
+done
+SHIPPED_CS="$(IFS=,; echo "${SHIPPED[*]}")"
+APP_INDEX="$RT,$OBJC,$CT,$SS_JAR,$SSCF_JAR,$WORK/java-time-supply.jar,$NIO_JAR,$KEEP_CS,$SHIPPED_CS"
+FIX_ARGS=()
+for j in "${SHIPPED[@]}"; do FIX_ARGS+=(--in "$j" --out "$j"); done
+# forge.compat (cible de la réécriture) n'est compilé qu'avec le module ios : vérifié à l'étape 5.
+ctor_fix "$WORK/ctor-report.txt" "$APP_INDEX" --defer forge/compat/ "${FIX_ARGS[@]}"
 for j in "${TRANSFORM[@]}"; do
   cp "$WORK/out/$(basename "$j")" "$CLONE/${j#"$M2"/}"
 done
@@ -160,6 +182,11 @@ if grep -q 'BRIDGE-GATE-FAIL' "$WORK/ios-bridge-report.txt"; then
   grep -A50 'BRIDGE-GATE-FAIL' "$WORK/ios-bridge-report.txt"
   exit 1
 fi
+# Le module ios corrigé, puis tout le reste revérifié avec forge.compat (le pont l'appelle après réécriture).
+SCAN_ARGS=()
+for j in "${SHIPPED[@]}"; do SCAN_ARGS+=(--scan "$j"); done
+ctor_fix "$WORK/ios-ctor-report.txt" "$APP_INDEX,$IOS/target/ios-bridged.jar" \
+  --in "$IOS/target/ios-bridged.jar" --out "$IOS/target/ios-bridged.jar" "${SCAN_ARGS[@]}"
 rm -rf "$IOS/target/classes" && mkdir -p "$IOS/target/classes"
 (cd "$IOS/target/classes" && jar xf ../ios-bridged.jar && rm -rf META-INF)
 
