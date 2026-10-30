@@ -9,9 +9,6 @@ import forge.game.card.CardCollection;
 import forge.game.card.CardCollectionView;
 import forge.game.player.Player;
 import forge.game.zone.ZoneType;
-import forge.player.LobbyPlayerHuman;
-import forge.player.PlayerControllerHuman;
-import forge.util.GuiDisplayUtil;
 
 /**
  * Mulligans gratuits, règle maison du salon : les {@code free} premiers mulligans de chaque joueur ne
@@ -49,43 +46,6 @@ final class Mulligans {
     /** Cartes à remettre après {@code taken} mulligans, dont {@code free} gratuits. */
     static int toReturn(final int taken, final int free) {
         return free == UNLIMITED ? 0 : Math.max(0, taken - free);
-    }
-
-    static LobbyPlayer human(final String name, final int free) {
-        return new LobbyPlayerHuman(name, 0, 0) {
-            @Override
-            public Player createIngamePlayer(final Game game, final int id) {
-                final Player player = new Player(GuiDisplayUtil.personalizeHuman(getName()), game, id);
-                player.setFirstController(new PlayerControllerHuman(game, player, this) {
-                    private int taken;
-
-                    @Override
-                    public boolean mulliganKeepHand(final Player first, final int cardsToReturn) {
-                        while (true) {
-                            final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
-                            if (keep) {
-                                return true;
-                            }
-                            taken++;
-                            if (free != UNLIMITED) {
-                                return false;
-                            }
-                            redraw(getPlayer());
-                            if (getGame().isGameOver()) {
-                                return true;
-                            }
-                        }
-                    }
-
-                    @Override
-                    public CardCollectionView tuckCardsViaMulligan(final CardCollectionView hand, final int cardsToReturn) {
-                        final int n = toReturn(taken, free);
-                        return n <= 0 ? new CardCollection() : super.tuckCardsViaMulligan(hand, n);
-                    }
-                });
-                return player;
-            }
-        };
     }
 
     /** Même IA (nom, profil, avatar) que {@code base}, avec la règle maison. */

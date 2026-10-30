@@ -197,6 +197,20 @@ final class BridgeGuiGame extends AbstractGuiGame {
         p.addProperty("okEnabled", okEnabled);
         p.addProperty("cancelEnabled", cancelEnabled);
         p.addProperty("focusOk", focusOk);
+        // « Défaire » : seulement quand Forge peut remettre la partie à la priorité précédente (sinon, la raison).
+        final PlayerControllerHuman c = controller();
+        if (c != null && c.getGame() != null) {
+            try {
+                final boolean can = c.canUndoLastAction();
+                p.addProperty("canUndo", can);
+                if (!can) {
+                    final String why = c.getGame().getUndoManager().whyNot();
+                    p.addProperty("undoWhyNot", why == null ? "" : why);
+                }
+            } catch (final RuntimeException e) {
+                p.addProperty("canUndo", false);
+            }
+        }
         final CardView pc = promptCard;
         if (pc != null) {
             p.addProperty("card", pc.getId());

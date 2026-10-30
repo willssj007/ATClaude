@@ -183,7 +183,7 @@ final class MatchSession {
                 if (human != null) {
                     throw new IllegalArgumentException("Un seul joueur humain par partie.");
                 }
-                lobby = freeMulligans == Mulligans.FORGE_DEFAULT ? GamePlayerUtil.getGuiPlayer(name, 0, 0, false) : Mulligans.human(name, freeMulligans);
+                lobby = HumanController.lobby(name, freeMulligans);
                 human = rp;
             }
             rp.setPlayer(lobby);
@@ -1365,6 +1365,8 @@ final class MatchSession {
                 // mana...), on les recalcule pour que la surbrillance suive tout de suite.
                 if (c.getInputQueue().getInput() instanceof forge.gamemodes.match.input.InputPassPriority) {
                     gui.setWeaklySelectable(forge.ai.AvailableActions.collectActionable(c.getPlayer(), 400));
+                    // Nouvelle photo pour « Défaire » : un lancement annulé ensuite revient ici, pas avant la triche.
+                    game.getUndoManager().checkpoint(game, c.getPlayer());
                 }
             } catch (final RuntimeException e) {
                 bridge.reportError(e);

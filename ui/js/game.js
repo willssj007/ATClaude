@@ -1423,8 +1423,9 @@ export class Game {
 
     const extra = this.table.querySelector('.extra');
     let html = '';
-    if (p.input === 'InputPassPriority' || p.input === 'InputPayMana') {
-      html += `<button class="btn small ghost" data-act="undo" title="Défaire la dernière action (engagement de mana...)">${icon('undo')} Défaire</button>`;
+    // Défaire : seulement quand le moteur peut revenir à la priorité précédente (pendant un paiement : Annuler).
+    if (p.canUndo === true || p.canUndo === undefined && (p.input === 'InputPassPriority' || p.input === 'InputPayMana')) {
+      html += `<button class="btn small ghost" data-act="undo" title="Défaire la dernière action (engagement de mana, capacité...)">${icon('undo')} Défaire</button>`;
     }
     if (extra._html !== html) {
       extra.innerHTML = html;
