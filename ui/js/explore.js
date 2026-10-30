@@ -203,11 +203,10 @@ export class MoxfieldExplorer {
   addTiles(decks) {
     const results = this.root.querySelector('.mx-results');
     for (const d of decks) {
-      const stats = [d.author ? 'par ' + d.author : '', `${icon('heart')}${fmtNum(d.likes)}`, `${icon('eye')}${fmtNum(d.views)}`].filter(Boolean);
-      const tile = deckTile(d, '<button class="btn small gold" data-add>Ajouter</button>', '');
+      const tile = deckTile(d, '<button class="btn small gold" data-add>Ajouter</button>', d.author ? 'par ' + d.author : 'Moxfield');
       tile.classList.add('mx-tile');
-      const sub = tile.querySelector('.info');
-      sub.insertAdjacentHTML('beforeend', `<div class="mx-stats muted small">${stats.join('<span class="sep">·</span>')}${d.bracket ? `<span class="mx-b">B${d.bracket}</span>` : ''}</div>`);
+      tile.querySelector('.info').insertAdjacentHTML('beforeend', `<div class="mx-stats muted small"><span>${icon('heart')}${fmtNum(d.likes)}</span>
+        <span>${icon('eye')}${fmtNum(d.views)}</span>${d.bracket ? `<span class="mx-b">B${d.bracket}</span>` : ''}</div>`);
       tile._deck = d;
       results.appendChild(tile);
     }
