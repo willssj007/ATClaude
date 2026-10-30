@@ -958,7 +958,7 @@ final class MatchSession {
                     opponentDeck = p.getRegisteredPlayer().getDeck();
                 }
             }
-            final JsonObject reward = Career.duelFinished(sessionId, won, opponentDeck);
+            final JsonObject reward = Career.duelFinished(sessionId, won, opponentDeck, g);
             if (reward != null) {
                 bridge.sendEvent("careerReward", m -> m.add("reward", reward));
             }

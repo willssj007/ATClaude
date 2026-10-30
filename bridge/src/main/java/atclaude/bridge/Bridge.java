@@ -429,6 +429,8 @@ public final class Bridge {
                 return Career.adjust(catalog, m);
             case "careerBuyCosmetic":
                 return Career.buyCosmetic(catalog, m.get("id").getAsString());
+            case "careerSwapChallenge":
+                return Career.swapChallenge(catalog, m.get("id").getAsString());
             case "careerReset":
                 // Un duel gardé en cours (retour au menu) n'a plus de sens : il est abandonné avec la carrière.
                 if (session != null && session.isCareer()) {

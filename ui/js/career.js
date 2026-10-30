@@ -67,14 +67,21 @@ export function wildcardsHtml(wc) {
     ['common', 'uncommon', 'rare', 'mythic'].map(r => wildcardHtml(r, w[r] || 0)).join('')}</span>`;
 }
 
+/** Défis accomplis pendant ce duel (gagné ou perdu), pour l'écran de fin. */
+function challengesDoneHtml(r) {
+  return (r.challenges || []).map(ch => `<div class="rw-bonus rw-challenge">${icon('chalice')}<span>${esc(ch.label)} accompli : ${esc(ch.text)}
+    · +${Number(ch.mana).toLocaleString('fr-FR')} mana${(ch.boosters || []).map(b => ` · booster ${esc(b.name)}`).join('')}</span></div>`).join('');
+}
+
 /** Récompenses d'un duel de carrière, pour l'écran de fin de partie. */
 export function rewardHtml(r) {
   if (!r) {
     return '';
   }
   if (!r.won) {
-    return `<div class="reward lost">${icon('hourglass')}<div><b>Duel perdu</b>
-      <div class="muted small">${r.lostStreak ? `Ta série de ${plural(r.lostStreak, 'victoire', 'victoires')} s'arrête.` : 'Aucune récompense cette fois.'} Un nouvel adversaire t'attend.</div></div></div>`;
+    return `<div class="reward lost${(r.challenges || []).length ? ' with-challenges' : ''}">${icon('hourglass')}<div><b>Duel perdu</b>
+      <div class="muted small">${r.lostStreak ? `Ta série de ${plural(r.lostStreak, 'victoire', 'victoires')} s'arrête.` : 'Aucune récompense cette fois.'} Un nouvel adversaire t'attend.</div>
+      ${challengesDoneHtml(r)}</div></div>`;
   }
   const boosters = [...(r.boosters || [])];
   return `<div class="reward">
@@ -84,6 +91,7 @@ export function rewardHtml(r) {
     <div class="rw-h">${icon('booster')} ${boosters.map(b => `Booster ${esc(b.name)}`).join(', ')}</div>
     ${r.bonus ? `<div class="rw-bonus">${icon('crown')} ${r.streak} victoires d'affilée : ${plural(r.bonus.length, 'booster', 'boosters')} en bonus${r.deckChoice ? ' et un nouveau deck à choisir dans Duel' : ''} !</div>` : ''}
     ${r.newBracket ? `<div class="rw-bonus">${icon('crown')} Préconstruits de bracket ${r.newBracket} débloqués : à choisir ou à acheter dans Duel.</div>` : ''}
+    ${challengesDoneHtml(r)}
     <div class="muted small">Série en cours : ${plural(r.streak || 0, 'victoire', 'victoires')}.</div>
   </div>`;
 }
@@ -122,6 +130,48 @@ function starterReveal(c) {
 }
 
 const ID_ORDER = 'WUBRG';
+
+/** « dans 5 h 12 », « dans 3 jours » : le temps avant les prochains défis. */
+function untilText(end) {
+  const ms = Math.max(0, end - Date.now());
+  const min = Math.floor(ms / 60000);
+  if (min < 60) {
+    return `dans ${Math.max(1, min)} min`;
+  }
+  const h = Math.floor(min / 60);
+  if (h < 24) {
+    return `dans ${h} h ${String(min % 60).padStart(2, '0')}`;
+  }
+  const d = Math.round(h / 24);
+  return `dans ${plural(d, 'jour', 'jours')}`;
+}
+
+/** Une colonne de défis (du jour ou de la semaine). */
+function challengeColumn(title, list, end, canSwap) {
+  const items = list.map(ch => {
+    const pct = Math.round(100 * Math.min(ch.goal, ch.progress) / ch.goal);
+    const reward = `${manaAmount(ch.mana)}${ch.boosters ? ` <span class="ch-booster">${icon('booster')} + ${plural(ch.boosters, 'booster', 'boosters')}</span>` : ''}`;
+    return `<div class="ch-item${ch.done ? ' done' : ''}" data-id="${esc(ch.id)}">
+      <div class="ch-top"><span class="ch-text">${ch.done ? icon('check') : ''}${esc(ch.text)}</span>
+        ${canSwap && !ch.done ? `<button class="ch-swap" data-swap="${esc(ch.id)}" title="Changer ce défi (une fois par jour)">${icon('dice')}</button>` : ''}</div>
+      <div class="ch-bar"><i style="width:${pct}%"></i></div>
+      <div class="ch-meta"><span>${ch.done ? 'Accompli' : `${Number(ch.progress).toLocaleString('fr-FR')} / ${Number(ch.goal).toLocaleString('fr-FR')}`}</span><span class="ch-reward">${reward}</span></div>
+    </div>`;
+  }).join('');
+  return `<div class="ch-col"><div class="ch-head"><b>${title}</b><span class="muted small">Nouveaux défis ${untilText(end)}</span></div>${items}</div>`;
+}
+
+/** Défis du jour et de la semaine (écran Duel). */
+function challengesHtml(ch) {
+  if (!ch) {
+    return '';
+  }
+  return `<div class="challenges panel">
+    ${challengeColumn('Défis du jour', ch.daily || [], ch.dayEnds, ch.canSwap)}
+    ${challengeColumn('Défis de la semaine', ch.weekly || [], ch.weekEnds, false)}
+    <div class="ch-note muted small">Les duels Planeswalker font avancer les défis, gagnés ou perdus. Un défi accompli donne sa récompense tout de suite.${ch.canSwap ? ' Le dé change un défi du jour, une fois par jour.' : ''}</div>
+  </div>`;
+}
 
 /** Pastilles bracket et puissance d'un préconstruit (déjà calculées par le moteur). */
 function measureHtml(p) {
@@ -231,6 +281,7 @@ const RULES = `<ul class="pw-rules">
   <li>${icon('undo')} Le premier mulligan est gratuit (tu gardes 7 cartes), pour toi comme pour l'IA ; les suivants coûtent une carte.</li>
   <li>${icon('mana')} Chaque victoire : 200 mana, quelques cartes du deck adverse que tu n'as pas, et un booster.</li>
   <li>${icon('crown')} 5 victoires d'affilée (une série) : 5 boosters d'extensions au hasard et un nouveau préconstruit au choix.</li>
+  <li>${icon('chalice')} Chaque jour, 3 défis du jour ; chaque lundi, 3 défis de la semaine, plus longs. Ils rapportent du mana (et des boosters pour certains défis de la semaine) ; un défi du jour peut être changé une fois par jour.</li>
   <li>${icon('cards')} D'autres préconstruits s'achètent avec du mana (bouton « Acheter un deck » de l'écran Duel), de 2 000 mana (bracket 1) à 7 000 (bracket 5).</li>
   <li>${icon('swords')} Au départ, les préconstruits vont jusqu'au bracket 2 ; chaque fois que tu termines 2 séries, le bracket suivant se débloque (3, puis 4, puis 5).</li>
   <li>${icon('booster')} La boutique vend des boosters de toutes les extensions, 750 mana pièce.</li>
@@ -385,6 +436,7 @@ export class DuelScreen {
         <button class="btn gold big" data-fight>${icon('swords')} Combattre</button>
         ${playable.length ? '' : '<div class="muted small">Aucun deck complet : termine un deck de 100 cartes dans Decks.</div>'}
       </div>
+      ${challengesHtml(c.challenges)}
       <details class="pw-more"><summary class="muted small">Règles du mode Planeswalker</summary>${RULES}
         <button class="btn small danger" data-reset>Recommencer la carrière</button></details>
     </div>`;
@@ -422,6 +474,19 @@ export class DuelScreen {
       gift.addEventListener('click', () => this.chooseNewDeck());
     }
     this.root.querySelector('[data-buy-deck]').addEventListener('click', () => this.buyDeck());
+    this.root.querySelectorAll('[data-swap]').forEach(b => b.addEventListener('click', async () => {
+      const item = (c.challenges.daily || []).find(x => x.id === b.dataset.swap);
+      if (!item || !await confirmBox('Changer ce défi ?', `« ${item.text} » sera remplacé par un autre défi du jour. Tu ne peux en changer qu'un par jour.`, {yes: 'Changer'})) {
+        return;
+      }
+      try {
+        const next = await bridge.request('careerSwapChallenge', {id: item.id});
+        setCareer(next);
+        this.render(next);
+      } catch (e) {
+        toast(e.message, {error: true});
+      }
+    }));
     this.root.querySelector('.vs-deck').addEventListener('change', (e) => {
       this.deckKey = e.target.value;
       prefs.set('careerDeck', this.deckKey);

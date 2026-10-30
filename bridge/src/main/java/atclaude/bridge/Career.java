@@ -157,7 +157,21 @@ final class Career {
         }
         o.add("cosmetics", array(c, "cosmetics").deepCopy());
         o.addProperty("cosmeticPrice", COSMETIC_PRICE);
+        if (bool(c, "started")) {
+            o.add("challenges", Challenges.view(c));
+        }
         return o;
+    }
+
+    /** Change un défi du jour (une fois par jour) ; renvoie la carrière à jour. */
+    static synchronized JsonObject swapChallenge(final Catalog catalog, final String id) {
+        final JsonObject c = load();
+        if (!bool(c, "started")) {
+            throw new IllegalStateException("Commence d'abord ta carrière de Planeswalker.");
+        }
+        Challenges.swap(c, id);
+        save(c);
+        return summary(catalog);
     }
 
     /** Prix en mana d'une apparence mythique à acheter (fond, dos de cartes). */
@@ -712,9 +726,11 @@ final class Career {
      * Fin d'un duel de carrière (une seule fois par partie). Victoire : mana, cartes du deck adverse pas encore
      * possédées, un booster d'une extension au hasard ; toutes les 5 victoires d'affilée, 5 boosters et un nouveau
      * préconstruit au choix. Défaite, égalité ou abandon : la série repart de zéro. Dans tous les cas, de nouveaux
-     * adversaires attendent.
+     * adversaires attendent. La partie (record, comme dans les statistiques) fait aussi avancer les défis du jour et
+     * de la semaine.
      */
-    static synchronized JsonObject duelFinished(final String sessionId, final boolean won, final Deck opponentDeck) {
+    static synchronized JsonObject duelFinished(final String sessionId, final boolean won, final Deck opponentDeck,
+            final JsonObject record) {
         final JsonObject c = load();
         if (!bool(c, "started") || sessionId.equals(str(c, "lastDuel"))) {
             return null;
@@ -777,16 +793,41 @@ final class Career {
             c.addProperty("streak", 0);
             reward.addProperty("streak", 0);
         }
+        if (record != null) {
+            final JsonObject game = record.deepCopy();
+            game.addProperty("streak", num(c, "streak"));
+            final JsonArray boosters = array(c, "boosters");
+            final JsonArray done = Challenges.record(c, game, n -> {
+                final JsonArray got = new JsonArray();
+                for (int i = 0; i < n; i++) {
+                    got.add(newBooster(boosters, randomSet()));
+                }
+                return got;
+            });
+            c.add("boosters", boosters);
+            if (!done.isEmpty()) {
+                reward.add("challenges", done);
+            }
+        }
         c.add("opponents", new JsonObject());
         save(c);
         reward.addProperty("manaTotal", num(c, "mana"));
         // Noms des extensions, pour l'écran de fin.
+        final List<JsonArray> named = new ArrayList<>();
         for (final String k : List.of("boosters", "bonus")) {
             if (reward.has(k)) {
-                for (final JsonElement e : reward.getAsJsonArray(k)) {
-                    final CardEdition ed = FModel.getMagicDb().getEditions().get(str(e.getAsJsonObject(), "set"));
-                    e.getAsJsonObject().addProperty("name", ed == null ? str(e.getAsJsonObject(), "set") : ed.getName());
-                }
+                named.add(reward.getAsJsonArray(k));
+            }
+        }
+        for (final JsonElement e : array(reward, "challenges")) {
+            if (e.getAsJsonObject().has("boosters")) {
+                named.add(e.getAsJsonObject().getAsJsonArray("boosters"));
+            }
+        }
+        for (final JsonArray a : named) {
+            for (final JsonElement e : a) {
+                final CardEdition ed = FModel.getMagicDb().getEditions().get(str(e.getAsJsonObject(), "set"));
+                e.getAsJsonObject().addProperty("name", ed == null ? str(e.getAsJsonObject(), "set") : ed.getName());
             }
         }
         return reward;
