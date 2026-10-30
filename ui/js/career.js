@@ -239,11 +239,13 @@ const RULES = `<ul class="pw-rules">
 
 /** Écran Duel du mode Planeswalker : ton deck contre le prochain adversaire. */
 export class DuelScreen {
-  constructor(root, {onStart, onBoosters, playerName}) {
+  constructor(root, {onStart, onBoosters, playerName, duelRunning, endDuel}) {
     this.root = root;
     this.onStart = onStart;
     this.onBoosters = onBoosters;
     this.playerName = playerName;
+    this.duelRunning = duelRunning || (() => false);
+    this.endDuel = endDuel || (async () => {});
     this.deckKey = null;
   }
 
@@ -437,8 +439,12 @@ export class DuelScreen {
       ]});
     });
     this.root.querySelector('[data-reset]').addEventListener('click', async () => {
-      if (await confirmBox('Recommencer la carrière ?', 'Ta collection, ton mana, tes boosters et tes decks Planeswalker seront effacés (sur tous tes appareils synchronisés).', {yes: 'Tout effacer', danger: true})) {
+      const running = this.duelRunning();
+      if (await confirmBox('Recommencer la carrière ?', `${running ? 'Ton duel en cours sera abandonné. ' : ''}Ta collection, ton mana, tes boosters et tes decks Planeswalker seront effacés (sur tous tes appareils synchronisés).`, {yes: 'Tout effacer', danger: true})) {
         try {
+          if (running) {
+            await this.endDuel();
+          }
           setCareer(await bridge.request('careerReset'));
           this.show();
         } catch (e) {

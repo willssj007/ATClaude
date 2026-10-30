@@ -1125,9 +1125,9 @@ final class Catalog {
         }
         final String id = m.group(1);
         IOException last = null;
-        for (final String api : List.of("https://api2.moxfield.com/v3/decks/all/", "https://api2.moxfield.com/v2/decks/all/")) {
+        for (final String api : List.of(Moxfield.API + "v3/decks/all/", Moxfield.API + "v2/decks/all/")) {
             try {
-                final JsonObject root = JsonParser.parseString(httpGet(api + id)).getAsJsonObject();
+                final JsonObject root = JsonParser.parseString(Moxfield.get(api + id)).getAsJsonObject();
                 return parseDeckText(moxfieldToText(root), root.has("name") ? root.get("name").getAsString() : "Deck Moxfield");
             } catch (final IOException e) {
                 last = e;
@@ -1170,27 +1170,6 @@ final class Catalog {
             }
         }
         return sb.toString();
-    }
-
-    private static String httpGet(final String url) throws IOException {
-        final HttpURLConnection c = Net.open(url);
-        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36");
-        c.setRequestProperty("Accept", "application/json");
-        c.setConnectTimeout(10_000);
-        c.setReadTimeout(20_000);
-        final int code = c.getResponseCode();
-        if (code != 200) {
-            throw new IOException("HTTP " + code);
-        }
-        try (InputStream in = c.getInputStream()) {
-            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            final byte[] buffer = new byte[16 * 1024];
-            int n;
-            while ((n = in.read(buffer)) > 0) {
-                out.write(buffer, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
-        }
     }
 
     // ------------------------------------------------------------------ outils

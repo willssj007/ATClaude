@@ -27,6 +27,40 @@ function frameHtml(card) {
 
 // Images introuvables pendant cette session : on ne les redemande pas à chaque rendu.
 const missing = new Set();
+// iPhone : adresses Scryfall directes des images que le pont n'a pas pu télécharger (une demande par carte).
+const direct = new Map();
+
+/**
+ * iPhone : image que le pont n'a pas pu télécharger. La page la charge elle-même chez Scryfall, par le réseau d'iOS
+ * (dans la langue choisie, sinon en anglais).
+ */
+function loadDirect(node, img, key, url) {
+  if (!bridge.ios || !key || key.startsWith('back:') || key.startsWith('booster:')) {
+    return;
+  }
+  const lang = prefs.get('imageLang') === 'en' ? 'en' : 'fr';
+  let urls = direct.get(key + '|' + lang);
+  if (!urls) {
+    urls = bridge.request('imageDirect', {key, lang}).catch(() => ({}));
+    direct.set(key + '|' + lang, urls);
+  }
+  urls.then((u) => {
+    const list = [u.local, u.en].filter(Boolean);
+    const next = (i) => {
+      if (i >= list.length || img.dataset.src !== url) {
+        return;
+      }
+      img.onload = () => {
+        if (img.dataset.src === url) {
+          node.classList.add('has-img');
+        }
+      };
+      img.onerror = () => next(i + 1);
+      img.src = list[i];
+    };
+    next(0);
+  });
+}
 
 /** Charge l'image d'une carte dans l'élément, si les images sont activées. */
 export function loadImage(node, key, bust = '') {
@@ -55,11 +89,13 @@ export function loadImage(node, key, bust = '') {
     }
   };
   if (missing.has(url) && !bust) {
+    loadDirect(node, img, key, url);
     return;
   }
   img.onerror = () => {
     missing.add(url);
     node.classList.remove('has-img');
+    loadDirect(node, img, key, url);
   };
   img.src = url + bust;
 }

@@ -156,7 +156,8 @@ function prefetchImages() {
   }
 }
 
-async function leaveMatch() {
+/** Quitte la partie (abandon si elle n'est pas finie), puis va à l'écran `to` (rien avec null). */
+async function leaveMatch(to = 'home') {
   inMatch = false;
   closeAllForgeDialogs();
   try {
@@ -168,7 +169,9 @@ async function leaveMatch() {
     game.destroy();
     game = null;
   }
-  showScreen('home');
+  if (to) {
+    showScreen(to);
+  }
 }
 
 function playDeck(deckKey) {
@@ -211,7 +214,7 @@ function homeScreen() {
       const actions = pw ? `
             ${inMatch ? '<button class="btn gold" data-go="game">Reprendre la partie</button>' : ''}
             <button class="btn gold" data-go="duel">${icon('swords')} ${c && c.started ? 'Duel' : 'Commencer ma carrière'}</button>
-            <button class="btn primary" data-go="boosters">${icon('booster')} Boosters</button>
+            <button class="btn primary" data-go="boosters">${icon('booster')} Boutique</button>
             <button class="btn" data-go="decks">Mes decks</button>` : `
             ${inMatch ? '<button class="btn gold" data-go="game">Reprendre la partie</button>' : ''}
             <button class="btn gold" data-go="quick">${icon('swords')} Partie rapide</button>
@@ -219,7 +222,7 @@ function homeScreen() {
             <button class="btn" data-go="decks">Mes decks</button>`;
       const tiles = pw ? `
           <div class="tile panel" data-go="duel">${icon('swords', 'tile-ic')}<h3>Duel</h3><p class="muted">Un adversaire à la fois : 200 mana, des cartes et un booster par victoire.</p></div>
-          <div class="tile panel" data-go="boosters">${icon('booster', 'tile-ic')}<h3>Boosters</h3><p class="muted">Ouvre tes boosters, ou achètes-en de n'importe quelle extension.</p></div>
+          <div class="tile panel" data-go="boosters">${icon('booster', 'tile-ic')}<h3>Boutique</h3><p class="muted">Ouvre tes boosters, achètes-en de n'importe quelle extension, et des apparences mythiques.</p></div>
           <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">Construis tes decks avec les cartes de ta collection.</p></div>
           <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Collection</h3><p class="muted">${c && c.started ? `${c.unique} cartes différentes, ${c.cards} au total.` : 'Les cartes que tu possèdes.'}</p></div>`
         : `
@@ -488,7 +491,8 @@ function init() {
     decksCache = null;
   }});
   screens.cards = cardsScreen();
-  screens.duel = new DuelScreen($('#screen-duel'), {onStart: startMatch, onBoosters: () => showScreen('boosters'), playerName: () => screens.lobby.playerName});
+  screens.duel = new DuelScreen($('#screen-duel'), {onStart: startMatch, onBoosters: () => showScreen('boosters'), playerName: () => screens.lobby.playerName,
+    duelRunning: () => inMatch && !!(game && game.career), endDuel: () => leaveMatch(null)});
   screens.boosters = new BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')});
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));

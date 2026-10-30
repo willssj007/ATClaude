@@ -28,7 +28,7 @@ public final class Presence {
             java.util.Map.entry("home", "Dans les menus"), java.util.Map.entry("lobby", "Prépare une partie"),
             java.util.Map.entry("duel", "Prépare un duel"), java.util.Map.entry("decks", "Construit ses decks"),
             java.util.Map.entry("cards", "Parcourt les cartes"), java.util.Map.entry("collection", "Parcourt sa collection"),
-            java.util.Map.entry("boosters", "Ouvre des boosters"), java.util.Map.entry("stats", "Consulte ses statistiques"),
+            java.util.Map.entry("boosters", "À la boutique"), java.util.Map.entry("stats", "Consulte ses statistiques"),
             java.util.Map.entry("trophies", "Regarde ses trophées"), java.util.Map.entry("settings", "Dans les réglages"));
 
     private Presence() { }

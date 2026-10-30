@@ -93,6 +93,42 @@ public final class ImageService {
         return en == null ? null : new Served(en, "en", cacheable);
     }
 
+    /**
+     * Adresses Scryfall de l'image (dans la langue demandée, et en anglais), calculées sans réseau : si le pont n'a
+     * pas pu télécharger une image, la page de l'iPhone la charge elle-même par le réseau d'iOS.
+     */
+    public static com.google.gson.JsonObject directUrls(final String imageKey, final String lang) {
+        final com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+        if (!ForgeRuntime.isReady() || imageKey == null || imageKey.isEmpty() || ImageKeys.HIDDEN_CARD.equals(imageKey)
+                || imageKey.startsWith(CardBacks.PREFIX) || imageKey.startsWith(BoosterArt.PREFIX)) {
+            return o;
+        }
+        String key = imageKey;
+        final boolean back = key.endsWith(ImageKeys.BACKFACE_POSTFIX);
+        if (back) {
+            key = key.substring(0, key.length() - ImageKeys.BACKFACE_POSTFIX.length());
+        }
+        final PaperCard pc = key.indexOf('$') >= 0 ? null : ImageUtil.getPaperCardFromImageKey(key);
+        if (pc == null) {
+            return o;
+        }
+        final forge.card.CardEdition ed = forge.StaticData.instance().getEditions().get(pc.getEdition());
+        final String set = ed != null && ed.getScryfallCode() != null && !ed.getScryfallCode().isEmpty()
+                ? ed.getScryfallCode() : pc.getEdition().toLowerCase(java.util.Locale.ROOT);
+        final String base = forge.localinstance.properties.ForgeConstants.URL_PIC_SCRYFALL_DOWNLOAD;
+        if (pc.getRules().isCustom() || forge.item.IPaperCard.NO_COLLECTOR_NUMBER.equals(pc.getCollectorNumber())) {
+            o.addProperty("en", base + "named?format=image&version=normal&exact="
+                    + java.net.URLEncoder.encode(pc.getName(), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"));
+            return o;
+        }
+        final String face = back ? "back" : "";
+        o.addProperty("en", base + ImageUtil.getScryfallDownloadUrl(pc, face, set, "en", false));
+        if (lang != null && LocalizedImages.SUPPORTED.contains(lang)) {
+            o.addProperty("local", base + ImageUtil.getScryfallDownloadUrl(pc, face, set, lang, false));
+        }
+        return o;
+    }
+
     static boolean isImageThread() {
         return Thread.currentThread() == imageThread;
     }

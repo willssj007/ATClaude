@@ -214,7 +214,7 @@ public final class Bridge {
             analyzer.execute(() -> dispatch(type, message));
             return;
         }
-        if ("edhrec".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type)) {
+        if ("edhrec".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type) || "moxfieldSearch".equals(type)) {
             // Lecture d'EDHREC : à part, pour ne pas attendre derrière une synchronisation.
             web.execute(() -> dispatch(type, message));
             return;
@@ -312,6 +312,8 @@ public final class Bridge {
 
     private JsonElement handle(final String type, final JsonObject m) {
         switch (type) {
+            case "imageDirect":
+                return ImageService.directUrls(m.has("key") ? m.get("key").getAsString() : null, m.has("lang") ? m.get("lang").getAsString() : null);
             case "hello":
                 return hello();
             case "searchCards":
@@ -372,6 +374,8 @@ public final class Bridge {
                         m.has("prefsAt") ? m.get("prefsAt").getAsLong() : 0, () -> session != null);
             case "parseDeck":
                 return catalog.parseDeckText(m.get("text").getAsString(), m.has("name") ? m.get("name").getAsString() : "");
+            case "moxfieldSearch":
+                return Moxfield.search(catalog, m.has("query") && m.get("query").isJsonObject() ? m.getAsJsonObject("query") : new JsonObject());
             case "fetchMoxfield":
                 return catalog.fetchMoxfield(m.get("url").getAsString());
             case "validateDeck":
@@ -426,8 +430,9 @@ public final class Bridge {
             case "careerBuyCosmetic":
                 return Career.buyCosmetic(catalog, m.get("id").getAsString());
             case "careerReset":
+                // Un duel gardé en cours (retour au menu) n'a plus de sens : il est abandonné avec la carrière.
                 if (session != null && session.isCareer()) {
-                    throw new IllegalStateException("Termine d'abord le duel en cours.");
+                    endSession();
                 }
                 SaveGame.deleteCareer();
                 Career.reset();

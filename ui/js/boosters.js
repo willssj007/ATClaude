@@ -45,7 +45,7 @@ export class BoostersScreen {
 
   async show() {
     if (!isPlaneswalker()) {
-      this.root.innerHTML = '<div class="page"><h1>Boosters</h1><p class="muted">Les boosters et le mana font partie du mode Planeswalker (à choisir sur l\'accueil).</p></div>';
+      this.root.innerHTML = '<div class="page"><h1>Boutique</h1><p class="muted">Les boosters et le mana font partie du mode Planeswalker (à choisir sur l\'accueil).</p></div>';
       return;
     }
     let c;
@@ -57,7 +57,7 @@ export class BoostersScreen {
       return;
     }
     if (!c.started) {
-      this.root.innerHTML = `<div class="page"><h1>Boosters</h1><div class="panel" style="padding:18px">
+      this.root.innerHTML = `<div class="page"><h1>Boutique</h1><div class="panel" style="padding:18px">
         <p>Commence d'abord ta carrière de Planeswalker : ton premier deck t'attend dans Duel.</p>
         <button class="btn gold" data-duel>${icon('swords')} Aller au Duel</button></div></div>`;
       this.root.querySelector('[data-duel]').addEventListener('click', () => this.onDuel());
@@ -77,7 +77,7 @@ export class BoostersScreen {
       groups.get(b.set).push(b);
     }
     this.root.innerHTML = `<div class="page boosters-page">
-      <div class="pw-head"><h1>Boosters</h1><div class="pw-stats">${manaAmount(c.mana, 'chip')}${wildcardsHtml(c.wildcards)}</div></div>
+      <div class="pw-head"><h1>Boutique</h1><div class="pw-stats">${manaAmount(c.mana, 'chip')}${wildcardsHtml(c.wildcards)}</div></div>
       <div class="shop panel">
         <div class="shop-pack"></div>
         <div class="shop-info">

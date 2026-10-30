@@ -70,6 +70,8 @@ public final class Main extends UIApplicationDelegateAdapter {
 
     /** Forge charge sa base de cartes en arrière-plan : de quelques secondes à une minute. */
     private static void startForge() {
+        // Images, prix, EDHREC, synchronisation : par le réseau d'iOS (voir AppleHttpConnection).
+        atclaude.bridge.Net.setTransport(AppleHttpConnection::new);
         final Thread loader = new Thread(() -> {
             try {
                 final String assets = NSBundle.getMainBundle().getBundlePath() + "/forge";
