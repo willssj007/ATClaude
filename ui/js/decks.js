@@ -6,7 +6,6 @@ import {addFlipButton, cardElement, loadImage, showZoom, onLongPress} from './ca
 import {isPlaneswalker, loadCareer, wildcardsHtml} from './career.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {icon} from './icons.js';
-import {MoxfieldExplorer} from './explore.js';
 import {SearchPanel} from './search.js';
 import {esc, el, manaHtml, prefs, toast, debounce} from './util.js';
 
@@ -139,7 +138,7 @@ export class Decks {
   }
 
   async show() {
-    if (this.deck || this.exploring) {
+    if (this.deck) {
       return;
     }
     await this.list();
@@ -147,7 +146,6 @@ export class Decks {
 
   async list() {
     this.deck = null;
-    this.exploring = false;
     // Mode Planeswalker : les decks de la carrière, construits avec la collection ; pas de préconstruits.
     const pw = isPlaneswalker();
     this.data = await bridge.request('listDecks', pw ? {career: true} : {});
@@ -156,7 +154,6 @@ export class Decks {
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
         <h1 style="margin:0;flex:1">${pw ? 'Mes decks Planeswalker' : 'Mes decks'}</h1>
         ${pw ? '' : '<button class="btn" data-new="constructed">+ Deck construit</button>'}
-        <button class="btn" data-explore>${icon('search')} Explorer Moxfield</button>
         <button class="btn" data-import>⇩ Importer (Moxfield, texte)</button>
         <button class="btn gold" data-new="commander">+ Deck Commander</button>
       </div>
@@ -187,14 +184,12 @@ export class Decks {
       this.root.querySelector('.precon-q').addEventListener('input', debounce(e => renderPrecons(e.target.value), 150));
     }
     this.root.onclick = async (e) => {
-      if (this.deck || this.exploring) {
+      if (this.deck) {
         return;
       }
       const tile = e.target.closest('.deck-tile');
       const newBtn = e.target.closest('[data-new]');
-      if (e.target.closest('[data-explore]')) {
-        this.explore();
-      } else if (newBtn) {
+      if (newBtn) {
         this.edit({name: '', format: newBtn.dataset.new, career: pw, sections: {commander: [], main: [], side: []}});
       } else if (e.target.closest('[data-import]')) {
         this.importDialog();
@@ -211,41 +206,6 @@ export class Decks {
         this.edit(deck);
       }
     };
-  }
-
-  /** Explorateur des decks publics de Moxfield (la liste revient avec « Mes decks »). */
-  explore() {
-    this.exploring = true;
-    new MoxfieldExplorer(this.root, {
-      onBack: () => this.list(),
-      onImport: async (result, {edit, source}) => {
-        const deck = result.deck;
-        if (result.unknown && result.unknown.length) {
-          toast(`${result.unknown.length} carte(s) inconnue(s) de Forge, laissée(s) de côté :\n${result.unknown.slice(0, 8).join('\n')}`, {title: 'Import partiel', error: true, duration: 9000});
-        }
-        // Mode Planeswalker : le deck devient un deck de carrière, à compléter avec sa collection (éditeur).
-        deck.career = isPlaneswalker();
-        if (edit || deck.career) {
-          this.exploring = false;
-          this.edit(deck);
-          this.dirty = true;
-          return;
-        }
-        const taken = new Set(((this.data && this.data.decks) || []).map(d => d.name));
-        const base = (source.name || deck.name || 'Deck Moxfield').trim();
-        let name = base;
-        for (let n = 2; taken.has(name); n++) {
-          name = `${base} (${n})`;
-        }
-        deck.name = name;
-        await bridge.request('saveDeck', {deck});
-        taken.add(name);
-        if (this.data) {
-          this.data.decks.push({name});
-        }
-        toast(`« ${name} » est dans tes decks.`, {title: 'Deck ajouté'});
-      },
-    }).show();
   }
 
   /** Clé du deck en cours d'édition (« career:Nom » pour un deck Planeswalker). */

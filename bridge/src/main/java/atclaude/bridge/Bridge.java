@@ -214,7 +214,7 @@ public final class Bridge {
             analyzer.execute(() -> dispatch(type, message));
             return;
         }
-        if ("edhrec".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type) || "moxfieldSearch".equals(type)) {
+        if ("edhrec".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type)) {
             // Lecture d'EDHREC : à part, pour ne pas attendre derrière une synchronisation.
             web.execute(() -> dispatch(type, message));
             return;
@@ -374,8 +374,6 @@ public final class Bridge {
                         m.has("prefsAt") ? m.get("prefsAt").getAsLong() : 0, () -> session != null);
             case "parseDeck":
                 return catalog.parseDeckText(m.get("text").getAsString(), m.has("name") ? m.get("name").getAsString() : "");
-            case "moxfieldSearch":
-                return Moxfield.search(catalog, m.has("query") && m.get("query").isJsonObject() ? m.getAsJsonObject("query") : new JsonObject());
             case "fetchMoxfield":
                 return catalog.fetchMoxfield(m.get("url").getAsString());
             case "validateDeck":
