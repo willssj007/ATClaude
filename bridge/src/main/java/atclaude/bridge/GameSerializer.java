@@ -3,7 +3,6 @@ package atclaude.bridge;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.common.collect.Multiset;
-import forge.util.CardTranslation;
 import forge.card.ColorSet;
 import forge.card.MagicColor;
 import forge.card.mana.ManaCost;
@@ -137,7 +136,7 @@ final class GameSerializer {
         }
         o.add("keywords", keywords);
         o.addProperty("lost", p.getHasLost());
-        // Archenemy : son camp (0 : l'Archenemy, 1 : l'équipe), ses manigances encore cachées.
+        // Archenemy : son camp (0 : l'Archenemy, 1 : l'équipe), ses machinations encore cachées.
         final forge.game.player.Player gp = gamePlayer(gv, p);
         if (gp != null && gv.getGame().getRules().hasAppliedVariant(forge.game.GameType.Archenemy)) {
             o.addProperty("team", gp.getTeam());
@@ -300,8 +299,14 @@ final class GameSerializer {
         flag(o, "instant", s.isInstant());
         flag(o, "sorcery", s.isSorcery());
         flag(o, "battle", s.isBattle());
-        flag(o, "scheme", s.getType() != null && s.getType().isScheme());
-        flag(o, "ongoing", s.getType() != null && s.getType().hasSupertype(forge.card.CardType.Supertype.Ongoing));
+        final boolean scheme = s.getType() != null && s.getType().isScheme();
+        final boolean ongoing = s.getType() != null && s.getType().hasSupertype(forge.card.CardType.Supertype.Ongoing);
+        flag(o, "scheme", scheme);
+        flag(o, "ongoing", ongoing);
+        if (scheme) {
+            // Le type des machinations est parfois resté en anglais dans Forge (« Scheme ») : son nom officiel.
+            o.addProperty("typeLine", ongoing ? "Machination continue" : "Machination");
+        }
         if (s.isCreature()) {
             o.addProperty("power", s.getPower());
             o.addProperty("toughness", s.getToughness());
@@ -337,7 +342,7 @@ final class GameSerializer {
     }
 
     static String translatedName(final CardStateView s) {
-        final String translated = CardTranslation.getTranslatedName(s.getName());
+        final String translated = French.cardName(s.getName());
         return translated == null || translated.isEmpty() ? s.getName() : translated;
     }
 

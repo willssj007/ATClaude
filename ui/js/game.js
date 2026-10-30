@@ -1197,8 +1197,8 @@ export class Game {
   }
 
   /**
-   * Archenemy : une manigance qui arrive dans sa zone de commandement vient d'être mise en œuvre. Elle s'affiche en
-   * grand quelques secondes (toucher : le détail). Les manigances déjà là au premier affichage ne s'annoncent pas.
+   * Archenemy : une machination qui arrive dans sa zone de commandement vient d'être mise à exécution. Elle s'affiche en
+   * grand quelques secondes (toucher : le détail). Les machinations déjà là au premier affichage ne s'annoncent pas.
    */
   schemeReveal(state) {
     const arch = state.players.find(p => p.archenemy);
@@ -1216,29 +1216,48 @@ export class Game {
     this.showScheme(arch, fresh[fresh.length - 1], Date.now());
   }
 
-  /** L'annonce d'une manigance, après les fenêtres de Forge encore ouvertes (début de partie...). */
+  /** L'annonce d'une machination, après les fenêtres de Forge encore ouvertes (début de partie...). */
   showScheme(arch, card, since) {
     clearTimeout(this.schemeWait);
     if (document.querySelector('#dialogs .modal-back')) {
       this.schemeWait = setTimeout(() => this.table && this.table.isConnected && this.showScheme(arch, card, since), 400);
       return;
     }
-    // Annonce retardée : seulement si la manigance est encore là (une manigance permanente, par exemple).
+    // Annonce retardée : seulement si la machination est encore là (une machination continue, par exemple).
     const now = this.state && this.state.players.find(p => p.id === arch.id);
     if (Date.now() - since > 4000 && !(now && (now.zones.command || []).some(c => c.id === card.id))) {
       return;
     }
     this.table.querySelectorAll('.scheme-reveal').forEach(n => n.remove());
-    const box = el(`<div class="scheme-reveal"><div class="sr-label">${icon('horns')} ${esc(arch.name)} met une manigance en œuvre${card.ongoing ? ' · permanente' : ''}</div></div>`);
-    const big = cardElement(card, 'sr-card');
-    box.appendChild(big);
-    box.addEventListener('click', () => {
-      showZoom(card, this.cardDetails(card));
-      box.remove();
+    clearTimeout(this.schemeOut);
+    const box = el(`<div class="scheme-reveal">
+      <div class="sr-label">${icon('horns')} ${esc(arch.name)} met une machination à exécution</div>
+      <div class="sr-body">
+        <div class="sr-text">
+          <div class="sr-name">${esc(card.nameFr || card.name || '')}</div>
+          <div class="sr-type">${esc(card.typeLine || (card.ongoing ? 'Machination continue' : 'Machination'))}</div>
+          <div class="sr-rules">${rulesHtml(card.text || '')}</div>
+          <div class="sr-hint">Touche la carte pour l'agrandir, ailleurs pour fermer.</div>
+        </div>
+      </div>
+    </div>`);
+    box.querySelector('.sr-body').prepend(cardElement(card, 'sr-card'));
+    const close = () => {
+      clearTimeout(this.schemeOut);
+      box.classList.add('out');
+      setTimeout(() => box.remove(), 600);
+    };
+    box.addEventListener('click', (e) => {
+      if (e.target.closest('.sr-card')) {
+        showZoom(card, this.cardDetails(card));
+        box.remove();
+      } else {
+        close();
+      }
     });
     this.table.appendChild(box);
-    setTimeout(() => box.classList.add('out'), 3600);
-    setTimeout(() => box.remove(), 4200);
+    // Le temps de lire : plus long pour un long texte.
+    this.schemeOut = setTimeout(close, Math.min(15000, 6000 + (card.text || '').length * 35));
   }
 
   renderPlayerHead(box, p, isMe) {
@@ -1260,7 +1279,7 @@ export class Game {
     if (p.archenemy) {
       const ongoing = (p.zones.command || []).filter(c => c.scheme && c.ongoing).length;
       html += chip('arch', 'horns', `${p.schemeDeck}${ongoing ? ` · ${ongoing}${icon('ward')}` : ''}`,
-        `Archenemy : ${p.schemeDeck} manigance(s) dans sa pile${ongoing ? `, ${ongoing} permanente(s) en cours` : ''} (touche pour voir sa zone de commandement)`,
+        `Archenemy : ${p.schemeDeck} machination(s) dans sa pile${ongoing ? `, ${ongoing} continue(s) en cours` : ''} (touche pour voir sa zone de commandement)`,
         ` data-zone="command" data-pid="${p.id}"`);
     } else if (team && !isMe && p.team === meP.team) {
       html += chip('ally', 'shield', '', 'Allié : ton équipe contre l\'Archenemy (vous ne pouvez pas vous attaquer)');

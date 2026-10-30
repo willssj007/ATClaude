@@ -8,7 +8,7 @@ import {esc, el, prefs, toast, avatarHtml, ownPhotoUrl} from './util.js';
 
 const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless: 'Agressive', Experimental: 'Expérimentale'};
 const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
-/** Manigances de l'Archenemy : 20 tirées au hasard dans un produit officiel, ou parmi toutes. */
+/** Machinations de l'Archenemy : 20 tirées au hasard dans un produit officiel, ou parmi toutes. */
 const SCHEME_SETS = [['all', 'Toutes'], ['OARC', 'Archenemy (2010)'], ['OE01', 'Nicol Bolas (2017)']];
 
 function mulliganHelp(free, count) {
@@ -37,7 +37,7 @@ export class Lobby {
     this.seats = last && last.players ? last.players : null;
     // Mulligans gratuits : absent = règle de Forge, -1 = illimités.
     this.mulligans = last && typeof last.mulligans === 'number' ? last.mulligans : null;
-    // Variante Archenemy : la place de l'Archenemy (0 : moi), la série de manigances.
+    // Variante Archenemy : la place de l'Archenemy (0 : moi), la série de machinations.
     this.variant = last && typeof last.archenemy === 'number' ? 'archenemy' : 'none';
     this.archenemy = last && typeof last.archenemy === 'number' ? last.archenemy : 1;
     this.schemes = last && last.schemes || 'all';
@@ -123,19 +123,19 @@ export class Lobby {
               <button data-v="none" class="${arch ? '' : 'on'}">Aucune</button>
               <button data-v="archenemy" class="${arch ? 'on' : ''}">${icon('horns')} Archenemy</button>
             </div>
-            <div class="muted small">${arch ? `L'Archenemy (${this.format === 'commander' ? '60' : '40'} points de vie) joue en premier et met une manigance en œuvre au début de chacun de ses tours ; les trois autres font équipe contre lui et ne peuvent attaquer que lui.`
-              : 'Archenemy : un joueur contre une équipe de trois, avec ses manigances.'}</div>
+            <div class="muted small">${arch ? `L'Archenemy (${this.format === 'commander' ? '60' : '40'} points de vie) joue en premier et met une machination à exécution au début de chacun de ses tours ; les trois autres font équipe contre lui et ne peuvent attaquer que lui.`
+              : 'Archenemy : un joueur contre une équipe de trois, avec ses machinations.'}</div>
           </div>
           ${arch ? `<div class="field"><span>Archenemy</span>
             <div class="seg" data-seg="archenemy">
               ${this.seats.map((s, i) => `<button data-v="${i}" class="${i === this.archenemy ? 'on' : ''}">${esc(s.name || (s.ai ? 'IA ' + i : 'Moi'))}</button>`).join('')}
             </div>
           </div>
-          <div class="field"><span>Manigances</span>
+          <div class="field"><span>Machinations</span>
             <div class="seg" data-seg="schemes">
               ${SCHEME_SETS.map(([v, label]) => `<button data-v="${v}" class="${this.schemes === v ? 'on' : ''}">${label}</button>`).join('')}
             </div>
-            <div class="muted small">20 manigances différentes, mélangées, tirées ${this.schemes === 'all' ? 'parmi toutes celles de Magic' : `de ${SCHEME_SETS.find(x => x[0] === this.schemes)[1]}`}.</div>
+            <div class="muted small">20 machinations différentes, mélangées, tirées ${this.schemes === 'all' ? 'parmi toutes celles de Magic' : `de ${SCHEME_SETS.find(x => x[0] === this.schemes)[1]}`}.</div>
           </div>` : `<div class="field"><span>Joueurs</span>
             <div class="seg" data-seg="count">
               ${[2, 3, 4].map(n => `<button data-v="${n}" class="${this.count === n ? 'on' : ''}">${n}</button>`).join('')}

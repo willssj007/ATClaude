@@ -77,6 +77,34 @@ final class French {
         }
     }
 
+    /**
+     * Types de jetons que Forge traduit mal (« Plant » en « Usine », « Drake » en « Canard », « Goblin » en « Lutin »...) :
+     * le mot imprimé sur les cartes françaises. Les autres gardent la traduction de Forge.
+     */
+    private static final Map<String, String> TOKEN_TYPES = Map.ofEntries(
+            Map.entry("Plant", "Plante"), Map.entry("Goblin", "Gobelin"), Map.entry("Saproling", "Saprobionte"),
+            Map.entry("Elemental", "Élémental"), Map.entry("Drake", "Drakôn"), Map.entry("Ooze", "Limon"),
+            Map.entry("Sliver", "Slivoïde"), Map.entry("Shapeshifter", "Changeforme"), Map.entry("Treefolk", "Sylvin"),
+            Map.entry("Gremlin", "Gremlin"), Map.entry("Bat", "Chauve-souris"), Map.entry("Wizard", "Sorcier"),
+            Map.entry("Rogue", "Gredin"), Map.entry("Wurm", "Guivre"), Map.entry("Zombie", "Zombie"),
+            Map.entry("Phyrexian", "Phyrexian"), Map.entry("Thopter", "Mécanoptère"), Map.entry("Scout", "Éclaireur"),
+            Map.entry("Powerstone", "Lithoforce"));
+
+    /** Nom français d'un jeton (« Plant Token ») dont Forge traduit mal le type, sinon null. */
+    static String tokenName(final String name) {
+        if (name == null || !name.endsWith(" Token")) {
+            return null;
+        }
+        final String type = TOKEN_TYPES.get(name.substring(0, name.length() - " Token".length()));
+        return type == null ? null : type + " " + forge.util.Localizer.getInstance().getMessage("lblToken");
+    }
+
+    /** Nom français d'une carte ou d'un jeton (celui de Forge, types de jetons corrigés). */
+    static String cardName(final String name) {
+        final String token = tokenName(name);
+        return token != null ? token : CardTranslation.getTranslatedName(name);
+    }
+
     static boolean looksEnglish(final String s) {
         return s != null && ENGLISH.matcher(s.replaceAll("\\([^)]*\\)", " ").toLowerCase()).find();
     }

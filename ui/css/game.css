@@ -651,14 +651,13 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 .rp-speed { display: flex; }
 .rp-speed button { flex: 1; }
 
-/* Archenemy : plaques, badges et annonce des manigances */
+/* Archenemy : plaques, badges et annonce des machinations */
 .plate.archenemy { box-shadow: 0 0 0 2px rgb(214 72 72 / 0.75), 0 0 18px rgb(214 72 72 / 0.35); }
 .plate.ally { box-shadow: 0 0 0 2px rgb(110 190 255 / 0.55); }
 .stat.arch { color: #ff9a8a; cursor: pointer; }
 .stat.arch .ic { color: #ff7a6a; }
 .stat.arch b .ic { width: 11px; height: 11px; vertical-align: -1px; margin-left: 2px; }
 .stat.ally { color: #8fd0ff; }
-.mcard.scheme { aspect-ratio: 88 / 63; }
 .scheme-reveal {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; display: flex; flex-direction: column;
   align-items: center; gap: 10px; padding: 14px 18px 18px; border-radius: 16px; cursor: pointer;
@@ -669,8 +668,22 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 .scheme-reveal.out { animation: sr-out 0.55s ease forwards; }
 .sr-label { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #ffb3a8; font-size: 14px; text-align: center; }
 .sr-label .ic { width: 18px; height: 18px; color: #ff7a6a; }
-.scheme-reveal .sr-card { --w: min(420px, 62vw); }
-@media (max-height: 520px) { .scheme-reveal .sr-card { --w: min(330px, 56vw, 80vh); } }
+/* Une machination est une carte verticale (surdimensionnée) : la carte à gauche, son texte complet à droite. */
+.sr-body { --srw: min(250px, 30vw, calc(58vh * 63 / 88)); display: flex; align-items: flex-start; gap: 16px; }
+.scheme-reveal .sr-card { --w: var(--srw); }
+.sr-text { width: min(320px, 38vw); max-height: calc(var(--srw) * 88 / 63); box-sizing: border-box; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px;
+  background: rgb(0 0 0 / 0.35); border: 1px solid rgb(214 72 72 / 0.35); text-align: left; }
+.sr-name { font-family: var(--title-font); font-size: 18px; font-weight: 700; color: #fff; line-height: 1.2; }
+.sr-type { font-size: 12.5px; font-weight: 600; color: #ffb3a8; }
+.sr-rules { font-size: 14px; line-height: 1.45; color: var(--text); }
+.sr-rules p { margin: 0 0 6px; }
+.sr-hint { margin-top: auto; padding-top: 4px; font-size: 11px; color: var(--muted); }
+@media (max-height: 520px) {
+  .scheme-reveal { padding: 10px 14px 12px; gap: 6px; }
+  .sr-name { font-size: 15px; }
+  .sr-rules { font-size: 12.5px; line-height: 1.38; }
+}
 @keyframes sr-in { from { opacity: 0; transform: translate(-50%, -46%) scale(0.85); } }
 @keyframes sr-out { to { opacity: 0; transform: translate(-50%, -54%) scale(0.95); } }
 

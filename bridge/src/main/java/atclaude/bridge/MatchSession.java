@@ -94,7 +94,7 @@ final class MatchSession {
     private boolean commanderFormat;
     /** Duel du mode Planeswalker : pas de triche, récompenses à la fin. */
     private boolean career;
-    /** Variante Archenemy (Sandbox, à 4) : pas de sauvegarde, Forge ne garde pas la pile de manigances. */
+    /** Variante Archenemy (Sandbox, à 4) : pas de sauvegarde, Forge ne garde pas la pile de machinations. */
     private boolean archenemy;
     private static final Set<PhaseType> SAVE_PHASES = EnumSet.of(PhaseType.UPKEEP, PhaseType.DRAW, PhaseType.MAIN1, PhaseType.MAIN2, PhaseType.END_OF_TURN);
 
@@ -130,8 +130,8 @@ final class MatchSession {
             throw new IllegalArgumentException("Une partie se joue à 2, 3 ou 4 joueurs.");
         }
         // Archenemy (règles officielles, 904) : un joueur, humain ou IA, contre une équipe de trois qui ne peuvent
-        // s'attaquer qu'à lui ; il a 40 points de vie (60 en Commander), joue en premier et met une manigance en
-        // œuvre au début de sa première phase principale, chaque tour.
+        // s'attaquer qu'à lui ; il a 40 points de vie (60 en Commander), joue en premier et met une machination à
+        // exécution au début de sa première phase principale, chaque tour.
         final int archenemySeat = !career && setup.has("archenemy") && setup.get("archenemy").isJsonPrimitive() ? setup.get("archenemy").getAsInt() : -1;
         final boolean archenemy = archenemySeat >= 0;
         if (archenemy && (seats.size() != 4 || archenemySeat >= seats.size())) {
@@ -774,7 +774,7 @@ final class MatchSession {
     /** Sauvegarde aux moments calmes : le joueur a la priorité, la pile est vide, hors combat. Une fois par phase. */
     private void maybeSave(final PlayerControllerHuman c, final Input input) {
         if (archenemy) {
-            return; // la pile de manigances ne se sauvegarde pas : une partie Archenemy ne se reprend pas
+            return; // la pile de machinations ne se sauvegarde pas : une partie Archenemy ne se reprend pas
         }
         final Game game = game();
         if (game == null || game.isGameOver() || !game.getStack().isEmpty()) {

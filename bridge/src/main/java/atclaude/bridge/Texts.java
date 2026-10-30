@@ -5,7 +5,6 @@ import forge.game.GameView;
 import forge.game.card.Card;
 import forge.game.card.CardView;
 import forge.game.card.CardView.CardStateView;
-import forge.util.CardTranslation;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -85,7 +84,7 @@ final class Texts {
         addState(names, c.getRightSplitState());
         if (names.size() != before || visible) {
             for (final String n : new ArrayList<>(names)) {
-                final String fr = CardTranslation.getTranslatedName(n);
+                final String fr = French.cardName(n);
                 if (fr != null && !fr.isEmpty() && !fr.equals(n)) {
                     names.add(fr);
                     if (visible && n.length() >= 4 && !ENGLISH.containsKey(n)) {
@@ -194,7 +193,7 @@ final class Texts {
             }
             for (final String n : new ArrayList<>(names)) {
                 if (n != null && !n.isEmpty()) {
-                    names.add(CardTranslation.getTranslatedName(n));
+                    names.add(French.cardName(n));
                 }
             }
         }
@@ -226,7 +225,7 @@ final class Texts {
                 }
             }
         }
-        final String fr = CardTranslation.getTranslatedName(hit);
+        final String fr = French.cardName(hit);
         return fr == null || fr.isEmpty() ? hit : fr;
     }
 

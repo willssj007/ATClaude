@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Pile de manigances de l'Archenemy : 20 manigances différentes tirées au hasard (règle 904.3 : au moins 20 cartes,
- * pas plus de 2 exemplaires d'une même manigance), parmi celles d'un produit officiel ou parmi toutes.
+ * Pile de machinations de l'Archenemy : 20 machinations différentes tirées au hasard (règle 904.3 : au moins 20 cartes,
+ * pas plus de 2 exemplaires d'une même machination), parmi celles d'un produit officiel ou parmi toutes.
  */
 final class Schemes {
 
@@ -21,7 +21,7 @@ final class Schemes {
 
     /**
      * set : « OARC » (Archenemy, 2010), « OE01 » (Archenemy : Nicol Bolas, 2017), vide ou autre : toutes les
-     * manigances connues de Forge.
+     * machinations connues de Forge.
      */
     static List<PaperCard> deck(final String set) {
         final Map<String, PaperCard> byName = new LinkedHashMap<>();
@@ -32,7 +32,7 @@ final class Schemes {
             }
         }
         if (byName.size() < DECK_SIZE && set != null && !set.isEmpty() && !"all".equals(set)) {
-            return deck("all"); // produit incomplet dans cette version de Forge : toutes les manigances
+            return deck("all"); // produit incomplet dans cette version de Forge : toutes les machinations
         }
         final List<PaperCard> pool = new ArrayList<>(byName.values());
         Collections.shuffle(pool);
