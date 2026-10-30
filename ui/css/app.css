@@ -339,11 +339,11 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 /* Écran étroit : les icônes seules (le nom de l'écran reste en info-bulle). */
 @media (max-width: 1180px) { #nav button { padding: 8px 10px; } #nav button span { display: none; } #nav button.active span { display: inline; } }
 @media (max-width: 560px) { #nav button.active span { display: none; } }
-body.in-game #topbar { display: none; }
+body.in-game #topbar, body.in-replay #topbar { display: none; }
 #screens { flex: 1; position: relative; overflow: hidden; }
 .screen { position: absolute; inset: 0; overflow: auto; padding: 20px calc(20px + var(--safe-right)) 20px calc(20px + var(--safe-left)); display: none; }
 .screen.active { display: block; animation: fade-in 0.2s ease; }
-#screen-game { padding: 0; overflow: hidden; }
+#screen-game, #screen-replay { padding: 0; overflow: hidden; }
 .page { max-width: 1200px; margin: 0 auto; }
 .cards-page { height: 100%; display: flex; flex-direction: column; }
 .browser { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -713,6 +713,19 @@ body.in-game #topbar { display: none; }
 .hl { display: flex; overflow: hidden; min-height: 76px; }
 .hl-art { width: 76px; flex: none; background: var(--panel-2) center 25% / 160% auto no-repeat; display: none; }
 .hl-art.on { display: block; }
+/* Replays (Statistiques) */
+.replays { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-bottom: 8px; }
+.replay-tile { display: flex; align-items: center; gap: 12px; padding: 0 12px 0 0; overflow: hidden; cursor: pointer; min-height: 76px; }
+.replay-tile:hover { border-color: rgb(var(--gold-rgb) / 0.5); }
+.rt-art { align-self: stretch; width: 70px; flex: none; background: var(--panel-2) center 25% / 170% auto no-repeat; }
+.rt-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 8px 0; }
+.rt-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rt-result { font-size: 15px; }
+.replay-tile.win .rt-result { color: var(--gold-2); }
+.replay-tile.loss .rt-result { color: #ff8a8a; }
+.rt-decks { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.replay-tile .btn { flex: none; }
+.replay-tile .btn .ic { width: 14px; height: 14px; }
 .hl-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hl-body b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -906,7 +919,7 @@ body.in-game #topbar { display: none; }
 
 /* Apparences mythiques : calque animé derrière les menus (transformations et opacité seulement, peu coûteuses). */
 #menu-fx { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-body.in-game #menu-fx { display: none; }
+body.in-game #menu-fx, body.in-replay #menu-fx { display: none; }
 #menu-fx i { position: absolute; display: block; will-change: transform, opacity; }
 .mf-band { left: -25%; width: 150%; height: 52%; top: -4%; mix-blend-mode: screen; }
 .mf-band.b1 { background: radial-gradient(48% 34% at 38% 62%, rgb(89 245 176 / 0.42), transparent 70%), radial-gradient(30% 26% at 70% 55%, rgb(63 214 200 / 0.3), transparent 70%); animation: mf-sway 17s ease-in-out infinite alternate; }

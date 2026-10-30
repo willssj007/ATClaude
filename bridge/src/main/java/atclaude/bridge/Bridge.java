@@ -209,7 +209,12 @@ public final class Bridge {
             network.execute(() -> dispatch(type, message));
             return;
         }
-        if ("deckSummaries".equals(type)) {
+        if (type.startsWith("replay")) {
+            // Replays : lecture de fichiers, à part de la partie en cours et des decks.
+            replayThread.execute(() -> dispatch(type, message));
+            return;
+        }
+                if ("deckSummaries".equals(type)) {
             // Analyse de nombreux decks : à part, pour ne pas retarder le reste de l'interface.
             analyzer.execute(() -> dispatch(type, message));
             return;
@@ -227,7 +232,8 @@ public final class Bridge {
             "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
             "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster", "openBoosters",
-            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic");
+            "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic",
+            "careerSwapChallenge");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -235,6 +241,12 @@ public final class Bridge {
     });
     private final java.util.concurrent.ExecutorService network = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-net");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private final java.util.concurrent.ExecutorService replayThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        final Thread t = new Thread(r, "atclaude-replay");
         t.setDaemon(true);
         return t;
     });
@@ -429,6 +441,23 @@ public final class Bridge {
                 return Career.buyCosmetic(catalog, m.get("id").getAsString());
             case "careerSwapChallenge":
                 return Career.swapChallenge(catalog, m.get("id").getAsString());
+            case "replays":
+                return Replays.list();
+            case "replayOpen":
+                try {
+                    return Replays.open(m.get("id").getAsString());
+                } catch (final java.io.IOException e) {
+                    throw new IllegalStateException("Replay illisible : " + e.getMessage());
+                }
+            case "replayFrame":
+                try {
+                    return Replays.frame(m.get("id").getAsString(), m.get("i").getAsInt());
+                } catch (final java.io.IOException e) {
+                    throw new IllegalStateException("Replay illisible : " + e.getMessage());
+                }
+            case "replayDelete":
+                Replays.delete(m.get("id").getAsString());
+                return Replays.list();
             case "careerReset":
                 // Un duel gardé en cours (retour au menu) n'a plus de sens : il est abandonné avec la carrière.
                 if (session != null && session.isCareer()) {

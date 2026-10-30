@@ -4,6 +4,7 @@
 import {bridge} from './bridge.js';
 import {isPlaneswalker} from './career.js';
 import {confirmBox} from './dialogs.js';
+import {fillReplayArt, loadReplays, replayListHtml} from './replay.js';
 import {esc, prefs, toast} from './util.js';
 
 const RESULT_LABEL = {win: 'Victoire', loss: 'Défaite', draw: 'Nulle'};
@@ -159,8 +160,9 @@ function recentHtml(list) {
 }
 
 export class StatsScreen {
-  constructor(root) {
+  constructor(root, {onWatch} = {}) {
     this.root = root;
+    this.onWatch = onWatch || (() => {});
     this.format = 'all';
     this.withCheats = prefs.get('statsWithCheats') !== false;
     this.open = null;
@@ -169,7 +171,7 @@ export class StatsScreen {
   async show() {
     this.root.innerHTML = '<div class="page"><h1>Statistiques</h1><p class="muted">Chargement…</p></div>';
     try {
-      this.games = await loadGames();
+      [this.games, this.replays] = await Promise.all([loadGames(), loadReplays().catch(() => [])]);
     } catch (e) {
       this.root.innerHTML = `<div class="page"><h1>Statistiques</h1><p class="muted">${esc(e.message)}</p></div>`;
       return;
@@ -196,6 +198,8 @@ export class StatsScreen {
         </div>
         <label class="check small"><input type="checkbox" data-cheats ${this.withCheats ? 'checked' : ''}> Avec triche${cheated ? ` (${cheated})` : ''}</label>`}
       </div>
+      <h2>Replays <span class="muted small">(les 5 dernières parties, tous modes)</span></h2>
+      ${replayListHtml(this.replays || [])}
       ${!games.length ? `<div class="panel" style="padding:18px;margin-top:12px"><p>Aucune partie terminée${all.length ? ' pour ce filtre' : ''}.</p>
         <p class="muted">${pw ? 'Chaque duel de ta carrière de Planeswalker' : 'Chaque partie finie du mode Sandbox'} (victoire, défaite ou abandon) est ajouté${pw ? '' : 'e'} ici, avec son deck, sa durée, les terrains posés et les blessures infligées et reçues. ${pw ? 'Les parties du mode Sandbox ont leurs propres statistiques.' : 'Les duels du mode Planeswalker ont leurs propres statistiques.'} Avec un compte relié, l'historique suit sur tous tes appareils.</p></div>` : `
       <div class="kpis">
@@ -252,7 +256,13 @@ export class StatsScreen {
       };
       img.src = url;
     });
+    fillReplayArt(this.root);
     this.root.onclick = async (e) => {
+      const watch = e.target.closest('[data-watch], .replay-tile');
+      if (watch) {
+        this.onWatch(watch.dataset.watch || watch.dataset.replay);
+        return;
+      }
       const seg = e.target.closest('[data-seg] button');
       if (seg) {
         this.format = seg.dataset.v;

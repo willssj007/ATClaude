@@ -89,6 +89,8 @@ final class MatchSession {
     /** Compteurs de la partie pour les statistiques (blessures, terrains, tours). */
     private volatile GameTracker tracker;
     private volatile boolean recorded;
+    /** Le replay de la partie (photos envoyées à l'interface), créé à la première photo. */
+    private volatile Replays.Recorder replay;
     private boolean commanderFormat;
     /** Duel du mode Planeswalker : pas de triche, récompenses à la fin. */
     private boolean career;
@@ -870,6 +872,19 @@ final class MatchSession {
 
     void onGameEvent(final GameEvent event) { }
 
+    /** Une photo envoyée à l'interface : elle rejoint le replay (pas pendant la remise en place d'une sauvegarde). */
+    void recordFrame(final JsonObject state) {
+        if (resumePending) {
+            return;
+        }
+        Replays.Recorder r = replay;
+        if (r == null) {
+            r = new Replays.Recorder(sessionId + "_" + System.currentTimeMillis());
+            replay = r;
+        }
+        r.add(state);
+    }
+
     void onGameFinished() {
         // Partie terminée : rien à reprendre.
         SaveGame.delete(sessionId);
@@ -877,6 +892,11 @@ final class MatchSession {
             recordGame();
         } catch (final RuntimeException e) {
             System.err.println("Partie non comptée dans les statistiques : " + e);
+        }
+        try {
+            finishReplay();
+        } catch (final RuntimeException e) {
+            System.err.println("Replay non enregistré : " + e);
         }
         if (closed) {
             return; // partie abandonnée pour en lancer une autre : l'écran de fin n'a pas lieu d'être
@@ -895,6 +915,48 @@ final class MatchSession {
             }
             m.add("details", lines);
         });
+    }
+
+    /** Le résumé du replay (joueurs, decks, résultat), puis le replay rejoint les 5 derniers. */
+    private void finishReplay() {
+        final Replays.Recorder r = replay;
+        final Game game = game();
+        final GameView gv = gui.getGameView();
+        final GameOutcome outcome = gv == null ? null : gv.getOutcome();
+        if (r == null) {
+            return;
+        }
+        final Player me = game == null ? null : humanPlayer(game);
+        if (me == null || outcome == null) {
+            r.discard();
+            return;
+        }
+        final JsonObject meta = new JsonObject();
+        meta.addProperty("at", System.currentTimeMillis());
+        meta.addProperty("mode", career ? "planeswalker" : "sandbox");
+        meta.addProperty("format", commanderFormat ? "commander" : "constructed");
+        meta.addProperty("turns", outcome.getLastTurnNumber());
+        meta.addProperty("result", outcome.isDraw() ? "draw" : outcome.isWinner(me.getRegisteredPlayer()) ? "win" : "loss");
+        meta.addProperty("conceded", me.getOutcome() != null && me.getOutcome().lossState == forge.game.player.GameLossReason.Conceded);
+        meta.addProperty("me", me.getId());
+        final JsonArray players = new JsonArray();
+        for (final Player p : game.getRegisteredPlayers()) {
+            final JsonObject o = deckSummary(p.getRegisteredPlayer().getDeck());
+            o.addProperty("id", p.getId());
+            o.addProperty("player", p.getName());
+            o.addProperty("me", p == me);
+            o.addProperty("won", !outcome.isDraw() && outcome.isWinner(p.getRegisteredPlayer()));
+            players.add(o);
+        }
+        meta.add("players", players);
+        // La dernière photo (partie finie) n'est envoyée qu'après : elle est prise ici, pour finir sur le plateau final.
+        try {
+            r.add(new GameSerializer(gui).snapshot());
+        } catch (final RuntimeException e) {
+            // sans elle, le replay s'arrête sur la photo précédente
+        }
+        r.finish(meta);
+        bridge.sendEvent("replaysChanged", m -> { });
     }
 
     /** Ajoute la partie finie (ou abandonnée) à l'historique des statistiques. */

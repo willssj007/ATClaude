@@ -88,6 +88,12 @@ const PATHS = {
   chevronLeft: '<path d="m15 5-7 7 7 7"/>',
   chevronRight: '<path d="m9 5 7 7-7 7"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  // Lecteur de replay : lecture, pause, tour précédent et suivant, replay (bobine).
+  play: '<path d="M7.5 4.8v14.4L19 12z"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  skipBack: '<path d="M6 5v14"/><path d="M18.5 5.4v13.2L9 12z"/>',
+  skipForward: '<path d="M18 5v14"/><path d="M5.5 5.4v13.2L15 12z"/>',
+  reel: '<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="7.2" r="1.7"/><circle cx="12" cy="16.8" r="1.7"/><circle cx="7.2" cy="12" r="1.7"/><circle cx="16.8" cy="12" r="1.7"/>',
   // Mode Planeswalker : mana (la monnaie), booster, étincelle ; mode Sandbox : coffre.
   mana: '<path d="M12 2.6c3.2 4.4 6.2 7.9 6.2 11.4a6.2 6.2 0 0 1-12.4 0c0-3.5 3-7 6.2-11.4z"/><path d="M9.3 14.4a2.9 2.9 0 0 0 2.7 3" opacity=".7"/>',
   booster: '<path d="M6.2 2.8h11.6l-.7 1.6.7 1.6v12l-.7 1.6.7 1.6H6.2l.7-1.6-.7-1.6V6l.7-1.6z"/><path d="M6.2 6h11.6M6.2 18H17.8" opacity=".55"/><path d="m12 8.6 1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 14.6l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z"/>',

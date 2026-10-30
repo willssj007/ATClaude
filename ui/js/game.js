@@ -177,8 +177,15 @@ function faceSig(card) {
 }
 
 export class Game {
-  constructor(root, {onExit, onRematch, onMenu}) {
+  /**
+   * replay : partie enregistrée, revue sans pouvoir jouer (les actions ne partent pas ; toucher une carte l'agrandit).
+   * onBuild(table) : après chaque construction du plateau (le lecteur de replay y remet ses commandes).
+   */
+  constructor(root, {onExit, onRematch, onMenu, onReplay = null, replay = false, onBuild = null}) {
     this.root = root;
+    this.onReplay = onReplay;
+    this.replay = replay;
+    this.onBuild = onBuild;
     this.onExit = onExit;
     this.onRematch = onRematch;
     this.onMenu = onMenu || onExit;
@@ -327,6 +334,7 @@ export class Game {
     if (this.over) {
       table.appendChild(this.over);
     }
+    table.classList.toggle('replay', this.replay);
     this.board = table.querySelector('.board');
     this.slots.clear();
     this.handOpen = false;
@@ -349,6 +357,9 @@ export class Game {
       pillHost: table.querySelector('.pill-host'),
     });
     this.bindEvents(table);
+    if (this.onBuild) {
+      this.onBuild(table);
+    }
   }
 
   /** Part du plateau donnée à l'adversaire (0,5 = moitié-moitié), réglée en glissant la ligne du milieu. */
@@ -402,9 +413,18 @@ export class Game {
     }
   }
 
+  /** Une action du joueur pour Forge. Dans un replay, rien ne part : la carte touchée (s'il y en a une) s'agrandit. */
+  act(type, body, card = null) {
+    if (!this.replay) {
+      bridge.send(type, body);
+    } else if (card && !card.hidden) {
+      showZoom(card, this.cardDetails(card));
+    }
+  }
+
   stackItemClicked(sid, row) {
     const item = this.state && this.state.stack.find(s => s.id === sid);
-    if (item && item.selectable) {
+    if (item && item.selectable && !this.replay) {
       bridge.send('stackItem', {id: sid});
       return;
     }
@@ -498,7 +518,7 @@ export class Game {
       // Créature équipée ou enchantée : ses pièces jointes s'écartent (ou se rangent), en plus de l'action habituelle.
       this.toggleSpread(slot && slot.classList.contains('has-attach') ? Number(slot.dataset.key.slice(1)) : null);
       if (slot && slot.dataset.key && slot.dataset.key.startsWith('c')) {
-        bridge.send('card', {id: Number(slot.dataset.key.slice(1))});
+        this.act('card', {id: Number(slot.dataset.key.slice(1))}, this.cards.get(slot.dataset.key));
         if (inHand && this.handOpen && !this.handNeeded) {
           this.setHandOpen(false);
         }
@@ -518,13 +538,13 @@ export class Game {
         if (plate && table.dataset.oppview === 'focus' && pid !== this.focusPid && !(player && player.selectable)) {
           this.focus(pid);
         } else if (hit) {
-          bridge.send('player', {id: pid});
+          this.act('player', {id: pid});
         }
         return;
       }
       const mana = e.target.closest('[data-mana]');
       if (mana) {
-        bridge.send('useMana', {color: mana.dataset.mana});
+        this.act('useMana', {color: mana.dataset.mana});
         return;
       }
       const promptCard = e.target.closest('.prompt-card');
@@ -538,7 +558,7 @@ export class Game {
     table.querySelector('.actions .extra').addEventListener('click', (e) => {
       const b = e.target.closest('[data-act]');
       if (b) {
-        bridge.send(b.dataset.act);
+        this.act(b.dataset.act);
       }
     });
 
@@ -623,7 +643,7 @@ export class Game {
         setTimeout(() => {
           this.swallowClick = false;
         }, 400);
-        bridge.send('card', {id: Number(slot.dataset.key.slice(1))});
+        this.act('card', {id: Number(slot.dataset.key.slice(1))});
         if (!this.handNeeded) {
           this.setHandOpen(false);
         }
@@ -739,14 +759,14 @@ export class Game {
 
   primary() {
     const p = this.state && this.state.prompt;
-    if (p && p.okEnabled) {
+    if (p && p.okEnabled && !this.replay) {
       bridge.send('ok');
     }
   }
 
   secondary() {
     const p = this.state && this.state.prompt;
-    if (p && p.cancelEnabled) {
+    if (p && p.cancelEnabled && !this.replay) {
       bridge.send('cancel');
     }
   }
@@ -1888,7 +1908,7 @@ export class Game {
         if (slot) {
           e.stopPropagation();
           const card = this.cards.get(slot.dataset.key) || slot._card;
-          if (card && (card.selectable || card.playable)) {
+          if (card && (card.selectable || card.playable) && !this.replay) {
             bridge.send('card', {id: card.id});
             if (!card.selectable) {
               // Carte jouée depuis la zone (commandant, flashback...) : la fenêtre se ferme.
@@ -2340,6 +2360,7 @@ export class Game {
       <div class="reward-slot">${this.career ? rewardHtml(this.reward) : ''}</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn" data-go="board">Voir le plateau</button>
+        ${this.onReplay ? `<button class="btn" data-go="replay">${icon('play')} Revoir la partie</button>` : ''}
         <button class="btn" data-go="menu">Retour au menu</button>
         <button class="btn gold" data-go="again">${this.career ? 'Duel suivant' : 'Revanche'}</button>
       </div></div></div>`);
@@ -2352,6 +2373,10 @@ export class Game {
       if (b.dataset.go === 'board') {
         box.remove();
         this.over = null;
+        return;
+      }
+      if (b.dataset.go === 'replay') {
+        this.onReplay();
         return;
       }
       box.remove();

@@ -179,6 +179,7 @@ final class BridgeGuiGame extends AbstractGuiGame {
             if (s != null) {
                 s.afterStateSent();
                 s.presence();
+                s.recordFrame(state);
             }
         } catch (final RuntimeException e) {
             // Une photo ratée sera remplacée par la suivante.

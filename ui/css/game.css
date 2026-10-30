@@ -630,3 +630,23 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 :root[data-board-theme="reef"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.32), rgb(6 7 12 / 0.52)), url("../img/themes/bg-reef.svg") center / cover no-repeat, #03101a; isolation: isolate; }
 :root[data-board-theme="eclipse"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.32), rgb(6 7 12 / 0.52)), url("../img/themes/bg-eclipse.svg") center / cover no-repeat, #050204; isolation: isolate; }
 :root[data-board-theme="blizzard"] .table { background: linear-gradient(180deg, rgb(6 7 12 / 0.32), rgb(6 7 12 / 0.52)), url("../img/themes/bg-blizzard.svg") center / cover no-repeat, #060a14; isolation: isolate; }
+
+/* Replay : plateau en lecture seule, commandes à la place des boutons de l'invite */
+.replay-host { position: absolute; inset: 0; }
+.table.replay [data-open="cheat"], .table.replay [data-open="menu"], .table.replay [data-hold],
+.table.replay .actions .btn-row, .table.replay .actions .prompt-row { display: none !important; }
+.replay-bar { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; background: rgb(10 12 22 / 0.92); box-shadow: 0 6px 18px rgb(0 0 0 / 0.45); }
+.rp-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.rp-title { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--gold-2); font-size: 13px; }
+.rp-title .ic { width: 16px; height: 16px; }
+.rp-turn { font-size: 12px; color: var(--muted); min-height: 1.3em; }
+.rp-turn b { color: var(--text); }
+.rp-ctl { display: flex; justify-content: space-between; gap: 3px; }
+.rp-btn { flex: 1; min-width: 0; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.rp-btn:disabled { opacity: 0.35; cursor: default; }
+.rp-btn .ic { width: 16px; height: 16px; }
+.rp-btn.rp-play { background: linear-gradient(180deg, var(--gold-2), var(--gold)); color: #1a1408; border-color: transparent; }
+.rp-x { flex: none; width: 26px; height: 26px; font-size: 13px; }
+.rp-range { width: 100%; accent-color: var(--gold); }
+.rp-speed { display: flex; }
+.rp-speed button { flex: 1; }

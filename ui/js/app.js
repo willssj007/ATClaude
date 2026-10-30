@@ -13,6 +13,7 @@ import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
 import {enhanceSelects} from './select.js';
 import {icon} from './icons.js';
+import {ReplayScreen} from './replay.js';
 import {StatsScreen} from './stats.js';
 import {openLedger} from './ledger.js';
 import {announceUnlocks, appearanceHtml, applyThemes, livePreviews, themeClicked} from './themes.js';
@@ -43,8 +44,13 @@ function showScreen(name) {
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + name));
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
   document.body.classList.toggle('in-game', name === 'game');
+  // Replay : plein écran comme une partie, mais sans les raccourcis clavier de la partie en cours.
+  document.body.classList.toggle('in-replay', name === 'replay');
+  if (name !== 'replay' && screens.replay) {
+    screens.replay.stop();
+  }
   setMusicMode(name === 'game' ? 'match' : 'menus');
-  $('#resume-game').classList.toggle('hidden', !inMatch || name === 'game');
+  $('#resume-game').classList.toggle('hidden', !inMatch || name === 'game' || name === 'replay');
   const screen = screens[name];
   if (screen && screen.show) {
     screen.show();
@@ -125,6 +131,18 @@ function newGame(rematch) {
     onExit: leaveMatch,
     onRematch: () => (game && game.career ? leaveMatch().then(() => showScreen('duel')) : rematch()),
     onMenu: () => showScreen('home'),
+    // Le replay de la partie finie est le plus récent (gardé avant l'écran de fin).
+    onReplay: async () => {
+      try {
+        const [latest] = await bridge.request('replays');
+        if (latest) {
+          showScreen('replay');
+          screens.replay.open(latest.id);
+        }
+      } catch (e) {
+        toast(e.message, {error: true});
+      }
+    },
   });
 }
 
@@ -496,7 +514,11 @@ function init() {
   screens.boosters = new BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')});
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
-  screens.stats = new StatsScreen($('#screen-stats'));
+  screens.replay = new ReplayScreen($('#screen-replay'), {onClose: () => showScreen('stats')});
+  screens.stats = new StatsScreen($('#screen-stats'), {onWatch: (id) => {
+    showScreen('replay');
+    screens.replay.open(id);
+  }});
   screens.account = new AccountScreen($('#screen-account'), {onSynced: afterSync});
   onProfile((p) => {
     $('#profile-btn').innerHTML = `${avatarHtml(p.name, p.avatar, 28, p.photo)}<span>${esc(p.name)}</span>${p.linked ? '<i title="Synchronisé">⟳</i>' : ''}`;
