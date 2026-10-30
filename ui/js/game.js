@@ -131,9 +131,28 @@ function stackKey(card, hasAttachments) {
   }
   return [card.name, card.image, card.tapped ? 1 : 0, card.sick ? 1 : 0, card.power, card.toughness, card.loyalty,
     card.damage || 0, card.counters ? JSON.stringify(card.counters) : '', card.token ? 1 : 0, card.commander ? 1 : 0,
-    card.attacking ? 1 : 0, card.blocking ? 1 : 0, card.selectable ? 1 : 0, card.highlighted ? 1 : 0, card.playable ? 1 : 0,
-    (card.status || []).join(',')].join('|');
+    // Pendant qu'on désigne les attaquants ou les bloqueurs, les piles restent telles quelles : la carte choisie se
+    // soulève dans sa pile au lieu d'en sortir (sinon la rangée se réorganise et change de taille à chaque toucher).
+    declaring ? '' : [card.attacking ? 1 : 0, card.blocking ? 1 : 0, card.selectable ? 1 : 0, card.highlighted ? 1 : 0].join(''),
+    card.playable ? 1 : 0, (card.status || []).join(',')].join('|');
 }
+
+/** Texte ou HTML écrit seulement s'il change : réécrire le même contenu à chaque photo de la partie redessine. */
+function setText(node, text) {
+  if (node && node.textContent !== String(text)) {
+    node.textContent = text;
+  }
+}
+
+function setHtml(node, html) {
+  if (node && node._html !== html) {
+    node.innerHTML = html;
+    node._html = html;
+  }
+}
+
+/** Désignation des attaquants ou des bloqueurs en cours (piles figées, voir stackKey). */
+let declaring = false;
 
 /** Rangée triée par arrivée, les cartes identiques regroupées à la place de la première d'entre elles. */
 function groupIdentical(cards, attached) {
@@ -845,6 +864,7 @@ export class Game {
       this.reconcile(container, list);
     };
 
+    declaring = /^Input(Attack|Block)/.test((state.prompt && state.prompt.input) || '');
     const splitField = (p) => {
       const cards = p.zones.battlefield.filter(c => !(c.attachedTo && !c.attachedToPlayer && onBattlefield.has(c.attachedTo)));
       const hosts = new Set(attachments.keys());
@@ -1130,7 +1150,7 @@ export class Game {
       count = el('<div class="count"></div>');
       pile.appendChild(count);
     }
-    count.textContent = cards.length;
+    setText(count, cards.length);
     count.classList.toggle('hidden', cards.length === 0);
     pile.classList.toggle('has-selectable', cards.some(c => c.selectable || c.playable));
     if (label && !pile.querySelector('.label')) {
@@ -1144,7 +1164,7 @@ export class Game {
     hit.classList.toggle('highlighted', !!p.highlighted);
     hit.classList.toggle('priority', !!p.priority);
     const life = hit.querySelector('.life');
-    life.textContent = p.life;
+    setText(life, p.life);
     life.classList.toggle('low', p.life <= 10);
     const stats = box.querySelector('.stats');
     let html = '';
@@ -1210,7 +1230,7 @@ export class Game {
       count = el('<div class="count"></div>');
       pile.appendChild(count);
     }
-    count.textContent = p.library;
+    setText(count, p.library);
     const top = p.libraryTop || [];
     pile.classList.toggle('seen', top.length > 0);
     pile.classList.toggle('has-selectable', top.some(c => c.playable || c.selectable));
@@ -1238,7 +1258,7 @@ export class Game {
       phases._html = html;
     }
     const active = state.players.find(p => p.id === state.game.activePlayer);
-    this.table.querySelector('.turn-label').innerHTML = `Tour <b>${state.game.turn}</b> · ${myTurn ? 'à vous' : esc(active ? active.name : '')}`;
+    setHtml(this.table.querySelector('.turn-label'), `Tour <b>${state.game.turn}</b> · ${myTurn ? 'à vous' : esc(active ? active.name : '')}`);
   }
 
   /** Bouton « Garder la priorité » de la ligne du milieu : allumé quand mes sorts s'arrêtent sur la pile. */
@@ -1278,7 +1298,7 @@ export class Game {
     if (!message && waiting) {
       message = state.game.activePlayer === me.id ? '' : 'L\'adversaire joue…';
     }
-    promptBox.textContent = message;
+    setText(promptBox, message);
     promptBox.classList.toggle('waiting', waiting);
     // Carte dont parle l'invite, quand elle n'est pas visible sur le plateau (regard d'une carte, etc.).
     const info = p.cardInfo && !p.cardInfo.hidden && !['battlefield', 'hand'].includes(p.cardInfo.zone) ? p.cardInfo : null;
@@ -1303,7 +1323,7 @@ export class Game {
     if (p.input === 'InputPassPriority' && /^ok$/i.test(okLabel)) {
       okLabel = state.stack.length ? 'Résoudre' : 'Passer';
     }
-    ok.textContent = okLabel;
+    setText(ok, okLabel);
     ok.disabled = !p.okEnabled;
     ok.classList.toggle('hidden', !p.okEnabled && waiting);
     let cancelHtml = esc(p.cancelLabel || 'Annuler');
@@ -1312,7 +1332,7 @@ export class Game {
       cancelHtml = /rappel/i.test(p.cancelLabel || '') ? `${icon('undo')} Personne n'attaque` : `${icon('swords')} Tout attaquer`;
     }
     if (cancel._html !== cancelHtml) {
-      cancel.innerHTML = cancelHtml;
+      setHtml(cancel, cancelHtml);
       cancel._html = cancelHtml;
     }
     cancel.classList.toggle('hidden', !p.cancelEnabled);
@@ -1725,35 +1745,63 @@ export class Game {
     // Carte d'un plateau adverse masqué : la flèche va à la fiche de son joueur.
     const cardNode = (id) => shown(this.slots.get('c' + id))
       || (this.cardController && this.cardController.has(id) ? playerNode(this.cardController.get(id)) : null);
-    const curve = (a, b, cls) => {
+    // Flèches mises à jour sur place (une clé par flèche) : en désignant les attaquants, chaque toucher n'ajoute que la
+    // nouvelle flèche ; les autres ne sont pas recréées (leur animation ne repart pas de zéro, rien ne clignote).
+    const want = new Map();
+    const curve = (key, a, b, cls) => {
       if (!a || !b) {
-        return '';
+        return;
       }
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2 - Math.min(80, Math.abs(a.x - b.x) * 0.15 + 20);
-      return `<path class="${cls}" d="M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}"/>`;
+      want.set(key, {cls, d: `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`});
     };
-    let html = '';
     for (const c of state.combat || []) {
       const from = center(cardNode(c.attacker));
       if (!c.blockers.length && c.defender !== undefined) {
-        html += curve(from, center(c.defenderIsPlayer ? playerNode(c.defender) : cardNode(c.defender)), 'atk');
+        curve('atk' + c.attacker, from, center(c.defenderIsPlayer ? playerNode(c.defender) : cardNode(c.defender)), 'atk');
       }
       for (const b of c.blockers) {
-        html += curve(center(cardNode(b)), from, 'blk');
+        curve('blk' + b + '>' + c.attacker, center(cardNode(b)), from, 'blk');
       }
     }
     const top = state.stack[0];
     if (top) {
       const from = center(shown(this.stackPanel.itemNode(top.id)));
       for (const id of top.targetCards || []) {
-        html += curve(from, center(cardNode(id)), 'tgt');
+        curve('tgt' + top.id + 'c' + id, from, center(cardNode(id)), 'tgt');
       }
       for (const id of top.targetPlayers || []) {
-        html += curve(from, center(playerNode(id)), 'tgt');
+        curve('tgt' + top.id + 'p' + id, from, center(playerNode(id)), 'tgt');
       }
     }
-    svg.innerHTML = html;
+    const paths = this.arrowPaths || (this.arrowPaths = new Map());
+    for (const [key, pair] of paths) {
+      if (!want.has(key) || !pair.line.isConnected || want.get(key).cls !== pair.cls) {
+        pair.shade.remove();
+        pair.line.remove();
+        paths.delete(key);
+      }
+    }
+    const NS = 'http://www.w3.org/2000/svg';
+    for (const [key, w] of want) {
+      let pair = paths.get(key);
+      if (!pair) {
+        // Ombre sombre sous la flèche (plus léger qu'un filtre d'ombre, recalculé à chaque image de l'animation).
+        const shade = document.createElementNS(NS, 'path');
+        shade.setAttribute('class', 'shade');
+        const line = document.createElementNS(NS, 'path');
+        line.setAttribute('class', w.cls);
+        svg.append(shade, line);
+        pair = {shade, line, cls: w.cls, d: ''};
+        paths.set(key, pair);
+      }
+      if (pair.d !== w.d) {
+        pair.shade.setAttribute('d', w.d);
+        pair.line.setAttribute('d', w.d);
+        pair.d = w.d;
+      }
+    }
   }
 
   // ------------------------------------------------------------------ zones et détails

@@ -443,7 +443,8 @@
 
 /* Flèches de combat et de ciblage */
 svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: visible; }
-svg.arrows path { fill: none; stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8)); }
+svg.arrows path { fill: none; stroke-width: 3; stroke-linecap: round; }
+svg.arrows path.shade { stroke: rgba(0, 0, 0, 0.55); stroke-width: 7; }
 svg.arrows .atk { stroke: rgba(239, 90, 90, 0.85); marker-end: url(#arrow-red); stroke-dasharray: 8 6; animation: dash 0.8s linear infinite; }
 svg.arrows .blk { stroke: rgba(79, 182, 255, 0.9); marker-end: url(#arrow-blue); }
 svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold); stroke-dasharray: 3 5; }

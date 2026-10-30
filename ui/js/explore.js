@@ -2,6 +2,7 @@
 // résultats en tuiles comme ses propres decks, aperçu de la liste et ajout à « Mes decks » en un geste.
 
 import {bridge} from './bridge.js';
+import {cardElement, showZoom} from './cards.js';
 import {customBox} from './dialogs.js';
 import {deckTile, identityHtml} from './decks.js';
 import {icon} from './icons.js';
@@ -212,15 +213,27 @@ export class MoxfieldExplorer {
     }
   }
 
-  /** Aperçu du deck (liste lue sur Moxfield) ; « Ajouter » l'enregistre tout de suite, « Modifier » ouvre l'éditeur. */
+  /**
+   * Aperçu visuel du deck (liste lue sur Moxfield) : le commandant en grand, la courbe de mana et la répartition par
+   * type, puis toutes les cartes en images, groupées par type (toucher une carte l'agrandit). « Ajouter » enregistre
+   * le deck tout de suite, « Modifier » l'ouvre dans le deck builder.
+   */
   preview(d, addNow) {
     customBox(d.name, (body, footer, close) => {
-      body.innerHTML = `<div class="mx-preview">
-          <div class="muted small">${esc(d.author ? 'Par ' + d.author : '')}${d.updated ? ' · mis à jour le ' + new Date(d.updated).toLocaleDateString('fr-FR') : ''}</div>
-          <div class="mx-pv-stats">${identityHtml(d.identity)}<span>${icon('heart')}${fmtNum(d.likes)}</span><span>${icon('eye')}${fmtNum(d.views)}</span>${d.bracket ? `<span class="mx-b">Bracket ${d.bracket}</span>` : ''}</div>
-          <div class="mx-pv-list muted">Lecture de la liste sur Moxfield…</div>
+      body.innerHTML = `<div class="mxv">
+          <aside class="mxv-side">
+            <div class="mxv-cmd"></div>
+            <div class="mxv-meta muted small">${esc(d.author ? 'Par ' + d.author : '')}${d.updated ? ' · mis à jour le ' + new Date(d.updated).toLocaleDateString('fr-FR') : ''}</div>
+            <div class="mxv-stats">${identityHtml(d.identity)}<span>${icon('heart')}${fmtNum(d.likes)}</span><span>${icon('eye')}${fmtNum(d.views)}</span>${d.bracket ? `<span class="mx-b">Bracket ${d.bracket}</span>` : ''}</div>
+            <div class="mxv-summary"></div>
+          </aside>
+          <section class="mxv-cards"><div class="mxv-loading muted">${icon('book')} Lecture de la liste sur Moxfield…</div></section>
         </div>`;
-      const list = body.querySelector('.mx-pv-list');
+      const cmdBox = body.querySelector('.mxv-cmd');
+      // En attendant la liste : l'illustration du commandant de la tuile.
+      if (d.image) {
+        cmdBox.appendChild(cardElement({name: (d.commanders || [])[0] || d.name, image: d.image}));
+      }
       const edit = el('<button class="btn">Modifier avant d\'ajouter</button>');
       const add = el(`<button class="btn gold">${icon('check')} Ajouter à mes decks</button>`);
       edit.disabled = add.disabled = true;
@@ -230,19 +243,13 @@ export class MoxfieldExplorer {
       let result = null;
       bridge.request('fetchMoxfield', {url: d.url}).then((res) => {
         result = res;
-        const s = res.deck.sections;
-        const count = (lines) => lines.reduce((n, l) => n + (l.count || 1), 0);
-        const names = (lines) => lines.map(l => `${l.count > 1 ? l.count + ' ' : ''}${esc(l.card.nameFr || l.card.name)}`);
-        list.classList.remove('muted');
-        list.innerHTML = `${s.commander.length ? `<div><b>Commandant :</b> ${names(s.commander).join(' & ')}</div>` : ''}
-          <div class="muted small">${count(s.main)} cartes dans le deck${s.side.length ? `, ${count(s.side)} en réserve` : ''}${res.unknown && res.unknown.length ? ` · ${res.unknown.length} carte(s) inconnue(s) de Forge` : ''}</div>
-          <div class="mx-pv-cards">${names(s.main).map(n => `<span>${n}</span>`).join('')}</div>`;
+        this.renderDeck(body, res);
         edit.disabled = add.disabled = false;
         if (addNow) {
           add.click();
         }
       }).catch((e) => {
-        list.textContent = e.message;
+        body.querySelector('.mxv-cards').innerHTML = `<div class="mxv-loading">${esc(e.message)}</div>`;
       });
       edit.addEventListener('click', () => {
         close();
@@ -258,6 +265,84 @@ export class MoxfieldExplorer {
           add.disabled = false;
         }
       });
+    }, {full: true});
+  }
+
+  /** Commandant(s), courbe de mana, types, puis les cartes en images par type. */
+  renderDeck(body, res) {
+    const s = res.deck.sections;
+    const cmdBox = body.querySelector('.mxv-cmd');
+    if (s.commander.length) {
+      cmdBox.replaceChildren(...s.commander.map((l) => {
+        const node = cardElement(l.card);
+        node._card = l.card;
+        return node;
+      }));
+      cmdBox.classList.toggle('two', s.commander.length > 1);
+    }
+    const lines = [...s.main];
+    const total = lines.reduce((n, l) => n + (l.count || 1), 0);
+    const groups = new Map(TYPES.map(([key, label]) => [key, {label, lines: [], n: 0}]));
+    const curve = new Array(8).fill(0);
+    for (const l of lines) {
+      const key = typeOf(l.card);
+      const g = groups.get(key);
+      g.lines.push(l);
+      g.n += l.count || 1;
+      if (key !== 'land') {
+        curve[Math.min(7, Math.max(0, Math.round(l.card.cmc || 0)))] += l.count || 1;
+      }
+    }
+    const peak = Math.max(1, ...curve);
+    body.querySelector('.mxv-summary').innerHTML = `
+      <div class="mxv-h">Courbe de mana</div>
+      <div class="mxv-curve">${curve.map((n, i) => `<div class="bar" title="${n} carte(s) à ${i}${i === 7 ? '+' : ''}"><b>${n || ''}</b><i style="--h:${(n / peak).toFixed(3)}"></i><span>${i === 7 ? '7+' : i}</span></div>`).join('')}</div>
+      <div class="mxv-h">${total} cartes${s.side.length ? ` · ${s.side.reduce((n, l) => n + (l.count || 1), 0)} en réserve` : ''}</div>
+      <div class="mxv-types">${[...groups.values()].filter(g => g.n).map(g => `<span><b>${g.n}</b> ${esc(g.label.toLowerCase())}</span>`).join('')}</div>
+      ${res.unknown && res.unknown.length ? `<div class="muted small">${res.unknown.length} carte(s) inconnue(s) de Forge, laissée(s) de côté.</div>` : ''}`;
+    const box = body.querySelector('.mxv-cards');
+    box.replaceChildren();
+    for (const g of groups.values()) {
+      if (!g.n) {
+        continue;
+      }
+      const grid = el('<div class="mxv-grid"></div>');
+      for (const l of g.lines.sort((a, b) => (a.card.cmc || 0) - (b.card.cmc || 0) || (a.card.nameFr || a.card.name).localeCompare(b.card.nameFr || b.card.name))) {
+        const cell = el('<div class="mxv-card"></div>');
+        const node = cardElement(l.card);
+        node._card = l.card;
+        cell.appendChild(node);
+        if ((l.count || 1) > 1) {
+          cell.appendChild(el(`<span class="mxv-n">×${l.count}</span>`));
+        }
+        grid.appendChild(cell);
+      }
+      box.append(el(`<h3 class="mxv-group">${esc(g.label)} <span>${g.n}</span></h3>`), grid);
+    }
+    body.querySelector('.mxv').addEventListener('click', (e) => {
+      const card = e.target.closest('.mcard');
+      if (card && card._card) {
+        showZoom(card._card);
+      }
     });
   }
+}
+
+/** Types dans l'ordre d'affichage (une créature-artefact compte comme créature, comme sur Moxfield). */
+const TYPES = [['creature', 'Créatures'], ['planeswalker', 'Planeswalkers'], ['battle', 'Batailles'], ['instant', 'Éphémères'],
+  ['sorcery', 'Rituels'], ['artifact', 'Artefacts'], ['enchantment', 'Enchantements'], ['land', 'Terrains'], ['other', 'Autres']];
+
+function typeOf(card) {
+  const t = (card.typeEn || card.type || card.typeLine || '').toLowerCase();
+  for (const [key] of TYPES) {
+    if (key !== 'other' && t.includes(key === 'creature' ? 'creature' : key)) {
+      return key;
+    }
+  }
+  // Type en français seulement (cartes sans type anglais) : quelques mots-clés.
+  const fr = (card.typeLine || '').toLowerCase();
+  const map = [['créature', 'creature'], ['planeswalker', 'planeswalker'], ['bataille', 'battle'], ['éphémère', 'instant'], ['rituel', 'sorcery'],
+    ['artefact', 'artifact'], ['enchantement', 'enchantment'], ['terrain', 'land']];
+  const hit = map.find(([w]) => fr.includes(w));
+  return hit ? hit[1] : 'other';
 }
