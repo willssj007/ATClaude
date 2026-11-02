@@ -121,6 +121,7 @@ final class ArchenemyAi extends Mulligans.HouseAi {
             aggression.setInt(getAi(), level);
             return true;
         } catch (final ReflectiveOperationException | RuntimeException e) {
+            System.err.println("Archenemy : attaque répartie impossible, Forge choisit sa cible : " + e);
             combat.clearAttackers();
             return false;
         }
