@@ -97,6 +97,7 @@ final class WebController extends UIViewController {
         web.getScrollView().setContentInsetAdjustmentBehavior(UIScrollViewContentInsetAdjustmentBehavior.Never);
         web.getScrollView().setBounces(false);
         web.getScrollView().setScrollEnabled(false);
+        web.setAllowsLinkPreview(false); // l'appui long lit une carte : pas d'aperçu de lien ni d'image
         if (atLeast(16, 4)) {
             web.setInspectable(true); // inspecteur web de Safari (Mac), pour le diagnostic
         }
