@@ -178,7 +178,8 @@ final class MatchSession {
                 final String profile = str(seat, "profile");
                 final LobbyPlayer base = profile.isEmpty() ? GamePlayerUtil.createAiPlayer(name, aiIndex)
                         : GamePlayerUtil.createAiPlayer(name, aiIndex, profile);
-                lobby = freeMulligans == Mulligans.FORGE_DEFAULT || !(base instanceof forge.ai.LobbyPlayerAi la) ? base : Mulligans.ai(la, freeMulligans);
+                lobby = !(base instanceof forge.ai.LobbyPlayerAi la) || freeMulligans == Mulligans.FORGE_DEFAULT && !isArchenemy
+                        ? base : Mulligans.ai(la, freeMulligans, isArchenemy);
             } else {
                 if (human != null) {
                     throw new IllegalArgumentException("Un seul joueur humain par partie.");

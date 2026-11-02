@@ -48,39 +48,16 @@ final class Mulligans {
         return free == UNLIMITED ? 0 : Math.max(0, taken - free);
     }
 
-    /** Même IA (nom, profil, avatar) que {@code base}, avec la règle maison. */
-    static LobbyPlayer ai(final LobbyPlayerAi base, final int free) {
+    /**
+     * Même IA (nom, profil, avatar) que {@code base}, avec la règle maison ({@link #FORGE_DEFAULT} : celle de Forge) ;
+     * {@code archenemy} : l'IA de l'Archenemy, qui répartit ses attaques ({@link ArchenemyAi}).
+     */
+    static LobbyPlayer ai(final LobbyPlayerAi base, final int free, final boolean archenemy) {
         final LobbyPlayerAi ai = new LobbyPlayerAi(base.getName(), null) {
             @Override
             public Player createIngamePlayer(final Game game, final int id) {
                 final Player player = new Player(getName(), game, id);
-                player.setFirstController(new PlayerControllerAi(game, player, this) {
-                    private int taken;
-
-                    @Override
-                    public boolean mulliganKeepHand(final Player first, final int cardsToReturn) {
-                        while (true) {
-                            final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
-                            if (keep) {
-                                return true;
-                            }
-                            taken++;
-                            if (free != UNLIMITED) {
-                                return false;
-                            }
-                            if (taken >= AI_UNLIMITED_CAP) {
-                                return true;
-                            }
-                            redraw(getPlayer());
-                        }
-                    }
-
-                    @Override
-                    public CardCollectionView tuckCardsViaMulligan(final CardCollectionView hand, final int cardsToReturn) {
-                        final int n = toReturn(taken, free);
-                        return n <= 0 ? new CardCollection() : super.tuckCardsViaMulligan(hand, n);
-                    }
-                });
+                player.setFirstController(archenemy ? new ArchenemyAi(game, player, this, free) : new HouseAi(game, player, this, free));
                 return player;
             }
         };
@@ -88,5 +65,46 @@ final class Mulligans {
         ai.setAvatarIndex(base.getAvatarIndex());
         ai.setSleeveIndex(base.getSleeveIndex());
         return ai;
+    }
+
+    /** Contrôleur d'IA de Forge qui compte ses mulligans pour appliquer la règle maison. */
+    static class HouseAi extends PlayerControllerAi {
+        private final int free;
+        private int taken;
+
+        HouseAi(final Game game, final Player player, final LobbyPlayer lobby, final int free) {
+            super(game, player, lobby);
+            this.free = free;
+        }
+
+        @Override
+        public boolean mulliganKeepHand(final Player first, final int cardsToReturn) {
+            if (free == FORGE_DEFAULT) {
+                return super.mulliganKeepHand(first, cardsToReturn);
+            }
+            while (true) {
+                final boolean keep = super.mulliganKeepHand(first, toReturn(taken, free));
+                if (keep) {
+                    return true;
+                }
+                taken++;
+                if (free != UNLIMITED) {
+                    return false;
+                }
+                if (taken >= AI_UNLIMITED_CAP) {
+                    return true;
+                }
+                redraw(getPlayer());
+            }
+        }
+
+        @Override
+        public CardCollectionView tuckCardsViaMulligan(final CardCollectionView hand, final int cardsToReturn) {
+            if (free == FORGE_DEFAULT) {
+                return super.tuckCardsViaMulligan(hand, cardsToReturn);
+            }
+            final int n = toReturn(taken, free);
+            return n <= 0 ? new CardCollection() : super.tuckCardsViaMulligan(hand, n);
+        }
     }
 }
