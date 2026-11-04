@@ -74,6 +74,8 @@ const PATHS = {
   portrait: '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3.2"/><path d="M7 18.8c.8-2.8 2.8-4.2 5-4.2s4.2 1.4 5 4.2"/>',
   // Apparence : palette.
   palette: '<path d="M12 3a9 9 0 0 0 0 18c1.2 0 1.9-1 1.4-2-.6-1.3.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4C21 7.4 17 3 12 3z"/><circle class="f" cx="7.6" cy="11" r="1.3"/><circle class="f" cx="10" cy="7" r="1.3"/><circle class="f" cx="14.6" cy="7" r="1.3"/>',
+  // Atelier (cartes perso) : enclume de forgeron, avec des étincelles.
+  anvil: '<path d="M2 8.4h18.6v2.4a2 2 0 0 1-2 2h-1.8v3H10v-3c-3.6 0-6.2-1.4-8-4.4z"/><path d="M10 15.8 7.8 20.8h11.2l-2.2-5"/><path d="M13.4 2.6v2.6M9.6 3.4l1.3 2M17.2 3.4l-1.3 2"/>',
   // Illustration d'une carte : pinceau.
   brush: '<path d="M20.5 3.5c-3.6 1.8-8 6-10.2 9.4l1.8 1.8c3.4-2.2 7.6-6.6 9.4-10.2-.3-.4-.6-.7-1-1z"/><path d="M9.6 13.6c-2.2.2-3.6 1.6-3.8 3.6-.1 1.2-.8 2.2-2.3 2.8 2.6 1 5.6.6 7.1-.9 1-1 1.2-2.4.8-3.6"/>',
   // Points de vie : cœur.

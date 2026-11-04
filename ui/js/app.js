@@ -307,7 +307,7 @@ function savedGameHtml(s) {
   </div>`;
 }
 
-const NAV_ICONS = {home: 'castle', lobby: 'swords', duel: 'swords', decks: 'cards', cards: 'book', boosters: 'booster', stats: 'banner', trophies: 'chalice', settings: 'gear'};
+const NAV_ICONS = {home: 'castle', lobby: 'swords', duel: 'swords', decks: 'cards', cards: 'book', boosters: 'booster', stats: 'banner', trophies: 'chalice', settings: 'gear', atelier: 'anvil'};
 
 async function quickMatch() {
   if (isPlaneswalker()) {

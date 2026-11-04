@@ -84,7 +84,7 @@ export function effectsFor(when) {
 }
 
 const KW_FR = Object.fromEntries(KEYWORDS);
-/** « Les X-Men que vous contrôlez ont le vol » : le mot-clé avec son article. */
+/** « Les Elfes que vous contrôlez ont le vol » : le mot-clé avec son article. */
 const KW_GRANT = {
   'Flying': 'ont le vol', 'First Strike': 'ont l\'initiative', 'Double Strike': 'ont la double initiative',
   'Deathtouch': 'ont le contact mortel', 'Haste': 'ont la célérité', 'Hexproof': 'ont la défense talismanique',
@@ -126,7 +126,7 @@ function plural(n, one, many) {
   return n === 1 ? one : many;
 }
 
-/** « Creature.X-Men+YouCtrl+Other » pour Forge. */
+/** « Creature.Elf+YouCtrl+Other » pour Forge. */
 function valid(f) {
   const props = ['YouCtrl'];
   if (f && f.other) {

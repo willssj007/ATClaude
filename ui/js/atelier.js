@@ -1,6 +1,6 @@
 // Atelier : cartes perso. Une carte se fait par un formulaire (nom, coût, types, force, mots-clés, capacités à choisir
 // dans des modèles) ou en écrivant son script de Forge ; Forge la vérifie à chaque changement et l'aperçu montre la
-// carte telle qu'elle sera en jeu. Les types de créature inventés (« X-Men ») se déclarent ici : sans ça, Forge ne
+// carte telle qu'elle sera en jeu. Les types de créature inventés se déclarent ici : sans ça, Forge ne
 // les reconnaît pas et les effets qui les citent ne trouvent aucune carte.
 
 import {bridge} from './bridge.js';
@@ -50,8 +50,8 @@ export class Atelier {
         se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker).</p>
       <div class="ate-grid">${d.cards.length ? '' : '<p class="muted">Aucune carte perso pour l\'instant.</p>'}</div>
       <h2>Types de créature perso</h2>
-      <p class="muted small">Un type inventé (« X-Men ») doit être déclaré ici : Forge ne connaît que les types officiels, et
-        un effet qui cite un type inconnu (« chaque X-Men que vous contrôlez ») ne trouverait aucune créature.</p>
+      <p class="muted small">Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et
+        un effet qui cite un type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.</p>
       <div class="ate-types">${d.types.map(t => `<span class="ate-type">${esc(t)}<button data-untype="${esc(t)}" title="Retirer">✕</button></span>`).join('')}
         <span class="ate-addtype"><input type="text" placeholder="Nouveau type (un mot)" maxlength="30"><button class="btn small" data-addtype>Ajouter</button></span>
       </div>
@@ -171,7 +171,7 @@ export class Atelier {
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
-      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Human X-Men (séparés par des espaces)"></label>
+      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Human Wizard (séparés par des espaces)"></label>
       ${f.types.includes('Creature') ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
         <input type="number" data-k="power" value="${esc(f.power)}" min="0" max="99"> / <input type="number" data-k="toughness" value="${esc(f.toughness)}" min="0" max="99"></div>` : ''}
       ${f.types.includes('Planeswalker') ? `<label class="ate-field"><span>Loyauté de départ</span><input type="number" data-k="loyaltyStart" value="${esc(f.loyaltyStart)}" min="1" max="20"></label>` : ''}
@@ -200,7 +200,7 @@ export class Atelier {
       ${e.token ? `<div class="ate-ab-row"><select data-a="token">${TOKENS.map(t => `<option value="${t[0]}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
-        <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : X-Men" style="width:170px">
+        <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-a="fother"${a.filter.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
     </div>`;
   }
