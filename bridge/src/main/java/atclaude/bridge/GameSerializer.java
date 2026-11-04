@@ -301,6 +301,16 @@ final class GameSerializer {
         flag(o, "battle", s.isBattle());
         final boolean scheme = s.getType() != null && s.getType().isScheme();
         final boolean ongoing = s.getType() != null && s.getType().hasSupertype(forge.card.CardType.Supertype.Ongoing);
+        if (CustomCards.isCustom(s.getName())) {
+            // Carte perso : cadre dessiné avec son illustration, type en français.
+            o.addProperty("custom", true);
+            o.addProperty("image", "");
+            o.addProperty("typeLine", CustomCards.typeLine(s.getType()));
+            final String art = CustomCards.artKey(s.getName());
+            if (art != null) {
+                o.addProperty("customArt", art);
+            }
+        }
         flag(o, "scheme", scheme);
         flag(o, "ongoing", ongoing);
         if (scheme) {

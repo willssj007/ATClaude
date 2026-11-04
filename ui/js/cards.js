@@ -13,12 +13,18 @@ function ptText(card) {
   return '';
 }
 
+/** Carte perso (Atelier) : son illustration dans le cadre dessiné. */
+function artStyle(card) {
+  const url = card.customArtUrl || (card.customArt ? bridge.imageUrl(card.customArt) : '');
+  return url ? ` style="background:center / cover no-repeat url(&quot;${esc(url)}&quot;)"` : '';
+}
+
 function frameHtml(card) {
   const pt = ptText(card);
   const name = card.nameFr || card.name || '';
-  return `<div class="frame ${frameClass(card)}">
+  return `<div class="frame ${frameClass(card)}${card.custom ? ' custom' : ''}">
     <div class="f-title"><span class="n">${esc(name)}</span>${manaHtml(card.cost)}</div>
-    <div class="f-art"></div>
+    <div class="f-art"${artStyle(card)}></div>
     <div class="f-type">${esc(card.typeLine || '')}</div>
     <div class="f-text">${rulesHtml(card.text || '')}</div>
     ${pt ? `<div class="f-pt">${esc(pt)}</div>` : ''}

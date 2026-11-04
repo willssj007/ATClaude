@@ -329,6 +329,7 @@ final class Account {
         b.add("stats", Stats.load());
         b.add("arts", ArtChoices.json());
         b.add("career", Career.load());
+        b.add("custom", CustomCards.export());
         return b;
     }
 
@@ -424,6 +425,9 @@ final class Account {
         if (career != null) {
             m.add("career", career);
         }
+        // Atelier : cartes perso (avec leur illustration) et types de créature inventés.
+        m.add("custom", CustomCards.merge(local.has("custom") && local.get("custom").isJsonObject() ? local.getAsJsonObject("custom") : null,
+                remote.has("custom") && remote.get("custom").isJsonObject() ? remote.getAsJsonObject("custom") : null, firstSync));
         return m;
     }
 
@@ -648,6 +652,12 @@ final class Account {
             final int newGames = Stats.mergeIn(merged.getAsJsonObject("stats"));
             if (newGames != 0) {
                 report.addProperty("statsChange", newGames);
+            }
+        }
+        if (merged.has("custom") && merged.get("custom").isJsonObject()) {
+            final int n = CustomCards.apply(merged.getAsJsonObject("custom"));
+            if (n > 0) {
+                report.addProperty("customChanged", n);
             }
         }
         final JsonObject prefs = merged.getAsJsonObject("prefs");

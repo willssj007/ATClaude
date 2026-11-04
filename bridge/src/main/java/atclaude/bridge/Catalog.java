@@ -70,6 +70,14 @@ final class Catalog {
 
     // ------------------------------------------------------------------ recherche
 
+    /** Carte perso créée, modifiée ou supprimée : l'index de recherche sera refait à la prochaine recherche. */
+    void invalidateIndex() {
+        synchronized (this) {
+            index = null;
+            frenchToEnglish = null;
+        }
+    }
+
     private List<Entry> index() {
         List<Entry> result = index;
         if (result != null) {
@@ -84,6 +92,10 @@ final class Catalog {
             final List<Entry> list = new ArrayList<>();
             final Map<String, String> fr = new HashMap<>();
             for (final PaperCard pc : FModel.getMagicDb().getCommonCards().getUniqueCards()) {
+                // Carte perso supprimée pendant cette session : Forge la garde jusqu'au prochain lancement.
+                if (CustomCards.isDeleted(pc.getName())) {
+                    continue;
+                }
                 // Versions rééquilibrées d'Arena (« A-… ») : pas des cartes papier, elles doublaient l'original.
                 if (pc.getName().startsWith("A-") && FModel.getMagicDb().getCommonCards().getCard(pc.getName().substring(2)) != null) {
                     continue;
@@ -114,6 +126,19 @@ final class Catalog {
                         legal.test(pc), commander.test(pc)));
                 if (!nameFr.equals(nameEn)) {
                     fr.put(normalize(nameFr), nameEn);
+                }
+            }
+            // Cartes perso créées pendant cette session : dans la base de Forge, pas encore dans ses cartes « uniques ».
+            final java.util.Set<String> seen = new java.util.HashSet<>();
+            list.forEach(e -> seen.add(e.nameEn()));
+            for (final String name : CustomCards.names()) {
+                final PaperCard pc = FModel.getMagicDb().getCommonCards().getCard(name);
+                if (pc != null && seen.add(name)) {
+                    final CardRules rules = pc.getRules();
+                    final ManaCost cost = rules.getManaCost();
+                    list.add(new Entry(pc, name, name, normalize(name), normalize(rules.getOracleText()),
+                            rules.getType().toString().toLowerCase(Locale.ROOT), cost == null ? 0 : cost.getCMC(),
+                            GameSerializer.colors(rules.getColorIdentity()), legal.test(pc), commander.test(pc)));
                 }
             }
             list.sort(Comparator.comparing(Entry::nameFr, String.CASE_INSENSITIVE_ORDER));
@@ -152,6 +177,7 @@ final class Catalog {
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
             if (onlyOwned && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
+            if (owned != null && e.card().getRules().isCustom()) continue; // cartes perso : Sandbox seulement
             if (!text.isEmpty()) {
                 final boolean nameHit = e.searchName().contains(text);
                 if (!nameHit && !(inText && e.searchText().contains(text))) {
@@ -316,6 +342,16 @@ final class Catalog {
         o.addProperty("canBeCommander", DeckFormat.Commander.isLegalCommanderPredicate().test(pc));
         o.addProperty("commanderLegal", DeckFormat.Commander.isLegalCardPredicate().test(pc));
         o.addProperty("basic", rules.getType().isBasicLand());
+        if (rules.isCustom() || CustomCards.isCustom(nameEn)) {
+            // Carte perso : cadre dessiné avec son illustration (pas d'image Scryfall), type en français.
+            o.addProperty("custom", true);
+            o.addProperty("image", "");
+            o.addProperty("typeLine", CustomCards.typeLine(rules.getType()));
+            final String art = CustomCards.artKey(nameEn);
+            if (art != null) {
+                o.addProperty("customArt", art);
+            }
+        }
         return o;
     }
 
@@ -461,6 +497,17 @@ final class Catalog {
      * « Emeria's Call / Emeria, Shattered Skyclave » (export Moxfield), « Agadeem's Awakening // Agadeem, the
      * Undercrypt », ou la face arrière seule (« Insectile Aberration »).
      */
+    /** Nom anglais de la carte officielle qui s'appelle {@code name} en français (sans casse ni accents), ou null. */
+    String officialFrench(final String name) {
+        index();
+        final String en = frenchToEnglish.get(normalize(name));
+        if (en == null) {
+            return null;
+        }
+        final CardRules r = FModel.getMagicDb().getCommonCards().getRules(en, false);
+        return r != null && !r.isCustom() ? en : null;
+    }
+
     PaperCard resolve(final String rawName) {
         final String name = rawName == null ? "" : rawName.trim();
         if (name.isEmpty()) {

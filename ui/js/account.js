@@ -41,7 +41,11 @@ export async function loadProfile() {
  * dans un cercle qu'on peut déplacer et agrandir, puis réduite à 256 px (JPEG, quelques dizaines de Ko).
  * À appeler pendant le toucher (le sélecteur de fichiers ne s'ouvre que sur un geste).
  */
-export function pickPhoto() {
+/**
+ * Photo de la galerie, recadrée. Par défaut : la photo de profil (256 px, dans un cercle). {@code w}, {@code h} :
+ * taille du résultat ; {@code round} : cadre rond ; {@code title}, {@code use} : textes de la fenêtre.
+ */
+export function pickPhoto(opts = {}) {
   return new Promise((resolve) => {
     const input = el('<input type="file" accept="image/*" style="display:none">');
     document.body.appendChild(input);
@@ -61,7 +65,7 @@ export function pickPhoto() {
       img.onload = () => {
         const src = downscale(img, 1024);
         URL.revokeObjectURL(url);
-        cropDialog(src, resolve);
+        cropDialog(src, resolve, opts);
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
@@ -84,8 +88,9 @@ function downscale(img, max) {
   return c;
 }
 
-function cropDialog(src, done) {
-  const OUT = 256;
+function cropDialog(src, done, {w = 256, h = 256, round = true, title = 'Recadrer la photo', use = 'Utiliser cette photo'} = {}) {
+  const OUT = w;
+  const OUT_H = h;
   let answered = false;
   const answer = (value) => {
     if (!answered) {
@@ -93,12 +98,12 @@ function cropDialog(src, done) {
       done(value);
     }
   };
-  const box = customBox('Recadrer la photo', (body, footer, close) => {
+  const box = customBox(title, (body, footer, close) => {
     body.innerHTML = `<div class="crop">
-      <div class="crop-view"><canvas width="${OUT}" height="${OUT}"></canvas></div>
+      <div class="crop-view${round ? '' : ' rect'}" style="aspect-ratio:${OUT} / ${OUT_H}"><canvas width="${OUT}" height="${OUT_H}"></canvas></div>
       <div class="crop-side">
         <label class="crop-zoom"><span class="muted small">Zoom</span><input type="range" min="100" max="400" value="100"></label>
-        <p class="muted small">Glisse la photo pour la placer dans le cercle.</p>
+        <p class="muted small">Glisse la photo pour la placer dans le ${round ? 'cercle' : 'cadre'}.</p>
       </div>
     </div>`;
     const canvas = body.querySelector('canvas');
@@ -106,17 +111,18 @@ function cropDialog(src, done) {
     const view = body.querySelector('.crop-view');
     const zoom = body.querySelector('input');
     // Échelle de départ : le petit côté de la photo remplit le cercle ; (cx, cy) : centre du cadrage dans la photo.
-    const base = OUT / Math.min(src.width, src.height);
+    const base = Math.max(OUT / src.width, OUT_H / src.height);
     let scale = base;
     let cx = src.width / 2;
     let cy = src.height / 2;
     const draw = () => {
-      const half = OUT / 2 / scale;
-      cx = Math.min(Math.max(cx, half), src.width - half);
-      cy = Math.min(Math.max(cy, half), src.height - half);
+      const halfW = OUT / 2 / scale;
+      const halfH = OUT_H / 2 / scale;
+      cx = Math.min(Math.max(cx, halfW), src.width - halfW);
+      cy = Math.min(Math.max(cy, halfH), src.height - halfH);
       ctx.fillStyle = '#0b0d17';
-      ctx.fillRect(0, 0, OUT, OUT);
-      ctx.drawImage(src, OUT / 2 - cx * scale, OUT / 2 - cy * scale, src.width * scale, src.height * scale);
+      ctx.fillRect(0, 0, OUT, OUT_H);
+      ctx.drawImage(src, OUT / 2 - cx * scale, OUT_H / 2 - cy * scale, src.width * scale, src.height * scale);
     };
     draw();
     zoom.addEventListener('input', () => {
@@ -148,7 +154,7 @@ function cropDialog(src, done) {
       zoom.dispatchEvent(new Event('input'));
     }, {passive: false});
     const cancel = el('<button class="btn">Annuler</button>');
-    const ok = el('<button class="btn gold">Utiliser cette photo</button>');
+    const ok = el(`<button class="btn gold">${use}</button>`);
     cancel.addEventListener('click', () => {
       close();
       answer(null);
@@ -182,6 +188,9 @@ export async function syncNow({auto = false, onDone} = {}) {
     }
     if (r.decksRemoved) {
       bits.push(`${r.decksRemoved} supprimé(s)`);
+    }
+    if (r.customChanged) {
+      bits.push(`${r.customChanged} carte(s) perso mise(s) à jour`);
     }
     if (r.saveImported) {
       bits.push('partie en cours récupérée');

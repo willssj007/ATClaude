@@ -3,6 +3,7 @@
 import {AccountScreen, loadProfile, onProfile, syncNow} from './account.js';
 import {initAudio, refreshAudio, setMusicMode} from './audio.js';
 import {bridge} from './bridge.js';
+import {Atelier} from './atelier.js';
 import {BoostersScreen} from './boosters.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
 import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCareer, wildcardsHtml} from './career.js';
@@ -450,8 +451,11 @@ function setLoading(text, percent) {
 }
 
 /** Après une synchronisation : decks et réglages ont pu changer. */
-function afterSync() {
+function afterSync(r) {
   decksCache = null;
+  if (r && r.customChanged) {
+    screens.cards.reset(); // cartes perso venues d'un autre appareil
+  }
   forgetCareer();
   applyMode();
   refreshAudio();
@@ -530,6 +534,11 @@ function init() {
   screens.boosters = new BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')});
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
+  screens.atelier = new Atelier($('#screen-atelier'), {onChanged: () => {
+    // Une carte perso créée ou supprimée : les listes de decks et la recherche se refont.
+    decksCache = null;
+    screens.cards.reset();
+  }});
   screens.replay = new ReplayScreen($('#screen-replay'), {onClose: () => showScreen('stats')});
   screens.stats = new StatsScreen($('#screen-stats'), {onWatch: (id) => {
     showScreen('replay');

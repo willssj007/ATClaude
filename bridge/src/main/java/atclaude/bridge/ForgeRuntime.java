@@ -88,6 +88,8 @@ public final class ForgeRuntime {
             @Override public void setMaximum(final int m) { maximum = m; }
         };
 
+        // Le dossier des cartes perso doit exister avant que Forge le lise (sinon il n'en charge aucune).
+        new File(user, "custom" + File.separator + "cards").mkdirs();
         FModel.initialize(progress, prefs -> {
             prefs.setPref(FPref.UI_LANGUAGE, "fr-FR");
             if (prefs.getPref(FPref.PLAYER_NAME).trim().isEmpty()) {
@@ -102,6 +104,8 @@ public final class ForgeRuntime {
             prefs.setPref(FPref.UI_ENABLE_AI_CHEATS, "false");
             prefs.setPref(FPref.MULLIGAN_RULE, "London");
             prefs.setPref(FPref.LOAD_CARD_SCRIPTS_LAZILY, "false");
+            // Cartes perso de l'Atelier permises dans les decks (sinon Forge refuse tout deck qui en contient).
+            prefs.setPref(FPref.ALLOW_CUSTOM_CARDS_IN_DECKS_CONFORMANCE, "true");
             // Pas de decks générés « d'après les cartes » (matrices de res/deckgendecks, dont un fichier sérialisé de
             // 7 Mo lu au démarrage, très lent sur téléphone) : l'application tire ses decks aléatoires autrement.
             prefs.setPref(FPref.DECKGEN_CARDBASED, "false");
@@ -121,6 +125,7 @@ public final class ForgeRuntime {
             return null;
         });
         final long forgeDone = System.nanoTime();
+        CustomCards.init();
         French.prebuildVariantMappings();
         System.out.println("Démarrage : Forge " + (forgeDone - started) / 1_000_000 + " ms, traductions "
                 + (System.nanoTime() - forgeDone) / 1_000_000 + " ms");

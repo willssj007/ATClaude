@@ -59,6 +59,11 @@ public final class Bridge {
     private final Map<Integer, JsonObject> openDialogs = new ConcurrentHashMap<>();
     private final AtomicInteger dialogIds = new AtomicInteger();
     private final Catalog catalog = new Catalog();
+
+    {
+        CustomCards.onChanged = catalog::invalidateIndex;
+        CustomCards.officialFrench = catalog::officialFrench;
+    }
     private final Account account = new Account(this, catalog);
     private volatile MatchSession session;
 
@@ -240,7 +245,7 @@ public final class Bridge {
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
             "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster", "openBoosters",
             "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic",
-            "careerSwapChallenge");
+            "careerSwapChallenge", "customCards", "customValidate", "customSave", "customDelete", "customTypes");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -326,6 +331,11 @@ public final class Bridge {
         });
     }
 
+    /** Chaîne facultative d'un message : null si absente ou nulle. */
+    private static String optString(final JsonObject m, final String key) {
+        return m.has(key) && !m.get(key).isJsonNull() ? m.get(key).getAsString() : null;
+    }
+
     private void dispatch(final String type, final JsonObject message) {
         final JsonElement rid = message.get("rid");
         try {
@@ -359,6 +369,17 @@ public final class Bridge {
                 return hello();
             case "searchCards":
                 return catalog.search(m.getAsJsonObject("query"));
+            case "customCards":
+                return CustomCards.state();
+            case "customValidate":
+                return CustomCards.validate(m.get("script").getAsString(), optString(m, "previous"));
+            case "customSave":
+                return CustomCards.save(m.get("script").getAsString(), optString(m, "previous"), optString(m, "art"),
+                        m.has("form") && !m.get("form").isJsonNull() ? m.get("form").toString() : null);
+            case "customDelete":
+                return CustomCards.delete(m.get("name").getAsString());
+            case "customTypes":
+                return CustomCards.setTypes(m.getAsJsonArray("types"));
             case "cardInfo":
                 return catalog.cardInfo(m.get("name").getAsString());
             case "prints":

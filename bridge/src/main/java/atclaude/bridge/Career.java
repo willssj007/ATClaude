@@ -488,6 +488,9 @@ final class Career {
         if (isBasic(pc)) {
             throw new IllegalArgumentException("Les terrains de base sont illimités.");
         }
+        if (pc.getRules().isCustom()) {
+            throw new IllegalArgumentException(CUSTOM_ONLY_SANDBOX);
+        }
         final JsonObject coll = collection(c);
         if (coll.has(pc.getName())) {
             throw new IllegalArgumentException("Tu as déjà " + Catalog.translated(pc.getName()) + ".");
@@ -509,6 +512,8 @@ final class Career {
         o.addProperty("spent", r);
         return o;
     }
+
+    static final String CUSTOM_ONLY_SANDBOX = "Les cartes perso de l'Atelier se jouent en Sandbox seulement";
 
     static final Map<String, String> RARITY_FR = Map.of("common", "commun", "uncommon", "peu commun", "rare", "rare", "mythic", "mythique");
 
@@ -605,6 +610,15 @@ final class Career {
         final Deck deck = catalog.deckFromJson(json, unknown);
         if (!unknown.isEmpty()) {
             throw new IllegalArgumentException("Cartes inconnues : " + String.join(", ", unknown));
+        }
+        final List<String> custom = new ArrayList<>();
+        for (final Map.Entry<PaperCard, Integer> e : deck.getAllCardsInASinglePool(true, true)) {
+            if (e.getKey().getRules().isCustom() && !custom.contains(e.getKey().getName())) {
+                custom.add(e.getKey().getName());
+            }
+        }
+        if (!custom.isEmpty()) {
+            throw new IllegalArgumentException(CUSTOM_ONLY_SANDBOX + " (" + String.join(", ", custom) + ")");
         }
         final List<String> lack = missing(deck);
         if (!lack.isEmpty()) {
