@@ -150,6 +150,11 @@ public final class Main extends UIApplicationDelegateAdapter {
         }
         // Mémo des capacités statiques de Forge, prévu pour iOS : moins d'allocations, IA plus rapide.
         System.setProperty("forge.staticMemo", "on");
+        // Essai dans le simulateur (scripts/ios-sim-test.sh) : la synchronisation parle à un faux GitHub.
+        final String githubApi = System.getenv("ATCLAUDE_GITHUB_API");
+        if (githubApi != null && !githubApi.isEmpty()) {
+            System.setProperty("atclaude.githubApi", githubApi);
+        }
         try (NSAutoreleasePool pool = new NSAutoreleasePool()) {
             UIApplication.main(args, null, Main.class);
         }

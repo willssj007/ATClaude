@@ -73,8 +73,13 @@ xcrun simctl bootstatus "$UDID" -b > /dev/null
 # Paysage : l'application ne s'affiche qu'en paysage hors des écrans des decks.
 xcrun simctl ui "$UDID" appearance dark 2>/dev/null || true
 xcrun simctl install "$UDID" "$APP"
+# Faux GitHub (le compte de l'essai, déjà synchronisé depuis un autre appareil) : la restauration du compte est
+# testée sans vrai compte. Le simulateur partage le réseau du Mac.
+python3 "$ROOT/scripts/ios/fake-github.py" 8799 "$ROOT/scripts/ios/fake-gist.json" > "$OUT/fake-github.log" 2>&1 &
+FAKE_GH=$!
+trap 'kill "$FAKE_GH" 2>/dev/null' EXIT
 START="$(date +%s)"
-xcrun simctl launch "$UDID" "$APP_ID" -autotest | tee "$OUT/sim-launch.txt"
+SIMCTL_CHILD_ATCLAUDE_GITHUB_API="http://127.0.0.1:8799/" xcrun simctl launch "$UDID" "$APP_ID" -autotest | tee "$OUT/sim-launch.txt"
 for t in 20 45 90 150 240 330 420 480 600; do
   [ "$t" -gt "$DURATION" ] && break
   now=$(( $(date +%s) - START ))
@@ -90,5 +95,5 @@ cp "$DATA/Library/Application Support/atclaude/app.log" "$OUT/app.log" 2>/dev/nu
 xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate "process == \"$APP_EXEC\"" > "$OUT/sim-system.log" 2>/dev/null || true
 cp ~/Library/Logs/DiagnosticReports/"$APP_EXEC"* "$OUT/" 2>/dev/null || true
 # Le journal de l'application passe aussi par le journal système du simulateur (sorties standard).
-grep -h 'autotest\|ÉCHEC\|erreur\|Exception' "$OUT/app.log" "$OUT/sim-system.log" | cut -c1-400 | head -120 > "$OUT/summary.txt" || true
+grep -h 'autotest\|ÉCHEC\|erreur\|Erreur\|Exception\|Error' "$OUT/app.log" "$OUT/sim-system.log" | cut -c1-600 | head -300 > "$OUT/summary.txt" || true
 cat "$OUT/summary.txt"
