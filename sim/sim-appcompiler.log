@@ -1,0 +1,5 @@
+RoboVM has detected that you are running on a slow HDD. Please consider mounting a RAM disk.
+To create a 2GB RAM disk, run this in your terminal:
+SIZE=2048 ; diskutil erasevolume HFS+ 'RoboVM RAM Disk' `hdiutil attach -nomount ram://$((SIZE * 2048))`
+See http://docs.robovm.com/ for more info
+Skipping code signing. The resulting app will be unsigned and will not run on unjailbroken devices

@@ -1,0 +1,1 @@
+-rw-r--r--  1 runner  staff  66811997 Nov  4 15:05 ArcaneTable-iOS.ipa
