@@ -47,7 +47,11 @@ function loadDirect(node, img, key, url) {
   urls.then((u) => {
     const list = [u.local, u.en].filter(Boolean);
     const next = (i) => {
-      if (i >= list.length || img.dataset.src !== url) {
+      if (img.dataset.src !== url) {
+        return;
+      }
+      if (i >= list.length) {
+        retryLater(node, img, url);
         return;
       }
       img.onload = () => {
@@ -60,6 +64,35 @@ function loadDirect(node, img, key, url) {
     };
     next(0);
   });
+}
+
+/** iPhone : délais avant de redemander au pont une image qu'il n'avait pas encore (il continue de la télécharger). */
+const RETRY_DELAYS = [4000, 12000, 30000, 60000];
+
+/**
+ * iPhone : ni le pont (pas encore téléchargée, au premier lancement surtout) ni Scryfall (trop de demandes à la
+ * fois) n'ont donné l'image. Le pont continue de la télécharger : on la lui redemande un peu plus tard, plutôt
+ * que d'abandonner jusqu'au prochain lancement.
+ */
+function retryLater(node, img, url) {
+  const n = Number(img.dataset.retry || 0);
+  if (n >= RETRY_DELAYS.length) {
+    return;
+  }
+  img.dataset.retry = String(n + 1);
+  setTimeout(() => {
+    if (img.dataset.src !== url || !node.isConnected) {
+      return;
+    }
+    img.onload = () => {
+      if (img.dataset.src === url) {
+        missing.delete(url);
+        node.classList.add('has-img');
+      }
+    };
+    img.onerror = () => retryLater(node, img, url);
+    img.src = url + '&retry=' + (n + 1);
+  }, RETRY_DELAYS[n]);
 }
 
 /** Charge l'image d'une carte dans l'élément, si les images sont activées. */
@@ -82,6 +115,7 @@ export function loadImage(node, key, bust = '') {
   }
   img.dataset.key = key;
   img.dataset.src = url;
+  delete img.dataset.retry;
   node.classList.remove('has-img');
   img.onload = () => {
     if (img.dataset.src === url) {
