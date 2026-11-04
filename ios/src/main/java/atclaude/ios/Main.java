@@ -46,6 +46,7 @@ public final class Main extends UIApplicationDelegateAdapter {
         window.makeKeyAndVisible();
         setWindow(window);
         if (bridge == null) {
+            Bridge.setIos(true);
             bridge = new Bridge(controller::deliver);
             controller.setBridge(bridge);
             final Object version = NSBundle.getMainBundle().getInfoDictionaryObject("CFBundleShortVersionString");

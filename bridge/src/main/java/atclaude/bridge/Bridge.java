@@ -45,6 +45,13 @@ public final class Bridge {
         appVersion = version == null ? "" : version;
     }
 
+    /** iPhone et iPad : la préparation du démarrage ne retient pas les écrans du menu (voir {@link #warmUp}). */
+    private static volatile boolean ios;
+
+    public static void setIos(final boolean value) {
+        ios = value;
+    }
+
     private final Transport transport;
     private final ExecutorService edt;
     private volatile Thread edtThread;
@@ -270,6 +277,26 @@ public final class Bridge {
      * une demande de l'interface passe entre deux étapes, et chaque écran s'ouvre ensuite sans attendre.
      */
     void warmUp() {
+        if (ios) {
+            // iPhone : l'analyse des préconstruits dure plus d'une minute ; sur le fil du catalogue, le profil, les
+            // decks et les statistiques du menu attendaient derrière. Elle se fait donc sur un fil à elle.
+            warmStep(java.util.List.of(
+                    () -> catalog.search(new JsonObject()),
+                    catalog::listDecks,
+                    Career::boosterSets,
+                    () -> catalog.refillRandomPool(0)), 0);
+            final Thread precons = new Thread(() -> {
+                try {
+                    Precons.all();
+                } catch (final RuntimeException e) {
+                    // simple préparation : le premier écran qui en a besoin refera l'analyse
+                }
+            }, "atclaude-precons");
+            precons.setDaemon(true);
+            precons.setPriority(Thread.MIN_PRIORITY);
+            precons.start();
+            return;
+        }
         final java.util.List<Runnable> steps = java.util.List.of(
                 () -> catalog.search(new JsonObject()),
                 catalog::listDecks,
@@ -286,12 +313,14 @@ public final class Bridge {
         catalogThread.execute(() -> {
             final Thread t = Thread.currentThread();
             t.setPriority(Thread.MIN_PRIORITY);
+            final long started = System.nanoTime();
             try {
                 steps.get(i).run();
             } catch (final RuntimeException e) {
                 // simple préparation : l'écran refera le calcul et montrera l'erreur s'il y en a une
             } finally {
                 t.setPriority(Thread.NORM_PRIORITY);
+                System.out.println("Préparation " + (i + 1) + "/" + steps.size() + " : " + (System.nanoTime() - started) / 1_000_000 + " ms");
             }
             warmStep(steps, i + 1);
         });
