@@ -62,13 +62,13 @@ body {
   font: 14px/1.4 var(--ui-font);
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
-  /* Pas de sélection de texte ni de menu « Copier / Enregistrer dans Photos » à l'appui long (iOS veut le préfixe) :
-     l'appui long sert à lire une carte. Seuls les champs de saisie restent sélectionnables. */
-  -webkit-user-select: none; user-select: none;
-  -webkit-touch-callout: none;
+  user-select: none;
 }
-img { -webkit-touch-callout: none; -webkit-user-drag: none; }
-input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+/* iPhone : pas de sélection de texte ni de menu « Copier / Enregistrer dans Photos » à l'appui long (iOS veut le
+   préfixe) : l'appui long sert à lire une carte. Seuls les champs de saisie restent sélectionnables. */
+html.ios body { -webkit-user-select: none; -webkit-touch-callout: none; }
+html.ios img { -webkit-touch-callout: none; -webkit-user-drag: none; }
+html.ios input, html.ios textarea, html.ios [contenteditable="true"] { -webkit-user-select: text; -webkit-touch-callout: default; }
 button, input, select, textarea { font: inherit; color: inherit; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }

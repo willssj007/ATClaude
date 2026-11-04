@@ -500,6 +500,16 @@ async function hello() {
 const checkUnlocks = debounce(() => announceUnlocks().catch(() => {}), 1500);
 
 function init() {
+  if (bridge.ios) {
+    // iPhone : règles propres à iOS (appui long, voir app.css). Une sélection qui démarre hors d'un champ de saisie
+    // (doigt encore posé quand la carte s'agrandit) est annulée.
+    document.documentElement.classList.add('ios');
+    document.addEventListener('selectstart', (e) => {
+      if (!(e.target instanceof Element && e.target.closest('input, textarea, [contenteditable="true"]'))) {
+        e.preventDefault();
+      }
+    });
+  }
   applyThemes();
   initAudio();
   enhanceSelects();

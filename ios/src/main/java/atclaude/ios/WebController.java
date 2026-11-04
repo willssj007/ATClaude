@@ -11,6 +11,7 @@ import org.robovm.apple.uikit.UIApplicationOpenURLOptions;
 import org.robovm.apple.uikit.UIColor;
 import org.robovm.apple.uikit.UIDevice;
 import org.robovm.apple.uikit.UIEdgeInsets;
+import org.robovm.apple.uikit.UIInterfaceOrientation;
 import org.robovm.apple.uikit.UIInterfaceOrientationMask;
 import org.robovm.apple.uikit.UIScreen;
 import org.robovm.apple.uikit.UIScrollViewContentInsetAdjustmentBehavior;
@@ -164,15 +165,50 @@ final class WebController extends UIViewController {
         sendInsets();
     }
 
-    /** Marges de sécurité (encoche, coins arrondis) : la page les reçoit comme l'encoche d'Android. */
+    /** Un demi-tour d'un paysage à l'autre ne change pas les marges, mais l'encoche passe de l'autre côté. */
+    @Override
+    public void viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews();
+        sendInsets();
+    }
+
+    /** Hauteur couverte par l'encoche (ou la Dynamic Island) en paysage, au milieu du bord : la plus haute des deux. */
+    private static final double NOTCH_LENGTH = 230;
+    private String sentInsets;
+
+    /**
+     * Marges de sécurité (encoche, coins arrondis) et place de l'encoche : la page les reçoit comme celles d'Android.
+     * iOS donne les mêmes marges à gauche et à droite en paysage ; l'encoche n'est que d'un côté (le haut de
+     * l'iPhone), au milieu du bord : le plateau, qui va jusqu'aux bords, ne s'en écarte que là.
+     */
     private void sendInsets() {
         if (web == null) {
             return;
         }
         final UIEdgeInsets i = getView().getSafeAreaInsets();
+        final double w = getView().getBounds().getWidth();
+        final double h = getView().getBounds().getHeight();
+        final UIInterfaceOrientation o = getView().getWindow() == null || getView().getWindow().getWindowScene() == null
+                ? null : getView().getWindow().getWindowScene().getInterfaceOrientation();
+        String rect = null;
+        if (o == UIInterfaceOrientation.LandscapeRight && i.getLeft() > 0) {
+            rect = box(0, (h - NOTCH_LENGTH) / 2, i.getLeft(), (h + NOTCH_LENGTH) / 2);
+        } else if (o == UIInterfaceOrientation.LandscapeLeft && i.getRight() > 0) {
+            rect = box(w - i.getRight(), (h - NOTCH_LENGTH) / 2, w, (h + NOTCH_LENGTH) / 2);
+        } else if (o == UIInterfaceOrientation.Portrait && i.getTop() > 0) {
+            rect = box((w - NOTCH_LENGTH) / 2, 0, (w + NOTCH_LENGTH) / 2, i.getTop());
+        }
         final String json = "{\"left\":" + i.getLeft() + ",\"top\":" + i.getTop() + ",\"right\":" + i.getRight()
-                + ",\"bottom\":" + i.getBottom() + "}";
+                + ",\"bottom\":" + i.getBottom() + ",\"rects\":[" + (rect == null ? "" : rect) + "]}";
+        if (json.equals(sentInsets)) {
+            return;
+        }
+        sentInsets = json;
         web.evaluateJavaScript("window.__atCutout && window.__atCutout(" + json + ")", null);
+    }
+
+    private static String box(final double l, final double t, final double r, final double b) {
+        return "{\"l\":" + l + ",\"t\":" + t + ",\"r\":" + r + ",\"b\":" + b + "}";
     }
 
     private static void openExternal(final String url) {
