@@ -24,12 +24,14 @@ APP_EXEC="$(sed -n 's/^app\.executable=//p' "$PROPS")"
 MAIN="$(sed -n 's/^app\.mainclass=//p' "$PROPS")"
 APP="$TMPD/sim/$APP_EXEC.app"
 
-echo "=== compilation pour le simulateur (arm64) ==="
+# Mac Apple : simulateur arm64 ; Mac Intel (quand GitHub n'a pas de Mac Apple libre) : simulateur x86_64.
+SIM_ARCH="$([ "$(uname -m)" = "arm64" ] && echo arm64-simulator || echo x86_64)"
+echo "=== compilation pour le simulateur ($SIM_ARCH) ==="
 rm -f "$TMPD/config.xml"
 mkdir -p "$TMPD"
 set -m
 # maven.main.skip : la phase « compile » de robovm:ipad-sim ne remplace pas les classes converties (voir build-ios.sh).
-(cd "$IOS" && mvn -B robovm:ipad-sim -Dmaven.repo.local="$CLONE" -Drobovm.arch=arm64-simulator -Dmaven.main.skip=true > "$OUT/sim-build.log" 2>&1) &
+(cd "$IOS" && mvn -B robovm:ipad-sim -Dmaven.repo.local="$CLONE" -Drobovm.arch="$SIM_ARCH" -Dmaven.main.skip=true > "$OUT/sim-build.log" 2>&1) &
 MVN=$!
 set +m
 while kill -0 "$MVN" 2>/dev/null && [ ! -s "$TMPD/config.xml" ]; do sleep 5; done
