@@ -19,7 +19,6 @@ import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -49,9 +48,9 @@ final class CustomCards {
     /** Nom de la carte (celui du script) → son fichier. */
     private static final Map<String, File> FILES = new ConcurrentHashMap<>();
     /** Supprimées pendant cette session : Forge les garde jusqu'au prochain lancement, les recherches non. */
-    private static final Set<String> DELETED = ConcurrentHashMap.newKeySet();
+    private static final Set<String> DELETED = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     /** Types ajoutés à la liste de Forge par l'application (les seuls qu'on puisse en retirer). */
-    private static final Set<String> ADDED_TYPES = ConcurrentHashMap.newKeySet();
+    private static final Set<String> ADDED_TYPES = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /** Index de recherche du catalogue à refaire (posé par le pont). */
     static volatile Runnable onChanged = () -> { };
@@ -410,7 +409,7 @@ final class CustomCards {
             delete(artFile);
         } else {
             final String b64 = art.startsWith("data:") ? art.substring(art.indexOf(',') + 1) : art;
-            final byte[] bytes = Base64.getDecoder().decode(b64);
+            final byte[] bytes = B64.decode(b64);
             if (bytes.length > 2_000_000) {
                 throw new IllegalArgumentException("Illustration trop lourde.");
             }
@@ -586,7 +585,7 @@ final class CustomCards {
             final File art = new File(artDir(), base(e.getValue()) + ".jpg");
             if (art.isFile()) {
                 try {
-                    c.addProperty("art", Base64.getEncoder().encodeToString(Files.readAllBytes(art.toPath())));
+                    c.addProperty("art", B64.encode(Files.readAllBytes(art.toPath())));
                 } catch (final IOException ex) {
                     // sans illustration
                 }
