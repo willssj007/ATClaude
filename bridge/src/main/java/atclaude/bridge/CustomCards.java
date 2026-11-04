@@ -496,6 +496,62 @@ final class CustomCards {
         return out.toString();
     }
 
+    // ------------------------------------------------------------------ affichage
+
+    private static final Pattern FRAME_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,20}");
+
+    /**
+     * Réglages d'affichage d'une carte perso, écrits dans son script (lignes « SVar:AtelierFrame:… »,
+     * « SVar:AtelierFrameColor:… », « SVar:AtelierLang:en ») : cadre, couleur du cadre, langue du texte.
+     */
+    static void addDisplay(final JsonObject o, final CardRules rules) {
+        String frame = "modern";
+        String color = "auto";
+        String lang = "fr";
+        if (rules != null && rules.getMainPart() != null) {
+            for (final Map.Entry<String, String> v : rules.getMainPart().getVariables()) {
+                final String value = v.getValue() == null ? "" : v.getValue().trim();
+                if (!FRAME_VALUE.matcher(value).matches()) {
+                    continue;
+                }
+                switch (v.getKey()) {
+                    case "AtelierFrame" -> frame = value;
+                    case "AtelierFrameColor" -> color = value;
+                    case "AtelierLang" -> lang = "en".equals(value) ? "en" : "fr";
+                    default -> { }
+                }
+            }
+        }
+        o.addProperty("frame", frame);
+        o.addProperty("frameColor", color);
+        o.addProperty("lang", lang);
+    }
+
+    /** La carte perso de ce nom, telle que Forge l'a lue (null si ce n'en est pas une). */
+    static CardRules rules(final String name) {
+        final CardRules r = name == null ? null : FModel.getMagicDb().getCommonCards().getRules(name, false);
+        return r != null && r.isCustom() ? r : null;
+    }
+
+    /** Ligne de type dans la langue de la carte : « Legendary Creature — Human Wizard » en anglais. */
+    static String typeLine(final forge.card.CardTypeView type, final String lang) {
+        if (!"en".equals(lang)) {
+            return typeLine(type);
+        }
+        final List<String> head = new ArrayList<>();
+        for (final CardType.Supertype st : type.getSupertypes()) {
+            head.add(st.name());
+        }
+        for (final CardType.CoreType c : type.getCoreTypes()) {
+            head.add(c.name());
+        }
+        final StringBuilder sb = new StringBuilder(String.join(" ", head));
+        if (!type.getSubtypes().isEmpty()) {
+            sb.append(" — ").append(String.join(" ", type.getSubtypes()));
+        }
+        return sb.toString().trim();
+    }
+
     /** Ligne de type en français (Forge n'a pas de traduction pour une carte perso) : « Créature légendaire : Human X-Men ». */
     static String typeLine(final forge.card.CardTypeView type) {
         final List<String> core = new ArrayList<>();

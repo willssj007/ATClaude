@@ -305,8 +305,10 @@ final class GameSerializer {
             // Carte perso : cadre dessiné avec son illustration, type en français.
             o.addProperty("custom", true);
             o.addProperty("image", "");
-            o.addProperty("typeLine", CustomCards.typeLine(s.getType()));
-            if (inGame) {
+            CustomCards.addDisplay(o, CustomCards.rules(s.getName()));
+            final boolean english = "en".equals(o.get("lang").getAsString());
+            o.addProperty("typeLine", CustomCards.typeLine(s.getType(), o.get("lang").getAsString()));
+            if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
             }
             final String art = CustomCards.artKey(s.getName());

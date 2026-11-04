@@ -1,5 +1,6 @@
 // Rendu d'une carte (catalogue ou partie) : image Scryfall servie par le pont, cadre dessiné en attendant.
 
+import {customFrameHtml} from './frames.js';
 import {bridge} from './bridge.js';
 import {esc, el, frameClass, manaHtml, prefs, rulesHtml} from './util.js';
 
@@ -20,6 +21,9 @@ function artStyle(card) {
 }
 
 function frameHtml(card) {
+  if (card.custom) {
+    return customFrameHtml(card, artStyle(card));
+  }
   const pt = ptText(card);
   const name = card.nameFr || card.name || '';
   return `<div class="frame ${frameClass(card)}${card.custom ? ' custom' : ''}">

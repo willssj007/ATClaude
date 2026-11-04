@@ -1,0 +1,161 @@
+// Cadres des cartes perso (Atelier) : dessinés pour l'application, dans l'esprit des grandes époques des cartes
+// (moderne, classique, ancien, futur, vitrine, Nyx, art étendu, sans bord, illustration pleine, jeton), chacun aux
+// couleurs de la carte. Ce ne sont pas les cadres officiels (images de Wizards of the Coast) : tout est en CSS.
+
+import {esc, manaHtml, rulesHtml} from './util.js';
+import {icon} from './icons.js';
+
+export const FRAMES = [
+  ['modern', 'Moderne'], ['classic', 'Classique'], ['retro', 'Ancien'], ['future', 'Futur'], ['showcase', 'Vitrine'],
+  ['nyx', 'Nyx'], ['extended', 'Art étendu'], ['borderless', 'Sans bord'], ['fullart', 'Illustration pleine'], ['token', 'Jeton'],
+];
+
+export const FRAME_COLORS = [
+  ['auto', 'Auto'], ['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['M', 'Or'],
+  ['A', 'Artefact'], ['C', 'Incolore'], ['L', 'Terrain'],
+];
+
+// Teinte de chaque partie du cadre : f le cadre, b les bandeaux (nom, type), x la boîte de texte, e les filets,
+// ink le texte posé directement sur le cadre (cadre ancien).
+const PALETTE = {
+  W: {f: '#ddd4ba', b: '#f1ead4', x: '#f5f1e4', e: '#8b8064', ink: '#1d1a14'},
+  U: {f: '#2f6eaa', b: '#c6dbec', x: '#dfe9f2', e: '#1c4873', ink: '#ffffff'},
+  B: {f: '#3f393a', b: '#cdc6c3', x: '#dbd5d2', e: '#211c1d', ink: '#ffffff'},
+  R: {f: '#c4472d', b: '#f0c9b7', x: '#f3ddd2', e: '#7a2315', ink: '#ffffff'},
+  G: {f: '#2f7a48', b: '#cbdfc2', x: '#dce8d4', e: '#1c4f2f', ink: '#ffffff'},
+  M: {f: '#c9a24c', b: '#f1dfab', x: '#f3e9cb', e: '#7b5d1e', ink: '#ffffff'},
+  A: {f: '#9da2a8', b: '#e0e3e6', x: '#e9eaec', e: '#52575d', ink: '#ffffff'},
+  C: {f: '#cdc8bf', b: '#edeae4', x: '#f2f0eb', e: '#78746c', ink: '#1d1a14'},
+  L: {f: '#a88b66', b: '#e3d4bd', x: '#ece2d2', e: '#5c4831', ink: '#ffffff'},
+};
+
+/** Couleurs du cadre : celle choisie, sinon d'après la carte (deux couleurs : cadre partagé ; trois et plus : or). */
+export function frameColors(card) {
+  const pick = card.frameColor;
+  if (pick && pick !== 'auto' && PALETTE[pick]) {
+    return [pick];
+  }
+  if (card.land) {
+    return ['L'];
+  }
+  const colors = [...String(card.colors || '')].filter(c => 'WUBRG'.includes(c));
+  if (!colors.length) {
+    return [/Artefact|Artifact/.test(card.typeLine || '') ? 'A' : 'C'];
+  }
+  return colors.length === 2 ? colors : colors.length === 1 ? colors : ['M'];
+}
+
+function typeIcon(typeLine) {
+  const t = typeLine || '';
+  if (/Planeswalker/.test(t)) return icon('crown');
+  if (/Créature|Creature/.test(t)) return icon('swords');
+  if (/Éphémère|Instant/.test(t)) return icon('bolt');
+  if (/Rituel|Sorcery/.test(t)) return icon('torch');
+  if (/Terrain|Land/.test(t)) return icon('mountain');
+  if (/Artefact|Artifact/.test(t)) return icon('gear');
+  if (/Enchantement|Enchantment/.test(t)) return icon('spark');
+  return icon('spark');
+}
+
+// Place de chaque cadre, en centièmes de la largeur de la carte : largeur utile du nom (t), du type (y), et de la boîte
+// de texte (largeur w, hauteur h, sans les marges). Le texte rétrécit jusqu'à tenir, comme sur les vraies cartes.
+const SPACE = {
+  modern: {t: 82.4, y: 74.4, w: 78, h: 35.3}, nyx: {t: 82.4, y: 74.4, w: 78, h: 35.3}, extended: {t: 82.4, y: 74.4, w: 78, h: 35.3},
+  showcase: {t: 82.4, y: 74.4, w: 78, h: 35.3}, fullart: {t: 82.4, y: 74.4, w: 78, h: 35.3},
+  classic: {t: 80, y: 72, w: 74.8, h: 31.4}, retro: {t: 82.8, y: 80, w: 72, h: 37},
+  future: {t: 84.4, y: 62, w: 83.6, h: 35}, borderless: {t: 84.8, y: 76.8, w: 84, h: 34.8}, token: {t: 57.6, y: 74.4, w: 78, h: 16.6},
+};
+const FONT = '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Noto Serif", serif';
+let measureCtx = null;
+const widths = new Map();
+
+/** Largeur d'un texte en unités de police (1 = la taille de la police). */
+function textWidth(text, bold) {
+  const key = (bold ? 'b' : 'r') + text;
+  let w = widths.get(key);
+  if (w === undefined) {
+    if (!measureCtx) {
+      measureCtx = document.createElement('canvas').getContext('2d');
+    }
+    measureCtx.font = `${bold ? 700 : 400} 100px ${FONT}`;
+    w = measureCtx.measureText(text).width / 100;
+    if (widths.size > 5000) {
+      widths.clear();
+    }
+    widths.set(key, w);
+  }
+  return w;
+}
+
+/** Nombre de lignes du texte de règles à cette taille de police (en unités), pour cette largeur. */
+function lineCount(paras, size, width) {
+  const space = textWidth(' ', false) * size;
+  let lines = 0;
+  for (const p of paras) {
+    let line = 0;
+    lines++;
+    for (const word of p.split(/\s+/).filter(Boolean)) {
+      // Un symbole de mana ({T}, {2}) prend à peu près la place d'un cadratin.
+      const w = (/^\{[^}]+\}/.test(word) ? 0.95 * (word.match(/\{/g) || []).length + textWidth(word.replace(/\{[^}]+\}/g, ''), false) : textWidth(word, false)) * size;
+      if (line && line + space + w > width) {
+        lines++;
+        line = w;
+      } else {
+        line += (line ? space : 0) + w;
+      }
+    }
+  }
+  return lines;
+}
+
+function rulesScale(text, box) {
+  const paras = String(text || '').replace(/\\n/g, '\n').split('\n').filter(p => p.trim());
+  if (!paras.length) {
+    return 1;
+  }
+  for (let s = 1; s > 0.45; s -= 0.03) {
+    const size = 6 * s;
+    if (lineCount(paras, size, box.w) * size * 1.16 <= box.h) {
+      return Math.round(s * 100) / 100;
+    }
+  }
+  return 0.45;
+}
+
+function clampScale(v) {
+  return Math.round(Math.max(0.45, Math.min(1, v)) * 100) / 100;
+}
+
+/** Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou ""). */
+export function customFrameHtml(card, art) {
+  const style = FRAMES.some(f => f[0] === card.frame) ? card.frame : 'modern';
+  const cols = frameColors(card);
+  const l = PALETTE[cols[0]];
+  const r = PALETTE[cols[1] || cols[0]];
+  const name = card.nameFr || card.name || '';
+  const typeLine = card.typeLine || '';
+  // En partie, Forge sépare les mots-clés du reste par une ligne vide (et des \r) : une ligne suffit sur la carte.
+  const text = String(card.text || '').replace(/\r/g, '').replace(/\n{2,}/g, '\n').trim();
+  const loyalty = card.power === undefined && card.loyalty !== undefined && card.loyalty !== null && card.loyalty !== '';
+  const pt = card.power !== undefined && card.toughness !== undefined ? `${card.power}/${card.toughness}` : loyalty ? String(card.loyalty) : '';
+  const pips = card.cost ? (String(card.cost).match(/\{[^}]+\}/g) || String(card.cost).trim().split(/\s+/)).length : 0;
+  const legendary = /légendaire|Legendary/.test(typeLine);
+  // Le nom, le type et le texte rétrécissent pour tenir (comme sur les vraies cartes, au lieu d'être coupés).
+  const box = SPACE[style];
+  const costWidth = style === 'token' || !pips ? 0 : pips * 5.96 + (pips - 1) * 0.5 + 2;
+  const sn = clampScale(0.93 * (box.t - costWidth) / Math.max(1, textWidth(name, true) * 6.6));
+  const st = clampScale(0.93 * box.y / Math.max(1, textWidth(typeLine, true) * (style === 'retro' ? 5 : 5.4)));
+  const sr = rulesScale(text, box);
+  const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}`;
+  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${art ? '' : ' cf-noart'}" style="${vars}">
+    <div class="cf-bg"></div>
+    <div class="cf-art"${art}></div>
+    <div class="cf-crown"></div>
+    <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span></div>
+    <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span><span class="cf-set">${icon('anvil')}</span></div>
+    <div class="cf-icon">${typeIcon(typeLine)}</div>
+    <div class="cf-box"><div class="cf-rules">${rulesHtml(text)}</div></div>
+    ${pt ? `<div class="cf-pt${loyalty ? ' cf-loy' : ''}">${esc(pt)}</div>` : ''}
+    <div class="cf-foot">Atelier</div>
+  </div>`;
+}

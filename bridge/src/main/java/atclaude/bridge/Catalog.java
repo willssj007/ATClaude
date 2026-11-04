@@ -358,7 +358,8 @@ final class Catalog {
             // Carte perso : cadre dessiné avec son illustration (pas d'image Scryfall), type en français.
             o.addProperty("custom", true);
             o.addProperty("image", "");
-            o.addProperty("typeLine", CustomCards.typeLine(rules.getType()));
+            CustomCards.addDisplay(o, rules);
+            o.addProperty("typeLine", CustomCards.typeLine(rules.getType(), o.get("lang").getAsString()));
             final String art = CustomCards.artKey(nameEn);
             if (art != null) {
                 o.addProperty("customArt", art);

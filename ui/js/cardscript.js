@@ -29,27 +29,27 @@ export const WHEN = [
 ];
 
 export const TOKENS = [
-  ['w_1_1_soldier', 'Soldat 1/1 blanc', 'de créature 1/1 blanche Soldat'],
-  ['w_1_1_human', 'Humain 1/1 blanc', 'de créature 1/1 blanche Humain'],
-  ['w_1_1_spirit_flying', 'Esprit 1/1 blanc, vol', 'de créature 1/1 blanche Esprit avec le vol'],
-  ['w_2_2_cat', 'Chat 2/2 blanc', 'de créature 2/2 blanche Chat'],
-  ['w_4_4_angel_flying', 'Ange 4/4 blanc, vol', 'de créature 4/4 blanche Ange avec le vol'],
-  ['u_1_1_bird_flying', 'Oiseau 1/1 bleu, vol', 'de créature 1/1 bleue Oiseau avec le vol'],
-  ['u_2_2_drake_flying', 'Drakôn 2/2 bleu, vol', 'de créature 2/2 bleue Drakôn avec le vol'],
-  ['b_1_1_rat', 'Rat 1/1 noir', 'de créature 1/1 noire Rat'],
-  ['b_2_2_zombie', 'Zombie 2/2 noir', 'de créature 2/2 noire Zombie'],
-  ['r_1_1_goblin', 'Gobelin 1/1 rouge', 'de créature 1/1 rouge Gobelin'],
-  ['r_1_1_elemental_haste', 'Élémental 1/1 rouge, célérité', 'de créature 1/1 rouge Élémental avec la célérité'],
-  ['r_5_5_dragon_flying', 'Dragon 5/5 rouge, vol', 'de créature 5/5 rouge Dragon avec le vol'],
-  ['g_1_1_saproling', 'Saprobionte 1/1 vert', 'de créature 1/1 verte Saprobionte'],
-  ['g_1_1_elf_warrior', 'Elfe guerrier 1/1 vert', 'de créature 1/1 verte Elfe et Guerrier'],
-  ['g_2_2_wolf', 'Loup 2/2 vert', 'de créature 2/2 verte Loup'],
-  ['g_3_3_beast', 'Bête 3/3 verte', 'de créature 3/3 verte Bête'],
-  ['c_1_1_a_thopter_flying', 'Mécanoptère 1/1, vol', 'de créature-artefact 1/1 incolore Mécanoptère avec le vol'],
-  ['c_1_1_a_servo', 'Servo 1/1', 'de créature-artefact 1/1 incolore Servo'],
-  ['c_a_treasure_sac', 'Trésor', 'Trésor'],
-  ['c_a_clue_draw', 'Indice', 'Indice'],
-  ['c_a_food_sac', 'Nourriture', 'Nourriture'],
+  ['w_1_1_soldier', 'Soldat 1/1 blanc', 'de créature 1/1 blanche Soldat', '1/1 white Soldier creature', ''],
+  ['w_1_1_human', 'Humain 1/1 blanc', 'de créature 1/1 blanche Humain', '1/1 white Human creature', ''],
+  ['w_1_1_spirit_flying', 'Esprit 1/1 blanc, vol', 'de créature 1/1 blanche Esprit avec le vol', '1/1 white Spirit creature', 'flying'],
+  ['w_2_2_cat', 'Chat 2/2 blanc', 'de créature 2/2 blanche Chat', '2/2 white Cat creature', ''],
+  ['w_4_4_angel_flying', 'Ange 4/4 blanc, vol', 'de créature 4/4 blanche Ange avec le vol', '4/4 white Angel creature', 'flying'],
+  ['u_1_1_bird_flying', 'Oiseau 1/1 bleu, vol', 'de créature 1/1 bleue Oiseau avec le vol', '1/1 blue Bird creature', 'flying'],
+  ['u_2_2_drake_flying', 'Drakôn 2/2 bleu, vol', 'de créature 2/2 bleue Drakôn avec le vol', '2/2 blue Drake creature', 'flying'],
+  ['b_1_1_rat', 'Rat 1/1 noir', 'de créature 1/1 noire Rat', '1/1 black Rat creature', ''],
+  ['b_2_2_zombie', 'Zombie 2/2 noir', 'de créature 2/2 noire Zombie', '2/2 black Zombie creature', ''],
+  ['r_1_1_goblin', 'Gobelin 1/1 rouge', 'de créature 1/1 rouge Gobelin', '1/1 red Goblin creature', ''],
+  ['r_1_1_elemental_haste', 'Élémental 1/1 rouge, célérité', 'de créature 1/1 rouge Élémental avec la célérité', '1/1 red Elemental creature', 'haste'],
+  ['r_5_5_dragon_flying', 'Dragon 5/5 rouge, vol', 'de créature 5/5 rouge Dragon avec le vol', '5/5 red Dragon creature', 'flying'],
+  ['g_1_1_saproling', 'Saprobionte 1/1 vert', 'de créature 1/1 verte Saprobionte', '1/1 green Saproling creature', ''],
+  ['g_1_1_elf_warrior', 'Elfe guerrier 1/1 vert', 'de créature 1/1 verte Elfe et Guerrier', '1/1 green Elf Warrior creature', ''],
+  ['g_2_2_wolf', 'Loup 2/2 vert', 'de créature 2/2 verte Loup', '2/2 green Wolf creature', ''],
+  ['g_3_3_beast', 'Bête 3/3 verte', 'de créature 3/3 verte Bête', '3/3 green Beast creature', ''],
+  ['c_1_1_a_thopter_flying', 'Mécanoptère 1/1, vol', 'de créature-artefact 1/1 incolore Mécanoptère avec le vol', '1/1 colorless Thopter artifact creature', 'flying'],
+  ['c_1_1_a_servo', 'Servo 1/1', 'de créature-artefact 1/1 incolore Servo', '1/1 colorless Servo artifact creature', ''],
+  ['c_a_treasure_sac', 'Trésor', 'Trésor', 'Treasure', ''],
+  ['c_a_clue_draw', 'Indice', 'Indice', 'Clue', ''],
+  ['c_a_food_sac', 'Nourriture', 'Nourriture', 'Food', ''],
 ];
 
 /** Effets. filter : agit sur « chaque <créature filtrée> » ; n : demande un nombre ; only : n'existe que pour ces « quand ». */
@@ -93,6 +93,21 @@ const KW_GRANT = {
   'Shroud': 'ont le linceul', 'Prowess': 'ont la prouesse',
 };
 
+/** Langues du texte d'une carte perso. */
+export const LANGS = [['fr', 'Français'], ['en', 'English']];
+
+/** Nom d'un mot-clé dans la langue de la carte (l'anglais est le nom de Forge, en minuscules après le premier). */
+export function keywordName(k, lang) {
+  return lang === 'en' ? k.charAt(0) + k.slice(1).toLowerCase() : (KW_FR[k] || k);
+}
+
+const EN_NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const FR_NUM = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix'];
+/** « two cards », « deux cartes » : les petits nombres en toutes lettres, comme sur les cartes. */
+function word(n, lang) {
+  return (lang === 'en' ? EN_NUM : FR_NUM)[n] || String(n);
+}
+
 /** Coût de mana du formulaire (« 2WU », « {2}{W/U} », « 2 W U ») au format de Forge (« 2 W U », « 1 GW », « 3 GP »). */
 export function forgeCost(text) {
   const t = String(text || '').trim().toUpperCase();
@@ -135,6 +150,7 @@ function valid(f) {
   return f && f.type ? `Creature.${f.type}+${props.join('+')}` : `Creature.${props.join('+')}`;
 }
 
+// Créatures filtrées, dans les deux langues : « un autre Elfe » / « another Elf ».
 function oneFr(f) {
   if (f && f.type) {
     return f.other ? `un autre ${f.type}` : `un ${f.type}`;
@@ -156,61 +172,95 @@ function allFr(f) {
   return f && f.other ? 'les autres créatures' : 'les créatures';
 }
 
-/** Paramètres de Forge et texte français d'un effet. id : préfixe des SVar de cette capacité. */
+function article(word) {
+  return /^[aeiouAEIOU]/.test(word) ? 'an' : 'a';
+}
+
+function oneEn(f) {
+  const t = f && f.type ? f.type : 'creature';
+  return f && f.other ? `another ${t}` : `${article(t)} ${t}`;
+}
+
+function eachEn(f) {
+  const t = f && f.type ? f.type : 'creature';
+  return f && f.other ? `other ${t}` : t;
+}
+
+function allEn(f) {
+  const t = f && f.type ? `${f.type} creatures` : 'creatures';
+  return f && f.other ? `other ${t}` : t;
+}
+
+/** Paramètres de Forge et texte (français et anglais) d'un effet. id : préfixe des SVar de cette capacité. */
 function effect(a, id) {
   const n = Math.max(0, Math.round(Number(a.n) || 0));
+  const n1 = Math.max(1, n);
   const target = (what) => `ValidTgts$ ${what.v} | TgtPrompt$ ${what.prompt}`;
   const creature = {v: 'Creature', prompt: 'Choisissez une créature ciblée'};
+  const countersFr = (k) => k === 1 ? 'un marqueur +1/+1' : `${word(k, 'fr')} marqueurs +1/+1`;
+  const countersEn = (k) => k === 1 ? 'a +1/+1 counter' : `${word(k, 'en')} +1/+1 counters`;
   switch (a.effect) {
     case 'damageAny':
-      return {p: `DealDamage | ValidTgts$ Any | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à n'importe quelle cible`};
+      return {p: `DealDamage | ValidTgts$ Any | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à n'importe quelle cible`,
+        en: `CARDNAME deals ${n} damage to any target`};
     case 'damageCreature':
-      return {p: `DealDamage | ${target(creature)} | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à une créature ciblée`};
+      return {p: `DealDamage | ${target(creature)} | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à une créature ciblée`,
+        en: `CARDNAME deals ${n} damage to target creature`};
     case 'damageOpponents':
-      return {p: `DealDamage | Defined$ Player.Opponent | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à chaque adversaire`};
+      return {p: `DealDamage | Defined$ Player.Opponent | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à chaque adversaire`,
+        en: `CARDNAME deals ${n} damage to each opponent`};
     case 'draw':
-      return {p: `Draw | Defined$ You | NumCards$ ${n}`, fr: n === 1 ? 'piochez une carte' : `piochez ${n} cartes`};
+      return {p: `Draw | Defined$ You | NumCards$ ${n}`, fr: n === 1 ? 'piochez une carte' : `piochez ${word(n, 'fr')} cartes`,
+        en: n === 1 ? 'draw a card' : `draw ${word(n, 'en')} cards`};
     case 'gainLife':
-      return {p: `GainLife | Defined$ You | LifeAmount$ ${n}`, fr: `vous gagnez ${n} ${plural(n, 'point', 'points')} de vie`};
+      return {p: `GainLife | Defined$ You | LifeAmount$ ${n}`, fr: `vous gagnez ${n} ${plural(n, 'point', 'points')} de vie`, en: `you gain ${n} life`};
     case 'drain':
       return {
         p: `LoseLife | Defined$ Player.Opponent | LifeAmount$ ${n} | SubAbility$ ${id}Gain`,
         extra: [`SVar:${id}Gain:DB$ GainLife | Defined$ You | LifeAmount$ ${n}`],
         fr: `chaque adversaire perd ${n} ${plural(n, 'point', 'points')} de vie et vous gagnez ${n} ${plural(n, 'point', 'points')} de vie`,
+        en: `each opponent loses ${n} life and you gain ${n} life`,
       };
     case 'countersSelf':
-      return {p: `PutCounter | Defined$ Self | CounterType$ P1P1 | CounterNum$ ${n}`, fr: `mettez ${n === 1 ? 'un marqueur' : n + ' marqueurs'} +1/+1 sur CARDNAME`};
+      return {p: `PutCounter | Defined$ Self | CounterType$ P1P1 | CounterNum$ ${n}`, fr: `mettez ${countersFr(n)} sur CARDNAME`, en: `put ${countersEn(n)} on CARDNAME`};
     case 'countersEach':
       return {p: `PutCounterAll | ValidCards$ ${valid(a.filter)} | CounterType$ P1P1 | CounterNum$ ${n}`,
-        fr: `mettez ${n === 1 ? 'un marqueur' : n + ' marqueurs'} +1/+1 sur chaque ${eachFr(a.filter)} que vous contrôlez`};
+        fr: `mettez ${countersFr(n)} sur chaque ${eachFr(a.filter)} que vous contrôlez`, en: `put ${countersEn(n)} on each ${eachEn(a.filter)} you control`};
     case 'countersTarget':
-      return {p: `PutCounter | ${target(creature)} | CounterType$ P1P1 | CounterNum$ ${n}`, fr: `mettez ${n === 1 ? 'un marqueur' : n + ' marqueurs'} +1/+1 sur une créature ciblée`};
+      return {p: `PutCounter | ${target(creature)} | CounterType$ P1P1 | CounterNum$ ${n}`, fr: `mettez ${countersFr(n)} sur une créature ciblée`,
+        en: `put ${countersEn(n)} on target creature`};
     case 'pumpAll':
-      return {p: `PumpAll | ValidCards$ ${valid(a.filter)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `${allFr(a.filter)} que vous contrôlez gagnent +${n}/+${n} jusqu'à la fin du tour`};
+      return {p: `PumpAll | ValidCards$ ${valid(a.filter)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `${allFr(a.filter)} que vous contrôlez gagnent +${n}/+${n} jusqu'à la fin du tour`,
+        en: `${allEn(a.filter)} you control get +${n}/+${n} until end of turn`};
     case 'pumpTarget':
-      return {p: `Pump | ${target(creature)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `une créature ciblée gagne +${n}/+${n} jusqu'à la fin du tour`};
+      return {p: `Pump | ${target(creature)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `une créature ciblée gagne +${n}/+${n} jusqu'à la fin du tour`,
+        en: `target creature gets +${n}/+${n} until end of turn`};
     case 'token': {
       const t = TOKENS.find(x => x[0] === a.token) || TOKENS[0];
-      return {p: `Token | TokenAmount$ ${Math.max(1, n)} | TokenScript$ ${t[0]} | TokenOwner$ You`,
-        fr: `créez ${Math.max(1, n) === 1 ? 'un jeton' : Math.max(1, n) + ' jetons'} ${t[2]}`};
+      const en = `${n1 === 1 ? article(t[3]) : word(n1, 'en')} ${t[3]} ${plural(n1, 'token', 'tokens')}${t[4] ? ' with ' + t[4] : ''}`;
+      return {p: `Token | TokenAmount$ ${n1} | TokenScript$ ${t[0]} | TokenOwner$ You`,
+        fr: `créez ${n1 === 1 ? 'un jeton' : word(n1, 'fr') + ' jetons'} ${t[2]}`, en: `create ${en}`};
     }
     case 'destroy':
-      return {p: `Destroy | ${target(creature)}`, fr: 'détruisez une créature ciblée'};
+      return {p: `Destroy | ${target(creature)}`, fr: 'détruisez une créature ciblée', en: 'destroy target creature'};
     case 'destroyPermanent':
-      return {p: `Destroy | ${target({v: 'Permanent.nonLand', prompt: 'Choisissez un permanent non-terrain ciblé'})}`, fr: 'détruisez un permanent non-terrain ciblé'};
+      return {p: `Destroy | ${target({v: 'Permanent.nonLand', prompt: 'Choisissez un permanent non-terrain ciblé'})}`, fr: 'détruisez un permanent non-terrain ciblé',
+        en: 'destroy target nonland permanent'};
     case 'exile':
-      return {p: `ChangeZone | ${target(creature)} | Origin$ Battlefield | Destination$ Exile`, fr: 'exilez une créature ciblée'};
+      return {p: `ChangeZone | ${target(creature)} | Origin$ Battlefield | Destination$ Exile`, fr: 'exilez une créature ciblée', en: 'exile target creature'};
     case 'bounce':
-      return {p: `ChangeZone | ${target(creature)} | Origin$ Battlefield | Destination$ Hand`, fr: 'renvoyez une créature ciblée dans la main de son propriétaire'};
+      return {p: `ChangeZone | ${target(creature)} | Origin$ Battlefield | Destination$ Hand`, fr: 'renvoyez une créature ciblée dans la main de son propriétaire',
+        en: 'return target creature to its owner\'s hand'};
     case 'tap':
-      return {p: `Tap | ${target(creature)}`, fr: 'engagez une créature ciblée'};
+      return {p: `Tap | ${target(creature)}`, fr: 'engagez une créature ciblée', en: 'tap target creature'};
     case 'counterSpell':
-      return {p: 'Counter | TargetType$ Spell | ValidTgts$ Card | TgtPrompt$ Choisissez un sort ciblé', fr: 'contrecarrez un sort ciblé'};
+      return {p: 'Counter | TargetType$ Spell | ValidTgts$ Card | TgtPrompt$ Choisissez un sort ciblé', fr: 'contrecarrez un sort ciblé', en: 'counter target spell'};
     case 'scry':
-      return {p: `Scry | ScryNum$ ${Math.max(1, n)}`, fr: `regard ${Math.max(1, n)}`};
+      return {p: `Scry | ScryNum$ ${n1}`, fr: `regard ${n1}`, en: `scry ${n1}`};
     case 'discard':
-      return {p: `Discard | Defined$ Player.Opponent | NumCards$ ${Math.max(1, n)} | Mode$ TgtChoose`,
-        fr: `chaque adversaire défausse ${Math.max(1, n) === 1 ? 'une carte' : Math.max(1, n) + ' cartes'}`};
+      return {p: `Discard | Defined$ Player.Opponent | NumCards$ ${n1} | Mode$ TgtChoose`,
+        fr: `chaque adversaire défausse ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`,
+        en: `each opponent discards ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
     default:
       return null;
   }
@@ -220,28 +270,29 @@ function capitalize(s) {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
-/** Coût d'une capacité activée : mana, {T}, sacrifier. Renvoie le coût pour Forge et en français. */
-function activationCost(a) {
+/** Coût d'une capacité activée : mana, {T}, sacrifier. Renvoie le coût pour Forge et son texte. */
+function activationCost(a, lang) {
   const forge = [];
-  const fr = [];
+  const text = [];
   const mana = forgeCost(a.cost);
   if (mana) {
     forge.push(mana);
-    fr.push(costSymbols(mana));
+    text.push(costSymbols(mana));
   }
   if (a.tap) {
     forge.push('T');
-    fr.push('{T}');
+    text.push('{T}');
   }
   if (a.sac) {
     forge.push('Sac<1/CARDNAME>');
-    fr.push('sacrifiez CARDNAME');
+    text.push(lang === 'en' ? (text.length ? 'sacrifice CARDNAME' : 'Sacrifice CARDNAME') : 'sacrifiez CARDNAME');
   }
-  return {forge: forge.join(' ') || '0', fr: fr.join(', ') || '{0}'};
+  return {forge: forge.join(' ') || '0', text: text.join(', ') || '{0}'};
 }
 
-/** Lignes du script et texte français d'une capacité. i : son numéro (noms des SVar). */
-export function abilityLines(a, i) {
+/** Lignes du script et texte (dans la langue de la carte) d'une capacité. i : son numéro (noms des SVar). */
+export function abilityLines(a, i, lang = 'fr') {
+  const en = lang === 'en';
   const id = `Atelier${i + 1}`;
   const w = WHEN.find(x => x.id === a.when);
   if (!w) {
@@ -251,47 +302,80 @@ export function abilityLines(a, i) {
     const n = Math.max(0, Math.round(Number(a.n) || 0));
     if (a.effect === 'grantKeyword') {
       const kw = a.keyword || 'Flying';
-      const fr = `${capitalize(allFr(a.filter))} que vous contrôlez ${KW_GRANT[kw] || 'ont ' + (KW_FR[kw] || kw).toLowerCase()}.`;
-      return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddKeyword$ ${kw} | Description$ ${fr}`], fr};
+      const text = en ? `${capitalize(allEn(a.filter))} you control have ${kw.toLowerCase()}.`
+        : `${capitalize(allFr(a.filter))} que vous contrôlez ${KW_GRANT[kw] || 'ont ' + (KW_FR[kw] || kw).toLowerCase()}.`;
+      return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddKeyword$ ${kw} | Description$ ${text}`], text};
     }
-    const fr = `${capitalize(allFr(a.filter))} que vous contrôlez gagnent +${n}/+${n}.`;
-    return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddPower$ ${n} | AddToughness$ ${n} | Description$ ${fr}`], fr};
+    const text = en ? `${capitalize(allEn(a.filter))} you control get +${n}/+${n}.` : `${capitalize(allFr(a.filter))} que vous contrôlez gagnent +${n}/+${n}.`;
+    return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddPower$ ${n} | AddToughness$ ${n} | Description$ ${text}`], text};
   }
   const e = effect(a, id);
   if (!e) {
     return null;
   }
+  const body = en ? e.en : e.fr;
   const extra = e.extra || [];
   if (w.kind === 'SP') {
-    const fr = capitalize(e.fr) + '.';
-    return {lines: [`A:SP$ ${e.p} | SpellDescription$ ${fr}`, ...extra], fr};
+    const text = capitalize(body) + '.';
+    return {lines: [`A:SP$ ${e.p} | SpellDescription$ ${text}`, ...extra], text};
   }
   if (w.kind === 'A') {
     if (a.when === 'loyalty') {
       const k = Math.round(Number(a.loyalty) || 0);
       const cost = k >= 0 ? `AddCounter<${k}/LOYALTY>` : `SubCounter<${-k}/LOYALTY>`;
-      const fr = `[${k > 0 ? '+' : ''}${k}] : ${capitalize(e.fr)}.`;
-      return {lines: [`A:AB$ ${e.p} | Cost$ ${cost} | Planeswalker$ True | SpellDescription$ ${fr}`, ...extra], fr};
+      const text = en ? `${k > 0 ? '+' : k < 0 ? '−' : ''}${Math.abs(k)}: ${capitalize(body)}.` : `[${k > 0 ? '+' : ''}${k}] : ${capitalize(body)}.`;
+      return {lines: [`A:AB$ ${e.p} | Cost$ ${cost} | Planeswalker$ True | SpellDescription$ ${text}`, ...extra], text};
     }
-    const c = activationCost(a);
-    const fr = `${c.fr} : ${capitalize(e.fr)}.`;
-    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge} | SpellDescription$ ${fr}`, ...extra], fr};
+    const c = activationCost(a, lang);
+    const text = en ? `${c.text}: ${capitalize(body)}.` : `${c.text} : ${capitalize(body)}.`;
+    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge} | SpellDescription$ ${text}`, ...extra], text};
   }
   const head = {
-    etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille'],
+    etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille', 'When CARDNAME enters'],
     ally: [`Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ ${valid(a.filter)} | TriggerZones$ Battlefield`,
-      `Quand ${oneFr(a.filter)} arrive sur le champ de bataille sous votre contrôle`],
-    attacks: ['Mode$ Attacks | ValidCard$ Card.Self', 'Quand CARDNAME attaque'],
-    dies: ['Mode$ ChangesZone | Origin$ Battlefield | Destination$ Graveyard | ValidCard$ Card.Self', 'Quand CARDNAME meurt'],
-    upkeep: ['Mode$ Phase | Phase$ Upkeep | ValidPlayer$ You | TriggerZones$ Battlefield', 'Au début de votre entretien'],
-    end: ['Mode$ Phase | Phase$ End of Turn | ValidPlayer$ You | TriggerZones$ Battlefield', 'Au début de votre étape de fin'],
+      `Quand ${oneFr(a.filter)} arrive sur le champ de bataille sous votre contrôle`, `Whenever ${oneEn(a.filter)} you control enters`],
+    attacks: ['Mode$ Attacks | ValidCard$ Card.Self', 'Quand CARDNAME attaque', 'Whenever CARDNAME attacks'],
+    dies: ['Mode$ ChangesZone | Origin$ Battlefield | Destination$ Graveyard | ValidCard$ Card.Self', 'Quand CARDNAME meurt', 'When CARDNAME dies'],
+    upkeep: ['Mode$ Phase | Phase$ Upkeep | ValidPlayer$ You | TriggerZones$ Battlefield', 'Au début de votre entretien', 'At the beginning of your upkeep'],
+    end: ['Mode$ Phase | Phase$ End of Turn | ValidPlayer$ You | TriggerZones$ Battlefield', 'Au début de votre étape de fin', 'At the beginning of your end step'],
   }[a.when];
-  const fr = `${head[1]}, ${e.fr}.`;
-  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${fr}`, `SVar:${id}:DB$ ${e.p}`, ...extra], fr};
+  const text = `${head[en ? 2 : 1]}, ${body}.`;
+  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, `SVar:${id}:DB$ ${e.p}`, ...extra], text};
+}
+
+/** Lignes d'affichage du script (cadre, sa couleur, langue du texte) : Forge les garde sans s'en servir. */
+export function displayLines(d) {
+  const out = [];
+  if (d.frame && d.frame !== 'modern') {
+    out.push(`SVar:AtelierFrame:${d.frame}`);
+  }
+  if (d.frameColor && d.frameColor !== 'auto') {
+    out.push(`SVar:AtelierFrameColor:${d.frameColor}`);
+  }
+  if (d.lang === 'en') {
+    out.push('SVar:AtelierLang:en');
+  }
+  return out;
+}
+
+/** Réglages d'affichage écrits dans un script (lignes « SVar:Atelier… »). */
+export function readDisplay(script) {
+  const get = (k) => (String(script || '').match(new RegExp(`^SVar:${k}:(\\S+)`, 'm')) || [])[1];
+  return {frame: get('AtelierFrame') || 'modern', frameColor: get('AtelierFrameColor') || 'auto', lang: get('AtelierLang') === 'en' ? 'en' : 'fr'};
+}
+
+/** Le script avec d'autres réglages d'affichage (pour le mode script). */
+export function withDisplay(script, d) {
+  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|Lang):/.test(l));
+  while (kept.length && !kept[kept.length - 1].trim()) {
+    kept.pop();
+  }
+  return [...kept, ...displayLines(d)].join('\n');
 }
 
 /** Le script complet d'une carte du formulaire. */
 export function buildScript(f) {
+  const lang = f.lang === 'en' ? 'en' : 'fr';
   const lines = [];
   const name = String(f.name || '').trim();
   lines.push(`Name:${name}`);
@@ -306,23 +390,24 @@ export function buildScript(f) {
   if (types.includes('Planeswalker')) {
     lines.push(`Loyalty:${Math.max(1, Number(f.loyaltyStart) || 3)}`);
   }
-  const fr = [];
+  const text = [];
   const kws = (f.keywords || []).filter(k => KW_FR[k]);
   for (const k of kws) {
     lines.push(`K:${k}`);
   }
   if (kws.length) {
-    fr.push(kws.map((k, i) => i ? KW_FR[k].toLowerCase() : KW_FR[k]).join(', '));
+    text.push(kws.map((k, i) => i ? keywordName(k, lang).toLowerCase() : keywordName(k, lang)).join(', '));
   }
   (f.abilities || []).forEach((a, i) => {
-    const r = abilityLines(a, i);
+    const r = abilityLines(a, i, lang);
     if (r) {
       lines.push(...r.lines);
-      fr.push(r.fr.replace(/CARDNAME/g, name));
+      text.push(r.text.replace(/CARDNAME/g, name));
     }
   });
-  if (fr.length) {
-    lines.push(`Oracle:${fr.join('\\n')}`);
+  if (text.length) {
+    lines.push(`Oracle:${text.join('\\n')}`);
   }
+  lines.push(...displayLines(f));
   return lines.join('\n');
 }

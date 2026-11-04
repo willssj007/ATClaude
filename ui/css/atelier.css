@@ -41,8 +41,16 @@
 .ate-msg.error { color: #ff9a8a; }
 .ate-art, .ate-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
-/* Cadre d'une carte perso : un liseré doré la distingue des cartes officielles sans image. */
-.frame.custom { box-shadow: inset 0 0 0 2px rgb(var(--gold-rgb) / 0.75); }
+
+/* Présentation : langue, couleur du cadre, cadres en vignettes. */
+.ate-look-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ate-fcolor { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.ate-frames { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin; }
+.ate-frame { flex: none; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 5px; cursor: pointer;
+  border: 2px solid transparent; border-radius: 12px; background: rgb(255 255 255 / 0.04); color: var(--muted); font-size: 11.5px; }
+.ate-frame .mcard { --w: 82px; pointer-events: none; }
+.ate-frame:hover { background: rgb(255 255 255 / 0.08); }
+.ate-frame.on { border-color: rgb(var(--gold-rgb) / 0.9); color: var(--text); background: rgb(var(--gold-rgb) / 0.12); }
 
 /* Recadrage de l'illustration : un rectangle (photo de profil : un cercle). */
 .crop-view.rect { border-radius: 10px; width: min(340px, 80vw, 62vh); }
@@ -52,6 +60,7 @@
   .ate-preview .mcard { --w: 170px; }
   .ate-side { padding: 10px; gap: 8px; }
   .ate-tile .mcard { --w: 120px; }
+  .ate-frame .mcard { --w: 70px; }
   .ate-script { min-height: 240px; }
 }
 @media (max-width: 560px) {

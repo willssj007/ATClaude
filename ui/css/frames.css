@@ -1,0 +1,225 @@
+/* Cadres des cartes perso (Atelier) : voir js/frames.js. Tout est relatif à la largeur de la carte (--w). */
+
+.frame.cf {
+  --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .3 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  --paper: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.6' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .3  0 0 0 0 .2  0 0 0 .11 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+  --stone: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='s'><feTurbulence type='turbulence' baseFrequency='.035' numOctaves='4' seed='7'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23s)'/></svg>");
+  --split-f: linear-gradient(90deg, var(--fL) 0 42%, var(--fR) 58% 100%);
+  --split-b: linear-gradient(90deg, var(--bL) 0 40%, var(--bR) 60% 100%);
+  --split-x: linear-gradient(90deg, var(--xL) 0 35%, var(--xR) 65% 100%);
+  --u: calc(var(--w) / 100);
+  padding: 0; display: block; gap: 0; border: 0; border-radius: inherit; overflow: hidden;
+  background: #0d0c0b; color: #15130f; box-shadow: none;
+  font: 400 calc(var(--u) * 5.6) / 1.18 "Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Noto Serif", serif;
+}
+.frame.cf > * { position: absolute; }
+
+/* Corps du cadre : la couleur, éclairée du haut, avec le grain du carton. */
+.cf-bg {
+  inset: 2.6% 3.6% 5.2% 3.6%; border-radius: calc(var(--u) * 2.2);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.26), rgb(255 255 255 / 0) 40%, rgb(0 0 0 / 0.3)), var(--noise), var(--split-f);
+  background-size: auto, calc(var(--u) * 46), auto;
+  box-shadow: inset 0 0 0 calc(var(--u) * 0.4) rgb(0 0 0 / 0.55), inset 0 calc(var(--u) * 0.6) calc(var(--u) * 1.2) rgb(255 255 255 / 0.25);
+}
+
+.cf-art {
+  top: 11.2%; left: 7.4%; right: 7.4%; height: 43.8%;
+  background: radial-gradient(circle at 30% 30%, rgb(255 255 255 / 0.18), rgb(0 0 0 / 0.35)), var(--split-f);
+  background-size: cover; background-position: center;
+  box-shadow: 0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.8), 0 0 0 calc(var(--u) * 1) var(--e);
+}
+.cf-noart .cf-art::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 120%, rgb(255 255 255 / 0.25), transparent 60%);
+}
+
+/* Bandeaux du nom et du type : métal teinté, bords arrondis. */
+.cf-title, .cf-type {
+  left: 5.6%; right: 5.6%; height: 6.3%; display: flex; align-items: center; gap: 2%; padding: 0 3.2%;
+  border-radius: calc(var(--u) * 2.4) / 50%;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 45%, rgb(0 0 0 / 0.16)), var(--split-b);
+  box-shadow: 0 0 0 calc(var(--u) * 0.45) rgb(0 0 0 / 0.75), 0 0 0 calc(var(--u) * 0.9) var(--e), 0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgb(0 0 0 / 0.45);
+}
+.cf-title { top: 4.3%; justify-content: space-between; }
+.cf-type { top: 55.6%; }
+.cf-name {
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden;
+  font-weight: 700; font-size: calc(var(--u) * 6.6 * var(--sn)); letter-spacing: 0.01em;
+}
+.cf-cost { flex: none; display: flex; align-items: center; font-size: calc(var(--u) * 6); }
+.cf-cost .mana { display: flex; gap: calc(var(--u) * 0.5); }
+.cf-cost .ms { width: 1.08em; height: 1.08em; font-size: 0.92em; box-shadow: 0 calc(var(--u) * 0.4) 0 rgb(0 0 0 / 0.7); }
+.cf-tl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-weight: 700; font-size: calc(var(--u) * 5.4 * var(--st)); }
+.cf-set { flex: none; display: flex; width: calc(var(--u) * 6); height: calc(var(--u) * 6); color: #9b7524; filter: drop-shadow(0 0 calc(var(--u) * 0.3) rgb(255 230 160 / 0.9)); }
+.cf-set svg, .cf-icon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cf-set svg .f, .cf-icon svg .f { fill: currentColor; stroke: none; }
+.cf-icon { display: none; }
+
+/* Boîte de texte : parchemin teinté. */
+.cf-box {
+  top: 62.6%; bottom: 8.4%; left: 7.4%; right: 7.4%; display: flex; align-items: center; padding: 2.6% 3.6%;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0) 30%), var(--paper), var(--split-x);
+  background-size: auto, calc(var(--u) * 50), auto;
+  box-shadow: 0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.7), 0 0 0 calc(var(--u) * 0.9) var(--e), inset 0 0 calc(var(--u) * 3) rgb(0 0 0 / 0.14);
+}
+.cf-rules { width: 100%; max-height: 100%; overflow: hidden; white-space: pre-line; font-size: calc(var(--u) * 6 * var(--sr)); line-height: 1.16; }
+.cf-rules .ms { width: 1.05em; height: 1.05em; font-size: 0.86em; vertical-align: -0.12em; }
+
+.cf-pt {
+  right: 5.4%; bottom: 3.4%; min-width: 19%; height: 6.6%; padding: 0 2.6%; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: calc(var(--u) * 6.8); letter-spacing: 0.02em;
+  border-radius: calc(var(--u) * 1.6);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.6), rgb(255 255 255 / 0) 50%, rgb(0 0 0 / 0.15)), var(--bR);
+  box-shadow: 0 0 0 calc(var(--u) * 0.45) rgb(0 0 0 / 0.8), 0 0 0 calc(var(--u) * 0.9) var(--e), 0 calc(var(--u) * 0.6) calc(var(--u) * 1.2) rgb(0 0 0 / 0.5);
+}
+.cf-pt.cf-loy {
+  min-width: 15%; height: 8.6%; padding: 0 2% 1.4%; color: #fff; border-radius: 0;
+  background: linear-gradient(180deg, #4a4a4a, #141414);
+  clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); box-shadow: none;
+}
+.cf-foot {
+  left: 6.4%; bottom: 1.3%; font: 700 calc(var(--u) * 2.6) / 1 system-ui, sans-serif; letter-spacing: 0.14em;
+  text-transform: uppercase; color: rgb(255 255 255 / 0.7);
+}
+
+/* Couronne d'une carte légendaire : une arche au-dessus du nom. */
+.cf-crown { display: none; }
+.cf-legend .cf-crown {
+  display: block; top: 0.7%; left: 14%; right: 14%; height: 6.4%;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.05)), var(--noise), var(--split-f);
+  background-size: auto, calc(var(--u) * 40), auto;
+  box-shadow: 0 0 0 calc(var(--u) * 0.45) rgb(0 0 0 / 0.75), inset 0 0 0 calc(var(--u) * 0.8) var(--e);
+}
+.cf-legend .cf-crown::after {
+  content: ""; position: absolute; left: 50%; top: 18%; width: calc(var(--u) * 3); height: calc(var(--u) * 3);
+  transform: translateX(-50%) rotate(45deg); background: var(--bL); box-shadow: 0 0 0 calc(var(--u) * 0.4) var(--e);
+}
+
+/* ---------- Classique : plaques crème biseautées, large liseré autour du texte, aucun arrondi. ---------- */
+.cf-classic .cf-bg { inset: 3.4% 4.4% 6% 4.4%; border-radius: 0;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.2), rgb(0 0 0 / 0.32)), var(--stone), var(--noise), var(--split-f);
+  background-size: auto, calc(var(--u) * 90), calc(var(--u) * 46), auto; }
+.cf-classic .cf-title, .cf-classic .cf-type, .cf-classic .cf-pt {
+  border-radius: 0; background: linear-gradient(180deg, #fbf7ec, #ddd6c4);
+  box-shadow: inset calc(var(--u) * 0.6) calc(var(--u) * 0.6) 0 rgb(255 255 255 / 0.8), inset calc(var(--u) * -0.6) calc(var(--u) * -0.6) 0 rgb(0 0 0 / 0.3),
+    0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.75);
+}
+.cf-classic .cf-title { top: 5%; left: 6.8%; right: 6.8%; }
+.cf-classic .cf-art { top: 12%; left: 9%; right: 9%; height: 42.4%;
+  box-shadow: 0 0 0 calc(var(--u) * 0.6) rgb(0 0 0 / 0.85), 0 0 0 calc(var(--u) * 1.4) rgb(255 255 255 / 0.3), 0 0 0 calc(var(--u) * 1.9) rgb(0 0 0 / 0.45); }
+.cf-classic .cf-type { top: 55.6%; left: 6.8%; right: 6.8%; }
+.cf-classic .cf-box { top: 63%; bottom: 10.8%; left: 9%; right: 9%;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.25)), var(--paper), var(--split-x); background-size: auto, calc(var(--u) * 50), auto;
+  box-shadow: 0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.8), 0 0 0 calc(var(--u) * 1.8) var(--e), 0 0 0 calc(var(--u) * 2.3) rgb(0 0 0 / 0.5); }
+.cf-classic .cf-pt { right: 6.2%; bottom: 4.2%; }
+.cf-classic .cf-crown { display: none; }
+
+/* ---------- Ancien : épais bord noir, cadre de pierre, nom et type posés sur le cadre. ---------- */
+.cf-retro .cf-bg {
+  inset: 4.4% 5.4% 6.4% 5.4%; border-radius: calc(var(--u) * 3);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(0 0 0 / 0.25)), var(--stone), var(--noise), var(--split-f);
+  background-size: auto, calc(var(--u) * 70), calc(var(--u) * 46), auto;
+}
+.cf-retro .cf-title, .cf-retro .cf-type { background: none; box-shadow: none; color: var(--ink); text-shadow: 0 0 calc(var(--u) * 0.8) var(--ish), 0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) var(--ish); }
+.cf-retro .cf-title { top: 5.6%; left: 7.6%; right: 7.6%; padding: 0 1%; }
+.cf-retro .cf-name { font-family: Georgia, "Times New Roman", "Noto Serif", serif; font-size: calc(var(--u) * 6.2 * var(--sn)); }
+.cf-retro .cf-art { top: 11.8%; left: 10.4%; right: 10.4%; height: 39.6%;
+  border: calc(var(--u) * 1.2) solid; border-color: rgb(0 0 0 / 0.55) rgb(255 255 255 / 0.35) rgb(255 255 255 / 0.35) rgb(0 0 0 / 0.55);
+  box-shadow: 0 0 0 calc(var(--u) * 0.3) rgb(0 0 0 / 0.5); }
+.cf-retro .cf-type { top: 52%; left: 9%; right: 9%; height: 5.6%; padding: 0 1%; }
+.cf-retro .cf-tl { font-size: calc(var(--u) * 5 * var(--st)); }
+.cf-retro .cf-box { top: 58.2%; bottom: 11.6%; left: 10.4%; right: 10.4%; border-radius: calc(var(--u) * 2.6);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.4), rgb(255 255 255 / 0.1)), var(--split-x);
+  box-shadow: 0 0 0 calc(var(--u) * 0.8) var(--e), inset 0 0 calc(var(--u) * 2) rgb(0 0 0 / 0.2); }
+.cf-retro .cf-pt { right: 8%; bottom: 6.6%; min-width: 0; height: 5%; background: none; box-shadow: none; color: var(--ink);
+  text-shadow: 0 0 calc(var(--u) * 0.8) var(--ish), 0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) var(--ish); font-family: Georgia, serif; }
+.cf-retro .cf-crown, .cf-retro .cf-set { display: none; }
+.cf-retro .cf-foot { bottom: 2.2%; left: 8%; color: rgb(255 255 255 / 0.55); }
+
+/* ---------- Futur : l'illustration passe sous le nom, angles coupés, symbole du type. ---------- */
+.cf-future .cf-bg { inset: 2.6% 3.4% 4.6% 3.4%; border-radius: calc(var(--u) * 1.4); }
+.cf-future .cf-art { top: 2.6%; left: 3.4%; right: 3.4%; height: 53.4%; box-shadow: none;
+  -webkit-mask: linear-gradient(180deg, #000 88%, transparent); mask: linear-gradient(180deg, #000 88%, transparent); }
+.cf-future .cf-title { top: 3.6%; left: 4.6%; right: 4.6%; border-radius: 0; color: #fff; box-shadow: none;
+  background: linear-gradient(90deg, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.35) 70%, rgb(0 0 0 / 0.6));
+  clip-path: polygon(0 0, 100% 0, 97% 100%, 3% 100%); }
+.cf-future .cf-type { top: 56.2%; left: 15%; right: 4.6%; border-radius: 0; padding-left: 4%;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+.cf-future .cf-icon { display: flex; top: 54.6%; left: 4.2%; width: 12.4%; aspect-ratio: 1; padding: 2.2%; border-radius: 50%; color: #fff;
+  background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.35), transparent 60%), var(--split-f);
+  box-shadow: 0 0 0 calc(var(--u) * 0.6) rgb(0 0 0 / 0.85), 0 0 0 calc(var(--u) * 1.1) var(--bL); }
+.cf-future .cf-box { top: 63.8%; bottom: 7%; left: 4.6%; right: 4.6%; box-shadow: none;
+  clip-path: polygon(0 0, 100% 0, 100% 84%, 90% 100%, 0 100%); }
+.cf-future .cf-pt { right: 3.8%; bottom: 2.6%; border-radius: 0; box-shadow: none;
+  clip-path: polygon(14% 0, 100% 0, 86% 100%, 0 100%); padding: 0 4%; }
+.cf-future .cf-crown { display: none; }
+
+/* ---------- Vitrine : cadre sombre à filets d'or, illustration en arche. ---------- */
+.cf-showcase { background: #0b0a08; }
+.cf-showcase .cf-bg {
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.25), rgb(0 0 0 / 0.55)), var(--noise), var(--split-f);
+  background-size: auto, calc(var(--u) * 46), auto;
+  box-shadow: inset 0 0 0 calc(var(--u) * 0.5) #c9a24c, inset 0 0 0 calc(var(--u) * 1.4) rgb(0 0 0 / 0.6), inset 0 0 0 calc(var(--u) * 1.8) #8f6c24;
+}
+.cf-showcase .cf-title, .cf-showcase .cf-type, .cf-showcase .cf-pt {
+  color: #f6e6b4; background: linear-gradient(180deg, #2d271e, #110e0a);
+  box-shadow: 0 0 0 calc(var(--u) * 0.45) #d6b05a, 0 0 0 calc(var(--u) * 1.1) rgb(0 0 0 / 0.8), 0 0 0 calc(var(--u) * 1.5) #8f6c24;
+}
+.cf-showcase .cf-art { border-radius: 50% 50% calc(var(--u) * 1) calc(var(--u) * 1) / 18% 18% calc(var(--u) * 1) calc(var(--u) * 1);
+  box-shadow: 0 0 0 calc(var(--u) * 0.5) #d6b05a, 0 0 0 calc(var(--u) * 1.4) #120f0b, 0 0 0 calc(var(--u) * 1.8) #8f6c24; }
+.cf-showcase .cf-box { box-shadow: 0 0 0 calc(var(--u) * 0.5) #d6b05a, 0 0 0 calc(var(--u) * 1.4) #120f0b, 0 0 0 calc(var(--u) * 1.8) #8f6c24;
+  background: linear-gradient(180deg, rgb(255 244 214 / 0.55), rgb(255 244 214 / 0.2)), var(--paper), var(--split-x); background-size: auto, calc(var(--u) * 50), auto; }
+.cf-showcase .cf-set { color: #e0bb62; }
+.cf-showcase .cf-crown { display: none; }
+.cf-showcase.cf-legend .cf-title::after {
+  content: ""; position: absolute; left: 50%; top: calc(var(--u) * -2.4); width: calc(var(--u) * 3.4); height: calc(var(--u) * 3.4);
+  transform: translateX(-50%) rotate(45deg); background: #d6b05a; box-shadow: 0 0 0 calc(var(--u) * 0.5) #110e0a;
+}
+
+/* ---------- Nyx : un ciel étoilé dans le haut du cadre. ---------- */
+.cf-nyx .cf-bg::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background:
+    radial-gradient(circle, #fff 0 calc(var(--u) * 0.25), transparent calc(var(--u) * 0.45)) 0 0 / 13% 7%,
+    radial-gradient(circle, #fff8 0 calc(var(--u) * 0.2), transparent calc(var(--u) * 0.4)) 6% 3% / 9% 5.4%,
+    radial-gradient(circle, #cfd8ff 0 calc(var(--u) * 0.35), transparent calc(var(--u) * 0.6)) 3% 11% / 21% 12%,
+    linear-gradient(180deg, rgb(28 20 78 / 0.92), rgb(70 44 130 / 0.6) 40%, rgb(70 44 130 / 0) 72%);
+  -webkit-mask: linear-gradient(180deg, #000 55%, transparent 80%); mask: linear-gradient(180deg, #000 55%, transparent 80%);
+}
+
+/* ---------- Art étendu : l'illustration va d'un bord à l'autre. ---------- */
+.cf-extended .cf-art { left: 3.6%; right: 3.6%; top: 10.9%; height: 44.4%; box-shadow: 0 calc(var(--u) * 0.6) 0 rgb(0 0 0 / 0.6), 0 calc(var(--u) * -0.6) 0 rgb(0 0 0 / 0.6); }
+
+/* ---------- Sans bord : l'illustration couvre la carte, bandeaux et texte en verre fumé. ---------- */
+.cf-borderless .cf-bg { display: none; }
+.cf-borderless .cf-art { inset: 0; height: auto; box-shadow: none; }
+.cf-borderless .cf-title, .cf-borderless .cf-type, .cf-borderless .cf-pt {
+  color: #fff; background: linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0) 50%), rgb(16 14 12 / 0.62);
+  box-shadow: 0 0 0 calc(var(--u) * 0.45) rgb(255 255 255 / 0.4), 0 calc(var(--u) * 0.6) calc(var(--u) * 1.6) rgb(0 0 0 / 0.5);
+}
+.cf-borderless .cf-title { top: 3.4%; left: 4.4%; right: 4.4%; }
+.cf-borderless .cf-type { top: 57.4%; left: 4.4%; right: 4.4%; }
+.cf-borderless .cf-box { top: 64.4%; bottom: 7%; left: 4.4%; right: 4.4%; color: #f6f1e7; border-radius: calc(var(--u) * 1.6);
+  background: rgb(14 12 10 / 0.64); box-shadow: 0 0 0 calc(var(--u) * 0.45) rgb(255 255 255 / 0.3); }
+.cf-borderless .cf-pt { right: 4.4%; bottom: 2.6%; }
+.cf-borderless .cf-set { color: #f0cf7a; }
+.cf-borderless .cf-crown { display: none; }
+
+/* ---------- Illustration pleine : l'illustration sous tout le cadre, boîtes translucides. ---------- */
+.cf-fullart .cf-bg { display: none; }
+.cf-fullart .cf-art { top: 2.6%; left: 3.6%; right: 3.6%; bottom: 5.2%; height: auto; border-radius: calc(var(--u) * 2.2); box-shadow: none; }
+.cf-fullart .cf-box {
+  background: rgb(245 240 228 / 0.8);
+  background: color-mix(in srgb, var(--xL) 80%, transparent);
+}
+.cf-fullart .cf-title, .cf-fullart .cf-type { opacity: 0.94; }
+.cf-fullart .cf-crown { display: none; }
+
+/* ---------- Jeton : grande illustration, nom centré dans un cartouche. ---------- */
+.cf-token .cf-art { top: 2.6%; left: 3.6%; right: 3.6%; height: 66%; box-shadow: none; border-radius: calc(var(--u) * 2.2) calc(var(--u) * 2.2) 0 0; }
+.cf-token .cf-title { top: 4.6%; left: 18%; right: 18%; justify-content: center; }
+.cf-token .cf-name { flex: none; text-align: center; }
+.cf-token .cf-cost, .cf-token .cf-crown { display: none; }
+.cf-token .cf-type { top: 68.8%; }
+.cf-token .cf-box { top: 76%; bottom: 8.4%; }
