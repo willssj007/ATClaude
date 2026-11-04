@@ -78,6 +78,18 @@ final class Catalog {
         }
     }
 
+    /** Noms français → anglais de l'index (refait au besoin : une carte perso enregistrée l'efface entre-temps). */
+    private Map<String, String> frenchToEnglish() {
+        for (int i = 0; i < 3; i++) {
+            index();
+            final Map<String, String> fr = frenchToEnglish;
+            if (fr != null) {
+                return fr;
+            }
+        }
+        return java.util.Collections.emptyMap();
+    }
+
     private List<Entry> index() {
         List<Entry> result = index;
         if (result != null) {
@@ -499,8 +511,7 @@ final class Catalog {
      */
     /** Nom anglais de la carte officielle qui s'appelle {@code name} en français (sans casse ni accents), ou null. */
     String officialFrench(final String name) {
-        index();
-        final String en = frenchToEnglish.get(normalize(name));
+        final String en = frenchToEnglish().get(normalize(name));
         if (en == null) {
             return null;
         }
@@ -526,8 +537,7 @@ final class Catalog {
     private PaperCard lookup(final String name) {
         PaperCard pc = tryCard(name);
         if (pc == null) {
-            index();
-            final String english = frenchToEnglish.get(normalize(name));
+            final String english = frenchToEnglish().get(normalize(name));
             if (english != null) {
                 pc = tryCard(english);
             }

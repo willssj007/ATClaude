@@ -306,6 +306,9 @@ final class GameSerializer {
             o.addProperty("custom", true);
             o.addProperty("image", "");
             o.addProperty("typeLine", CustomCards.typeLine(s.getType()));
+            if (inGame) {
+                o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
+            }
             final String art = CustomCards.artKey(s.getName());
             if (art != null) {
                 o.addProperty("customArt", art);

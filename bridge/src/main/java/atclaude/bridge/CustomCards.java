@@ -453,6 +453,50 @@ final class CustomCards {
         return true;
     }
 
+    /** Mots-clés de l'Atelier (ceux du formulaire) : Forge les écrit en anglais pour une carte sans traduction. */
+    private static final Map<String, String> KEYWORDS_FR = Map.ofEntries(
+            Map.entry("flying", "Vol"), Map.entry("first strike", "Initiative"), Map.entry("double strike", "Double initiative"),
+            Map.entry("deathtouch", "Contact mortel"), Map.entry("haste", "Célérité"), Map.entry("hexproof", "Défense talismanique"),
+            Map.entry("indestructible", "Indestructible"), Map.entry("lifelink", "Lien de vie"), Map.entry("menace", "Menace"),
+            Map.entry("reach", "Portée"), Map.entry("trample", "Piétinement"), Map.entry("vigilance", "Vigilance"),
+            Map.entry("defender", "Défenseur"), Map.entry("flash", "Flash"), Map.entry("shroud", "Linceul"),
+            Map.entry("prowess", "Prouesse"), Map.entry("ward", "Garde"), Map.entry("changeling", "Changelin"));
+    private static final Pattern COUNTERS_LINE = Pattern.compile("^(.+) counters: (\\d+)$");
+
+    /**
+     * Texte d'une carte perso en partie, en français : Forge y ajoute en anglais les mots-clés qu'elle a ou qu'on
+     * lui donne (« Haste, flying ») et ses marqueurs (« +1/+1 counters: 2 »).
+     */
+    static String frenchText(final String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        final StringBuilder out = new StringBuilder(text.length());
+        final String[] lines = text.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            final String line = lines[i];
+            if (i > 0) {
+                out.append('\n');
+            }
+            final java.util.regex.Matcher m = COUNTERS_LINE.matcher(line.trim());
+            if (m.matches()) {
+                out.append("Marqueurs ").append(m.group(1)).append(" : ").append(m.group(2));
+                continue;
+            }
+            final String[] parts = line.trim().split(",\\s*");
+            final List<String> fr = new ArrayList<>();
+            for (final String part : parts) {
+                final String k = KEYWORDS_FR.get(part.trim().toLowerCase(Locale.ROOT));
+                if (k == null) {
+                    break;
+                }
+                fr.add(fr.isEmpty() ? k : k.toLowerCase(Locale.ROOT));
+            }
+            out.append(!line.isBlank() && fr.size() == parts.length ? String.join(", ", fr) : line);
+        }
+        return out.toString();
+    }
+
     /** Ligne de type en français (Forge n'a pas de traduction pour une carte perso) : « Créature légendaire : Human X-Men ». */
     static String typeLine(final forge.card.CardTypeView type) {
         final List<String> core = new ArrayList<>();

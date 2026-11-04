@@ -430,7 +430,13 @@ final class MatchSession {
     JsonElement handle(final String type, final JsonObject m) {
         final PlayerControllerHuman c = gui.controller();
         switch (type) {
-            case "ok" -> c.selectButtonOk();
+            case "ok" -> {
+                if (cheatPending(c)) {
+                    gui.flashIncorrectAction();
+                } else {
+                    c.selectButtonOk();
+                }
+            }
             case "cancel" -> c.selectButtonCancel();
             case "card" -> {
                 final CardView card = findCard(m.get("id").getAsInt());
@@ -451,7 +457,13 @@ final class MatchSession {
                 }
             }
             case "useMana" -> c.useMana(colorByte(m.get("color").getAsString()));
-            case "passTurn" -> c.autoPassUntilEndOfTurn();
+            case "passTurn" -> {
+                if (cheatPending(c)) {
+                    gui.flashIncorrectAction();
+                } else {
+                    c.autoPassUntilEndOfTurn();
+                }
+            }
             case "cancelPass" -> c.autoPassCancel();
             case "alphaStrike" -> c.alphaStrike();
             case "undo" -> c.undoLastAction();
@@ -1350,6 +1362,18 @@ final class MatchSession {
         }
     }
 
+    /** Une triche en cours (déclencheurs à ordonner, cibles à choisir) : la carte arrive encore. */
+    private volatile boolean cheating;
+
+    /**
+     * Passer la priorité pendant qu'une triche attend un choix ferait repartir la partie sur son propre fil pendant
+     * que la triche continue sur le sien (Forge plante alors, liste des déclencheurs modifiée par les deux) : refusé.
+     * Les choix que la triche demande (cibles...) passent, eux, par leur propre invite.
+     */
+    private boolean cheatPending(final PlayerControllerHuman c) {
+        return cheating && c.getInputQueue().getInput() instanceof forge.gamemodes.match.input.InputPassPriority;
+    }
+
     private void inGame(final Game game, final Runnable change) {
         if (game == null) {
             throw new IllegalStateException("Aucune partie.");
@@ -1359,6 +1383,7 @@ final class MatchSession {
             throw new IllegalStateException("Attends d'avoir la main (priorité ou choix) pour tricher.");
         }
         final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        cheating = true;
         game.getAction().invoke(() -> {
             try {
                 change.run();
@@ -1372,6 +1397,7 @@ final class MatchSession {
             } catch (final RuntimeException e) {
                 bridge.reportError(e);
             } finally {
+                cheating = false;
                 done.countDown();
             }
             gui.markDirty();
