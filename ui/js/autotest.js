@@ -31,8 +31,8 @@ async function until(test, ms) {
   return null;
 }
 
-/** Messages affichés (erreurs comprises), requêtes au pont en échec, erreurs signalées par le pont. */
-function watchErrors() {
+/** Messages affichés (erreurs comprises), requêtes au pont lentes ou en échec, erreurs signalées par le pont. */
+export function watchErrors() {
   const box = document.getElementById('toasts');
   const seen = new WeakSet();
   const report = (t) => {
@@ -45,10 +45,19 @@ function watchErrors() {
   [...box.children].forEach(report);
   new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(report))).observe(box, {childList: true});
   const request = bridge.request.bind(bridge);
-  bridge.request = (type, payload) => request(type, payload).catch((e) => {
-    log(`requête « ${type} » en échec : ${String(e && e.message || e).slice(0, 400)}`);
-    throw e;
-  });
+  bridge.request = (type, payload) => {
+    const t = performance.now();
+    return request(type, payload).then((r) => {
+      const ms = Math.round(performance.now() - t);
+      if (ms > 1500) {
+        log(`requête « ${type} » lente : ${ms} ms`);
+      }
+      return r;
+    }, (e) => {
+      log(`requête « ${type} » en échec : ${String(e && e.message || e).slice(0, 400)}`);
+      throw e;
+    });
+  };
   bridge.on('error', m => log(`erreur du pont : ${String(m.message).slice(0, 400)}`));
 }
 
@@ -93,7 +102,6 @@ async function restoreAccount() {
 }
 
 export async function runAutotest() {
-  watchErrors();
   log(`Forge prêt, ${Math.round(performance.now() / 1000)} s après l'ouverture de la page`);
   try {
     await menuTour();

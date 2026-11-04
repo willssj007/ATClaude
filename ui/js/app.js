@@ -470,8 +470,8 @@ function onReady(hello) {
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
   checkUnlocks();
   $('#loading').classList.add('hidden');
-  if (/[?&]autotest=1\b/.test(location.search)) {
-    import('./autotest.js').then(m => m.runAutotest());
+  if (autotest) {
+    autotest.then(m => m.runAutotest());
   }
   screens.lobby.setProfiles(hello && hello.aiProfiles);
   if (hello && hello.inMatch) {
@@ -498,6 +498,12 @@ async function hello() {
 
 /** Apparences débloquées par la dernière partie ou le dernier trophée (les deux arrivent ensemble). */
 const checkUnlocks = debounce(() => announceUnlocks().catch(() => {}), 1500);
+
+// Essai automatique (simulateur iPhone) : chargé dès le départ, pour noter aussi les requêtes du démarrage.
+const autotest = /[?&]autotest=1\b/.test(location.search) ? import('./autotest.js').then((m) => {
+  m.watchErrors();
+  return m;
+}) : null;
 
 function init() {
   if (bridge.ios) {
