@@ -190,6 +190,18 @@ ctor_fix "$WORK/ios-ctor-report.txt" "$APP_INDEX,$IOS/target/ios-bridged.jar" \
 rm -rf "$IOS/target/classes" && mkdir -p "$IOS/target/classes"
 (cd "$IOS/target/classes" && jar xf ../ios-bridged.jar && rm -rf META-INF)
 
+# Les classes de target/classes sont-elles toujours celles du module converti ? (Barrière : une compilation de
+# Maven entre-temps y remettrait les classes brutes, qui plantent sur l'iPhone.)
+check_converted_classes() {
+  local ref="$WORK/ios-converted"
+  rm -rf "$ref" && mkdir -p "$ref" && (cd "$ref" && jar xf "$IOS/target/ios-bridged.jar" && rm -rf META-INF)
+  if ! diff -rq "$ref" "$IOS/target/classes" > "$WORK/ios-classes-diff.txt" 2>&1; then
+    echo "Classes du module ios remplacées après la conversion (classes brutes dans l'application) :"
+    head -20 "$WORK/ios-classes-diff.txt"
+    exit 1
+  fi
+}
+
 echo "=== [6/7] liens manquants (rapport) ==="
 java -cp "$TOOLS_CP" MobiVmLinkAudit \
   --rt "$RT,$OBJC,$CT,$SS_JAR,$SSCF_JAR,$WORK/out/jvmdg-java-api-mobivm.jar,$WORK/java-time-supply.jar,$NIO_JAR,$KEEP_CS,$OUT_JARS,$IOS/target/ios-bridged.jar" \
@@ -202,8 +214,11 @@ if [ -n "${IOS_SKIP_NATIVE:-}" ]; then
 fi
 
 echo "=== [7/7] compilation native et IPA ==="
-# Les classes du module (déjà converties) sont prises telles quelles dans target/classes.
-(cd "$IOS" && mvn -B robovm:create-ipa -Dmaven.repo.local="$CLONE" -Drobovm.iosSkipSigning=true)
+# Les classes du module (déjà converties) sont prises telles quelles dans target/classes. robovm:create-ipa lance
+# d'abord la phase « compile » : sans maven.main.skip, javac y remettrait les classes brutes (String.join...,
+# absents de MobiVM), comme dans l'IPA 0.3.4.
+(cd "$IOS" && mvn -B robovm:create-ipa -Dmaven.repo.local="$CLONE" -Drobovm.iosSkipSigning=true -Dmaven.main.skip=true)
+check_converted_classes
 IPA="$(find "$IOS/target" -name '*.ipa' -newer "$IOS/target/ios-bridged.jar" | head -1)"
 [ -n "$IPA" ] || { echo "IPA introuvable"; exit 1; }
 

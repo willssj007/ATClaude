@@ -119,7 +119,12 @@ final class AppleHttpConnection extends HttpURLConnection {
                     NSURLRequestCachePolicy.ReloadIgnoringLocalCacheData, timeout);
             request.setHTTPMethod(httpMethod);
             for (final Map.Entry<String, List<String>> e : requestHeaders.entrySet()) {
-                request.setHTTPHeaderField(e.getKey(), String.join(", ", e.getValue()));
+                // Pas de String.join : absent de MobiVM (seule la conversion des classes le remplace).
+                final StringBuilder value = new StringBuilder();
+                for (final String v : e.getValue()) {
+                    value.append(value.length() == 0 ? "" : ", ").append(v);
+                }
+                request.setHTTPHeaderField(e.getKey(), value.toString());
             }
             if (body != null) {
                 request.setHTTPBody(new NSData(body.toByteArray()));

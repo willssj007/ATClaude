@@ -28,7 +28,8 @@ echo "=== compilation pour le simulateur (arm64) ==="
 rm -f "$TMPD/config.xml"
 mkdir -p "$TMPD"
 set -m
-(cd "$IOS" && mvn -B robovm:ipad-sim -Dmaven.repo.local="$CLONE" -Drobovm.arch=arm64-simulator > "$OUT/sim-build.log" 2>&1) &
+# maven.main.skip : la phase « compile » de robovm:ipad-sim ne remplace pas les classes converties (voir build-ios.sh).
+(cd "$IOS" && mvn -B robovm:ipad-sim -Dmaven.repo.local="$CLONE" -Drobovm.arch=arm64-simulator -Dmaven.main.skip=true > "$OUT/sim-build.log" 2>&1) &
 MVN=$!
 set +m
 while kill -0 "$MVN" 2>/dev/null && [ ! -s "$TMPD/config.xml" ]; do sleep 5; done
@@ -39,6 +40,14 @@ if [ ! -s "$TMPD/config.xml" ]; then
   echo "La compilation pour le simulateur a échoué :"
   tail -30 "$OUT/sim-build.log"
   exit 1
+fi
+
+# Barrière : l'application doit contenir les classes converties du module ios (sinon String.join & co. plantent).
+REF="$IOS/build/pipeline/ios-converted-sim"
+rm -rf "$REF" && mkdir -p "$REF" && (cd "$REF" && jar xf "$IOS/target/ios-bridged.jar" && rm -rf META-INF)
+if ! diff -rq "$REF" "$IOS/target/classes" > "$OUT/classes-diff.txt" 2>&1; then
+  echo "ÉCHEC : classes brutes du module ios dans l'application (voir classes-diff.txt)" | tee -a "$OUT/summary-head.txt"
+  head -10 "$OUT/classes-diff.txt"
 fi
 
 echo "=== assemblage de l'application ==="
@@ -95,5 +104,6 @@ cp "$DATA/Library/Application Support/atclaude/app.log" "$OUT/app.log" 2>/dev/nu
 xcrun simctl spawn "$UDID" log show --last 15m --style compact --predicate "process == \"$APP_EXEC\"" > "$OUT/sim-system.log" 2>/dev/null || true
 cp ~/Library/Logs/DiagnosticReports/"$APP_EXEC"* "$OUT/" 2>/dev/null || true
 # Le journal de l'application passe aussi par le journal système du simulateur (sorties standard).
-grep -h 'autotest\|ÉCHEC\|erreur\|Erreur\|Exception\|Error' "$OUT/app.log" "$OUT/sim-system.log" | cut -c1-600 | head -300 > "$OUT/summary.txt" || true
+{ cat "$OUT/summary-head.txt" 2>/dev/null
+  grep -h 'autotest\|ÉCHEC\|erreur\|Erreur\|Exception\|Error' "$OUT/app.log" "$OUT/sim-system.log" | cut -c1-600 | head -300; } > "$OUT/summary.txt" || true
 cat "$OUT/summary.txt"
