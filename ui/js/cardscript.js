@@ -25,7 +25,7 @@ export const WHEN = [
   {id: 'activated', kind: 'A', label: 'Capacité activée (coût : effet)', cost: true},
   {id: 'loyalty', kind: 'A', label: 'Capacité de loyauté (planeswalker)', loyalty: true},
   {id: 'spell', kind: 'SP', label: 'Effet du sort (éphémère, rituel)'},
-  {id: 'static', kind: 'S', label: 'Effet permanent (tant qu\'elle est en jeu)', filter: true},
+  {id: 'static', kind: 'S', label: 'Effet permanent : « les … que vous contrôlez ont / gagnent … »', filter: true},
 ];
 
 export const TOKENS = [
@@ -61,9 +61,10 @@ export const EFFECTS = [
   {id: 'gainLife', label: 'Gagner des points de vie', n: true},
   {id: 'drain', label: 'Chaque adversaire perd des PV, vous les gagnez', n: true},
   {id: 'countersSelf', label: 'Marqueurs +1/+1 sur cette créature', n: true},
-  {id: 'countersEach', label: 'Marqueurs +1/+1 sur chaque créature filtrée', n: true, filter: true},
+  {id: 'countersEach', label: 'Marqueurs +1/+1 sur chaque créature choisie (chaque Elfe, chaque autre…)', n: true, filter: true},
   {id: 'countersTarget', label: 'Marqueurs +1/+1 sur une créature ciblée', n: true},
-  {id: 'pumpAll', label: '+N/+N aux créatures filtrées jusqu\'à la fin du tour', n: true, filter: true},
+  {id: 'pumpAll', label: 'Les créatures choisies gagnent +N/+N jusqu\'à la fin du tour', n: true, filter: true},
+  {id: 'grantKeywordTurn', label: 'Les créatures choisies gagnent un mot-clé jusqu\'à la fin du tour', filter: true, keyword: true},
   {id: 'pumpTarget', label: '+N/+N à une créature ciblée jusqu\'à la fin du tour', n: true},
   {id: 'token', label: 'Créer des jetons', n: true, token: true},
   {id: 'destroy', label: 'Détruire une créature ciblée'},
@@ -74,9 +75,33 @@ export const EFFECTS = [
   {id: 'counterSpell', label: 'Contrecarrer un sort ciblé'},
   {id: 'scry', label: 'Regard', n: true},
   {id: 'discard', label: 'Chaque adversaire défausse des cartes', n: true},
-  {id: 'anthem', label: '+N/+N aux créatures filtrées (en permanence)', n: true, filter: true, only: ['static']},
-  {id: 'grantKeyword', label: 'Un mot-clé aux créatures filtrées (en permanence)', filter: true, keyword: true, only: ['static']},
+  {id: 'grantKeyword', label: 'Les créatures choisies ont un mot-clé (« les autres Elfes que vous contrôlez ont la vigilance »)', filter: true, keyword: true, only: ['static']},
+  {id: 'anthem', label: 'Les créatures choisies gagnent +N/+N (« les autres Elfes que vous contrôlez gagnent +1/+1 »)', n: true, filter: true, only: ['static']},
 ];
+
+/**
+ * Capacités toutes prêtes : une phrase complète, puis la capacité du formulaire qu'elle donne (le type et le mot-clé
+ * restent à changer). type : le type de la carte proposé par défaut (« Elfe »...), ou "" pour toutes les créatures.
+ */
+export function templates(type) {
+  const t = type || '';
+  const others = t ? `les autres ${t}` : 'les autres créatures';
+  const base = {n: 1, filter: {type: t, other: true}, token: 'w_1_1_spirit_flying', keyword: 'Vigilance', cost: '{2}', tap: true, sac: false, loyalty: 1};
+  return [
+    {label: `${capitalize(others)} que vous contrôlez ont la vigilance`, a: {...base, when: 'static', effect: 'grantKeyword'}},
+    {label: `${capitalize(others)} que vous contrôlez gagnent +1/+1`, a: {...base, when: 'static', effect: 'anthem'}},
+    {label: `Quand ${t ? 'un autre ' + t : 'une autre créature'} arrive sous votre contrôle, un marqueur +1/+1 sur chaque ${t ? 'autre ' + t : 'autre créature'} que vous contrôlez`,
+      a: {...base, when: 'ally', effect: 'countersEach'}},
+    {label: `Quand elle attaque, ${others} que vous contrôlez gagnent la vigilance jusqu'à la fin du tour`, a: {...base, when: 'attacks', effect: 'grantKeywordTurn'}},
+    {label: `Quand elle attaque, ${others} que vous contrôlez gagnent +1/+1 jusqu'à la fin du tour`, a: {...base, when: 'attacks', effect: 'pumpAll'}},
+    {label: 'Quand elle arrive sur le champ de bataille, piochez une carte', a: {...base, when: 'etb', effect: 'draw', filter: {type: '', other: false}}},
+    {label: 'Quand elle arrive, elle inflige 2 blessures à n\'importe quelle cible', a: {...base, n: 2, when: 'etb', effect: 'damageAny', filter: {type: '', other: false}}},
+    {label: 'Quand elle arrive, détruisez une créature ciblée', a: {...base, when: 'etb', effect: 'destroy', filter: {type: '', other: false}}},
+    {label: 'Quand elle meurt, créez un jeton Esprit 1/1 volant', a: {...base, when: 'dies', effect: 'token', filter: {type: '', other: false}}},
+    {label: 'Au début de votre entretien, vous gagnez 1 point de vie', a: {...base, when: 'upkeep', effect: 'gainLife', filter: {type: '', other: false}}},
+    {label: '{2}, {T} : piochez une carte', a: {...base, when: 'activated', effect: 'draw', filter: {type: '', other: false}}},
+  ];
+}
 
 /** Effets proposés pour un « quand » donné. */
 export function effectsFor(when) {
@@ -232,6 +257,13 @@ function effect(a, id) {
     case 'pumpAll':
       return {p: `PumpAll | ValidCards$ ${valid(a.filter)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `${allFr(a.filter)} que vous contrôlez gagnent +${n}/+${n} jusqu'à la fin du tour`,
         en: `${allEn(a.filter)} you control get +${n}/+${n} until end of turn`};
+    case 'grantKeywordTurn': {
+      const kw = a.keyword || 'Flying';
+      const has = KW_GRANT[kw] || 'ont ' + (KW_FR[kw] || kw).toLowerCase();
+      const gain = has.startsWith('sont ') ? 'deviennent ' + has.slice(5) : 'gagnent ' + has.slice(4);
+      return {p: `PumpAll | ValidCards$ ${valid(a.filter)} | KW$ ${kw}`, fr: `${allFr(a.filter)} que vous contrôlez ${gain} jusqu'à la fin du tour`,
+        en: `${allEn(a.filter)} you control gain ${kw.toLowerCase()} until end of turn`};
+    }
     case 'pumpTarget':
       return {p: `Pump | ${target(creature)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `une créature ciblée gagne +${n}/+${n} jusqu'à la fin du tour`,
         en: `target creature gets +${n}/+${n} until end of turn`};

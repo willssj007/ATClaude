@@ -130,6 +130,46 @@ function clampScale(v) {
   return Math.round(Math.max(0.45, Math.min(1, v)) * 100) / 100;
 }
 
+// Tailles mesurées (nom, type, texte) par carte et par cadre : les polices de l'appareil ne sont pas celles de
+// l'estimation, et le texte ne doit jamais être coupé. Tout est relatif à la largeur : une mesure vaut pour toutes les tailles.
+const FITTED = new Map();
+
+function fitKey(style, name, type, text, cost) {
+  return [style, name, type, cost || '', text].join('\u0001');
+}
+
+/** Réduit le nom, le type et le texte d'un cadre affiché jusqu'à ce qu'ils tiennent, et retient le résultat. */
+export function fitFrame(frame) {
+  const key = frame.dataset.fit;
+  if (!key || !frame.isConnected || frame.offsetWidth < 20) {
+    return false;
+  }
+  const shrink = (selector, prop, overflows) => {
+    const el = frame.querySelector(selector);
+    let v = parseFloat(frame.style.getPropertyValue(prop)) || 1;
+    for (let i = 0; el && i < 30 && v > 0.3 && overflows(el); i++) {
+      v = Math.round((v - 0.04) * 100) / 100;
+      frame.style.setProperty(prop, String(v));
+    }
+    return v;
+  };
+  const wide = (el) => el.scrollWidth > el.clientWidth + 0.5;
+  const tall = (el) => el.scrollHeight > el.clientHeight + 0.5;
+  const sn = shrink('.cf-name', '--sn', wide);
+  const st = shrink('.cf-tl', '--st', wide);
+  const sr = shrink('.cf-rules', '--sr', tall);
+  delete frame.dataset.fit;
+  // Une petite carte peut garder un texte plus grand que demandé (taille minimale du système) : on ne retient que
+  // les mesures faites sur une carte assez grande.
+  if (frame.offsetWidth >= 150) {
+    if (FITTED.size > 500) {
+      FITTED.clear();
+    }
+    FITTED.set(key, {sn, st, sr});
+  }
+  return true;
+}
+
 /** Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou "") ; frameUrl : son cadre importé. */
 export function customFrameHtml(card, art, frameUrl = '') {
   const style = card.frame === IMPORTED && frameUrl ? IMPORTED : FRAMES.some(f => f[0] === card.frame) ? card.frame : 'modern';
@@ -147,13 +187,16 @@ export function customFrameHtml(card, art, frameUrl = '') {
   // Le nom, le type et le texte rétrécissent pour tenir (comme sur les vraies cartes, au lieu d'être coupés).
   const box = SPACE[style];
   const costWidth = style === 'token' || !pips ? 0 : pips * 5.96 + (pips - 1) * 0.5 + 2;
-  const sn = clampScale(0.93 * (box.t - costWidth) / Math.max(1, textWidth(name, true) * 6.6));
-  const st = clampScale(0.93 * box.y / Math.max(1, textWidth(typeLine, true) * (style === 'retro' ? 5 : 5.4)));
-  const sr = rulesScale(text, box);
+  // Taille déjà mesurée sur cet appareil pour cette carte dans ce cadre, sinon une estimation, vérifiée à l'affichage.
+  const key = fitKey(style, name, typeLine, text, card.cost);
+  const known = FITTED.get(key);
+  const sn = known ? known.sn : clampScale(0.93 * (box.t - costWidth) / Math.max(1, textWidth(name, true) * 6.6));
+  const st = known ? known.st : clampScale(0.93 * box.y / Math.max(1, textWidth(typeLine, true) * (style === 'retro' ? 5 : 5.4)));
+  const sr = known ? known.sr : rulesScale(text, box);
   const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}`;
   const overlay = style === IMPORTED ? `<div class="cf-overlay" style="background-image:url(&quot;${esc(frameUrl)}&quot;)"></div>` : '';
   const light = style === IMPORTED && card.frameText === 'light' ? ' cf-light' : '';
-  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${art ? '' : ' cf-noart'}${light}" style="${vars}">
+  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${art ? '' : ' cf-noart'}${light}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
     <div class="cf-bg"></div>
     <div class="cf-art"${art}></div>
     ${overlay}

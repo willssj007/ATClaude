@@ -42,6 +42,13 @@
 .ate-art, .ate-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 
 
+/* Capacités toutes prêtes. */
+.ate-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.ate-templates { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ate-template { text-align: left; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: 14px; line-height: 1.35;
+  border: 1px solid rgb(255 255 255 / 0.12); background: rgb(255 255 255 / 0.05); color: var(--text); }
+.ate-template:hover { border-color: rgb(var(--gold-rgb) / 0.7); background: rgb(var(--gold-rgb) / 0.1); }
+
 /* Présentation : langue, couleur du cadre, cadres en vignettes. */
 .ate-look-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ate-fcolor { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }

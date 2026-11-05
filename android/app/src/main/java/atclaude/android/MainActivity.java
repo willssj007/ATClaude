@@ -99,6 +99,9 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(false);
         settings.setTextZoom(100);
+        // Pas de taille de texte minimale : le texte des cartes dessinées (petites cartes, vignettes) rétrécit avec elles.
+        settings.setMinimumFontSize(1);
+        settings.setMinimumLogicalFontSize(1);
         WebView.setWebContentsDebuggingEnabled(true);
         web.addJavascriptInterface(new JsApi(), "AndroidBridge");
         web.setWebViewClient(new LocalClient());

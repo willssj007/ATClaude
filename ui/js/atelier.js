@@ -4,11 +4,11 @@
 // les reconnaît pas et les effets qui les citent ne trouvent aucune carte.
 
 import {bridge} from './bridge.js';
-import {cardElement, showZoom} from './cards.js';
-import {confirmBox} from './dialogs.js';
+import {cardElement, onLongPress, showZoom} from './cards.js';
+import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
-import {debounce, el, esc, toast} from './util.js';
-import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, effectsFor, readDisplay, withDisplay} from './cardscript.js';
+import {debounce, el, esc, rulesHtml, toast} from './util.js';
+import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, effectsFor, readDisplay, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -25,6 +25,21 @@ export class Atelier {
     this.root = root;
     this.onChanged = onChanged;
     this.data = null;
+    // Appui long (ou clic droit) sur une carte : on l'inspecte en grand, comme ailleurs dans l'application ; le
+    // toucher qui suit ne compte pas comme un clic.
+    this.pressed = onLongPress(root, '.ate-tile, .ate-preview .mcard, .ate-frame', (node) => this.inspect(node));
+  }
+
+  inspect(node) {
+    if (node.classList.contains('ate-tile')) {
+      const entry = this.data && this.data.cards.find(c => c.name === node.dataset.name);
+      if (entry && entry.card) {
+        showZoom(entry.card);
+      }
+    } else if (this.lastCard) {
+      const look = this.look();
+      showZoom(this.shown(node.dataset.frame ? {...this.lastCard, frame: node.dataset.frame, frameColor: look.frameColor, frameText: look.frameText} : this.lastCard));
+    }
   }
 
   async show() {
@@ -65,6 +80,9 @@ export class Atelier {
       grid.appendChild(tile);
     }
     this.root.onclick = async (e) => {
+      if (this.pressed()) {
+        return;
+      }
       const tile = e.target.closest('.ate-tile');
       if (e.target.closest('[data-new]')) {
         this.edit(null);
@@ -311,9 +329,39 @@ export class Atelier {
         ${KEYWORDS.map(([v, l]) => `<button class="chip ${f.keywords.includes(v) ? 'on' : ''}" data-kw="${v}">${l}</button>`).join('')}
       </div></div>
       <div class="ate-field"><span>Capacités</span><div class="ate-abilities">${f.abilities.map((a, i) => this.abilityHtml(a, i)).join('')}</div>
-        <button class="btn small" data-addab>＋ Ajouter une capacité</button></div>`;
+        <div class="ate-add"><button class="btn small gold" data-template>＋ Capacité toute prête…</button>
+        <button class="btn small" data-addab>＋ Capacité vide</button></div></div>`;
     this.renderLook();
     this.check();
+  }
+
+  /** Type proposé dans les capacités toutes prêtes : un type perso de la carte, sinon son dernier sous-type. */
+  guessType() {
+    const subs = String(this.form.subtypes || '').trim().split(/\s+/).filter(Boolean);
+    const custom = (this.data && this.data.types) || [];
+    return subs.find(t => custom.includes(t)) || subs[subs.length - 1] || '';
+  }
+
+  /** Liste de phrases toutes faites ; celle qu'on touche devient une capacité du formulaire, à ajuster ensuite. */
+  pickTemplate() {
+    const list = templates(this.guessType());
+    customBox('Capacité toute prête', (body, footer, close) => {
+      body.innerHTML = `<p class="muted small">Touche une phrase : elle s'ajoute aux capacités, et tu peux ensuite changer le type, le mot-clé ou le nombre.</p>
+        <div class="ate-templates">${list.map((t, i) => `<button class="ate-template" data-i="${i}">${rulesHtml(t.label)}</button>`).join('')}</div>`;
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-i]');
+        if (!b) {
+          return;
+        }
+        const t = list[Number(b.dataset.i)];
+        this.form.abilities.push(JSON.parse(JSON.stringify(t.a)));
+        close();
+        this.renderLeft();
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel);
+    }, {narrow: true});
   }
 
   abilityHtml(a, i) {
@@ -339,6 +387,9 @@ export class Atelier {
   }
 
   editClick(e) {
+    if (this.pressed()) {
+      return;
+    }
     const b = e.target.closest('button');
     if (!b) {
       return;
@@ -390,6 +441,8 @@ export class Atelier {
       const k = b.dataset.kw;
       f.keywords = f.keywords.includes(k) ? f.keywords.filter(x => x !== k) : [...f.keywords, k];
       this.renderLeft();
+    } else if (b.dataset.template !== undefined) {
+      this.pickTemplate();
     } else if (b.dataset.addab !== undefined) {
       const a = NEW_ABILITY();
       if (f.types.includes('Instant') || f.types.includes('Sorcery')) {
@@ -481,7 +534,7 @@ export class Atelier {
       this.lastCard = r.card;
       this.renderLook();
       const node = cardElement(this.shown(r.card));
-      node.addEventListener('click', () => showZoom(this.shown(r.card)));
+      node.addEventListener('click', () => this.pressed() || showZoom(this.shown(r.card)));
       preview.appendChild(node);
       preview.classList.remove('stale');
       msg.className = 'ate-msg small ' + (r.warnings.length ? 'warn' : 'ok');

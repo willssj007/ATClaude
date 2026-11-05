@@ -1,6 +1,6 @@
 // Rendu d'une carte (catalogue ou partie) : image Scryfall servie par le pont, cadre dessiné en attendant.
 
-import {customFrameHtml} from './frames.js';
+import {customFrameHtml, fitFrame} from './frames.js';
 import {bridge} from './bridge.js';
 import {esc, el, frameClass, manaHtml, prefs, rulesHtml} from './util.js';
 
@@ -177,7 +177,24 @@ export function cardElement(card, extraClass = '') {
     node.dataset.exact = '1';
   }
   loadImage(node, card.image);
+  scheduleFit(node);
   return node;
+}
+
+/** Carte perso : son texte est vérifié une fois affiché (mesure réelle), au besoin réduit pour tenir dans le cadre. */
+function scheduleFit(node) {
+  if (!node.querySelector('.cf[data-fit]')) {
+    return;
+  }
+  let tries = 0;
+  const step = () => {
+    const frame = node.querySelector('.cf[data-fit]');
+    if (!frame || fitFrame(frame) || ++tries > 120) {
+      return;
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 /** Remplace le cadre dessiné d'une carte déjà affichée (après un changement de caractéristiques). */
@@ -185,6 +202,7 @@ export function refreshFrame(node, card) {
   const frame = node.querySelector('.frame');
   if (frame) {
     frame.outerHTML = frameHtml(card);
+    scheduleFit(node);
   }
 }
 
