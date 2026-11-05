@@ -578,6 +578,12 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   .decks-head .wide-only { display: none; }
 }
 .deck-tile { display: flex; flex-direction: column; padding: 0; cursor: pointer; overflow: hidden; transition: transform 0.15s, box-shadow 0.15s; }
+/* Listes longues des menus (cartes des grilles, decks, trophées, apparences) : ce qui est loin de l'écran n'est ni
+   calculé ni dessiné ; le navigateur s'en occupe à l'approche (taille retenue après le premier affichage). */
+.card-grid .cell > .mcard, .deck-tile, .trophy, .theme-card { content-visibility: auto; }
+.deck-tile { contain-intrinsic-size: auto 200px auto 320px; }
+.trophy { contain-intrinsic-size: auto 240px auto 110px; }
+.theme-card { contain-intrinsic-size: auto 150px auto 150px; }
 .deck-tile:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5); }
 /* Illustration du commandant : l'image de la carte, agrandie et recadrée sur son illustration. */
 .deck-art { position: relative; aspect-ratio: 2 / 1; background: var(--id-grad); overflow: hidden; }

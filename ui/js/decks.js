@@ -59,17 +59,34 @@ export function deckTile(d, actionHtml, subtitle) {
       ${actionHtml}
     </div></div>`);
   if (d.image && prefs.get('images')) {
-    const url = bridge.imageUrl(d.image, prefs.get('imageLang'));
-    const img = new Image();
-    img.onload = () => {
-      tile.querySelector('.deck-art-img').style.backgroundImage = `url("${url}")`;
-      // Commandant perso : son illustration seule (pas une carte entière à recadrer).
-      tile.querySelector('.deck-art').classList.add('has-img', ...(artOnly(d.image) ? ['art-only'] : []));
+    tile._loadArt = () => {
+      const url = bridge.imageUrl(d.image, prefs.get('imageLang'));
+      const img = new Image();
+      img.onload = () => {
+        tile.querySelector('.deck-art-img').style.backgroundImage = `url("${url}")`;
+        // Commandant perso : son illustration seule (pas une carte entière à recadrer).
+        tile.querySelector('.deck-art').classList.add('has-img', ...(artOnly(d.image) ? ['art-only'] : []));
+      };
+      img.src = url;
     };
-    img.src = url;
+    // L'illustration se charge quand la tuile approche de l'écran : celles qu'on voit passent devant les autres.
+    if (tileArt) {
+      tileArt.observe(tile);
+    } else {
+      tile._loadArt();
+    }
   }
   return tile;
 }
+
+const tileArt = typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (e.isIntersecting) {
+      tileArt.unobserve(e.target);
+      e.target._loadArt();
+    }
+  }
+}, {rootMargin: '400px 0px'}) : null;
 
 /** Pastilles bracket / puissance sur des tuiles déjà affichées (calculées en arrière-plan). */
 export async function fillBadges(tiles) {
