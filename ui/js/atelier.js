@@ -9,7 +9,7 @@ import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, PICKS, TAP_WHAT, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
-  effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
+  effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -101,6 +101,18 @@ export class Atelier {
   /** Cartes et jetons perso ; les jetons deviennent des choix de « Créer des jetons ». */
   useData(data) {
     this.data = data;
+    // Les types de créature en français et en anglais : on peut taper « Dieu » comme « God ».
+    if (!this.typeNames) {
+      this.typeNames = bridge.request('creatureTypes').then((list) => {
+        setTypeNames(list);
+        this.typeList = list;
+        // Une carte déjà ouverte : sa vérification tient compte des types en français.
+        if (this.editing && this.check) {
+          this.check();
+        }
+        return list;
+      }).catch(() => []);
+    }
     setCustomTokens((data.cards || []).filter(c => c.token && c.tokenScript).map(c => ({script: c.tokenScript, name: c.name})));
   }
 
@@ -434,8 +446,10 @@ export class Atelier {
       return;
     }
     const f = this.form;
-    const types = this.data.creatureTypes || [];
-    left.innerHTML = `<datalist id="ate-subtypes">${types.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+    // Suggestions : les types en français (le type de Forge à côté) puis en anglais.
+    const list = this.typeList || (this.data.creatureTypes || []).map(en => ({en, fr: en}));
+    const options = [...list.filter(t => t.fr !== t.en).map(t => `<option value="${esc(t.fr)}">${esc(t.en)}</option>`), ...list.map(t => `<option value="${esc(t.en)}">`)];
+    left.innerHTML = `<datalist id="ate-subtypes">${options.join('')}</datalist>
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Professeur X" maxlength="60"></label>
       ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
         `<button class="ate-pip${f.colors.includes(c) ? ' first' : ''}" data-tcolor="${c}" title="${l}">${symbol(c)}</button>`).join('')}
@@ -445,7 +459,7 @@ export class Atelier {
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
-      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Human Wizard (séparés par des espaces)"></label>
+      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Humain Sorcier, ou Human Wizard (séparés par des espaces)"></label>
       ${f.types.includes('Creature') ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
         <input type="number" data-k="power" value="${esc(f.power)}" min="0" max="99"> / <input type="number" data-k="toughness" value="${esc(f.toughness)}" min="0" max="99"></div>` : ''}
       ${f.types.includes('Planeswalker') ? `<label class="ate-field"><span>Loyauté de départ</span><input type="number" data-k="loyaltyStart" value="${esc(f.loyaltyStart)}" min="1" max="20"></label>` : ''}

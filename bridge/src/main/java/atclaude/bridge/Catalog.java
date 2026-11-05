@@ -565,6 +565,9 @@ final class Catalog {
             o.addProperty("en", en);
             String fr = French.creatureType(en);
             if (fr == null) {
+                fr = French.creatureTypeFr(en);
+            }
+            if (fr == null) {
                 final String key = "lbl" + en.replaceAll("[^A-Za-z0-9]", "");
                 final String t = loc.getMessageorUseDefault(key, "");
                 fr = t == null || t.isEmpty() || t.startsWith("lbl") ? en : t;

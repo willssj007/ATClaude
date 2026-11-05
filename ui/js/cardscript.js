@@ -292,7 +292,7 @@ function tapWhat(a) {
   switch (a.tapXWhat) {
     case 'creature': return ['Creature', 'créatures', 'créature', 'es', 'creatures'];
     case 'artifact': return ['Artifact', 'artefacts', 'artefact', 's', 'artifacts'];
-    case 'type': return t ? [`Creature.${t}`, `créatures de type ${t}`, `créature de type ${t}`, 'es', `${t} creatures`] : ['Creature', 'créatures', 'créature', 'es', 'creatures'];
+    case 'type': return t ? [`Creature.${t}`, `créatures de type ${frType(a.tapXType)}`, `créature de type ${frType(a.tapXType)}`, 'es', `${t} creatures`] : ['Creature', 'créatures', 'créature', 'es', 'creatures'];
     default: return ['Card.token', 'jetons', 'jeton', 's', 'tokens'];
   }
 }
@@ -308,9 +308,66 @@ export const CONDITIONS = [
   ['tappedAtLeast', 'Si vous en avez engagé au moins N (coût « engager X »)'],
 ];
 
-/** Un type de créature saisi (« Elf ») sans ce qui casserait le script. */
+/** Types de créature, en français et en anglais (posés par l'Atelier d'après la liste du pont). */
+const typesByName = new Map();
+const typeFr = new Map();
+const plainType = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+/** La liste des types : [{en: 'God', fr: 'Dieu'}, …]. */
+export function setTypeNames(list) {
+  typesByName.clear();
+  typeFr.clear();
+  for (const t of list || []) {
+    typesByName.set(plainType(t.en), t.en);
+    if (t.fr && t.fr !== t.en) {
+      typesByName.set(plainType(t.fr), t.en);
+      typeFr.set(t.en, t.fr);
+    }
+  }
+}
+
+/** Le type de Forge d'un type tapé en français ou en anglais (« Dieu », « God ») ; un type inconnu reste tel quel. */
 function typeName(t) {
-  return String(t || '').trim().replace(/[^\p{L}\p{N}-]/gu, '');
+  return typesByName.get(plainType(t)) || String(t || '').trim().replace(/[^\p{L}\p{N}-]/gu, '');
+}
+
+/** Le type tel qu'il s'écrit sur une carte française (« Dieu ») ; un type sans traduction reste en anglais. */
+function frType(t) {
+  const en = typeName(t);
+  return typeFr.get(en) || String(t || '').trim() || en;
+}
+
+/** « Elfe » → « Elfes », « Dieu » → « Dieux », « Animal » → « Animaux ». */
+function frPlural(w) {
+  if (/[sxz]$/i.test(w)) {
+    return w;
+  }
+  if (/al$/i.test(w)) {
+    return w.slice(0, -2) + 'aux';
+  }
+  return /(eu|au)$/i.test(w) ? w + 'x' : w + 's';
+}
+
+/** Les sous-types tapés (« Dieu Peuple fée », « Elf Druid ») en types de Forge ; les noms de plusieurs mots d'abord. */
+export function forgeSubtypes(text) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < words.length;) {
+    let found = 0;
+    for (let n = Math.min(3, words.length - i); n >= 2 && !found; n--) {
+      const en = typesByName.get(plainType(words.slice(i, i + n).join(' ')));
+      if (en) {
+        out.push(en);
+        found = n;
+      }
+    }
+    if (!found) {
+      out.push(typeName(words[i]));
+      found = 1;
+    }
+    i += found;
+  }
+  return out.filter(Boolean);
 }
 
 /** X d'une capacité : [compte pour Forge, « X étant … », « where X is … »], ou null pour un nombre fixe. */
@@ -318,7 +375,7 @@ function amountOf(a) {
   const t = typeName(a.amountType);
   switch (a.amount) {
     case 'creatures': return ['Count$Valid Creature.YouCtrl', 'le nombre de créatures que vous contrôlez', 'the number of creatures you control'];
-    case 'typeCount': return t ? [`Count$Valid Creature.${t}+YouCtrl`, `le nombre de créatures de type ${t} que vous contrôlez`, `the number of ${t} creatures you control`]
+    case 'typeCount': return t ? [`Count$Valid Creature.${t}+YouCtrl`, `le nombre de créatures de type ${frType(a.amountType)} que vous contrôlez`, `the number of ${t} creatures you control`]
       : ['Count$Valid Creature.YouCtrl', 'le nombre de créatures que vous contrôlez', 'the number of creatures you control'];
     case 'lands': return ['Count$Valid Land.YouCtrl', 'le nombre de terrains que vous contrôlez', 'the number of lands you control'];
     case 'artifacts': return ['Count$Valid Artifact.YouCtrl', 'le nombre d\'artefacts que vous contrôlez', 'the number of artifacts you control'];
@@ -343,7 +400,7 @@ function conditionOf(a) {
   const many = (one, more) => (n === 1 ? one : more);
   switch (a.cond) {
     case 'control': return [t ? `Count$Valid Creature.${t}+YouCtrl` : 'Count$Valid Creature.YouCtrl', `GE${n}`,
-      `si vous contrôlez au moins ${many('une', word(n, 'fr'))} ${many('créature', 'créatures')}${t ? ' de type ' + t : ''}`,
+      `si vous contrôlez au moins ${many('une', word(n, 'fr'))} ${many('créature', 'créatures')}${t ? ' de type ' + frType(a.condType) : ''}`,
       `if you control ${word(n, 'en')} or more ${t ? t + ' ' : ''}${many('creature', 'creatures')}`];
     case 'lifeAtLeast': return ['Count$YourLifeTotal', `GE${n}`, `si vous avez au moins ${n} points de vie`, `if you have ${n} or more life`];
     case 'lifeAtMost': return ['Count$YourLifeTotal', `LE${n}`, `si vous avez ${n} ${plural(n, 'point', 'points')} de vie ou moins`, `if you have ${n} or less life`];
@@ -598,27 +655,27 @@ function valid(f) {
   if (f && f.other) {
     props.push('Other');
   }
-  return f && f.type ? `Creature.${f.type}+${props.join('+')}` : `Creature.${props.join('+')}`;
+  return f && f.type ? `Creature.${typeName(f.type)}+${props.join('+')}` : `Creature.${props.join('+')}`;
 }
 
 // Créatures filtrées, dans les deux langues : « un autre Elfe » / « another Elf ».
 function oneFr(f) {
   if (f && f.type) {
-    return f.other ? `un autre ${f.type}` : `un ${f.type}`;
+    return f.other ? `un autre ${frType(f.type)}` : `un ${frType(f.type)}`;
   }
   return f && f.other ? 'une autre créature' : 'une créature';
 }
 
 function eachFr(f) {
   if (f && f.type) {
-    return f.other ? `autre ${f.type}` : f.type;
+    return f.other ? `autre ${frType(f.type)}` : frType(f.type);
   }
   return f && f.other ? 'autre créature' : 'créature';
 }
 
 function allFr(f) {
   if (f && f.type) {
-    return f.other ? `les autres ${f.type}` : `les ${f.type}`;
+    return f.other ? `les autres ${frPlural(frType(f.type))}` : `les ${frPlural(frType(f.type))}`;
   }
   return f && f.other ? 'les autres créatures' : 'les créatures';
 }
@@ -633,17 +690,17 @@ function article(word) {
 }
 
 function oneEn(f) {
-  const t = f && f.type ? f.type : 'creature';
+  const t = f && f.type ? typeName(f.type) : 'creature';
   return f && f.other ? `another ${t}` : `${article(t)} ${t}`;
 }
 
 function eachEn(f) {
-  const t = f && f.type ? f.type : 'creature';
+  const t = f && f.type ? typeName(f.type) : 'creature';
   return f && f.other ? `other ${t}` : t;
 }
 
 function allEn(f) {
-  const t = f && f.type ? `${f.type} creatures` : 'creatures';
+  const t = f && f.type ? `${typeName(f.type)} creatures` : 'creatures';
   return f && f.other ? `other ${t}` : t;
 }
 
@@ -1016,7 +1073,7 @@ export function buildScript(f) {
     lines.push(`Colors:${colors.join(',') || 'colorless'}`);
   }
   const types = (f.types || []).filter(t => CARD_TYPES.some(c => c[0] === t));
-  const sub = String(f.subtypes || '').trim().split(/\s+/).filter(Boolean);
+  const sub = forgeSubtypes(f.subtypes);
   lines.push(`Types:${[f.legendary ? 'Legendary' : '', ...types, ...sub].filter(Boolean).join(' ')}`);
   if (types.includes('Creature')) {
     lines.push(`PT:${Number(f.power) || 0}/${Number(f.toughness) || 0}`);

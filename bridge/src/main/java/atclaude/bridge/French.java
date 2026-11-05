@@ -97,6 +97,78 @@ final class French {
         return TOKEN_TYPES.get(en);
     }
 
+    private static volatile Map<String, String> creatureTypesFr;
+
+    /**
+     * Types de créature en français (« God » → « dieu »), d'après les cartes officielles : pour chaque carte traduite,
+     * les sous-types de sa ligne de type anglaise en face de ceux de sa ligne française (« Créature légendaire : dieu »,
+     * « Créature : elfe et druide »), à la même place ; la traduction la plus fréquente l'emporte. En minuscules, comme
+     * sur les cartes.
+     */
+    static Map<String, String> creatureTypesFr() {
+        Map<String, String> map = creatureTypesFr;
+        if (map != null) {
+            return map;
+        }
+        final Map<String, Map<String, Integer>> votes = new java.util.HashMap<>();
+        for (final PaperCard pc : FModel.getMagicDb().getCommonCards().getUniqueCards()) {
+            final CardRules rules = pc.getRules();
+            if (rules == null || rules.isCustom() || rules.getType() == null || !rules.getType().isCreature()) {
+                continue;
+            }
+            final List<String> en = new java.util.ArrayList<>();
+            rules.getType().getSubtypes().forEach(en::add);
+            if (en.isEmpty()) {
+                continue;
+            }
+            final String typeEn = rules.getType().toString();
+            final String typeFr = CardTranslation.getTranslatedType(rules.getName(), typeEn);
+            if (typeFr == null || typeFr.isEmpty() || typeFr.equals(typeEn)) {
+                continue;
+            }
+            final int colon = Math.max(typeFr.lastIndexOf(':'), typeFr.lastIndexOf('—'));
+            if (colon < 0) {
+                continue;
+            }
+            final String[] fr = typeFr.substring(colon + 1).trim().split("\\s*,\\s*|\\s+et\\s+");
+            if (fr.length != en.size()) {
+                continue;
+            }
+            for (int i = 0; i < fr.length; i++) {
+                final String t = fr[i].trim().toLowerCase(Locale.ROOT);
+                if (!t.isEmpty() && forge.card.CardType.isACreatureType(en.get(i))) {
+                    votes.computeIfAbsent(en.get(i), k -> new java.util.HashMap<>()).merge(t, 1, Integer::sum);
+                }
+            }
+        }
+        map = new java.util.HashMap<>();
+        for (final Map.Entry<String, Map<String, Integer>> e : votes.entrySet()) {
+            String best = null;
+            int n = 0;
+            for (final Map.Entry<String, Integer> v : e.getValue().entrySet()) {
+                if (v.getValue() > n) {
+                    n = v.getValue();
+                    best = v.getKey();
+                }
+            }
+            if (best != null) {
+                map.put(e.getKey(), best);
+            }
+        }
+        // Les corrections faites à la main (« Goblin » : gobelin, pas lutin) passent devant.
+        for (final Map.Entry<String, String> e : TOKEN_TYPES.entrySet()) {
+            map.put(e.getKey(), e.getValue().toLowerCase(Locale.ROOT));
+        }
+        creatureTypesFr = map;
+        return map;
+    }
+
+    /** Un type de créature en français, avec sa majuscule (« Dieu ») ; null si aucune carte ne le traduit. */
+    static String creatureTypeFr(final String en) {
+        final String fr = creatureTypesFr().get(en);
+        return fr == null ? null : Character.toUpperCase(fr.charAt(0)) + fr.substring(1);
+    }
+
     /** Nom français d'un jeton (« Plant Token ») dont Forge traduit mal le type, sinon null. */
     static String tokenName(final String name) {
         if (name == null || !name.endsWith(" Token")) {

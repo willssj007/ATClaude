@@ -837,7 +837,14 @@ final class CustomCards {
             });
         }
         if (!type.getSubtypes().isEmpty()) {
-            sb.append(" : ").append(String.join(" ", type.getSubtypes()));
+            // Comme sur les cartes françaises : « Créature : elfe et druide » (un type inventé reste tel quel).
+            final List<String> subs = new ArrayList<>();
+            for (final String t : type.getSubtypes()) {
+                final String fr = French.creatureTypesFr().get(t);
+                subs.add(fr != null ? fr : t);
+            }
+            final String last = subs.remove(subs.size() - 1);
+            sb.append(" : ").append(subs.isEmpty() ? last : String.join(", ", subs) + " et " + last);
         }
         return sb.toString().trim();
     }
