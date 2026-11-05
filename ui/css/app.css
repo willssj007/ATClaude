@@ -163,6 +163,8 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
   width: 1.25em; height: 1.25em; border-radius: 50%; font-size: 0.85em; font-weight: 800;
   background: var(--mana-C); color: #1b1b22; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.5);
   line-height: 1;
+  /* Au milieu de la ligne, qu'elle porte un chiffre ou un symbole (sinon les deux ne s'alignent pas pareil). */
+  vertical-align: middle;
 }
 .ms-W { background: var(--mana-W); }
 .ms-U { background: var(--mana-U); color: #fff; }
@@ -173,32 +175,35 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 .ms-T { background: #d8d4c8; }
 
 /* Symboles de mana dessinés pour l'application (soleil, goutte, crâne, flamme, arbre, losange incolore, engager) :
-   posés sur les pastilles vides (coûts, filtres), pas sur celles qui portent un chiffre (réserve de mana). */
+   posés sur les pastilles vides (coûts, filtres), pas sur celles qui portent un chiffre (réserve de mana). Chaque dessin
+   est recentré dans un carré à sa mesure (scripts de mesure : boîte englobante), pour qu'ils soient tous au milieu. */
 :root {
-  --glyph-W: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><circle cx='16' cy='16' r='6.3'/><path d='M16 2.4L18.5 7.6L13.5 7.6zM25.62 6.38L23.71 11.83L20.17 8.29zM29.6 16L24.4 18.5L24.4 13.5zM25.62 25.62L20.17 23.71L23.71 20.17zM16 29.6L13.5 24.4L18.5 24.4zM6.38 25.62L8.29 20.17L11.83 23.71zM2.4 16L7.6 13.5L7.6 18.5zM6.38 6.38L11.83 8.29L8.29 11.83z'/></svg>");
-  --glyph-U: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><path d='M16 3.5C13 9 7.6 13.8 7.6 19.6a8.4 8.4 0 0 0 16.8 0C24.4 13.8 19 9 16 3.5z'/></svg>");
-  --glyph-B: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><path fill-rule='evenodd' d='M16 4.5c-6 0-10.4 4.3-10.4 10 0 3.4 1.6 6.1 4 7.7v4.3h2.9v-2.6h2.1v2.6h2.8v-2.6h2.1v2.6h2.9v-4.3c2.4-1.6 4-4.3 4-7.7 0-5.7-4.4-10-10.4-10zM8.9 15.2a2.9 2.9 0 1 0 5.8 0 2.9 2.9 0 1 0-5.8 0zM17.3 15.2a2.9 2.9 0 1 0 5.8 0 2.9 2.9 0 1 0-5.8 0zM16 18.2l-1.5 2.6h3z'/></svg>");
-  --glyph-R: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><path d='M16.6 3c.9 3.9-1.2 6.2-3.3 8.6-2.1 2.4-4.6 5-4.6 9a7.3 7.3 0 0 0 14.6 0c0-3.1-1.4-5.4-2.9-7.1.2 2-.5 3.6-1.8 4.4.5-4.6-.6-9.5-2-14.9z'/></svg>");
-  --glyph-G: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><path d='M16 3.4c-3.2 0-5.8 2.3-6.3 5.3A5.6 5.6 0 0 0 6 13.9a5.6 5.6 0 0 0 5.6 5.6h2.8v6.6c0 .9-.9 1.6-2.4 1.9h8c-1.5-.3-2.4-1-2.4-1.9v-6.6h2.8a5.6 5.6 0 0 0 5.6-5.6 5.6 5.6 0 0 0-3.7-5.2c-.5-3-3.1-5.3-6.3-5.3z'/></svg>");
-  --glyph-C: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><path fill-rule='evenodd' d='M16 3.6l9.4 12.4L16 28.4 6.6 16zM16 9.4l-5 6.6 5 6.6 5-6.6z'/></svg>");
-  --glyph-T: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%231c1a19'><path d='M10.2 21.6a7.6 7.6 0 1 1 11.4-.4' fill='none' stroke='%231c1a19' stroke-width='3.3' stroke-linecap='round'/><path d='M25.2 25.4l-2.2-8-5.8 5.6z'/></svg>");
+  --glyph-W: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='2.4 2.4 27.2 27.2' fill='%231c1a19'><circle cx='16' cy='16' r='6.3'/><path d='M16 2.4L18.5 7.6L13.5 7.6zM25.62 6.38L23.71 11.83L20.17 8.29zM29.6 16L24.4 18.5L24.4 13.5zM25.62 25.62L20.17 23.71L23.71 20.17zM16 29.6L13.5 24.4L18.5 24.4zM6.38 25.62L8.29 20.17L11.83 23.71zM2.4 16L7.6 13.5L7.6 18.5zM6.38 6.38L11.83 8.29L8.29 11.83z'/></svg>");
+  --glyph-U: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='3.75 3.5 24.5 24.5' fill='%231c1a19'><path d='M16 3.5C13 9 7.6 13.8 7.6 19.6a8.4 8.4 0 0 0 16.8 0C24.4 13.8 19 9 16 3.5z'/></svg>");
+  --glyph-B: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='5 4.5 22 22' fill='%231c1a19'><path fill-rule='evenodd' d='M16 4.5c-6 0-10.4 4.3-10.4 10 0 3.4 1.6 6.1 4 7.7v4.3h2.9v-2.6h2.1v2.6h2.8v-2.6h2.1v2.6h2.9v-4.3c2.4-1.6 4-4.3 4-7.7 0-5.7-4.4-10-10.4-10zM8.9 15.2a2.9 2.9 0 1 0 5.8 0 2.9 2.9 0 1 0-5.8 0zM17.3 15.2a2.9 2.9 0 1 0 5.8 0 2.9 2.9 0 1 0-5.8 0zM16 18.2l-1.5 2.6h3z'/></svg>");
+  --glyph-R: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='3.55 3 24.9 24.9' fill='%231c1a19'><path d='M16.6 3c.9 3.9-1.2 6.2-3.3 8.6-2.1 2.4-4.6 5-4.6 9a7.3 7.3 0 0 0 14.6 0c0-3.1-1.4-5.4-2.9-7.1.2 2-.5 3.6-1.8 4.4.5-4.6-.6-9.5-2-14.9z'/></svg>");
+  --glyph-G: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='3.7 3.4 24.6 24.6' fill='%231c1a19'><path d='M16 3.4c-3.2 0-5.8 2.3-6.3 5.3A5.6 5.6 0 0 0 6 13.9a5.6 5.6 0 0 0 5.6 5.6h2.8v6.6c0 .9-.9 1.6-2.4 1.9h8c-1.5-.3-2.4-1-2.4-1.9v-6.6h2.8a5.6 5.6 0 0 0 5.6-5.6 5.6 5.6 0 0 0-3.7-5.2c-.5-3-3.1-5.3-6.3-5.3z'/></svg>");
+  --glyph-C: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='3.6 3.6 24.8 24.8' fill='%231c1a19'><path fill-rule='evenodd' d='M16 3.6l9.4 12.4L16 28.4 6.6 16zM16 9.4l-5 6.6 5 6.6 5-6.6z'/></svg>");
+  --glyph-T: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='3.32 1.5 24.19 24.19' fill='%231c1a19'><path d='M23.2 18.6A8 8 0 1 1 16 8' fill='none' stroke='%231c1a19' stroke-width='3.4' stroke-linecap='round'/><path d='M14.2 3.2l7.4 4.8-7.4 4.8z'/></svg>");
 }
-.ms-W:empty, .ms-U:empty, .ms-B:empty, .ms-R:empty, .ms-G:empty, .ms-Cx:empty, .ms-T:empty { background-repeat: no-repeat; background-position: center; background-size: 74%; }
+.ms-W:empty, .ms-U:empty, .ms-B:empty, .ms-R:empty, .ms-G:empty, .ms-Cx:empty, .ms-T:empty { background-repeat: no-repeat; background-position: 50% 50%; background-size: 62% 62%; }
 .ms-W:empty { background-image: var(--glyph-W); }
 .ms-U:empty { background-image: var(--glyph-U); }
 .ms-B:empty { background-image: var(--glyph-B); }
 .ms-R:empty { background-image: var(--glyph-R); }
 .ms-G:empty { background-image: var(--glyph-G); }
+.ms-W:empty { background-size: 70% 70%; }
 .ms-Cx { background: var(--mana-C); }
 .ms-Cx:empty { background-image: var(--glyph-C); }
-.ms-T:empty { background-image: var(--glyph-T); background-size: 70%; }
+.ms-T:empty { background-image: var(--glyph-T); background-size: 60% 60%; }
 .ms-hl-W { --gl: var(--glyph-W); } .ms-hr-W { --gr: var(--glyph-W); }
 .ms-hl-U { --gl: var(--glyph-U); } .ms-hr-U { --gr: var(--glyph-U); }
 .ms-hl-B { --gl: var(--glyph-B); } .ms-hr-B { --gr: var(--glyph-B); }
 .ms-hl-R { --gl: var(--glyph-R); } .ms-hr-R { --gr: var(--glyph-R); }
 .ms-hl-G { --gl: var(--glyph-G); } .ms-hr-G { --gr: var(--glyph-G); }
 .ms-hl-C { --gl: var(--glyph-C); } .ms-hr-C { --gr: var(--glyph-C); }
-.ms-hybrid:empty { background: var(--gl, none) 27% 27% / 46% no-repeat, var(--gr, none) 73% 73% / 46% no-repeat, conic-gradient(from 225deg, var(--h1) 0 50%, var(--h2) 50% 100%); }
+/* Hybride : même taille que les autres pastilles, un symbole dans chaque moitié (en haut à gauche, en bas à droite). */
+.ms.ms-hybrid:empty { font-size: 0.85em; background: var(--gl, none) 26% 26% / 38% 38% no-repeat, var(--gr, none) 74% 74% / 38% 38% no-repeat, conic-gradient(from 225deg, var(--h1) 0 50%, var(--h2) 50% 100%); }
 
 /* ---------- Composant carte ---------- */
 
