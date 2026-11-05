@@ -247,7 +247,7 @@ export const EFFECTS = [
   {id: 'monarch', group: 'mech', label: 'Devenir le monarque'},
   {id: 'initiative', group: 'mech', label: 'Prendre l\'initiative (donjon)'},
   {id: 'venture', group: 'mech', label: 'S\'aventurer dans le donjon'},
-  {id: 'modal', group: 'modal', label: 'Choisissez l\'un — (2 ou 3 modes au choix)', modal: true},
+  {id: 'modal', group: 'modal', label: 'Choix de modes (choisissez l\'un, deux, ou un ou plusieurs —)', modal: true},
   {id: 'grantKeyword', group: 'static', label: 'Les créatures choisies ont un mot-clé (« les autres Elfes que vous contrôlez ont la vigilance »)', filter: true, keyword: true, only: ['static']},
   {id: 'anthem', group: 'static', label: 'Les créatures choisies gagnent +N/+N (« les autres Elfes que vous contrôlez gagnent +1/+1 »)', n: true, filter: true, only: ['static']},
 ];
@@ -258,6 +258,9 @@ export const EFFECT_GROUPS = [
   ['removal', 'Détruire, exiler, contrer'], ['control', 'Engager, contrôler'], ['mana', 'Mana et terrains'],
   ['mech', 'Mécaniques (explorer, l\'Anneau, monarque…)'], ['modal', 'Au choix'], ['static', 'Effets permanents'],
 ];
+
+/** Combien de modes on choisit : l'un, deux (avec trois modes), un ou plusieurs. */
+export const PICKS = [['one', 'Choisissez l\'un —'], ['two', 'Choisissez deux — (trois modes)'], ['oneOrMore', 'Choisissez un ou plusieurs —']];
 
 /** Effets possibles pour un mode de « Choisissez l'un — » (pas un autre choix de modes). */
 export function modeEffectsFor(when) {
@@ -480,6 +483,8 @@ export function templates(type) {
       a: {...base, when: 'etb', effect: 'draw', then: [{...newMode('gainLife'), n: 2}], filter: {type: '', other: false}}},
     {label: `Au début de votre entretien, si vous contrôlez au moins trois ${t || 'créatures'}, piochez une carte`,
       a: {...base, when: 'upkeep', effect: 'draw', cond: 'control', condN: 3, condType: t, filter: {type: '', other: false}}},
+    {label: 'Quand elle arrive, choisissez deux — piochez une carte ; vous gagnez 3 points de vie ; regard 2',
+      a: {...base, when: 'etb', effect: 'modal', pick: 'two', modes: [newMode('draw'), {...newMode('gainLife'), n: 3}, {...newMode('scry'), n: 2}], filter: {type: '', other: false}}},
     {label: 'Engagez X jetons dégagés que vous contrôlez : piochez X cartes',
       a: {...base, when: 'activated', effect: 'draw', cost: '', tap: false, tapX: true, tapXWhat: 'token', amount: 'tapped', filter: {type: '', other: false}}},
     {label: 'Engagez X créatures dégagées que vous contrôlez : vous gagnez X points de vie, puis, si au moins trois ont été engagées, créez un jeton',
@@ -934,8 +939,12 @@ function modalLines(a, id, w, lang) {
     return null;
   }
   const modes = parts.flatMap(p => [`SVar:${p.mid}:DB$ ${p.e.p} | SpellDescription$ ${p.text}`, ...(p.e.extra || [])]);
-  const charm = `Charm | Choices$ ${parts.map(p => p.mid).join(',')}`;
-  const choose = en ? 'choose one —' : 'choisissez l\'un —';
+  // Combien de modes : « choisissez deux » demande trois modes ; « un ou plusieurs », de un à tous.
+  const pick = a.pick === 'two' && parts.length >= 3 ? 'two' : a.pick === 'oneOrMore' ? 'oneOrMore' : 'one';
+  const num = pick === 'two' ? ' | CharmNum$ 2' : pick === 'oneOrMore' ? ` | CharmNum$ ${parts.length} | MinCharmNum$ 1` : '';
+  const charm = `Charm | Choices$ ${parts.map(p => p.mid).join(',')}${num}`;
+  const choose = {one: en ? 'choose one —' : 'choisissez l\'un —', two: en ? 'choose two —' : 'choisissez deux —',
+    oneOrMore: en ? 'choose one or more —' : 'choisissez un ou plusieurs —'}[pick];
   const bullets = parts.map(p => `\\n• ${p.text}`).join('');
   if (w.kind === 'SP') {
     return {lines: [`A:SP$ ${charm}`, ...modes], text: capitalize(choose) + bullets};

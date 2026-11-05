@@ -706,7 +706,9 @@ final class CustomCards {
         }
         final StringBuilder out = new StringBuilder(text.length());
         // « Choisissez l'un — » : Forge écrit toujours en anglais la tête d'une capacité à modes.
-        final String[] lines = text.replace("Choose one —", "Choisissez l'un —").replace("choose one —", "choisissez l'un —")
+        final String[] lines = text.replace("Choose one or more —", "Choisissez un ou plusieurs —").replace("choose one or more —", "choisissez un ou plusieurs —")
+                .replace("Choose two —", "Choisissez deux —").replace("choose two —", "choisissez deux —")
+                .replace("Choose one —", "Choisissez l'un —").replace("choose one —", "choisissez l'un —")
                 .split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
             final String line = lines[i];

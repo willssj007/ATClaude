@@ -8,7 +8,7 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, TAP_WHAT, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, PICKS, TAP_WHAT, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
@@ -681,8 +681,13 @@ export class Atelier {
   /** Les modes de « Choisissez l'un — » : chacun son effet et ses réglages ; 2 ou 3 modes. */
   modesHtml(a) {
     const modes = a.modes || [];
-    return `<div class="ate-modes"><p class="muted small">Au moment de jouer, on choisit un des modes.</p>
-      ${modes.map((m, k) => this.subEffectHtml(a, m, k, 'modes', `• Mode ${k + 1}`, modes.length > 2)).join('')}
+    const pick = a.pick || 'one';
+    const min = pick === 'two' ? 3 : 2;
+    const hint = {one: 'on choisit un des modes', two: 'on choisit deux modes différents', oneOrMore: 'on choisit un mode ou plusieurs (jusqu\'à tous)'}[pick];
+    return `<div class="ate-modes">
+      <div class="ate-ab-row"><span class="muted small">Combien</span><select data-a="pick">${PICKS.map(([v, l]) => `<option value="${v}"${v === pick ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+      <p class="muted small">Au moment de jouer, ${hint}.</p>
+      ${modes.map((m, k) => this.subEffectHtml(a, m, k, 'modes', `• Mode ${k + 1}`, modes.length > min)).join('')}
       ${modes.length < 3 ? '<button class="btn small" data-addsub="modes">＋ Un autre mode</button>' : ''}</div>`;
   }
 
@@ -907,7 +912,7 @@ export class Atelier {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
     this.repaintMana(t);
-    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat'].includes(k)) {
+    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
       }
@@ -915,6 +920,10 @@ export class Atelier {
         // Deux modes pour commencer ; ceux qui ne vont pas avec ce « quand » (un sort ne se régénère pas) changent.
         a.modes = (a.modes && a.modes.length >= 2 ? a.modes : [newMode('draw'), newMode('gainLife')])
           .map(m => (modeEffectsFor(a.when).some(x => x.id === m.effect) ? m : newMode('draw')));
+        // « Choisissez deux » : trois modes au moins.
+        while (a.pick === 'two' && a.modes.length < 3) {
+          a.modes.push(newMode(a.modes.length === 2 ? 'scry' : 'gainLife'));
+        }
       }
       if (a.then) {
         a.then = a.then.map(m => (modeEffectsFor(a.when).some(x => x.id === m.effect) ? m : newMode('draw')));
