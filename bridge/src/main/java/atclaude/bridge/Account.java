@@ -38,8 +38,12 @@ import java.util.Map;
  */
 final class Account {
 
-    private static final String GIST_DESC = "Arcane Table — compte (synchronisation, ne pas modifier)";
-    private static final String GIST_FILE = "arcane-table.json";
+    /** Version de test (AT TEST) : son propre Gist ; à sa première synchronisation, elle lit une copie du vrai compte. */
+    private static final boolean TEST = "test".equals(System.getProperty("atclaude.channel"));
+    private static final String MAIN_DESC = "Arcane Table — compte (synchronisation, ne pas modifier)";
+    private static final String MAIN_FILE = "arcane-table.json";
+    private static final String GIST_DESC = TEST ? "Arcane Table TEST — compte de la version de test (ne pas modifier)" : MAIN_DESC;
+    private static final String GIST_FILE = TEST ? "arcane-table-test.json" : MAIN_FILE;
     private static final String API = System.getProperty("atclaude.githubApi", "https://api.github.com/");
 
     private final Bridge bridge;
@@ -219,7 +223,8 @@ final class Account {
         final List<String> oldGists = new java.util.ArrayList<>();
         String newest = null;
         String newestAt = "";
-        for (final JsonElement e : request("GET", "gists?per_page=100", token, null).getAsJsonArray()) {
+        final com.google.gson.JsonArray gists = request("GET", "gists?per_page=100", token, null).getAsJsonArray();
+        for (final JsonElement e : gists) {
             final JsonObject g = e.getAsJsonObject();
             if (GIST_DESC.equals(str(g, "description", ""))) {
                 oldGists.add(str(g, "id", ""));
@@ -229,11 +234,23 @@ final class Account {
                 }
             }
         }
+        String readFile = GIST_FILE;
+        if (newest == null && TEST) {
+            // AT TEST, première synchronisation : on part d'une copie du vrai compte, qu'on ne modifie ni ne supprime.
+            for (final JsonElement e : gists) {
+                final JsonObject g = e.getAsJsonObject();
+                if (MAIN_DESC.equals(str(g, "description", "")) && str(g, "updated_at", "").compareTo(newestAt) > 0) {
+                    newestAt = str(g, "updated_at", "");
+                    newest = str(g, "id", "");
+                }
+            }
+            readFile = MAIN_FILE;
+        }
         if (newest != null) {
             final JsonObject gist = request("GET", "gists/" + newest, token, null).getAsJsonObject();
             final JsonObject files = gist.getAsJsonObject("files");
-            if (files != null && files.has(GIST_FILE)) {
-                final JsonObject f = files.getAsJsonObject(GIST_FILE);
+            if (files != null && files.has(readFile)) {
+                final JsonObject f = files.getAsJsonObject(readFile);
                 String content = str(f, "content", "");
                 if (f.has("truncated") && f.get("truncated").getAsBoolean()) {
                     content = rawGet(str(f, "raw_url", ""), token);

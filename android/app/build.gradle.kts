@@ -12,6 +12,9 @@ android {
         targetSdk = 35
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "0.3.0"
+        // Version de test « AT TEST » : un autre identifiant (elle s'installe à côté de l'appli) et son propre nom.
+        applicationIdSuffix = (project.findProperty("appIdSuffix") as String?) ?: ""
+        manifestPlaceholders["appLabel"] = (project.findProperty("appLabel") as String?) ?: "Arcane Table"
     }
 
     signingConfigs {

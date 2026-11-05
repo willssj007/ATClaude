@@ -559,6 +559,7 @@ public final class Bridge {
         final JsonObject o = new JsonObject();
         o.addProperty("version", ForgeRuntime.version());
         o.addProperty("appVersion", appVersion);
+        o.addProperty("channel", System.getProperty("atclaude.channel", ""));
         o.addProperty("ready", ForgeRuntime.isReady());
         o.addProperty("status", ForgeRuntime.status());
         o.addProperty("inMatch", session != null);

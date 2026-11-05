@@ -88,6 +88,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // AT TEST (identifiant « ….test ») : sa propre synchronisation, qui ne touche jamais aux vraies données.
+        if (getPackageName().endsWith(".test")) {
+            System.setProperty("atclaude.channel", "test");
+        }
         current = this;
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 

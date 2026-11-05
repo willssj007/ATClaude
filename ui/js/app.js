@@ -424,7 +424,7 @@ function settingsScreen() {
         }
       }));
       bridge.request('hello').then(h => {
-        root.querySelector('.version').textContent = `${h.appVersion ? `Arcane Table ${h.appVersion} · ` : ''}Version de Forge : ${h.version}`;
+        root.querySelector('.version').textContent = `${h.appVersion ? `${h.channel === 'test' ? 'AT TEST' : 'Arcane Table'} ${h.appVersion} · ` : ''}Version de Forge : ${h.version}`;
       });
       appearanceHtml().then((html) => {
         root.querySelector('.appearance').innerHTML = html;
@@ -490,6 +490,8 @@ function onReady(hello) {
 async function hello() {
   try {
     const h = await bridge.request('hello');
+    // AT TEST : un badge pour ne pas confondre avec l'appli publiée.
+    document.body.classList.toggle('channel-test', h.channel === 'test');
     if (h.ready) {
       onReady(h);
     } else {
