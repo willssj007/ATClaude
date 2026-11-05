@@ -588,7 +588,7 @@ final class Career {
                     for (final Map.Entry<PaperCard, Integer> c2 : d.get(DeckSection.Commander)) {
                         commanders.add(Catalog.translated(c2.getKey().getName()));
                     }
-                    o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getImageKey(false));
+                    Catalog.addDeckImage(o, d.get(DeckSection.Commander).toFlatList().get(0));
                 }
                 o.add("commanders", commanders);
                 o.addProperty("legal", forge.deck.DeckFormat.Commander.getDeckConformanceProblem(d) == null);

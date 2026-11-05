@@ -5,7 +5,7 @@
 import {bridge} from './bridge.js';
 import {Game} from './game.js';
 import {icon} from './icons.js';
-import {el, esc, prefs, toast} from './util.js';
+import {artOnly, el, esc, prefs, toast} from './util.js';
 
 const RESULT = {win: 'Victoire', loss: 'Défaite', draw: 'Égalité'};
 /** Pause entre deux photos, en millisecondes (vitesse ×1) : les rafales gardent leur rythme, les attentes sont coupées. */
@@ -61,7 +61,7 @@ export function fillReplayArt(root) {
     const img = new Image();
     img.onload = () => {
       node.style.backgroundImage = `url("${url}")`;
-      node.classList.add('on');
+      node.classList.add('on', ...(artOnly(node.dataset.img) ? ['art-only'] : []));
     };
     img.src = url;
   });

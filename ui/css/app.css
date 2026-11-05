@@ -431,6 +431,7 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   background: var(--seat-art) 100% 25% / 62% auto no-repeat;
   -webkit-mask-image: linear-gradient(90deg, transparent 30%, #000 75%); mask-image: linear-gradient(90deg, transparent 30%, #000 75%);
 }
+.seat.has-art.art-only::before { background-position: 100% 50%; }
 .seat .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .seat .fields select, .seat .fields input, .seat .fields .csel { width: 100%; }
 .seat .deck-line { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
@@ -560,12 +561,26 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   color: var(--gold-2); border-radius: 8px; padding: 0 6px; font-weight: 800;
 }
 .deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+/* En-tête « Mes decks » : le titre puis les boutons ; sur téléphone, « Deck Commander » sur toute la largeur et les
+   deux autres côte à côte, à parts égales. */
+.decks-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.decks-head h1 { margin: 0; flex: 1 1 auto; }
+.decks-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .decks-head h1 { flex-basis: 100%; }
+  .decks-actions { flex: 1 1 100%; gap: 8px; }
+  .decks-actions .btn { flex: 1 1 40%; justify-content: center; white-space: nowrap; }
+  .decks-actions .btn.gold { flex-basis: 100%; order: -1; }
+  .decks-head .wide-only { display: none; }
+}
 .deck-tile { display: flex; flex-direction: column; padding: 0; cursor: pointer; overflow: hidden; transition: transform 0.15s, box-shadow 0.15s; }
 .deck-tile:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5); }
 /* Illustration du commandant : l'image de la carte, agrandie et recadrée sur son illustration. */
 .deck-art { position: relative; aspect-ratio: 2 / 1; background: var(--id-grad); overflow: hidden; }
 .deck-art-img { position: absolute; inset: 0; background-size: 118% auto; background-position: 50% 25%; background-repeat: no-repeat; opacity: 0; transition: opacity 0.3s; }
 .deck-art.has-img .deck-art-img { opacity: 1; }
+/* Commandant perso : son illustration de l'Atelier, entière (pas une carte à recadrer). */
+.deck-art.art-only .deck-art-img { background-size: cover; background-position: 50% 40%; }
 .deck-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(10, 12, 22, 0.85)); }
 .deck-pips { position: absolute; right: 8px; bottom: 6px; z-index: 1; }
 .deck-body { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
@@ -770,6 +785,7 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 .hl { display: flex; overflow: hidden; min-height: 76px; }
 .hl-art { width: 76px; flex: none; background: var(--panel-2) center 25% / 160% auto no-repeat; display: none; }
 .hl-art.on { display: block; }
+.hl-art.art-only, .rt-art.art-only { background-size: cover; background-position: center; }
 /* Replays (Statistiques) */
 .replays { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-bottom: 8px; }
 .replay-tile { display: flex; align-items: center; gap: 12px; padding: 0 12px 0 0; overflow: hidden; cursor: pointer; min-height: 76px; }

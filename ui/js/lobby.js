@@ -4,7 +4,7 @@ import {bracketBadgeHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {confirmBox} from './dialogs.js';
 import {icon} from './icons.js';
-import {esc, el, prefs, toast, avatarHtml, ownPhotoUrl} from './util.js';
+import {artOnly, esc, el, prefs, toast, avatarHtml, ownPhotoUrl} from './util.js';
 
 const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless: 'Agressive', Experimental: 'Expérimentale'};
 const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
@@ -224,7 +224,7 @@ export class Lobby {
   seatArt(node, key) {
     const all = [...((this.decks && this.decks.decks) || []), ...((this.decks && this.decks.precons) || [])];
     const deck = all.find(d => d.key === key);
-    node.classList.remove('has-art');
+    node.classList.remove('has-art', 'art-only');
     node.style.removeProperty('--seat-art');
     if (!deck || !deck.image || !prefs.get('images')) {
       return;
@@ -233,7 +233,7 @@ export class Lobby {
     const img = new Image();
     img.onload = () => {
       node.style.setProperty('--seat-art', `url("${url}")`);
-      node.classList.add('has-art');
+      node.classList.add('has-art', ...(artOnly(deck.image) ? ['art-only'] : []));
     };
     img.src = url;
   }

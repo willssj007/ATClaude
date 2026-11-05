@@ -7,7 +7,7 @@ import {isPlaneswalker, loadCareer, wildcardsHtml} from './career.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {icon} from './icons.js';
 import {SearchPanel} from './search.js';
-import {esc, el, manaHtml, prefs, toast, debounce} from './util.js';
+import {artOnly, esc, el, manaHtml, prefs, toast, debounce} from './util.js';
 
 /** Clé de prix d'une carte : son impression (nom, édition, numéro). */
 function priceKey(card) {
@@ -63,7 +63,8 @@ export function deckTile(d, actionHtml, subtitle) {
     const img = new Image();
     img.onload = () => {
       tile.querySelector('.deck-art-img').style.backgroundImage = `url("${url}")`;
-      tile.querySelector('.deck-art').classList.add('has-img');
+      // Commandant perso : son illustration seule (pas une carte entière à recadrer).
+      tile.querySelector('.deck-art').classList.add('has-img', ...(artOnly(d.image) ? ['art-only'] : []));
     };
     img.src = url;
   }
@@ -151,11 +152,13 @@ export class Decks {
     this.data = await bridge.request('listDecks', pw ? {career: true} : {});
     const mine = this.data.decks;
     this.root.innerHTML = `<div class="page">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-        <h1 style="margin:0;flex:1">${pw ? 'Mes decks Planeswalker' : 'Mes decks'}</h1>
-        ${pw ? '' : '<button class="btn" data-new="constructed">+ Deck construit</button>'}
-        <button class="btn" data-import>⇩ Importer (Moxfield, texte)</button>
-        <button class="btn gold" data-new="commander">+ Deck Commander</button>
+      <div class="decks-head">
+        <h1>${pw ? 'Mes decks Planeswalker' : 'Mes decks'}</h1>
+        <div class="decks-actions">
+          ${pw ? '' : '<button class="btn" data-new="constructed">+ Deck construit</button>'}
+          <button class="btn" data-import>⇩ Importer<span class="wide-only"> (Moxfield, texte)</span></button>
+          <button class="btn gold" data-new="commander">+ Deck Commander</button>
+        </div>
       </div>
       ${pw ? '<p class="muted small" style="margin-top:-6px">Seulement les cartes de ta collection : gagne des duels et ouvre des boosters pour en avoir plus.</p>' : ''}
       <div class="deck-list mine">${mine.length ? '' : `<div class="panel" style="padding:18px"><p>Aucun deck pour l'instant.</p><p class="muted">${pw

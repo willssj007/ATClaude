@@ -5,7 +5,7 @@ import {bridge} from './bridge.js';
 import {isPlaneswalker} from './career.js';
 import {confirmBox} from './dialogs.js';
 import {fillReplayArt, loadReplays, replayListHtml} from './replay.js';
-import {esc, prefs, toast} from './util.js';
+import {artOnly, esc, prefs, toast} from './util.js';
 
 const RESULT_LABEL = {win: 'Victoire', loss: 'Défaite', draw: 'Nulle'};
 const RESULT_SHORT = {win: 'V', loss: 'D', draw: 'N'};
@@ -252,7 +252,7 @@ export class StatsScreen {
       const img = new Image();
       img.onload = () => {
         node.style.backgroundImage = `url("${url}")`;
-        node.classList.add('on');
+        node.classList.add('on', ...(artOnly(node.dataset.img) ? ['art-only'] : []));
       };
       img.src = url;
     });

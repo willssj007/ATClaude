@@ -643,7 +643,7 @@ final class Catalog {
                         commanders.add(translated(e.getKey().getName()));
                     }
                     if (d.get(DeckSection.Commander).countAll() > 0) {
-                        o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getImageKey(false));
+                        addDeckImage(o, d.get(DeckSection.Commander).toFlatList().get(0));
                     }
                 }
                 o.add("commanders", commanders);
@@ -653,6 +653,22 @@ final class Catalog {
         result.add("decks", mine);
         result.add("precons", precons());
         return result;
+    }
+
+    /**
+     * Image d'une tuile de deck : celle du commandant. Un commandant perso n'a pas d'image de carte : son illustration
+     * de l'Atelier (s'il en a une) la remplace, recadrée autrement par l'interface (clé « custom: »).
+     */
+    static void addDeckImage(final JsonObject o, final PaperCard commander) {
+        final String name = commander.getName();
+        if (commander.getRules().isCustom() || CustomCards.isCustom(name)) {
+            final String art = CustomCards.artKey(name);
+            if (art != null) {
+                o.addProperty("image", art);
+            }
+            return;
+        }
+        o.addProperty("image", commander.getImageKey(false));
     }
 
     private JsonArray preconCache;
@@ -677,7 +693,7 @@ final class Catalog {
                         commanders.add(translated(e.getKey().getName()));
                     }
                     o.add("commanders", commanders);
-                    o.addProperty("image", d.get(DeckSection.Commander).toFlatList().get(0).getImageKey(false));
+                    addDeckImage(o, d.get(DeckSection.Commander).toFlatList().get(0));
                 }
             } catch (final RuntimeException e) {
                 // Deck illisible : la tuile reste sans illustration.

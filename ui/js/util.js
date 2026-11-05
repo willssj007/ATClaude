@@ -46,6 +46,11 @@ export function symbol(sym) {
   return `<span class="${cls}">${esc('WUBRG'.includes(s) ? '' : s)}</span>`;
 }
 
+/** Image qui n'est qu'une illustration (celle d'une carte perso, clé « custom: ») et non une carte entière à recadrer. */
+export function artOnly(imageKey) {
+  return String(imageKey || '').startsWith('custom:');
+}
+
 /** Coût de mana en symboles. Accepte « {2}{W}{W} » comme « 2 W W ». */
 export function manaHtml(cost) {
   if (!cost) {

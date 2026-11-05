@@ -1112,7 +1112,7 @@ final class MatchSession {
                 en.add(pc.getName());
                 fr.add(Catalog.translated(pc.getName()));
                 if (!o.has("image")) {
-                    o.addProperty("image", pc.getImageKey(false));
+                    Catalog.addDeckImage(o, pc);
                 }
             }
         }
