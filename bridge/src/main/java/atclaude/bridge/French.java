@@ -16,6 +16,8 @@ import forge.model.FModel;
 import forge.util.CardTranslation;
 
 import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -170,6 +172,81 @@ final class French {
             // Cibles modifiées pendant la lecture.
         }
         return sb.toString();
+    }
+
+    /**
+     * Libellé d'une capacité à choisir (un mode de « Choisissez l'un — », une capacité parmi plusieurs) : la traduction de
+     * Forge si elle en a une, sinon la ligne « • … » du texte français imprimé qui est à la même place que la ligne
+     * anglaise correspondante. Le texte de Forge reste si rien ne correspond.
+     */
+    static String abilityLabel(final String text, final CardStateView state) {
+        if (text == null || state == null || !looksEnglish(text)) {
+            return text;
+        }
+        try {
+            final String fr = CardTranslation.translateSingleDescriptionText(text, state);
+            if (fr != null && !fr.isEmpty() && !fr.equals(text) && !looksEnglish(fr)) {
+                return fr.replaceFirst("^•\\s*", "");
+            }
+            final List<String> en = bullets(state.getOracleText());
+            List<String> frLines = bullets(CardTranslation.getTranslatedOracle(state));
+            if (frLines.isEmpty()) {
+                // Anciennes traductions : « … choisissez l'un — A ; ou B. » sur une seule ligne.
+                frLines = inlineModes(CardTranslation.getTranslatedOracle(state));
+            }
+            if (!en.isEmpty() && en.size() == frLines.size()) {
+                final String wanted = comparable(text);
+                for (int i = 0; i < en.size(); i++) {
+                    final String line = comparable(en.get(i));
+                    if (!line.isEmpty() && (line.equals(wanted) || wanted.startsWith(line) || line.startsWith(wanted))) {
+                        return frLines.get(i);
+                    }
+                }
+            }
+        } catch (final RuntimeException e) {
+            // pas de traduction : le texte de Forge
+        }
+        return text;
+    }
+
+    /** Les lignes « • … » d'un texte de carte (les modes), sans la puce. */
+    private static List<String> bullets(final String oracle) {
+        final List<String> out = new java.util.ArrayList<>();
+        if (oracle == null) {
+            return out;
+        }
+        for (final String line : oracle.replace("\\n", "\n").split("\n")) {
+            final String l = line.trim();
+            if (l.startsWith("•")) {
+                out.add(l.substring(1).trim());
+            }
+        }
+        return out;
+    }
+
+    /** Modes écrits sur une ligne après « — », séparés par « ; » (le dernier précédé de « ou »). */
+    private static List<String> inlineModes(final String oracle) {
+        final List<String> out = new java.util.ArrayList<>();
+        if (oracle == null) {
+            return out;
+        }
+        final String text = oracle.replace("\\n", " ").replace("\n", " ");
+        final int dash = text.indexOf('—');
+        if (dash < 0) {
+            return out;
+        }
+        for (final String part : text.substring(dash + 1).split(";")) {
+            String m = part.trim().replaceFirst("^ou\\s+", "").replaceAll("[\\s.]+$", "");
+            if (!m.isEmpty()) {
+                out.add(Character.toUpperCase(m.charAt(0)) + m.substring(1) + ".");
+            }
+        }
+        return out.size() >= 2 ? out : new java.util.ArrayList<>();
+    }
+
+    /** Pour comparer deux phrases de Forge : sans le nom de la carte, la ponctuation finale et la casse. */
+    private static String comparable(final String s) {
+        return s.replace("CARDNAME", "").replaceAll("[\\s.]+$", "").replaceAll("\\s+", " ").trim().toLowerCase(Locale.ROOT);
     }
 
     private static String fromAbility(final SpellAbility sa, final String forge) {

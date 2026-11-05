@@ -9,7 +9,7 @@ import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {CARD_TYPES, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
-  effectsFor, keywordValue, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
+  effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -622,6 +622,7 @@ export class Atelier {
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+      ${e.modal ? this.modesHtml(a, i) : ''}
       ${e.token ? `<div class="ate-ab-row"><select data-a="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
       ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
@@ -629,6 +630,31 @@ export class Atelier {
         <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-a="fother"${a.filter.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
     </div>`;
+  }
+
+  /** Les modes de « Choisissez l'un — » : chacun son effet et ses réglages ; 2 ou 3 modes. */
+  modesHtml(a, i) {
+    const modes = a.modes || [];
+    const effects = modeEffectsFor(a.when);
+    const boxes = modes.map((m, k) => {
+      const e = effects.find(x => x.id === m.effect) || effects[0];
+      const f = m.filter || {type: '', other: false};
+      return `<div class="ate-mode" data-mi="${k}">
+        <div class="ate-ab-row ate-mode-head"><b class="small">• Mode ${k + 1}</b>
+          ${modes.length > 2 ? `<button class="ate-x" data-delmode="${k}" title="Retirer ce mode">✕</button>` : ''}</div>
+        <div class="ate-ab-row"><select data-mf="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
+          .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
+          ${e.n ? `<input type="number" data-mf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+        ${e.token ? `<div class="ate-ab-row"><select data-mf="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === m.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
+        ${e.mana ? `<div class="ate-ab-row"><select data-mf="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (m.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+        ${e.keyword ? `<div class="ate-ab-row"><select data-mf="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === m.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+        ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
+          <input type="text" data-mf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
+          <label class="ate-check"><input type="checkbox" data-mf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
+      </div>`;
+    }).join('');
+    return `<div class="ate-modes"><p class="muted small">Au moment de jouer, on choisit un des modes.</p>${boxes}
+      ${modes.length < 3 ? `<button class="btn small" data-addmode>＋ Un autre mode</button>` : ''}</div>`;
   }
 
   editClick(e) {
@@ -722,6 +748,15 @@ export class Atelier {
       }
       f.abilities.push(a);
       this.renderLeft();
+    } else if (b.dataset.addmode !== undefined || b.dataset.delmode !== undefined) {
+      const a = f.abilities[Number(b.closest('[data-ab]').dataset.ab)];
+      a.modes = a.modes || [];
+      if (b.dataset.addmode !== undefined) {
+        a.modes.push(newMode('gainLife'));
+      } else {
+        a.modes.splice(Number(b.dataset.delmode), 1);
+      }
+      this.renderLeft();
     } else if (b.dataset.delab !== undefined) {
       f.abilities.splice(Number(b.dataset.delab), 1);
       this.renderLeft();
@@ -770,6 +805,23 @@ export class Atelier {
       return;
     }
     const box = t.closest('[data-ab]');
+    if (box && t.dataset.mf) {
+      const m = this.form.abilities[Number(box.dataset.ab)].modes[Number(t.closest('[data-mi]').dataset.mi)];
+      const k = t.dataset.mf;
+      if (k === 'ftype') {
+        m.filter = {...(m.filter || {other: false}), type: t.value.trim()};
+      } else if (k === 'fother') {
+        m.filter = {...(m.filter || {type: ''}), other: t.checked};
+      } else {
+        m[k] = t.type === 'number' ? Number(t.value) : t.value;
+      }
+      if (e.type === 'change' && k === 'effect') {
+        this.renderLeft();
+        return;
+      }
+      this.check();
+      return;
+    }
     if (!box || !t.dataset.a) {
       return;
     }
@@ -788,6 +840,11 @@ export class Atelier {
     if (e.type === 'change' && (k === 'when' || k === 'effect')) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
+      }
+      if (a.effect === 'modal') {
+        // Deux modes pour commencer ; ceux qui ne vont pas avec ce « quand » (un sort ne se régénère pas) changent.
+        a.modes = (a.modes && a.modes.length >= 2 ? a.modes : [newMode('draw'), newMode('gainLife')])
+          .map(m => (modeEffectsFor(a.when).some(x => x.id === m.effect) ? m : newMode('draw')));
       }
       this.renderLeft();
       return;

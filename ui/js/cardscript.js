@@ -247,6 +247,7 @@ export const EFFECTS = [
   {id: 'monarch', group: 'mech', label: 'Devenir le monarque'},
   {id: 'initiative', group: 'mech', label: 'Prendre l\'initiative (donjon)'},
   {id: 'venture', group: 'mech', label: 'S\'aventurer dans le donjon'},
+  {id: 'modal', group: 'modal', label: 'Choisissez l\'un — (2 ou 3 modes au choix)', modal: true},
   {id: 'grantKeyword', group: 'static', label: 'Les créatures choisies ont un mot-clé (« les autres Elfes que vous contrôlez ont la vigilance »)', filter: true, keyword: true, only: ['static']},
   {id: 'anthem', group: 'static', label: 'Les créatures choisies gagnent +N/+N (« les autres Elfes que vous contrôlez gagnent +1/+1 »)', n: true, filter: true, only: ['static']},
 ];
@@ -255,8 +256,18 @@ export const EFFECTS = [
 export const EFFECT_GROUPS = [
   ['life', 'Blessures et points de vie'], ['cards', 'Cartes (pioche, bibliothèque, cimetière)'], ['creatures', 'Créatures et marqueurs'],
   ['removal', 'Détruire, exiler, contrer'], ['control', 'Engager, contrôler'], ['mana', 'Mana et terrains'],
-  ['mech', 'Mécaniques (explorer, l\'Anneau, monarque…)'], ['static', 'Effets permanents'],
+  ['mech', 'Mécaniques (explorer, l\'Anneau, monarque…)'], ['modal', 'Au choix'], ['static', 'Effets permanents'],
 ];
+
+/** Effets possibles pour un mode de « Choisissez l'un — » (pas un autre choix de modes). */
+export function modeEffectsFor(when) {
+  return effectsFor(when).filter(e => !e.modal);
+}
+
+/** Un mode tout neuf (son effet et ses réglages, comme une capacité). */
+export function newMode(effect = 'draw') {
+  return {effect, n: 1, filter: {type: '', other: false}, token: TOKENS[0][0], keyword: 'Flying', mana: 'Any'};
+}
 
 /** Couleurs de mana d'« Ajouter du mana ». */
 export const MANA_CHOICES = [['Any', 'Une couleur au choix'], ['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['C', 'Incolore']];
@@ -658,6 +669,9 @@ export function abilityLines(a, i, lang = 'fr') {
     const text = en ? `${capitalize(allEn(a.filter))} you control get +${n}/+${n}.` : `${capitalize(allFr(a.filter))} que vous contrôlez gagnent +${n}/+${n}.`;
     return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddPower$ ${n} | AddToughness$ ${n} | Description$ ${text}`], text};
   }
+  if (a.effect === 'modal') {
+    return modalLines(a, id, w, lang);
+  }
   const e = effect(a, id);
   if (!e) {
     return null;
@@ -679,7 +693,14 @@ export function abilityLines(a, i, lang = 'fr') {
     const text = en ? `${c.text}: ${capitalize(body)}.` : `${c.text} : ${capitalize(body)}.`;
     return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge} | SpellDescription$ ${text}`, ...extra], text};
   }
-  const head = {
+  const head = triggerHead(a);
+  const text = `${head[en ? 2 : 1]}, ${body}.`;
+  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, `SVar:${id}:DB$ ${e.p}`, ...extra], text};
+}
+
+/** Déclencheur d'une capacité : [condition pour Forge, début de phrase en français, en anglais]. */
+function triggerHead(a) {
+  return {
     etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille', 'When CARDNAME enters'],
     ally: [`Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ ${valid(a.filter)} | TriggerZones$ Battlefield`,
       `Quand ${oneFr(a.filter)} arrive sur le champ de bataille sous votre contrôle`, `Whenever ${oneEn(a.filter)} you control enters`],
@@ -702,8 +723,45 @@ export function abilityLines(a, i, lang = 'fr') {
     upkeep: ['Mode$ Phase | Phase$ Upkeep | ValidPlayer$ You | TriggerZones$ Battlefield', 'Au début de votre entretien', 'At the beginning of your upkeep'],
     end: ['Mode$ Phase | Phase$ End of Turn | ValidPlayer$ You | TriggerZones$ Battlefield', 'Au début de votre étape de fin', 'At the beginning of your end step'],
   }[a.when];
-  const text = `${head[en ? 2 : 1]}, ${body}.`;
-  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, `SVar:${id}:DB$ ${e.p}`, ...extra], text};
+}
+
+/**
+ * « Choisissez l'un — » : chaque mode est une capacité (une SVar) avec sa description dans la langue de la carte ; Forge
+ * propose les modes au moment de jouer. Le texte suit la carte : « …, choisissez l'un —\n• A.\n• B. ».
+ */
+function modalLines(a, id, w, lang) {
+  const en = lang === 'en';
+  const parts = [];
+  (a.modes || []).slice(0, 3).forEach((m, k) => {
+    const mid = `${id}M${k + 1}`;
+    const e = effect({...newMode(), ...m}, mid);
+    if (e) {
+      parts.push({mid, e, text: capitalize(en ? e.en : e.fr) + '.'});
+    }
+  });
+  if (parts.length < 2) {
+    return null;
+  }
+  const modes = parts.flatMap(p => [`SVar:${p.mid}:DB$ ${p.e.p} | SpellDescription$ ${p.text}`, ...(p.e.extra || [])]);
+  const charm = `Charm | Choices$ ${parts.map(p => p.mid).join(',')}`;
+  const choose = en ? 'choose one —' : 'choisissez l\'un —';
+  const bullets = parts.map(p => `\\n• ${p.text}`).join('');
+  if (w.kind === 'SP') {
+    return {lines: [`A:SP$ ${charm}`, ...modes], text: capitalize(choose) + bullets};
+  }
+  if (w.kind === 'A') {
+    if (a.when === 'loyalty') {
+      const k = Math.round(Number(a.loyalty) || 0);
+      const cost = k >= 0 ? `AddCounter<${k}/LOYALTY>` : `SubCounter<${-k}/LOYALTY>`;
+      const head = en ? `${k > 0 ? '+' : k < 0 ? '−' : ''}${Math.abs(k)}:` : `[${k > 0 ? '+' : ''}${k}] :`;
+      return {lines: [`A:AB$ ${charm} | Cost$ ${cost} | Planeswalker$ True`, ...modes], text: `${head} ${capitalize(choose)}${bullets}`};
+    }
+    const c = activationCost(a, lang);
+    return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge}`, ...modes], text: `${c.text}${en ? ':' : ' :'} ${capitalize(choose)}${bullets}`};
+  }
+  const head = triggerHead(a);
+  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${head[en ? 2 : 1]}, ABILITY`, `SVar:${id}:DB$ ${charm}`, ...modes],
+    text: `${head[en ? 2 : 1]}, ${choose}${bullets}`};
 }
 
 /** Lignes d'affichage du script (cadre, sa couleur, langue du texte) : Forge les garde sans s'en servir. */

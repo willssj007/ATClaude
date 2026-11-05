@@ -602,12 +602,98 @@ final class CustomCards {
 
     /** Mots-clés de l'Atelier (ceux du formulaire) : Forge les écrit en anglais pour une carte sans traduction. */
     private static final Map<String, String> KEYWORDS_FR = Map.ofEntries(
-            Map.entry("flying", "Vol"), Map.entry("first strike", "Initiative"), Map.entry("double strike", "Double initiative"),
-            Map.entry("deathtouch", "Contact mortel"), Map.entry("haste", "Célérité"), Map.entry("hexproof", "Défense talismanique"),
-            Map.entry("indestructible", "Indestructible"), Map.entry("lifelink", "Lien de vie"), Map.entry("menace", "Menace"),
-            Map.entry("reach", "Portée"), Map.entry("trample", "Piétinement"), Map.entry("vigilance", "Vigilance"),
-            Map.entry("defender", "Défenseur"), Map.entry("flash", "Flash"), Map.entry("shroud", "Linceul"),
-            Map.entry("prowess", "Prouesse"), Map.entry("ward", "Garde"), Map.entry("changeling", "Changelin"));
+            Map.entry("flying", "Vol"),
+            Map.entry("first strike", "Initiative"),
+            Map.entry("double strike", "Double initiative"),
+            Map.entry("deathtouch", "Contact mortel"),
+            Map.entry("haste", "Célérité"),
+            Map.entry("lifelink", "Lien de vie"),
+            Map.entry("menace", "Menace"),
+            Map.entry("reach", "Portée"),
+            Map.entry("trample", "Piétinement"),
+            Map.entry("vigilance", "Vigilance"),
+            Map.entry("defender", "Défenseur"),
+            Map.entry("infect", "Infection"),
+            Map.entry("wither", "Flétrissure"),
+            Map.entry("shadow", "Distorsion"),
+            Map.entry("fear", "Peur"),
+            Map.entry("intimidate", "Intimidation"),
+            Map.entry("skulk", "Furtivité"),
+            Map.entry("horsemanship", "Équitation"),
+            Map.entry("flanking", "Débordement"),
+            Map.entry("plainswalk", "Traversée des plaines"),
+            Map.entry("islandwalk", "Traversée des îles"),
+            Map.entry("swampwalk", "Traversée des marais"),
+            Map.entry("mountainwalk", "Traversée des montagnes"),
+            Map.entry("forestwalk", "Traversée des forêts"),
+            Map.entry("hexproof", "Défense talismanique"),
+            Map.entry("shroud", "Linceul"),
+            Map.entry("indestructible", "Indestructible"),
+            Map.entry("protection from white", "Protection contre le blanc"),
+            Map.entry("protection from blue", "Protection contre le bleu"),
+            Map.entry("protection from black", "Protection contre le noir"),
+            Map.entry("protection from red", "Protection contre le rouge"),
+            Map.entry("protection from green", "Protection contre le vert"),
+            Map.entry("ward", "Parade"),
+            Map.entry("flash", "Flash"),
+            Map.entry("prowess", "Prouesse"),
+            Map.entry("cascade", "Cascade"),
+            Map.entry("exalted", "Exaltation"),
+            Map.entry("persist", "Persistance"),
+            Map.entry("undying", "Survivance"),
+            Map.entry("changeling", "Changelin"),
+            Map.entry("riot", "Émeute"),
+            Map.entry("training", "Entraînement"),
+            Map.entry("mentor", "Mentor"),
+            Map.entry("dethrone", "Détrônement"),
+            Map.entry("melee", "Mêlée"),
+            Map.entry("battle cry", "Cri de guerre"),
+            Map.entry("myriad", "Myriade"),
+            Map.entry("evolve", "Évolution"),
+            Map.entry("extort", "Extorsion"),
+            Map.entry("provoke", "Provocation"),
+            Map.entry("unleash", "Emportement"),
+            Map.entry("decayed", "Décomposition"),
+            Map.entry("partner", "Partenariat"),
+            Map.entry("annihilator", "Annihilateur"),
+            Map.entry("bushido", "Bushido"),
+            Map.entry("toxic", "Toxique"),
+            Map.entry("afflict", "Affliction"),
+            Map.entry("afterlife", "Au-delà"),
+            Map.entry("fabricate", "Fabrication"),
+            Map.entry("rampage", "Sauvagerie"),
+            Map.entry("modular", "Modularité"),
+            Map.entry("renown", "Réputation"),
+            Map.entry("bloodthirst", "Soif de sang"),
+            Map.entry("dredge", "Dragage"),
+            Map.entry("fading", "Évanescence"),
+            Map.entry("vanishing", "Disparition"),
+            Map.entry("cycling", "Recyclage"),
+            Map.entry("flashback", "Flashback"),
+            Map.entry("unearth", "Exhumation"),
+            Map.entry("ninjutsu", "Ninjutsu"),
+            Map.entry("dash", "Précipitation"),
+            Map.entry("blitz", "Blitz"),
+            Map.entry("evoke", "Évocation"),
+            Map.entry("madness", "Folie"),
+            Map.entry("embalm", "Embaumement"),
+            Map.entry("eternalize", "Éternalisation"),
+            Map.entry("encore", "Encore"),
+            Map.entry("morph", "Mue"),
+            Map.entry("disguise", "Déguisement"),
+            Map.entry("scavenge", "Récupération"),
+            Map.entry("outlast", "Résilience"),
+            Map.entry("equip", "Équipement"),
+            Map.entry("convoke", "Convocation"),
+            Map.entry("delve", "Fouille"),
+            Map.entry("improvise", "Improvisation"),
+            Map.entry("storm", "Déluge"),
+            Map.entry("split second", "Fraction de seconde"),
+            Map.entry("rebound", "Rebond"));
+    /** Mot-clé avec sa valeur, tel que Forge l'écrit (« Annihilator 2 », « Cycling {1}{U} », « Ward {3} »). */
+    /** Ligne de mot-clé avec son texte de rappel (« Undying (When this creature dies, …) ») : le rappel en anglais tombe. */
+    private static final Pattern REMINDER = Pattern.compile("^(.*?)\\s*\\((?:[^()]|\\([^()]*\\))*\\)$");
+    private static final Pattern KEYWORD_VALUE = Pattern.compile("^(.+?)\\s+((?:\\{[^}]*\\})+|\\d+)$");
     private static final Pattern COUNTERS_LINE = Pattern.compile("^(.+) counters: (\\d+)$");
 
     /**
@@ -619,7 +705,9 @@ final class CustomCards {
             return text;
         }
         final StringBuilder out = new StringBuilder(text.length());
-        final String[] lines = text.split("\n", -1);
+        // « Choisissez l'un — » : Forge écrit toujours en anglais la tête d'une capacité à modes.
+        final String[] lines = text.replace("Choose one —", "Choisissez l'un —").replace("choose one —", "choisissez l'un —")
+                .split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
             final String line = lines[i];
             if (i > 0) {
@@ -630,16 +718,26 @@ final class CustomCards {
                 out.append("Marqueurs ").append(m.group(1)).append(" : ").append(m.group(2));
                 continue;
             }
-            final String[] parts = line.trim().split(",\\s*");
+            String core = line.trim();
+            final java.util.regex.Matcher reminder = REMINDER.matcher(core);
+            if (reminder.matches() && !reminder.group(1).isEmpty()) {
+                core = reminder.group(1).trim();
+            }
+            final String[] parts = core.split(",\\s*");
             final List<String> fr = new ArrayList<>();
             for (final String part : parts) {
-                final String k = KEYWORDS_FR.get(part.trim().toLowerCase(Locale.ROOT));
+                String k = KEYWORDS_FR.get(part.trim().toLowerCase(Locale.ROOT));
                 if (k == null) {
-                    break;
+                    final java.util.regex.Matcher v = KEYWORD_VALUE.matcher(part.trim());
+                    final String name = v.matches() ? KEYWORDS_FR.get(v.group(1).toLowerCase(Locale.ROOT)) : null;
+                    if (name == null) {
+                        break;
+                    }
+                    k = name + " " + v.group(2);
                 }
-                fr.add(fr.isEmpty() ? k : k.toLowerCase(Locale.ROOT));
+                fr.add(fr.isEmpty() ? k : Character.toLowerCase(k.charAt(0)) + k.substring(1));
             }
-            out.append(!line.isBlank() && fr.size() == parts.length ? String.join(", ", fr) : line);
+            out.append(!core.isBlank() && fr.size() == parts.length ? String.join(", ", fr) : line);
         }
         return out.toString();
     }

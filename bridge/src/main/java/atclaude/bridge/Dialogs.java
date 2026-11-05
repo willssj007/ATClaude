@@ -46,7 +46,12 @@ final class Dialogs {
         final GameView gv = g == null ? null : g.getGameView();
         for (final T choice : choices) {
             final JsonObject item = new JsonObject();
-            item.addProperty("label", Texts.clean(label(choice, display)));
+            String text = Texts.clean(label(choice, display));
+            if (choice instanceof SpellAbilityView sa && sa.getHostCard() != null) {
+                // Un mode (« Choisissez l'un — ») ou une capacité au choix : en français d'après le texte imprimé.
+                text = French.abilityLabel(text, sa.getHostCard().getCurrentState());
+            }
+            item.addProperty("label", text);
             if (choice instanceof CardView card && g != null) {
                 item.add("card", new GameSerializer(g).card(card, gv));
             } else if (choice instanceof PlayerView player) {

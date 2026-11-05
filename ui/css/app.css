@@ -1509,3 +1509,7 @@ body.in-game #menu-fx, body.in-replay #menu-fx { display: none; }
 .th-back-ghostflame::after { background-image: url("../img/backs/thumbs/fxb-ghostflame.webp"); }
 .th-back-aurora::after { background-image: url("../img/backs/thumbs/fxb-aurora.webp"); }
 
+
+/* AT TEST (version de test) : un badge à côté du logo, pour ne pas confondre avec l'appli publiée. */
+body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800;
+  letter-spacing: 0.06em; color: #1b0f00; background: #ff9f43; align-self: center; }
