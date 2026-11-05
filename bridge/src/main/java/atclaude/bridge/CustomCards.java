@@ -51,6 +51,12 @@ final class CustomCards {
     private static final Map<String, File> FILES = new ConcurrentHashMap<>();
     /** Supprimées pendant cette session : Forge les garde jusqu'au prochain lancement, les recherches non. */
     private static final Set<String> DELETED = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+    /** Noms des jetons perso (fichiers du dossier des jetons, dans la base des jetons de Forge et pas dans celle des cartes). */
+    private static final Set<String> TOKENS = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+    /** Marque d'un jeton perso dans son script. */
+    private static final Pattern TOKEN_MARK = Pattern.compile("(?m)^SVar:AtelierToken:True\\s*$");
+    /** Jeton créé par une capacité (« TokenScript$ w_1_1_soldier ») : il doit exister dans la base des jetons. */
+    private static final Pattern TOKEN_SCRIPT = Pattern.compile("\\bTokenScript\\$\\s*([A-Za-z0-9_]+)");
     /** Types ajoutés à la liste de Forge par l'application (les seuls qu'on puisse en retirer). */
     private static final Set<String> ADDED_TYPES = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -67,6 +73,11 @@ final class CustomCards {
 
     private static File cardsDir() {
         return new File(ForgeConstants.USER_CUSTOM_CARDS_DIR);
+    }
+
+    /** Jetons perso : Forge les lit au démarrage dans sa base des jetons, sous le nom du fichier (« atelier_… »). */
+    private static File tokensDir() {
+        return new File(ForgeConstants.USER_CUSTOM_TOKENS_DIR);
     }
 
     private static File artDir() {
@@ -90,6 +101,7 @@ final class CustomCards {
     /** Avant le chargement de Forge : sans le dossier, Forge ne lit aucune carte perso. */
     static void prepare() {
         cardsDir().mkdirs();
+        tokensDir().mkdirs();
         artDir().mkdirs();
         frameDir().mkdirs();
         formsDir().mkdirs();
@@ -108,6 +120,46 @@ final class CustomCards {
                 }
             }
         }
+        final File[] tokens = tokensDir().listFiles((d, n) -> n.endsWith(".txt"));
+        if (tokens != null) {
+            for (final File f : tokens) {
+                final String text = read(f);
+                final String name = nameOf(text);
+                if (name != null && !FILES.containsKey(name)) {
+                    FILES.put(name, f);
+                    TOKENS.add(name);
+                    registerToken(base(f), text);
+                }
+            }
+        }
+    }
+
+    /** Jeton perso dans la base des jetons de Forge (déjà fait au démarrage par Forge, sinon tout de suite). */
+    private static void registerToken(final String script, final String text) {
+        final Map<String, CardRules> rules = FModel.getMagicDb().getAllTokens().getRules();
+        if (!rules.containsKey(script) || text != null) {
+            try {
+                rules.put(script, new CardRules.Reader().readCard(Arrays.asList(text.replace("\r", "").split("\n")), script));
+            } catch (final RuntimeException e) {
+                System.err.println("Jeton perso illisible (" + script + ") : " + e.getMessage());
+            }
+        }
+        Catalog.forgetTokenScripts();
+    }
+
+    static boolean isTokenScript(final String script) {
+        return script != null && TOKEN_MARK.matcher(script).find();
+    }
+
+    /** Jeton perso (créé par les capacités, pas une carte qu'on met dans un deck). */
+    static boolean isToken(final String name) {
+        return name != null && TOKENS.contains(name) && isCustom(name);
+    }
+
+    /** Nom du jeton perso pour Forge (« TokenScript$ atelier_… »), ou null. */
+    static String tokenScript(final String name) {
+        final File f = isToken(name) ? FILES.get(name) : null;
+        return f == null ? null : base(f);
     }
 
     static boolean isCustom(final String name) {
@@ -251,6 +303,15 @@ final class CustomCards {
                 // formulaire illisible : la carte s'ouvre dans l'éditeur de script
             }
         }
+        if (TOKENS.contains(name)) {
+            o.addProperty("token", true);
+            o.addProperty("tokenScript", base(file));
+            final CardRules r = FModel.getMagicDb().getAllTokens().getRules().get(base(file));
+            if (r != null) {
+                o.add("card", Catalog.paperJson(new PaperCard(r, "USER", CardRarity.Special)));
+            }
+            return o;
+        }
         final PaperCard pc = FModel.getMagicDb().getCommonCards().getCard(name);
         if (pc != null) {
             o.add("card", Catalog.paperJson(pc));
@@ -336,6 +397,13 @@ final class CustomCards {
                     throw new IllegalArgumentException("« " + exec.group(1) + " » n'est défini par aucune ligne « SVar:" + exec.group(1) + ":… »" + where + ".");
                 }
             }
+            final java.util.regex.Matcher token = TOKEN_SCRIPT.matcher(line);
+            while (token.find()) {
+                if (!FModel.getMagicDb().getAllTokens().containsRule(token.group(1))) {
+                    throw new IllegalArgumentException("Jeton inconnu : « " + token.group(1) + " »" + where
+                            + (token.group(1).startsWith("atelier_") ? " (jeton perso supprimé ?)." : "."));
+                }
+            }
             if (line.startsWith("K:")) {
                 final String k = line.substring(2).trim();
                 if (forge.game.keyword.Keyword.getInstance(k).getKeyword() == forge.game.keyword.Keyword.UNDEFINED) {
@@ -401,12 +469,24 @@ final class CustomCards {
         validate(script, previous);
         final CardRules rules = parse(script, previous);
         final String name = rules.getName();
+        // Carte ou jeton : chacun son dossier (Forge lit les cartes dans sa base des cartes, les jetons dans celle des jetons).
+        final boolean token = isTokenScript(script);
+        final File dir = token ? tokensDir() : cardsDir();
         File file = FILES.get(name);
-        if (file == null || DELETED.contains(name)) {
-            file = new File(cardsDir(), unusedBase(name) + ".txt");
-        }
         File oldArt = null;
         File oldFrame = null;
+        if (file != null && !DELETED.contains(name) && !dir.getAbsoluteFile().equals(file.getAbsoluteFile().getParentFile())) {
+            // Une carte devenue jeton (ou l'inverse) : nouveau fichier, l'illustration et le cadre suivent.
+            oldArt = new File(artDir(), base(file) + ".jpg");
+            oldFrame = new File(frameDir(), base(file) + ".png");
+            delete(new File(formsDir(), base(file) + ".json"));
+            delete(file);
+            file = null;
+        }
+        if (file == null || DELETED.contains(name)) {
+            dir.mkdirs();
+            file = new File(dir, unusedBase(name, token) + ".txt");
+        }
         if (previous != null && !previous.equals(name) && FILES.containsKey(previous)) {
             // Renommée : l'ancienne carte disparaît (de la base de Forge au prochain lancement), son illustration suit.
             final File old = FILES.remove(previous);
@@ -477,6 +557,14 @@ final class CustomCards {
                 throw new IllegalStateException("Cadre non enregistré : " + e.getMessage());
             }
         }
+        if (token) {
+            // Jeton : dans la base des jetons de Forge, sous le nom de son fichier ; jamais dans les cartes.
+            TOKENS.add(name);
+            registerToken(base(file), read(file));
+            changed();
+            return entry(name, file);
+        }
+        TOKENS.remove(name);
         // Dans la base de Forge tout de suite, comme au démarrage (édition « USER »), ou modifiée sur place.
         final CardDb db = FModel.getMagicDb().getCommonCards();
         if (db.getRules(name, false) != null) {
@@ -507,6 +595,7 @@ final class CustomCards {
         delete(new File(formsDir(), base(f) + ".json"));
         delete(f);
         DELETED.add(name);
+        TOKENS.remove(name);
         changed();
         return true;
     }
@@ -594,6 +683,10 @@ final class CustomCards {
 
     /** La carte perso de ce nom, telle que Forge l'a lue (null si ce n'en est pas une). */
     static CardRules rules(final String name) {
+        final String token = tokenScript(name);
+        if (token != null) {
+            return FModel.getMagicDb().getAllTokens().getRules().get(token);
+        }
         final CardRules r = name == null ? null : FModel.getMagicDb().getCommonCards().getRules(name, false);
         return r != null && r.isCustom() ? r : null;
     }
@@ -810,7 +903,13 @@ final class CustomCards {
             write(deletedFile(), mine.toString());
         }
         final JsonObject cards = obj(merged, "cards");
-        for (final String name : cards.keySet()) {
+        // Les jetons d'abord : une carte qui en crée un est refusée tant que son jeton n'existe pas.
+        final List<String> order = new ArrayList<>(cards.keySet());
+        order.sort(java.util.Comparator.comparing(n -> {
+            final JsonObject c = cards.getAsJsonObject(n);
+            return !isTokenScript(c.has("script") ? c.get("script").getAsString() : "");
+        }));
+        for (final String name : order) {
             final JsonObject c = cards.getAsJsonObject(name);
             final File here = FILES.get(name);
             final boolean present = here != null && !DELETED.contains(name);
@@ -873,10 +972,12 @@ final class CustomCards {
         return n.endsWith(".txt") ? n.substring(0, n.length() - 4) : n;
     }
 
-    private static String unusedBase(final String name) {
-        final String b = base(name);
+    /** Nom de fichier libre : celui de la carte (« gardienne_des_runes »), « atelier_… » pour un jeton (son nom pour Forge). */
+    private static String unusedBase(final String name, final boolean token) {
+        final String b = token ? "atelier_" + base(name) : base(name);
+        final File dir = token ? tokensDir() : cardsDir();
         String candidate = b;
-        for (int i = 2; new File(cardsDir(), candidate + ".txt").exists(); i++) {
+        for (int i = 2; new File(dir, candidate + ".txt").exists(); i++) {
             candidate = b + "_" + i;
         }
         return candidate;

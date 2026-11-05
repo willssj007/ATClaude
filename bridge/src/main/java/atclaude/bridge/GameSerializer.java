@@ -311,6 +311,10 @@ final class GameSerializer {
             if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
             }
+            if (CustomCards.isToken(s.getName())) {
+                // Jeton perso : le cadre dit déjà « Jeton », pas de ligne « Token » en tête du texte.
+                o.addProperty("text", o.get("text").getAsString().replaceFirst("^Token\\s*(\\n|$)", ""));
+            }
             final String frame = CustomCards.frameKey(s.getName());
             if (frame != null) {
                 o.addProperty("customFrame", frame);

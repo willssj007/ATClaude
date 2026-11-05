@@ -8,14 +8,17 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {CARD_TYPES, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, buildScript, costParts, effectsFor,
-  keywordValue, readDisplay, templates, withDisplay} from './cardscript.js';
+import {CARD_TYPES, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+  effectsFor, keywordValue, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
   keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none',
 });
+/** Nouveau jeton : une créature 1/1 verte sans coût, au cadre de jeton. */
+const NEW_TOKEN = () => ({...NEW_CARD(), token: true, colors: ['G'], power: 1, toughness: 1, frame: 'token'});
+const TOKEN_COLORS = [['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert']];
 const NEW_ABILITY = () => ({when: 'etb', effect: 'draw', n: 1, filter: {type: '', other: false}, token: TOKENS[0][0],
   keyword: 'Flying', cost: '', tap: true, sac: false, loyalty: 1, mana: 'Any'});
 /** Illustration : 480 × 352 (le cadre de l'illustration d'une carte). */
@@ -87,7 +90,7 @@ export class Atelier {
     }
     this.root.innerHTML = '<div class="page"><h1>Atelier</h1><p class="muted">Chargement…</p></div>';
     try {
-      this.data = await bridge.request('customCards');
+      this.useData(await bridge.request('customCards'));
     } catch (e) {
       this.root.innerHTML = `<div class="page"><h1>Atelier</h1><p class="muted">${esc(e.message)}</p></div>`;
       return;
@@ -95,15 +98,27 @@ export class Atelier {
     this.renderList();
   }
 
+  /** Cartes et jetons perso ; les jetons deviennent des choix de « Créer des jetons ». */
+  useData(data) {
+    this.data = data;
+    setCustomTokens((data.cards || []).filter(c => c.token && c.tokenScript).map(c => ({script: c.tokenScript, name: c.name})));
+  }
+
   // ------------------------------------------------------------------ liste
 
   renderList() {
     const d = this.data;
+    const cards = d.cards.filter(c => !c.token);
+    const tokens = d.cards.filter(c => c.token);
     this.root.innerHTML = `<div class="page atelier">
       <div class="ate-top"><h1>Atelier</h1><button class="btn gold" data-new>＋ Nouvelle carte</button></div>
       <p class="muted small">Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles
         se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker).</p>
-      <div class="ate-grid">${d.cards.length ? '' : '<p class="muted">Aucune carte perso pour l\'instant.</p>'}</div>
+      <div class="ate-grid ate-cards">${cards.length ? '' : '<p class="muted">Aucune carte perso pour l\'instant.</p>'}</div>
+      <div class="ate-top"><h2>Mes jetons</h2><button class="btn" data-new-token>＋ Nouveau jeton</button></div>
+      <p class="muted small">Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso
+        les créent (effet « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.</p>
+      <div class="ate-grid ate-tokens">${tokens.length ? '' : '<p class="muted">Aucun jeton perso pour l\'instant.</p>'}</div>
       <h2>Types de créature perso</h2>
       <p class="muted small">Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et
         un effet qui cite un type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.</p>
@@ -111,12 +126,13 @@ export class Atelier {
         <span class="ate-addtype"><input type="text" placeholder="Nouveau type (un mot)" maxlength="30"><button class="btn small" data-addtype>Ajouter</button></span>
       </div>
     </div>`;
-    const grid = this.root.querySelector('.ate-grid');
-    for (const c of d.cards) {
-      const tile = el(`<div class="ate-tile" data-name="${esc(c.name)}"></div>`);
-      tile.appendChild(c.card ? cardElement(c.card) : el(`<div class="mcard"><div class="face"></div></div>`));
-      tile.appendChild(el(`<div class="ate-name">${esc(c.name)}</div>`));
-      grid.appendChild(tile);
+    for (const [list, grid] of [[cards, this.root.querySelector('.ate-cards')], [tokens, this.root.querySelector('.ate-tokens')]]) {
+      for (const c of list) {
+        const tile = el(`<div class="ate-tile" data-name="${esc(c.name)}"></div>`);
+        tile.appendChild(c.card ? cardElement(c.card) : el(`<div class="mcard"><div class="face"></div></div>`));
+        tile.appendChild(el(`<div class="ate-name">${esc(c.name)}</div>`));
+        grid.appendChild(tile);
+      }
     }
     this.root.onclick = async (e) => {
       if (this.pressed()) {
@@ -125,6 +141,8 @@ export class Atelier {
       const tile = e.target.closest('.ate-tile');
       if (e.target.closest('[data-new]')) {
         this.edit(null);
+      } else if (e.target.closest('[data-new-token]')) {
+        this.edit(null, {token: true});
       } else if (tile) {
         this.edit(d.cards.find(c => c.name === tile.dataset.name));
       } else if (e.target.closest('[data-untype]')) {
@@ -145,7 +163,7 @@ export class Atelier {
 
   async setTypes(types) {
     try {
-      this.data = await bridge.request('customTypes', {types});
+      this.useData(await bridge.request('customTypes', {types}));
       this.renderList();
       this.onChanged();
     } catch (e) {
@@ -156,7 +174,7 @@ export class Atelier {
   // ------------------------------------------------------------------ édition
 
   /** Édite une carte perso (entry) ou en crée une (null). */
-  edit(entry) {
+  edit(entry, {token = false} = {}) {
     this.editing = true;
     this.previous = entry ? entry.name : null;
     this.art = null;
@@ -164,7 +182,9 @@ export class Atelier {
     // Cadre importé : PNG à envoyer (null : garder celui de la carte, "" : le retirer) et son adresse à l'écran.
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
-    this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : NEW_CARD();
+    this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : token ? NEW_TOKEN() : NEW_CARD();
+    this.form.token = !!(this.form.token || (entry && entry.token));
+    this.form.colors = this.form.colors || [];
     this.form.kwValues = this.form.kwValues || {};
     this.kwOpen = new Set(['combat', ...KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3])]);
     this.mode = entry && !entry.form ? 'script' : 'form';
@@ -180,7 +200,7 @@ export class Atelier {
     this.root.innerHTML = `<div class="page atelier-edit">
       <div class="ate-top">
         <button class="btn small" data-back>← Retour</button>
-        <h1>${entry ? 'Modifier la carte' : 'Nouvelle carte'}</h1>
+        <h1>${entry ? (this.form.token ? 'Modifier le jeton' : 'Modifier la carte') : this.form.token ? 'Nouveau jeton' : 'Nouvelle carte'}</h1>
         <div class="seg ate-mode"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button><button data-tab="look">Apparence</button></div>
       </div>
       <div class="ate-body">
@@ -408,8 +428,11 @@ export class Atelier {
     const types = this.data.creatureTypes || [];
     left.innerHTML = `<datalist id="ate-subtypes">${types.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Professeur X" maxlength="60"></label>
-      <div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>
+      ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
+        `<button class="ate-pip${f.colors.includes(c) ? ' first' : ''}" data-tcolor="${c}" title="${l}">${symbol(c)}</button>`).join('')}
+        <span class="muted small">${f.colors.length ? '' : 'Incolore'}</span></div></div>` : `<div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>`}
       <div class="ate-field"><span>Types</span><div class="ate-chips">
+        <button class="chip ${f.token ? 'on' : ''}" data-tokenflag title="Un jeton : pas de coût, créé par les capacités">Jeton</button>
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
@@ -599,7 +622,7 @@ export class Atelier {
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-      ${e.token ? `<div class="ate-ab-row"><select data-a="token">${TOKENS.map(t => `<option value="${t[0]}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
+      ${e.token ? `<div class="ate-ab-row"><select data-a="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
       ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
@@ -669,6 +692,16 @@ export class Atelier {
       }
     } else if (b.dataset.legendary !== undefined) {
       f.legendary = !f.legendary;
+      this.renderLeft();
+    } else if (b.dataset.tokenflag !== undefined) {
+      f.token = !f.token;
+      if (f.token && !f.colors.length) {
+        f.colors = [...'WUBRG'].filter(c => costParts(f.cost).some(p => p.includes(c)));
+      }
+      this.renderLeft();
+    } else if (b.dataset.tcolor) {
+      const c = b.dataset.tcolor;
+      f.colors = f.colors.includes(c) ? f.colors.filter(x => x !== c) : [...f.colors, c];
       this.renderLeft();
     } else if (b.dataset.type) {
       const t = b.dataset.type;
@@ -813,7 +846,8 @@ export class Atelier {
       }
       await bridge.request('customSave', {script: this.currentScript(), previous: this.previous, art: this.art,
         form: kept ? this.form : null, frameImage: this.frameImg});
-      toast('Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
+      toast(this.form.token ? 'Jeton enregistré : tes cartes perso peuvent le créer, et la triche le propose en partie.'
+        : 'Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
       this.onChanged();
       this.close();
     } catch (e) {
@@ -823,7 +857,9 @@ export class Atelier {
   }
 
   async remove() {
-    if (!await confirmBox('Supprimer la carte ?', `« ${this.previous} » disparaîtra de l'Atelier et des recherches. Les decks qui la contiennent la perdront au prochain lancement.`,
+    if (!await confirmBox(this.form.token ? 'Supprimer le jeton ?' : 'Supprimer la carte ?', this.form.token
+      ? `« ${this.previous} » disparaîtra de l'Atelier. Les cartes qui le créent ne pourront plus être enregistrées sans changer de jeton.`
+      : `« ${this.previous} » disparaîtra de l'Atelier et des recherches. Les decks qui la contiennent la perdront au prochain lancement.`,
       {yes: 'Supprimer', danger: true})) {
       return;
     }

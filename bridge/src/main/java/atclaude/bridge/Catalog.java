@@ -105,7 +105,7 @@ final class Catalog {
             final Map<String, String> fr = new HashMap<>();
             for (final PaperCard pc : FModel.getMagicDb().getCommonCards().getUniqueCards()) {
                 // Carte perso supprimée pendant cette session : Forge la garde jusqu'au prochain lancement.
-                if (CustomCards.isDeleted(pc.getName())) {
+                if (CustomCards.isDeleted(pc.getName()) || CustomCards.isToken(pc.getName())) {
                     continue;
                 }
                 // Versions rééquilibrées d'Arena (« A-… ») : pas des cartes papier, elles doublaient l'original.
@@ -144,6 +144,9 @@ final class Catalog {
             final java.util.Set<String> seen = new java.util.HashSet<>();
             list.forEach(e -> seen.add(e.nameEn()));
             for (final String name : CustomCards.names()) {
+                if (CustomCards.isToken(name)) {
+                    continue; // un jeton n'est pas une carte : ni dans la recherche, ni dans les decks
+                }
                 final PaperCard pc = FModel.getMagicDb().getCommonCards().getCard(name);
                 if (pc != null && seen.add(name)) {
                     final CardRules rules = pc.getRules();
@@ -385,6 +388,11 @@ final class Catalog {
     }
 
     private static volatile Map<CardRules, String> tokenScripts;
+
+    /** Un jeton perso ajouté ou changé : la liste des jetons (triche, aperçus) se refait. */
+    static void forgetTokenScripts() {
+        tokenScripts = null;
+    }
 
     /** Aperçu d'un jeton (liste des jetons de la triche) : nom, type, texte, force et endurance, image ; null si ce n'en est pas un. */
     static JsonObject tokenJson(final CardRules rules) {

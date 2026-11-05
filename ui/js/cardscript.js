@@ -177,6 +177,22 @@ export const TOKENS = [
   ['c_a_food_sac', 'Nourriture', 'Nourriture', 'Food', ''],
 ];
 
+/** Jetons perso de l'Atelier (posés par l'Atelier après chaque chargement), au même format que TOKENS. */
+let customTokens = [];
+
+/** Les jetons perso : [{script: 'atelier_…', name}]. */
+export function setCustomTokens(list) {
+  customTokens = (list || []).map(t => [t.script, `${t.name} (jeton perso)`, t.name, t.name, '']);
+}
+
+/** Jetons proposés par « Créer des jetons » : ceux de Forge, puis les jetons perso. */
+export function allTokens() {
+  return [...TOKENS, ...customTokens];
+}
+
+/** Couleurs d'un jeton (il n'a pas de coût) : « W », « U »… → la ligne « Colors: » de Forge. */
+const COLOR_WORDS = {W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green'};
+
 /**
  * Effets. filter : agit sur « chaque <créature filtrée> » ; n : demande un nombre ; only : n'existe que pour ces
  * « quand » ; self : agit sur la carte elle-même (pas pour un sort) ; mana : demande une couleur de mana.
@@ -485,7 +501,7 @@ function effect(a, id) {
       return {p: `Pump | ${target(creature)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `une créature ciblée gagne +${n}/+${n} jusqu'à la fin du tour`,
         en: `target creature gets +${n}/+${n} until end of turn`};
     case 'token': {
-      const t = TOKENS.find(x => x[0] === a.token) || TOKENS[0];
+      const t = allTokens().find(x => x[0] === a.token) || TOKENS[0];
       const en = `${n1 === 1 ? article(t[3]) : word(n1, 'en')} ${t[3]} ${plural(n1, 'token', 'tokens')}${t[4] ? ' with ' + t[4] : ''}`;
       return {p: `Token | TokenAmount$ ${n1} | TokenScript$ ${t[0]} | TokenOwner$ You`,
         fr: `créez ${n1 === 1 ? 'un jeton' : word(n1, 'fr') + ' jetons'} ${t[2]}`, en: `create ${en}`};
@@ -733,8 +749,13 @@ export function buildScript(f) {
   const lines = [];
   const name = String(f.name || '').trim();
   lines.push(`Name:${name}`);
-  const cost = forgeCost(f.cost);
+  // Un jeton n'a pas de coût : ses couleurs sont dites à part.
+  const cost = f.token ? '' : forgeCost(f.cost);
   lines.push(`ManaCost:${cost || 'no cost'}`);
+  if (f.token) {
+    const colors = [...'WUBRG'].filter(c => (f.colors || []).includes(c)).map(c => COLOR_WORDS[c]);
+    lines.push(`Colors:${colors.join(',') || 'colorless'}`);
+  }
   const types = (f.types || []).filter(t => CARD_TYPES.some(c => c[0] === t));
   const sub = String(f.subtypes || '').trim().split(/\s+/).filter(Boolean);
   lines.push(`Types:${[f.legendary ? 'Legendary' : '', ...types, ...sub].filter(Boolean).join(' ')}`);
@@ -766,6 +787,9 @@ export function buildScript(f) {
   });
   if (text.length) {
     lines.push(`Oracle:${text.join('\\n')}`);
+  }
+  if (f.token) {
+    lines.push('SVar:AtelierToken:True');
   }
   lines.push(...displayLines(f));
   return lines.join('\n');

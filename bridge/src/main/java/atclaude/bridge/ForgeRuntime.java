@@ -90,6 +90,8 @@ public final class ForgeRuntime {
 
         // Le dossier des cartes perso doit exister avant que Forge le lise (sinon il n'en charge aucune).
         new File(user, "custom" + File.separator + "cards").mkdirs();
+        // Les jetons perso de l'Atelier : Forge les lit au démarrage dans sa base des jetons.
+        new File(user, "custom" + File.separator + "tokens").mkdirs();
         FModel.initialize(progress, prefs -> {
             prefs.setPref(FPref.UI_LANGUAGE, "fr-FR");
             if (prefs.getPref(FPref.PLAYER_NAME).trim().isEmpty()) {

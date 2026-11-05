@@ -1,6 +1,8 @@
 /* Atelier : cartes perso */
 .ate-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
 .ate-top h1 { margin: 0; flex: 1; }
+.ate-top h2 { margin: 18px 0 0; flex: 1; }
+.ate-tcolors .muted { margin-left: 4px; }
 .ate-grid { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 26px; }
 .ate-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
 .ate-tile .mcard { --w: 150px; transition: transform 0.15s; }
