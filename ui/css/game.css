@@ -706,3 +706,10 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 .slot.atk-current > .mcard { box-shadow: 0 0 0 3px #ef5a5a, 0 0 18px rgb(239 90 90 / 0.6); }
 .slot.atk-target > .mcard { box-shadow: 0 0 0 2px rgb(239 90 90 / 0.4); }
 @keyframes atk-pulse { 50% { box-shadow: 0 0 0 3px #ef5a5a, 0 0 30px rgb(239 90 90 / 0.85); } }
+
+/* Fin de tour, main trop pleine : les cartes à garder. */
+.keep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; padding: 4px; justify-items: center; }
+.keep-cell { position: relative; cursor: pointer; border-radius: 8px; transition: opacity 0.15s, transform 0.15s; }
+.keep-cell .mcard { --w: 96px; }
+.keep-cell.on .mcard { box-shadow: 0 0 0 3px var(--chosen), 0 0 16px var(--chosen); transform: translateY(-3px); }
+.keep-grid.full .keep-cell:not(.on) { opacity: 0.45; }

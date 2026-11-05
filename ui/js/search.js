@@ -141,6 +141,7 @@ export class SearchPanel {
             <label class="tchip" title="Chercher le mot aussi dans le texte des cartes"><input type="checkbox" class="intext"><i></i><span>Dans le texte</span></label>
             <label class="tchip"><input type="checkbox" class="legal"><i></i><span>Légales en Commander</span></label>
             <label class="tchip"><input type="checkbox" class="cmdonly"><i></i><span>Peuvent être commandant</span></label>
+            ${this.owned ? '' : '<label class="tchip" title="Seulement les cartes faites dans l\'Atelier"><input type="checkbox" class="customonly"><i></i><span>Cartes perso</span></label>'}
           </div>
           <div class="sh-row">
             <label class="sh-ctype" title="Les créatures de ce type (Elfe, Dragon, Zombie…), changelins compris">${icon('swords')}
@@ -198,6 +199,13 @@ export class SearchPanel {
       this.query.commandersOnly = e.target.checked;
       run();
     });
+    const customOnly = r.querySelector('.customonly');
+    if (customOnly) {
+      customOnly.addEventListener('change', (e) => {
+        this.query.custom = e.target.checked;
+        run();
+      });
+    }
     r.querySelector('.set-btn').addEventListener('click', async () => {
       const ed = await pickEdition(this.edition);
       if (!ed) {
@@ -371,7 +379,7 @@ export class SearchPanel {
   countFilters() {
     const q = this.query;
     const n = (q.colors.length ? 1 : 0) + q.types.length + (q.cmcMin !== undefined ? 1 : 0) + (q.cmcMax !== undefined ? 1 : 0)
-      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.set ? 1 : 0) + (q.creatureType ? 1 : 0);
+      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.custom ? 1 : 0) + (q.set ? 1 : 0) + (q.creatureType ? 1 : 0);
     this.root.querySelector('.filters-btn .n').textContent = n ? String(n) : '';
   }
 

@@ -174,6 +174,26 @@ export function fitFrame(frame) {
   return true;
 }
 
+/** Capacité de loyauté (« [+1] : … », « −2: … ») : sa valeur et son texte, ou null. */
+const LOYALTY_LINE = /^\s*\[?\s*([+−-]?\s*(?:\d+|X))\s*\]?\s*:\s*(.+)$/;
+
+/**
+ * Texte d'un planeswalker : chaque capacité de loyauté sur sa ligne, sa valeur dans un insigne (pointe en haut
+ * pour +, en bas pour −, plat pour 0) ; les autres lignes en entier.
+ */
+function planeswalkerRules(text) {
+  // Le texte d'une carte qui n'est pas en partie sépare ses lignes par « \n » écrit en toutes lettres.
+  return text.replace(/\\n/g, '\n').split('\n').filter(l => l.trim()).map((line) => {
+    const m = line.match(LOYALTY_LINE);
+    if (!m) {
+      return `<div class="cf-pwt">${rulesHtml(line)}</div>`;
+    }
+    const v = m[1].replace(/\s/g, '').replace('-', '−');
+    const kind = v.startsWith('+') ? 'up' : v.startsWith('−') ? 'down' : 'zero';
+    return `<div class="cf-pwl cf-pw-${kind}"><span class="cf-lb"><b>${esc(v)}</b></span><span class="cf-lt">${rulesHtml(m[2])}</span></div>`;
+  }).join('');
+}
+
 /** Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou "") ; frameUrl : son cadre importé. */
 export function customFrameHtml(card, art, frameUrl = '') {
   const style = card.frame === IMPORTED && frameUrl ? IMPORTED : FRAMES.some(f => f[0] === card.frame) ? card.frame : 'modern';
@@ -188,8 +208,10 @@ export function customFrameHtml(card, art, frameUrl = '') {
   const pt = card.power !== undefined && card.toughness !== undefined ? `${card.power}/${card.toughness}` : loyalty ? String(card.loyalty) : '';
   const pips = card.cost ? (String(card.cost).match(/\{[^}]+\}/g) || String(card.cost).trim().split(/\s+/)).length : 0;
   const legendary = /légendaire|Legendary/.test(typeLine);
+  const pw = /Planeswalker/.test(typeLine) && style !== 'token';
   // Le nom, le type et le texte rétrécissent pour tenir (comme sur les vraies cartes, au lieu d'être coupés).
-  const box = SPACE[style];
+  // Planeswalker : boîte plus haute (l'illustration est plus courte), lignes moins larges (les insignes de loyauté).
+  const box = pw ? {...SPACE[style], w: SPACE[style].w - 14, h: SPACE[style].h + 10} : SPACE[style];
   const costWidth = style === 'token' || !pips ? 0 : pips * 5.96 + (pips - 1) * 0.5 + 2;
   // Taille déjà mesurée sur cet appareil pour cette carte dans ce cadre, sinon une estimation, vérifiée à l'affichage.
   const key = fitKey(style, name, typeLine, text, card.cost);
@@ -200,7 +222,7 @@ export function customFrameHtml(card, art, frameUrl = '') {
   const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}`;
   const overlay = style === IMPORTED ? `<div class="cf-overlay" style="background-image:url(&quot;${esc(frameUrl)}&quot;)"></div>` : '';
   const light = style === IMPORTED && card.frameText === 'light' ? ' cf-light' : '';
-  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${art ? '' : ' cf-noart'}${light}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
+  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${pw ? ' cf-pw' : ''}${art ? '' : ' cf-noart'}${light}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
     <div class="cf-bg"></div>
     <div class="cf-art"${art}></div>
     ${overlay}
@@ -208,8 +230,9 @@ export function customFrameHtml(card, art, frameUrl = '') {
     <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span></div>
     <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span><span class="cf-set">${icon('anvil')}</span></div>
     <div class="cf-icon">${typeIcon(typeLine)}</div>
-    <div class="cf-box"><div class="cf-rules">${rulesHtml(text)}</div></div>
-    ${pt ? `<div class="cf-pt${loyalty ? ' cf-loy' : ''}">${esc(pt)}</div>` : ''}
+    <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>` : `<div class="cf-rules">${rulesHtml(text)}</div>`}</div>
+    ${pt && loyalty ? `<div class="cf-pt cf-loy"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M3 3H37V30L20 43L3 30Z"/></svg><span>${esc(pt)}</span></div>`
+    : pt ? `<div class="cf-pt">${esc(pt)}</div>` : ''}
     <div class="cf-foot">Atelier</div>
     ${card.fx && card.fx !== 'none' && FX.some(f => f[0] === card.fx) ? `<div class="cf-fx cf-fx-${card.fx}"></div>` : ''}
   </div>`;

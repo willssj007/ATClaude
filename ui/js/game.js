@@ -8,7 +8,7 @@
 import {bridge} from './bridge.js';
 import {cardElement, hoverCard, onLongPress, showZoom} from './cards.js';
 import {fillRewardCards, rewardHtml} from './career.js';
-import {confirmBox} from './dialogs.js';
+import {confirmBox, customBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
 import {boardFx} from './themes.js';
 import {icon} from './icons.js';
@@ -1400,6 +1400,7 @@ export class Game {
   renderPrompt(state, me) {
     this.renderHold(state.settings && state.settings.holdPriority);
     const p = state.prompt || {};
+    this.keepDialog(state, p);
     const promptBox = this.table.querySelector('.prompt');
     let message = (p.message || '').trim();
     const waiting = !p.okEnabled && !p.cancelEnabled && (!p.input || /^Waiting for/i.test(message));
@@ -1469,6 +1470,73 @@ export class Game {
       extra.innerHTML = html;
       extra._html = html;
     }
+  }
+
+  /**
+   * Fin de tour avec 15 cartes ou plus en main : on choisit les cartes à garder (7 d'habitude) au lieu de toucher une à
+   * une toutes celles à défausser. « Défausser une à une » referme la fenêtre et revient au choix habituel.
+   */
+  keepDialog(state, p) {
+    const cleanup = p.input === 'InputSelectCardsFromList' && p.selectMax > 0
+      && /défausser pour réduire votre main|discard to bring your hand down/i.test(p.message || '');
+    const owner = cleanup && state.players.find(pl => (pl.me || pl.controlledByMe) && pl.zones.hand.some(c => c.selectable));
+    const hand = owner ? owner.zones.hand.filter(c => c.selectable) : [];
+    const keepN = hand.length - p.selectMax;
+    if (!owner || hand.length < 15 || keepN < 1 || this.replay) {
+      if (this.keepBox) {
+        this.keepBox.close();
+        this.keepBox = null;
+      }
+      return;
+    }
+    const key = `${state.game.turn}|${owner.id}|${hand.map(c => c.id).join(',')}`;
+    if (this.keepKey === key) {
+      return;
+    }
+    this.keepKey = key;
+    const kept = new Set();
+    this.keepBox = customBox(`Fin du tour : garde ${keepN} cartes`, (body, footer, close) => {
+      body.innerHTML = `<p class="muted small">Ta main a ${hand.length} cartes : touche les ${keepN} que tu gardes, les ${p.selectMax} autres seront défaussées.</p>
+        <div class="keep-grid"></div>`;
+      const grid = body.querySelector('.keep-grid');
+      const go = el(`<button class="btn gold" disabled></button>`);
+      const paint = () => {
+        go.disabled = kept.size !== keepN;
+        go.textContent = kept.size === keepN ? `Garder ces ${keepN} cartes` : `${kept.size} / ${keepN} gardées`;
+      };
+      for (const card of hand) {
+        const cell = el('<div class="keep-cell"></div>');
+        const node = cardElement(card);
+        cell.appendChild(node);
+        const consumed = onLongPress(cell, '.mcard', () => showZoom(card));
+        cell.addEventListener('click', () => {
+          if (consumed()) {
+            return; // appui long : la carte s'est agrandie
+          }
+          if (kept.has(card.id)) {
+            kept.delete(card.id);
+          } else if (kept.size < keepN) {
+            kept.add(card.id);
+          }
+          cell.classList.toggle('on', kept.has(card.id));
+          grid.classList.toggle('full', kept.size === keepN);
+          paint();
+        });
+        grid.appendChild(cell);
+      }
+      const manual = el('<button class="btn">Défausser une à une</button>');
+      manual.addEventListener('click', () => {
+        this.keepBox = null;
+        close();
+      });
+      go.addEventListener('click', () => {
+        bridge.send('keepCards', {keep: [...kept]});
+        this.keepBox = null;
+        close();
+      });
+      footer.append(manual, go);
+      paint();
+    });
   }
 
   /** « IA 2 », « Jace, l'arpenteur de IA 2 » : une cible d'attaque en clair. */

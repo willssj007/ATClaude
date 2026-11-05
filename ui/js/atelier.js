@@ -8,8 +8,8 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, PICKS, TAP_WHAT, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
-  effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay} from './cardscript.js';
+import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, PICKS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+  effectsFor, eminenceOk, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -487,6 +487,15 @@ export class Atelier {
       if (k[4] === 'cost') {
         return `<div class="ate-kwv-row"><span class="muted small">${esc(k[1])}</span>${this.manaHtml('kw:' + k[0])}</div>`;
       }
+      if (k[4] === 'sel') {
+        const v = keywordValue(f, k[0]);
+        return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])} pour</span>
+          <select data-kwv="${esc(k[0])}">${(KW_OPTIONS[k[0]] || []).map(o => `<option value="${esc(o[0])}"${o[0] === v ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select></label>`;
+      }
+      if (k[4] === 'text') {
+        return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}</span>
+          <input type="text" class="ate-kwv-text" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" placeholder="le nom exact de l'autre carte"></label>`;
+      }
       return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}${k[4] === 'gen' ? ' (coût générique)' : ''}</span>
         <input type="number" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" min="${k[4] === 'gen' ? 0 : 1}" max="20"></label>`;
     }).join('');
@@ -527,6 +536,9 @@ export class Atelier {
     if (target.startsWith('kw:')) {
       return keywordValue(this.form, target.slice(3)) || '';
     }
+    if (target.startsWith('prod:')) {
+      return (this.form.abilities[Number(target.slice(5))] || {}).manaSymbols || '';
+    }
     return target === 'form' ? this.form.cost : (this.form.abilities[Number(target.slice(3))] || {}).cost || '';
   }
 
@@ -535,6 +547,8 @@ export class Atelier {
       this.form.cost = value;
     } else if (target.startsWith('kw:')) {
       this.form.kwValues = {...this.form.kwValues, [target.slice(3)]: value};
+    } else if (target.startsWith('prod:')) {
+      this.form.abilities[Number(target.slice(5))].manaSymbols = value;
     } else {
       this.form.abilities[Number(target.slice(3))].cost = value;
     }
@@ -543,25 +557,30 @@ export class Atelier {
   /** Sélecteur de coût : le coût en symboles (toucher un symbole le retire), les boutons pour en ajouter. */
   manaHtml(target) {
     const value = this.manaValue(target);
-    const key = target === 'form' ? 'data-k="cost"' : target.startsWith('kw:') ? `data-kwv="${esc(target.slice(3))}"` : 'data-a="cost"';
+    const key = target === 'form' ? 'data-k="cost"' : target.startsWith('kw:') ? `data-kwv="${esc(target.slice(3))}"`
+      : target.startsWith('prod:') ? 'data-a="manaSymbols"' : 'data-a="cost"';
     return `<div class="ate-mana" data-mana="${esc(target)}">
-      <div class="ate-mana-show">${this.manaShowHtml(value)}</div>
+      <div class="ate-mana-show">${this.manaShowHtml(value, target)}</div>
       <div class="ate-mana-pad">${this.manaPadHtml(value, target)}</div>
       <details class="ate-mana-kb"${simpleCost(value) ? '' : ' open'}><summary class="muted small">Saisie au clavier</summary>
         <input type="text" ${key} value="${esc(value)}" placeholder="2WU ou {2}{W}{U} ; hybride {W/U}, phyrexian {W/P}"></details>
     </div>`;
   }
 
-  manaShowHtml(value) {
+  manaShowHtml(value, target = '') {
     const parts = costParts(value);
     if (!parts.length) {
-      return '<span class="muted small">Pas de coût : touche les symboles en dessous.</span>';
+      return `<span class="muted small">${target.startsWith('prod:') ? 'Aucun mana' : 'Pas de coût'} : touche les symboles en dessous.</span>`;
     }
     return parts.map((p, i) => `<button class="ate-pip-on" data-pipat="${i}" title="Retirer ce symbole">${symbol(p)}</button>`).join('')
       + '<button class="ate-mana-clear" data-pipclear title="Tout effacer">✕</button>';
   }
 
   manaPadHtml(value, target) {
+    if (target.startsWith('prod:')) {
+      // Mana produit : un symbole par mana ({G}{U}, {C}{C}) ; ni X, ni générique, ni hybride.
+      return PIPS.filter(([p]) => p !== 'X').map(([p, label]) => `<button class="ate-pip" data-pip="${p}" title="${label}">${symbol(p)}</button>`).join('');
+    }
     const {generic} = costModel(value);
     const hyb = this.hyb && this.hyb.target === target ? this.hyb : null;
     return PIPS.map(([p, label]) => {
@@ -623,7 +642,7 @@ export class Atelier {
   paintMana(box, input) {
     const target = box.dataset.mana;
     const value = this.manaValue(target);
-    box.querySelector('.ate-mana-show').innerHTML = this.manaShowHtml(value);
+    box.querySelector('.ate-mana-show').innerHTML = this.manaShowHtml(value, target);
     box.querySelector('.ate-mana-pad').innerHTML = this.manaPadHtml(value, target);
     if (input) {
       box.querySelector('.ate-mana-kb input').value = value;
@@ -639,6 +658,8 @@ export class Atelier {
       <div class="ate-ab-row"><select data-a="when">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind)
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
+      ${eminenceOk(a.when) && this.form.legendary ? `<div class="ate-ab-row"><label class="ate-check" title="Pour un commandant : la capacité marche aussi quand il est dans la zone de commandement">
+        <input type="checkbox" data-a="eminence"${a.eminence ? ' checked' : ''}> Éminence <span class="muted small">(marche aussi depuis la zone de commandement)</span></label></div>` : ''}
       ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>
@@ -646,19 +667,81 @@ export class Atelier {
         ${a.tapX ? `<select data-a="tapXWhat">${TAP_WHAT.map(([v, l]) => `<option value="${v}"${v === (a.tapXWhat || 'token') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
           ${a.tapXWhat === 'type' ? `<input type="text" data-a="tapXType" list="ate-subtypes" value="${esc(a.tapXType || '')}" placeholder="un type : Elf" style="width:120px">` : ''}
           <span class="muted small">dégagés que vous contrôlez (X au choix en jouant)</span>` : ''}</div>` : ''}
-      ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span><input type="number" data-a="loyalty" value="${esc(a.loyalty)}" min="-20" max="20" style="width:80px"><span class="muted small">(+1, −2…)</span></div>` : ''}
+      ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span>${this.loyaltyHtml(a)}<span class="muted small">− pour retirer des marqueurs, + pour en ajouter</span></div>` : ''}
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
-        ${e.n ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+        ${e.n && !(e.mana && a.mana === 'Symbols') ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
       ${e.modal ? this.modesHtml(a) : ''}
-      ${e.token ? `<div class="ate-ab-row"><select data-a="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
-      ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+      ${e.token ? `<div class="ate-ab-row">${this.tokenSelectHtml(a, 'a')}</div>` : ''}
+      ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+        ${a.mana === 'Symbols' ? `<div class="ate-ab-cost"><span class="muted small">Mana ajouté</span>${this.manaHtml('prod:' + i)}</div>` : ''}` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-a="fother"${a.filter.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
       ${!e.modal && a.when !== 'static' ? this.moreHtml(a, i, e) : ''}
     </div>`;
+  }
+
+  /** Loyauté d'une capacité de planeswalker au doigt (le clavier des téléphones n'a pas toujours le signe moins). */
+  loyaltyHtml(a) {
+    const v = Math.max(-20, Math.min(20, Math.round(Number(a.loyalty) || 0)));
+    const shown = v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0';
+    return `<span class="ate-loy"><button data-loy="-1" title="Un de moins"${v <= -20 ? ' disabled' : ''}>−</button>
+      <b class="ate-loy-v${v > 0 ? ' up' : v < 0 ? ' down' : ''}">${shown}</b><button data-loy="1" title="Un de plus"${v >= 20 ? ' disabled' : ''}>+</button></span>`;
+  }
+
+  /** Jeton créé : ceux d'usage courant et les jetons perso, celui choisi parmi tous ceux de Forge, et « Autre jeton… ». */
+  tokenSelectHtml(holder, attr) {
+    const list = allTokens();
+    const extra = !list.some(t => t[0] === holder.token) && Array.isArray(holder.tokenDef) && holder.tokenDef[0] === holder.token ? [holder.tokenDef] : [];
+    return `<select data-${attr}="token">${[...list, ...extra].map(t => `<option value="${esc(t[0])}"${t[0] === holder.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}
+      <option value="__more">Autre jeton de Forge… (lapin, trésor, tous les jetons)</option></select>`;
+  }
+
+  /** Tous les jetons de Forge, à chercher par nom : le choisi devient le jeton créé par la capacité (ou le mode). */
+  async pickToken(holder) {
+    if (!this.forgeTokens) {
+      try {
+        this.forgeTokens = await bridge.request('tokenList');
+      } catch (err) {
+        toast(err.message, {error: true});
+        return;
+      }
+    }
+    const list = this.forgeTokens;
+    const norm = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const keys = list.map(r => norm(`${r[1]} ${r[3]} ${r[0]}`));
+    customBox('Choisir un jeton', (body, footer, close) => {
+      body.innerHTML = `<input type="search" class="ate-tok-q" placeholder="Chercher : lapin, trésor, 2/2, vol, vert…">
+        <div class="ate-tok-list"></div>`;
+      const q = body.querySelector('.ate-tok-q');
+      const out = body.querySelector('.ate-tok-list');
+      const paint = () => {
+        const words = norm(q.value).split(/\s+/).filter(Boolean);
+        const hits = list.filter((r, i) => words.every(w => keys[i].includes(w)));
+        out.innerHTML = hits.length ? hits.slice(0, 150).map(r => `<button class="ate-tok${r[0] === holder.token ? ' on' : ''}" data-s="${esc(r[0])}">${esc(r[1])}</button>`).join('')
+          + (hits.length > 150 ? `<p class="muted small">Et ${hits.length - 150} autres : précise la recherche.</p>` : '')
+          : '<p class="muted small">Aucun jeton ne correspond.</p>';
+      };
+      q.addEventListener('input', debounce(paint, 120));
+      paint();
+      out.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-s]');
+        const r = b && list.find(x => x[0] === b.dataset.s);
+        if (!r) {
+          return;
+        }
+        holder.token = r[0];
+        holder.tokenDef = r;
+        close();
+        this.renderLeft();
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel);
+      setTimeout(() => q.focus(), 50);
+    }, {narrow: true});
   }
 
   /** Un effet dans un encadré : un mode de « Choisissez l'un — » (sub « modes ») ou un effet enchaîné (sub « then »). */
@@ -672,8 +755,8 @@ export class Atelier {
       <div class="ate-ab-row"><select data-sf="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-      ${e.token ? `<div class="ate-ab-row"><select data-sf="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === m.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
-      ${e.mana ? `<div class="ate-ab-row"><select data-sf="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (m.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+      ${e.token ? `<div class="ate-ab-row">${this.tokenSelectHtml(m, 'sf')}</div>` : ''}
+      ${e.mana ? `<div class="ate-ab-row"><select data-sf="mana">${MANA_CHOICES.filter(([v]) => v !== 'Symbols').map(([v, l]) => `<option value="${v}"${v === (m.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-sf="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === m.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-sf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
@@ -743,6 +826,13 @@ export class Atelier {
     const mana = b.closest('[data-mana]');
     if (mana) {
       this.manaClick(mana, b);
+      return;
+    }
+    if (b.dataset.loy) {
+      const a = f.abilities[Number(b.closest('[data-ab]').dataset.ab)];
+      a.loyalty = Math.max(-20, Math.min(20, Math.round(Number(a.loyalty) || 0) + Number(b.dataset.loy)));
+      b.closest('.ate-loy').outerHTML = this.loyaltyHtml(a);
+      this.check();
       return;
     }
     if (b.dataset.importFrame !== undefined) {
@@ -897,6 +987,11 @@ export class Atelier {
       const holder = t.closest('[data-sub]');
       const m = this.form.abilities[Number(box.dataset.ab)][holder.dataset.sub][Number(holder.dataset.si)];
       const k = t.dataset.sf;
+      if (k === 'token' && t.value === '__more') {
+        t.value = m.token;
+        this.pickToken(m);
+        return;
+      }
       if (k === 'ftype') {
         m.filter = {...(m.filter || {other: false}), type: t.value.trim()};
       } else if (k === 'fother') {
@@ -916,6 +1011,11 @@ export class Atelier {
     }
     const a = this.form.abilities[Number(box.dataset.ab)];
     const k = t.dataset.a;
+    if (k === 'token' && t.value === '__more') {
+      t.value = a.token;
+      this.pickToken(a);
+      return;
+    }
     if (k === 'ftype') {
       a.filter.type = t.value.trim();
     } else if (k === 'fother') {
@@ -926,7 +1026,10 @@ export class Atelier {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
     this.repaintMana(t);
-    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick'].includes(k)) {
+    if (k === 'mana' && a.mana === 'Symbols' && !costParts(a.manaSymbols).length) {
+      a.manaSymbols = '{G}{U}';
+    }
+    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick', 'mana'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
       }

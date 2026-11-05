@@ -24,6 +24,7 @@ import forge.gui.card.CardDetailUtil;
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Convertit l'état d'une partie (vu par le joueur local) en JSON pour l'interface.
@@ -308,6 +309,7 @@ final class GameSerializer {
             CustomCards.addDisplay(o, CustomCards.rules(s.getName()));
             final boolean english = "en".equals(o.get("lang").getAsString());
             o.addProperty("typeLine", CustomCards.typeLine(s.getType(), o.get("lang").getAsString()));
+            o.addProperty("text", withoutEngineLines(o.get("text").getAsString()));
             if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
             }
@@ -367,6 +369,30 @@ final class GameSerializer {
     static String translatedName(final CardStateView s) {
         final String translated = French.cardName(s.getName());
         return translated == null || translated.isEmpty() ? s.getName() : translated;
+    }
+
+    /** Ce que Forge ajoute au texte pour son propre affichage (commandant, « Non ability features ») : pas sur un cadre dessiné. */
+    private static final Pattern ENGINE_LINE = Pattern.compile(
+            "^(.+'s (Commander|Oathbreaker|Signature Spell)|Lancer depuis la zone de commande \\d+ fois|Cast from command zone \\d+ times?"
+            + "|Dégâts du commandant à .*|Commander damage to .*"
+            // La loyauté est dans l'écusson du cadre.
+            + "|Loyalty counters: \\d+)\\s*$");
+
+    private static final Pattern NON_ABILITY = Pattern.compile("(?im)^\\s*Non[\\s:-]*ability features");
+
+    static String withoutEngineLines(final String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        final java.util.regex.Matcher extra = NON_ABILITY.matcher(text);
+        final String kept = extra.find() ? text.substring(0, extra.start()) : text;
+        final StringBuilder out = new StringBuilder();
+        for (final String line : kept.split("\n", -1)) {
+            if (!ENGINE_LINE.matcher(line.trim()).matches()) {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString().replaceAll("\\n{3,}", "\n\n").trim();
     }
 
     static String colors(final ColorSet set) {

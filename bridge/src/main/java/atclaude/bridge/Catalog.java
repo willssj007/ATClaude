@@ -178,6 +178,8 @@ final class Catalog {
         final int cmcMax = q.has("cmcMax") ? q.get("cmcMax").getAsInt() : -1;
         final boolean commanderLegal = bool(q, "commanderLegal");
         final boolean commandersOnly = bool(q, "commandersOnly");
+        // Cartes perso (Atelier) seulement.
+        final boolean customOnly = bool(q, "custom");
         // Type de créature (anglais, celui de Forge : « Elf ») ; les changelins ont tous les types.
         final String creatureType = str(q, "creatureType").trim();
         final int offset = q.has("offset") ? q.get("offset").getAsInt() : 0;
@@ -203,6 +205,7 @@ final class Catalog {
             }
             if (commanderLegal && !e.commanderLegal()) continue;
             if (commandersOnly && !e.canBeCommander()) continue;
+            if (customOnly && !e.card().getRules().isCustom()) continue;
             if (!creatureType.isEmpty() && !hasCreatureType(e.card(), creatureType)) continue;
             if (cmcMin >= 0 && e.cmc() < cmcMin) continue;
             if (cmcMax >= 0 && e.cmc() > cmcMax) continue;
@@ -433,6 +436,158 @@ final class Catalog {
             // jeton sans impression connue : le cadre dessiné suffit
         }
         return o;
+    }
+
+    /** Sous-types d'artefacts des jetons (Trésor, Indice…) : leur nom imprimé en français. */
+    private static final Map<String, String> TOKEN_ARTIFACTS = Map.ofEntries(
+            Map.entry("Treasure", "Trésor"), Map.entry("Food", "Nourriture"), Map.entry("Clue", "Indice"),
+            Map.entry("Blood", "Sang"), Map.entry("Gold", "Or"), Map.entry("Map", "Carte"), Map.entry("Powerstone", "Lithoforce"),
+            Map.entry("Shard", "Éclat"), Map.entry("Junk", "Bric-à-brac"), Map.entry("Incubator", "Incubateur"),
+            Map.entry("Equipment", "Équipement"), Map.entry("Vehicle", "Véhicule"), Map.entry("Role", "Rôle"),
+            Map.entry("Aura", "Aura"), Map.entry("Mutagen", "Mutagène"), Map.entry("Lander", "Atterrisseur"));
+
+    private static final String[][] COLOR_WORDS = {
+        {"W", "blanc", "blanche", "white"}, {"U", "bleu", "bleue", "blue"}, {"B", "noir", "noire", "black"},
+        {"R", "rouge", "rouge", "red"}, {"G", "vert", "verte", "green"}};
+
+    private static volatile JsonArray tokenList;
+
+    /**
+     * Tous les jetons de Forge pour « Créer des jetons » de l'Atelier (lapin, trésor…) : [script, libellé, texte
+     * français après « créez un jeton », texte anglais, mots-clés en anglais]. Les jetons perso n'y sont pas.
+     */
+    static JsonArray tokenList() {
+        JsonArray list = tokenList;
+        if (list != null) {
+            return list;
+        }
+        final List<String[]> rows = new ArrayList<>();
+        for (final Map.Entry<String, CardRules> e : FModel.getMagicDb().getAllTokens().getRules().entrySet()) {
+            if (e.getKey().startsWith("atelier_")) {
+                continue;
+            }
+            try {
+                final String[] row = tokenRow(e.getKey(), e.getValue());
+                if (row != null) {
+                    rows.add(row);
+                }
+            } catch (final RuntimeException ex) {
+                // jeton illisible : on le passe
+            }
+        }
+        rows.sort(Comparator.comparing((String[] r) -> normalize(r[1])).thenComparing(r -> r[0]));
+        list = new JsonArray();
+        for (final String[] r : rows) {
+            final JsonArray a = new JsonArray();
+            for (final String x : r) {
+                a.add(x);
+            }
+            list.add(a);
+        }
+        tokenList = list;
+        return list;
+    }
+
+    private static String[] tokenRow(final String script, final CardRules rules) {
+        final forge.card.CardType type = rules.getType();
+        final ICardFace main = rules.getMainPart();
+        final String name = rules.getName().replaceAll("\\s*Token$", "").trim();
+        final String colors = GameSerializer.colors(rules.getColor());
+        final List<String> masc = new ArrayList<>();
+        final List<String> fem = new ArrayList<>();
+        final List<String> en = new ArrayList<>();
+        for (final String[] c : COLOR_WORDS) {
+            if (colors.indexOf(c[0].charAt(0)) >= 0) {
+                masc.add(c[1]);
+                fem.add(c[2]);
+                en.add(c[3]);
+            }
+        }
+        final String colorM = masc.isEmpty() ? "incolore" : String.join(" et ", masc);
+        final String colorF = fem.isEmpty() ? "incolore" : String.join(" et ", fem);
+        final String colorEn = en.isEmpty() ? "colorless" : String.join(" and ", en);
+        // Mots-clés simples (vol, célérité…) ; une autre capacité est signalée, le jeton agrandi la montre.
+        final List<String> kwFr = new ArrayList<>();
+        final List<String> kwEn = new ArrayList<>();
+        boolean other = false;
+        final String oracle = rules.getOracleText() == null ? "" : rules.getOracleText().replace("\\n", "\n");
+        for (final String line : oracle.split("\n")) {
+            final String l = line.replaceAll("\\([^)]*\\)", "").trim();
+            if (l.isEmpty()) {
+                continue;
+            }
+            for (final String part : l.split(",\\s*")) {
+                final String fr = CustomCards.keywordFr(part);
+                if (fr != null) {
+                    kwFr.add(fr.toLowerCase(Locale.ROOT));
+                    kwEn.add(part.trim().toLowerCase(Locale.ROOT));
+                } else {
+                    other = true;
+                }
+            }
+        }
+        final String withFr = kwFr.isEmpty() ? "" : " avec " + joinFr(kwFr.stream().map(Catalog::withArticle).toList());
+        final String extra = other ? " (avec une capacité)" : "";
+        if (type.isCreature() && main != null) {
+            final List<String> subs = new ArrayList<>(type.getCreatureTypes());
+            final List<String> subsFr = new ArrayList<>();
+            for (final String sub : subs) {
+                String fr = French.creatureType(sub);
+                if (fr == null) {
+                    fr = French.creatureTypeFr(sub);
+                }
+                subsFr.add(fr == null ? sub : fr);
+            }
+            final String pt = main.getPower() + "/" + main.getToughness();
+            final String typesFr = String.join(" et ", subsFr);
+            final String named = subs.isEmpty() || String.join(" ", subs).equals(name) ? "" : name + ", ";
+            final boolean artifact = type.isArtifact();
+            final String label = named + (typesFr.isEmpty() ? "Créature" : typesFr) + " " + pt + " " + colorM
+                    + (kwFr.isEmpty() ? "" : ", " + String.join(", ", kwFr)) + extra;
+            final String fr = (named.isEmpty() ? "" : name + ", ") + "de créature" + (artifact ? "-artefact" : "") + " " + pt + " "
+                    + colorF + (typesFr.isEmpty() ? "" : " " + typesFr) + withFr;
+            final String enText = (named.isEmpty() ? "" : name + ", ") + pt + " " + colorEn + (subs.isEmpty() ? "" : " " + String.join(" ", subs))
+                    + (artifact ? " artifact" : "") + " creature";
+            return new String[] {script, label, fr, enText, String.join(" and ", kwEn)};
+        }
+        // Trésor, Indice, Nourriture… : le nom du sous-type.
+        final List<String> subs = new ArrayList<>();
+        for (final String sub : type.getSubtypes()) {
+            subs.add(sub);
+        }
+        final String sub = subs.isEmpty() ? name : String.join(" ", subs);
+        final String subFr = subs.isEmpty() ? name : String.join(" ", subs.stream().map(x -> TOKEN_ARTIFACTS.getOrDefault(x, x)).toList());
+        final String kind = type.isArtifact() ? "artefact" : type.isEnchantment() ? "enchantement" : type.isLand() ? "terrain" : "";
+        final boolean namedOnly = !sub.equals(name);
+        final List<String> notes = new ArrayList<>();
+        if (!kind.isEmpty()) {
+            notes.add(kind);
+        }
+        if (other) {
+            notes.add("avec une capacité");
+        }
+        final String label = (namedOnly ? name + ", " : "") + subFr + (colors.isEmpty() ? "" : " " + colorM)
+                + (kwFr.isEmpty() ? "" : ", " + String.join(", ", kwFr)) + (notes.isEmpty() ? "" : " (" + String.join(", ", notes) + ")");
+        final String fr = (namedOnly ? name + ", " : "") + subFr + withFr;
+        return new String[] {script, label, fr, (namedOnly ? name + ", " : "") + sub, String.join(" and ", kwEn)};
+    }
+
+    /** Mots-clés féminins (« avec la menace ») ; les autres prennent « le », ou « l' » devant une voyelle. */
+    private static final java.util.Set<String> KW_FEMININE = java.util.Set.of("menace", "célérité", "portée", "vigilance",
+            "double initiative", "défense talismanique", "parade", "protection", "toxicité", "flash", "résistance");
+
+    private static String withArticle(final String k) {
+        if (k.matches("^[aeiouyhéèêàâîïôûAEIOUYHÉ].*")) {
+            return "l'" + k;
+        }
+        return (KW_FEMININE.contains(k) ? "la " : "le ") + k;
+    }
+
+    private static String joinFr(final List<String> words) {
+        if (words.size() < 2) {
+            return String.join("", words);
+        }
+        return String.join(", ", words.subList(0, words.size() - 1)) + " et " + words.get(words.size() - 1);
     }
 
     /** Parties d'une carte imprimées sur la carte elle-même, à lire avec le texte principal. */

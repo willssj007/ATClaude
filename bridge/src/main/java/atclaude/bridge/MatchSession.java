@@ -438,6 +438,7 @@ final class MatchSession {
                 }
             }
             case "cancel" -> c.selectButtonCancel();
+            case "keepCards" -> keepCards(c, m.getAsJsonArray("keep"));
             case "card" -> {
                 final CardView card = findCard(m.get("id").getAsInt());
                 if (card != null && !c.selectCard(card, null, CLICK)) {
@@ -766,6 +767,45 @@ final class MatchSession {
             cancelSearch = p;
         }
         return p;
+    }
+
+    /**
+     * Fin de tour, main trop pleine : le joueur a choisi les cartes qu'il garde, les autres sont défaussées (au lieu de
+     * toucher une à une les huit cartes ou plus à défausser). On retire d'abord ce qui était choisi à tort : Forge valide
+     * de lui-même dès que le compte est atteint.
+     */
+    private void keepCards(final PlayerControllerHuman c, final JsonArray keep) {
+        final Input input = c.getInputQueue().getInput();
+        if (!(input instanceof forge.gamemodes.match.input.InputSelectEntitiesFromList<?> list) || keep == null) {
+            gui.flashIncorrectAction();
+            return;
+        }
+        final Set<Integer> kept = new java.util.HashSet<>();
+        keep.forEach(e -> kept.add(e.getAsInt()));
+        final List<Card> drop = new ArrayList<>();
+        final List<Card> undo = new ArrayList<>();
+        for (final Object e : list.getValidChoices()) {
+            if (e instanceof Card card) {
+                final boolean chosen = list.getSelected().contains(card);
+                if (kept.contains(card.getId()) && chosen) {
+                    undo.add(card);
+                } else if (!kept.contains(card.getId()) && !chosen) {
+                    drop.add(card);
+                }
+            }
+        }
+        for (final Card card : undo) {
+            c.selectCard(card.getView(), null, CLICK);
+        }
+        for (final Card card : drop) {
+            if (c.getInputQueue().getInput() != input) {
+                return;
+            }
+            c.selectCard(card.getView(), null, CLICK);
+        }
+        if (c.getInputQueue().getInput() == input) {
+            c.selectButtonOk();
+        }
     }
 
     /** Avant de reprendre une partie : on joue, on garde sa main, on se choisit pour commencer. */

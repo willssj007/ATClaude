@@ -600,6 +600,11 @@ final class CustomCards {
         return true;
     }
 
+    /** Nom français d'un mot-clé simple (« flying » : Vol), ou null. */
+    static String keywordFr(final String en) {
+        return en == null ? null : KEYWORDS_FR.get(en.trim().toLowerCase(Locale.ROOT));
+    }
+
     /** Mots-clés de l'Atelier (ceux du formulaire) : Forge les écrit en anglais pour une carte sans traduction. */
     private static final Map<String, String> KEYWORDS_FR = Map.ofEntries(
             Map.entry("flying", "Vol"),

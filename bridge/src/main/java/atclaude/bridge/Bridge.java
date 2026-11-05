@@ -371,6 +371,8 @@ public final class Bridge {
                 return catalog.search(m.getAsJsonObject("query"));
             case "creatureTypes":
                 return catalog.creatureTypes();
+            case "tokenList":
+                return Catalog.tokenList();
             case "customCards":
                 return CustomCards.state();
             case "customValidate":

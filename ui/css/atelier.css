@@ -91,6 +91,27 @@
 .ate-kwv-row { display: flex; flex-direction: column; gap: 6px; }
 .ate-kwv-n { flex-direction: row; align-items: center; gap: 10px; }
 .ate-kwv-n input { width: 80px; }
+.ate-kwv-n input.ate-kwv-text { width: auto; flex: 1; min-width: 0; }
+.ate-kwv-n select { flex: 1; min-width: 0; }
+
+/* Loyauté d'une capacité de planeswalker : − et + au doigt, la valeur dans un écusson. */
+.ate-loy { display: inline-flex; align-items: center; gap: 6px; padding: 3px; border-radius: 999px; border: 1px solid var(--line-strong);
+  background: rgb(255 255 255 / 0.05); }
+.ate-loy button { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgb(255 255 255 / 0.1); color: var(--text);
+  font-size: 20px; font-weight: 800; cursor: pointer; padding: 0; line-height: 1; }
+.ate-loy button:disabled { opacity: 0.3; cursor: default; }
+.ate-loy button:not(:disabled):active { transform: scale(0.88); }
+.ate-loy-v { min-width: 44px; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
+.ate-loy-v.up { color: #9fe0a0; }
+.ate-loy-v.down { color: #ffab9a; }
+
+/* Tous les jetons de Forge : recherche puis liste. */
+.ate-tok-q { width: 100%; }
+.ate-tok-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: min(60vh, 520px); overflow-y: auto; }
+.ate-tok { text-align: left; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; line-height: 1.3;
+  border: 1px solid var(--line); background: rgb(255 255 255 / 0.03); color: var(--text); }
+.ate-tok:hover { border-color: rgb(var(--gold-rgb) / 0.7); background: rgb(var(--gold-rgb) / 0.1); }
+.ate-tok.on { border-color: var(--gold); }
 .ate-script { width: 100%; min-height: 360px; font-size: 12.5px; line-height: 1.45; white-space: pre; }
 
 .ate-side { position: sticky; top: 10px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; border-radius: 14px; }

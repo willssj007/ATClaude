@@ -66,6 +66,8 @@ export const KW_ALL = [
   ['Unleash', 'Emportement', 'Unleash', 'ability', null],
   ['Decayed', 'Décomposition', 'Decayed', 'ability', null],
   ['Partner', 'Partenariat', 'Partner', 'ability', null],
+  ['Partner with', 'Partenariat avec', 'Partner with', 'ability', 'text', null, ''],
+  ['Choose a Background', 'Choisissez un passé', 'Choose a Background', 'ability', null],
   ['Annihilator', 'Annihilateur', 'Annihilator', 'number', 'n', null, 2],
   ['Bushido', 'Bushido', 'Bushido', 'number', 'n', null, 1],
   ['Toxic', 'Toxique', 'Toxic', 'number', 'n', null, 1],
@@ -95,6 +97,7 @@ export const KW_ALL = [
   ['Scavenge', 'Récupération', 'Scavenge', 'cost', 'cost', null, '{3}'],
   ['Outlast', 'Résilience', 'Outlast', 'cost', 'cost', null, '{1}'],
   ['Equip', 'Équipement', 'Equip', 'cost', 'cost', null, '{2}'],
+  ['Affinity', 'Affinité', 'Affinity', 'spell', 'sel', null, 'Artifact'],
   ['Convoke', 'Convocation', 'Convoke', 'spell', null],
   ['Delve', 'Fouille', 'Delve', 'spell', null],
   ['Improvise', 'Improvisation', 'Improvise', 'spell', null],
@@ -111,6 +114,13 @@ export const KW_GROUPS = [
 
 const KW_BY = Object.fromEntries(KW_ALL.map(k => [k[0], k]));
 
+/** Valeurs au choix d'un mot-clé (« Affinité pour les artefacts ») : [valeur pour Forge, français, anglais]. */
+export const KW_OPTIONS = {
+  Affinity: [['Artifact', 'les artefacts', 'artifacts'], ['Equipment', 'les équipements', 'Equipment'], ['Creature', 'les créatures', 'creatures'],
+    ['Enchantment', 'les enchantements', 'enchantments'], ['Plains', 'les plaines', 'Plains'], ['Island', 'les îles', 'Islands'],
+    ['Swamp', 'les marais', 'Swamps'], ['Mountain', 'les montagnes', 'Mountains'], ['Forest', 'les forêts', 'Forests']],
+};
+
 /** Mots-clés qu'on peut donner aux autres créatures (« les autres Elfes que vous contrôlez ont … »). */
 export const KEYWORDS = KW_ALL.filter(k => k[5]).map(k => [k[0], k[1]]);
 
@@ -123,6 +133,13 @@ export function keywordValue(f, k) {
   }
   if (def[4] === 'cost') {
     return v === undefined || v === null ? def[6] : String(v);
+  }
+  if (def[4] === 'sel') {
+    return (KW_OPTIONS[k] || []).some(o => o[0] === v) ? v : def[6];
+  }
+  if (def[4] === 'text') {
+    // Un nom de carte (« Partenariat avec … ») : sans ce qui casserait le script.
+    return String(v || '').replace(/[|:\n]/g, ' ').trim();
   }
   const n = Math.round(Number(v));
   return Number.isFinite(n) && v !== '' && v !== undefined && v !== null ? Math.max(def[4] === 'gen' ? 0 : 1, Math.min(20, n)) : def[6];
@@ -239,6 +256,15 @@ export const EFFECTS = [
   {id: 'goad', group: 'control', label: 'Inciter une créature ciblée'},
   {id: 'addMana', group: 'mana', label: 'Ajouter du mana', n: true, mana: true, only: ['activated', 'loyalty', 'spell']},
   {id: 'rampLand', group: 'mana', label: 'Chercher un terrain de base, sur le champ de bataille engagé'},
+  {id: 'damagePlayer', group: 'players', label: 'Blessures à un joueur ou un planeswalker ciblé', n: true},
+  {id: 'damageOpponent', group: 'players', label: 'Blessures à un adversaire ciblé', n: true},
+  {id: 'targetLoseLife', group: 'players', label: 'Un joueur ciblé perd des points de vie', n: true},
+  {id: 'targetGainLife', group: 'players', label: 'Un joueur ciblé gagne des points de vie', n: true},
+  {id: 'targetDraw', group: 'players', label: 'Un joueur ciblé pioche des cartes', n: true},
+  {id: 'targetDiscard', group: 'players', label: 'Un joueur ciblé se défausse de cartes', n: true},
+  {id: 'targetMill', group: 'players', label: 'Un joueur ciblé meule des cartes', n: true},
+  {id: 'targetSacrifice', group: 'players', label: 'Un joueur ciblé sacrifie une créature'},
+  {id: 'discover', group: 'mech', label: 'Découvrir N', n: true},
   {id: 'explore', group: 'mech', label: 'Explorer', self: true},
   {id: 'connive', group: 'mech', label: 'Comploter', self: true},
   {id: 'investigate', group: 'mech', label: 'Enquêter (jetons Indice)', n: true},
@@ -255,7 +281,7 @@ export const EFFECTS = [
 /** Groupes des effets dans le formulaire. */
 export const EFFECT_GROUPS = [
   ['life', 'Blessures et points de vie'], ['cards', 'Cartes (pioche, bibliothèque, cimetière)'], ['creatures', 'Créatures et marqueurs'],
-  ['removal', 'Détruire, exiler, contrer'], ['control', 'Engager, contrôler'], ['mana', 'Mana et terrains'],
+  ['players', 'Cibler un joueur'], ['removal', 'Détruire, exiler, contrer'], ['control', 'Engager, contrôler'], ['mana', 'Mana et terrains'],
   ['mech', 'Mécaniques (explorer, l\'Anneau, monarque…)'], ['modal', 'Au choix'], ['static', 'Effets permanents'],
 ];
 
@@ -499,7 +525,7 @@ export function newMode(effect = 'draw') {
 }
 
 /** Couleurs de mana d'« Ajouter du mana ». */
-export const MANA_CHOICES = [['Any', 'Une couleur au choix'], ['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['C', 'Incolore']];
+export const MANA_CHOICES = [['Symbols', 'Ces symboles (ex. {G}{U}, plusieurs couleurs d\'un coup)'], ['Any', 'Une couleur au choix'], ['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['C', 'Incolore']];
 
 /**
  * Capacités toutes prêtes : une phrase complète, puis la capacité du formulaire qu'elle donne (le type et le mot-clé
@@ -584,6 +610,13 @@ function keywordText(f, k, lang) {
   if (def[4] === 'cost') {
     return `${name} ${costSymbols(forgeCost(v)) || '{0}'}`;
   }
+  if (def[4] === 'sel') {
+    const o = (KW_OPTIONS[k] || []).find(x => x[0] === v) || [v, v, v];
+    return lang === 'en' ? `${name} for ${o[2]}` : `${name} pour ${o[1]}`;
+  }
+  if (def[4] === 'text') {
+    return v ? `${name} ${v}` : '';
+  }
   return def[4] === 'gen' ? `${name} {${v}}` : `${name} ${v}`;
 }
 
@@ -594,6 +627,9 @@ function keywordLine(f, k) {
     return `K:${k}`;
   }
   const v = keywordValue(f, k);
+  if (def[4] === 'text' && !v) {
+    return null; // « Partenariat avec » sans nom : rien
+  }
   return `K:${k}:${def[4] === 'cost' ? forgeCost(v) || '0' : v}`;
 }
 
@@ -756,7 +792,7 @@ function effect(a, id) {
       return {p: `Pump | ${target(creature)} | NumAtt$ +${n} | NumDef$ +${n}`, fr: `une créature ciblée gagne +${n}/+${n} jusqu'à la fin du tour`,
         en: `target creature gets +${n}/+${n} until end of turn`};
     case 'token': {
-      const t = allTokens().find(x => x[0] === a.token) || TOKENS[0];
+      const t = allTokens().find(x => x[0] === a.token) || (Array.isArray(a.tokenDef) && a.tokenDef[0] === a.token ? a.tokenDef : null) || TOKENS[0];
       const en = `${n1 === 1 ? article(t[3]) : word(n1, 'en')} ${t[3]} ${plural(n1, 'token', 'tokens')}${t[4] ? ' with ' + t[4] : ''}`;
       return {p: `Token | TokenAmount$ ${n1} | TokenScript$ ${t[0]} | TokenOwner$ You`,
         fr: `créez ${n1 === 1 ? 'un jeton' : word(n1, 'fr') + ' jetons'} ${t[2]}`, en: `create ${en}`};
@@ -836,10 +872,28 @@ function effect(a, id) {
       return {p: `Goad | ${target(creature)}`, fr: 'incitez une créature ciblée', en: 'goad target creature'};
     case 'addMana': {
       const c = MANA_CHOICES.some(m => m[0] === a.mana) ? a.mana : 'Any';
+      if (c === 'Symbols') {
+        // « Ajoutez {G}{U} » : chaque symbole choisi (un nombre donne autant de mana incolore).
+        const produced = [];
+        for (const part of costParts(a.manaSymbols)) {
+          if (/^\d+$/.test(part)) {
+            produced.push(...Array(Math.min(10, Number(part))).fill('C'));
+          } else if ('WUBRGC'.includes(part)) {
+            produced.push(part);
+          }
+        }
+        if (produced.length) {
+          const sym = produced.map(x => `{${x}}`).join('');
+          return {p: `Mana | Produced$ ${produced.join(' ')}`, fr: `ajoutez ${sym}`, en: `add ${sym}`};
+        }
+      }
       if (c === 'Any') {
         return {p: `Mana | Produced$ Any | Amount$ ${n1}`,
           fr: n1 === 1 ? 'ajoutez un mana de la couleur de votre choix' : `ajoutez ${word(n1, 'fr')} manas d'une même couleur de votre choix`,
           en: n1 === 1 ? 'add one mana of any color' : `add ${word(n1, 'en')} mana of any one color`};
+      }
+      if (c === 'Symbols') {
+        return {p: 'Mana | Produced$ C', fr: 'ajoutez {C}', en: 'add {C}'};
       }
       const sym = `{${c}}`.repeat(Math.min(n1, 10));
       return {p: `Mana | Produced$ ${c} | Amount$ ${n1}`, fr: `ajoutez ${sym}`, en: `add ${sym}`};
@@ -848,6 +902,32 @@ function effect(a, id) {
       return {p: 'ChangeZone | Origin$ Library | Destination$ Battlefield | ChangeType$ Land.Basic | ChangeNum$ 1 | Tapped$ True',
         fr: 'cherchez dans votre bibliothèque une carte de terrain de base, mettez-la sur le champ de bataille engagée, puis mélangez',
         en: 'search your library for a basic land card, put it onto the battlefield tapped, then shuffle'};
+    case 'damagePlayer':
+      return {p: `DealDamage | ${target({v: 'Player,Planeswalker', prompt: 'Choisissez un joueur ou un planeswalker ciblé'})} | NumDmg$ ${n}`,
+        fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à un joueur ou un planeswalker ciblé`, en: `CARDNAME deals ${n} damage to target player or planeswalker`};
+    case 'damageOpponent':
+      return {p: `DealDamage | ${target({v: 'Opponent', prompt: 'Choisissez un adversaire ciblé'})} | NumDmg$ ${n}`,
+        fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à un adversaire ciblé`, en: `CARDNAME deals ${n} damage to target opponent`};
+    case 'targetLoseLife':
+      return {p: `LoseLife | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | LifeAmount$ ${n}`,
+        fr: `un joueur ciblé perd ${n} ${plural(n, 'point', 'points')} de vie`, en: `target player loses ${n} life`};
+    case 'targetGainLife':
+      return {p: `GainLife | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | LifeAmount$ ${n}`,
+        fr: `un joueur ciblé gagne ${n} ${plural(n, 'point', 'points')} de vie`, en: `target player gains ${n} life`};
+    case 'targetDraw':
+      return {p: `Draw | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1}`,
+        fr: `un joueur ciblé pioche ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`, en: `target player draws ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
+    case 'targetDiscard':
+      return {p: `Discard | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1} | Mode$ TgtChoose`,
+        fr: `un joueur ciblé se défausse de ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`, en: `target player discards ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
+    case 'targetMill':
+      return {p: `Mill | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1}`,
+        fr: `un joueur ciblé meule ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`, en: `target player mills ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
+    case 'targetSacrifice':
+      return {p: `Sacrifice | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | SacValid$ Creature`,
+        fr: 'un joueur ciblé sacrifie une créature', en: 'target player sacrifices a creature'};
+    case 'discover':
+      return {p: `Discover | Num$ ${n1}`, fr: `découvrez ${n1}`, en: `discover ${n1}`};
     case 'explore':
       return {p: 'Explore', fr: 'CARDNAME explore', en: 'CARDNAME explores'};
     case 'connive':
@@ -910,14 +990,18 @@ export function abilityLines(a, i, lang = 'fr') {
   }
   if (a.when === 'static') {
     const n = Math.max(0, Math.round(Number(a.n) || 0));
+    // Éminence : l'effet marche aussi depuis la zone de commandement.
+    const emin = a.eminence ? (en ? 'Eminence — ' : 'Éminence — ') : '';
+    const zone = a.eminence ? ' | EffectZone$ Battlefield,Command' : '';
     if (a.effect === 'grantKeyword') {
       const kw = a.keyword || 'Flying';
       const text = en ? `${capitalize(allEn(a.filter))} you control have ${keywordLower(kw)}.`
         : `${capitalize(allFr(a.filter))} que vous contrôlez ${KW_GRANT[kw] || 'ont ' + (KW_FR[kw] || kw).toLowerCase()}.`;
-      return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddKeyword$ ${kw} | Description$ ${text}`], text};
+      const t = emin + text;
+      return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddKeyword$ ${kw}${zone} | Description$ ${t}`], text: t};
     }
-    const text = en ? `${capitalize(allEn(a.filter))} you control get +${n}/+${n}.` : `${capitalize(allFr(a.filter))} que vous contrôlez gagnent +${n}/+${n}.`;
-    return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddPower$ ${n} | AddToughness$ ${n} | Description$ ${text}`], text};
+    const text = emin + (en ? `${capitalize(allEn(a.filter))} you control get +${n}/+${n}.` : `${capitalize(allFr(a.filter))} que vous contrôlez gagnent +${n}/+${n}.`);
+    return {lines: [`S:Mode$ Continuous | Affected$ ${valid(a.filter)} | AddPower$ ${n} | AddToughness$ ${n}${zone} | Description$ ${text}`], text};
   }
   if (a.effect === 'modal') {
     return modalLines(a, id, w, lang);
@@ -951,8 +1035,22 @@ export function abilityLines(a, i, lang = 'fr') {
   return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, `SVar:${id}:DB$ ${e.p}`, ...extra], text};
 }
 
-/** Déclencheur d'une capacité : [condition pour Forge, début de phrase en français, en anglais]. */
+/** Déclencheurs qui marchent depuis le champ de bataille et peuvent aussi marcher depuis la zone de commandement. */
+export function eminenceOk(when) {
+  return ['ally', 'allyDies', 'landfall', 'castNonCreature', 'castCreature', 'lifeGain', 'upkeep', 'beginCombat', 'end', 'static'].includes(when);
+}
+
+/** Déclencheur d'une capacité, avec l'Éminence si demandée (aussi depuis la zone de commandement). */
 function triggerHead(a) {
+  const h = triggerTable(a);
+  if (!h || !a.eminence || !eminenceOk(a.when)) {
+    return h;
+  }
+  return [h[0].replace('TriggerZones$ Battlefield', 'TriggerZones$ Battlefield,Command'), `Éminence — ${h[1]}`, `Eminence — ${h[2]}`];
+}
+
+/** Déclencheur d'une capacité : [condition pour Forge, début de phrase en français, en anglais]. */
+function triggerTable(a) {
   return {
     etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille', 'When CARDNAME enters'],
     ally: [`Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ ${valid(a.filter)} | TriggerZones$ Battlefield`,
@@ -1084,7 +1182,10 @@ export function buildScript(f) {
   const text = [];
   const kws = (f.keywords || []).filter(k => KW_FR[k]);
   for (const k of kws) {
-    lines.push(keywordLine(f, k));
+    const line = keywordLine(f, k);
+    if (line) {
+      lines.push(line);
+    }
   }
   // Les mots-clés simples sur une ligne (« Vol, piétinement »), ceux à nombre ou à coût chacun sur la sienne.
   const simple = kws.filter(k => !KW_BY[k][4]);
@@ -1092,7 +1193,10 @@ export function buildScript(f) {
     text.push(simple.map((k, i) => i ? keywordName(k, lang).toLowerCase() : keywordName(k, lang)).join(', '));
   }
   for (const k of kws.filter(k => KW_BY[k][4])) {
-    text.push(keywordText(f, k, lang));
+    const t = keywordText(f, k, lang);
+    if (t) {
+      text.push(t);
+    }
   }
   (f.abilities || []).forEach((a, i) => {
     const r = abilityLines(a, i, lang);
