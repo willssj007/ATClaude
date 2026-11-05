@@ -264,6 +264,137 @@ export function modeEffectsFor(when) {
   return effectsFor(when).filter(e => !e.modal);
 }
 
+/** Nombre d'un effet : celui indiqué, ou X calculé pendant la partie. */
+export const AMOUNTS = [
+  ['fixed', 'Le nombre indiqué'],
+  ['creatures', 'X = le nombre de créatures que vous contrôlez'],
+  ['typeCount', 'X = le nombre de créatures d\'un type que vous contrôlez'],
+  ['lands', 'X = le nombre de terrains que vous contrôlez'],
+  ['artifacts', 'X = le nombre d\'artefacts que vous contrôlez'],
+  ['hand', 'X = le nombre de cartes dans votre main'],
+  ['life', 'X = votre total de points de vie'],
+  ['graveyard', 'X = le nombre de cartes de créature dans votre cimetière'],
+  ['opponents', 'X = le nombre d\'adversaires'],
+  ['power', 'X = la force de cette carte'],
+  ['counters', 'X = le nombre de marqueurs +1/+1 sur cette carte'],
+];
+
+/** Conditions d'une capacité : elle n'agit que si… */
+export const CONDITIONS = [
+  ['none', 'Toujours'],
+  ['control', 'Si vous contrôlez au moins N créatures (d\'un type, au choix)'],
+  ['lifeAtLeast', 'Si vous avez au moins N points de vie'],
+  ['lifeAtMost', 'Si vous avez N points de vie ou moins'],
+  ['handAtLeast', 'Si vous avez au moins N cartes en main'],
+  ['graveyardAtLeast', 'S\'il y a au moins N cartes de créature dans votre cimetière'],
+];
+
+/** Un type de créature saisi (« Elf ») sans ce qui casserait le script. */
+function typeName(t) {
+  return String(t || '').trim().replace(/[^\p{L}\p{N}-]/gu, '');
+}
+
+/** X d'une capacité : [compte pour Forge, « X étant … », « where X is … »], ou null pour un nombre fixe. */
+function amountOf(a) {
+  const t = typeName(a.amountType);
+  switch (a.amount) {
+    case 'creatures': return ['Count$Valid Creature.YouCtrl', 'le nombre de créatures que vous contrôlez', 'the number of creatures you control'];
+    case 'typeCount': return t ? [`Count$Valid Creature.${t}+YouCtrl`, `le nombre de créatures de type ${t} que vous contrôlez`, `the number of ${t} creatures you control`]
+      : ['Count$Valid Creature.YouCtrl', 'le nombre de créatures que vous contrôlez', 'the number of creatures you control'];
+    case 'lands': return ['Count$Valid Land.YouCtrl', 'le nombre de terrains que vous contrôlez', 'the number of lands you control'];
+    case 'artifacts': return ['Count$Valid Artifact.YouCtrl', 'le nombre d\'artefacts que vous contrôlez', 'the number of artifacts you control'];
+    case 'hand': return ['Count$CardsInYourHand', 'le nombre de cartes dans votre main', 'the number of cards in your hand'];
+    case 'life': return ['Count$YourLifeTotal', 'votre total de points de vie', 'your life total'];
+    case 'graveyard': return ['Count$ValidGraveyard Creature.YouOwn', 'le nombre de cartes de créature dans votre cimetière', 'the number of creature cards in your graveyard'];
+    case 'opponents': return ['PlayerCountOpponents$Amount', 'le nombre d\'adversaires que vous avez', 'the number of opponents you have'];
+    case 'power': return ['Count$CardPower', 'la force de CARDNAME', 'CARDNAME\'s power'];
+    case 'counters': return ['Count$CardCounters.P1P1', 'le nombre de marqueurs +1/+1 sur CARDNAME', 'the number of +1/+1 counters on CARDNAME'];
+    default: return null;
+  }
+}
+
+/** Condition d'une capacité : [compte pour Forge, comparaison, « si … », « if … »], ou null. */
+function conditionOf(a) {
+  const n = Math.max(0, Math.round(Number(a.condN ?? 3) || 0));
+  const t = typeName(a.condType);
+  const many = (one, more) => (n === 1 ? one : more);
+  switch (a.cond) {
+    case 'control': return [t ? `Count$Valid Creature.${t}+YouCtrl` : 'Count$Valid Creature.YouCtrl', `GE${n}`,
+      `si vous contrôlez au moins ${many('une', word(n, 'fr'))} ${many('créature', 'créatures')}${t ? ' de type ' + t : ''}`,
+      `if you control ${word(n, 'en')} or more ${t ? t + ' ' : ''}${many('creature', 'creatures')}`];
+    case 'lifeAtLeast': return ['Count$YourLifeTotal', `GE${n}`, `si vous avez au moins ${n} points de vie`, `if you have ${n} or more life`];
+    case 'lifeAtMost': return ['Count$YourLifeTotal', `LE${n}`, `si vous avez ${n} ${plural(n, 'point', 'points')} de vie ou moins`, `if you have ${n} or less life`];
+    case 'handAtLeast': return ['Count$CardsInYourHand', `GE${n}`, `si vous avez au moins ${many('une carte', word(n, 'fr') + ' cartes')} en main`,
+      `if you have ${word(n, 'en')} or more ${many('card', 'cards')} in hand`];
+    case 'graveyardAtLeast': return ['Count$ValidGraveyard Creature.YouOwn', `GE${n}`,
+      `s'il y a au moins ${many('une carte', word(n, 'fr') + ' cartes')} de créature dans votre cimetière`,
+      `if there are ${word(n, 'en')} or more creature ${many('card', 'cards')} in your graveyard`];
+    default: return null;
+  }
+}
+
+/** Repère du nombre X pendant la construction du texte (remplacé ensuite par X et par le compte de Forge). */
+const X_MARK = 7777;
+
+/**
+ * Effet complet d'une capacité : son effet (avec X si le nombre est calculé), les effets enchaînés (« …, puis … ») et la
+ * condition (« si … »), qui s'applique à chacun. Renvoie les paramètres de Forge du premier effet, les SVar qui suivent
+ * et le texte.
+ */
+function chainOf(a, id, lang) {
+  const en = lang === 'en';
+  const def = EFFECTS.find(x => x.id === a.effect);
+  const x = def && def.n && !def.mana ? amountOf(a) : null;
+  const main = effect(x ? {...a, n: X_MARK} : a, id);
+  if (!main) {
+    return null;
+  }
+  const xName = `${id}X`;
+  const toForge = (l) => (x ? l.replace(/\b7777\b/g, xName) : l);
+  const toText = (l) => (x ? l.replace(/\b7777\b/g, 'X') : l);
+  const items = [{head: toForge(main.p), extra: (main.extra || []).map(toForge), text: toText(en ? main.en : main.fr)
+    + (x ? (en ? `, where X is ${x[2]}` : `, X étant ${x[1]}`) : '')}];
+  (a.then || []).slice(0, 2).forEach((m, k) => {
+    const name = `${id}T${k + 1}`;
+    const e = effect({...newMode(), ...m}, name);
+    if (e) {
+      items.push({name, head: e.p, extra: e.extra || [], text: en ? e.en : e.fr});
+    }
+  });
+  const cond = conditionOf(a);
+  if (cond) {
+    const check = ` | ConditionCheckSVar$ ${id}C | ConditionSVarCompare$ ${cond[1]}`;
+    for (const it of items) {
+      it.head += check;
+      it.extra = it.extra.map(l => l + check);
+    }
+  }
+  for (let k = 0; k < items.length - 1; k++) {
+    const it = items[k];
+    const link = ` | SubAbility$ ${items[k + 1].name}`;
+    if (it.extra.length) {
+      it.extra[it.extra.length - 1] += link;
+    } else {
+      it.head += link;
+    }
+  }
+  const svars = [...items[0].extra];
+  if (x) {
+    svars.push(`SVar:${xName}:${x[0]}`);
+  }
+  if (cond) {
+    svars.push(`SVar:${id}C:${cond[0]}`);
+  }
+  for (const it of items.slice(1)) {
+    svars.push(`SVar:${it.name}:DB$ ${it.head}`, ...it.extra);
+  }
+  let body = items.map(it => it.text).join(en ? ', then ' : ', puis ');
+  if (cond) {
+    body = `${en ? cond[3] : cond[2]}, ${body}`;
+  }
+  return {p: items[0].head, extra: svars, body};
+}
+
 /** Un mode tout neuf (son effet et ses réglages, comme une capacité). */
 export function newMode(effect = 'draw') {
   return {effect, n: 1, filter: {type: '', other: false}, token: TOKENS[0][0], keyword: 'Flying', mana: 'Any'};
@@ -305,6 +436,14 @@ export function templates(type) {
     {label: 'Quand elle arrive, amassez des Orques 2', a: {...base, n: 2, when: 'etb', effect: 'amass', filter: {type: '', other: false}}},
     {label: 'Quand elle arrive, vous devenez le monarque', a: {...base, when: 'etb', effect: 'monarch', filter: {type: '', other: false}}},
     {label: 'Au début du combat de votre tour, un marqueur +1/+1 sur une créature ciblée', a: {...base, when: 'beginCombat', effect: 'countersTarget', filter: {type: '', other: false}}},
+    {label: 'Quand elle arrive, piochez X cartes, X étant le nombre de créatures que vous contrôlez',
+      a: {...base, when: 'etb', effect: 'draw', amount: 'creatures', filter: {type: '', other: false}}},
+    {label: 'Quand elle arrive, piochez une carte, puis vous gagnez 2 points de vie',
+      a: {...base, when: 'etb', effect: 'draw', then: [{...newMode('gainLife'), n: 2}], filter: {type: '', other: false}}},
+    {label: `Au début de votre entretien, si vous contrôlez au moins trois ${t || 'créatures'}, piochez une carte`,
+      a: {...base, when: 'upkeep', effect: 'draw', cond: 'control', condN: 3, condType: t, filter: {type: '', other: false}}},
+    {label: 'Quand elle meurt, elle inflige X blessures à n\'importe quelle cible, X étant sa force',
+      a: {...base, when: 'dies', effect: 'damageAny', amount: 'power', filter: {type: '', other: false}}},
   ];
 }
 
@@ -672,12 +811,12 @@ export function abilityLines(a, i, lang = 'fr') {
   if (a.effect === 'modal') {
     return modalLines(a, id, w, lang);
   }
-  const e = effect(a, id);
+  const e = chainOf(a, id, lang);
   if (!e) {
     return null;
   }
-  const body = en ? e.en : e.fr;
-  const extra = e.extra || [];
+  const body = e.body;
+  const extra = e.extra;
   if (w.kind === 'SP') {
     const text = capitalize(body) + '.';
     return {lines: [`A:SP$ ${e.p} | SpellDescription$ ${text}`, ...extra], text};

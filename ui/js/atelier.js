@@ -8,7 +8,7 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {CARD_TYPES, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
@@ -187,6 +187,7 @@ export class Atelier {
     this.form.colors = this.form.colors || [];
     this.form.kwValues = this.form.kwValues || {};
     this.kwOpen = new Set(['combat', ...KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3])]);
+    this.moreOpen = new Set();
     this.mode = entry && !entry.form ? 'script' : 'form';
     this.formUsed = this.mode === 'form'; // carte faite au formulaire (une carte en script n'en a pas)
     this.tab = 'edit';
@@ -222,6 +223,14 @@ export class Atelier {
     this.root.addEventListener('change', this.onEditInput);
     // Groupes de mots-clés ouverts ou fermés : retenus d'un affichage du formulaire à l'autre.
     this.root.addEventListener('toggle', this.onEditToggle = (e) => {
+      const more = e.target.dataset && e.target.dataset.more;
+      if (more !== undefined) {
+        if (e.target.open) {
+          this.moreOpen.add(Number(more));
+        } else {
+          this.moreOpen.delete(Number(more));
+        }
+      }
       const g = e.target.dataset && e.target.dataset.kwg;
       if (g) {
         if (e.target.open) {
@@ -622,39 +631,67 @@ export class Atelier {
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-      ${e.modal ? this.modesHtml(a, i) : ''}
+      ${e.modal ? this.modesHtml(a) : ''}
       ${e.token ? `<div class="ate-ab-row"><select data-a="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
       ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-a="fother"${a.filter.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
+      ${!e.modal && a.when !== 'static' ? this.moreHtml(a, i, e) : ''}
+    </div>`;
+  }
+
+  /** Un effet dans un encadré : un mode de « Choisissez l'un — » (sub « modes ») ou un effet enchaîné (sub « then »). */
+  subEffectHtml(a, m, k, sub, title, canDelete) {
+    const effects = modeEffectsFor(a.when);
+    const e = effects.find(x => x.id === m.effect) || effects[0];
+    const f = m.filter || {type: '', other: false};
+    return `<div class="ate-mode" data-sub="${sub}" data-si="${k}">
+      <div class="ate-ab-row ate-mode-head"><b class="small">${esc(title)}</b>
+        ${canDelete ? `<button class="ate-x" data-delsub="${k}" title="Retirer">✕</button>` : ''}</div>
+      <div class="ate-ab-row"><select data-sf="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
+        .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
+        ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+      ${e.token ? `<div class="ate-ab-row"><select data-sf="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === m.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
+      ${e.mana ? `<div class="ate-ab-row"><select data-sf="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (m.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+      ${e.keyword ? `<div class="ate-ab-row"><select data-sf="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === m.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+      ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
+        <input type="text" data-sf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
+        <label class="ate-check"><input type="checkbox" data-sf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
     </div>`;
   }
 
   /** Les modes de « Choisissez l'un — » : chacun son effet et ses réglages ; 2 ou 3 modes. */
-  modesHtml(a, i) {
+  modesHtml(a) {
     const modes = a.modes || [];
-    const effects = modeEffectsFor(a.when);
-    const boxes = modes.map((m, k) => {
-      const e = effects.find(x => x.id === m.effect) || effects[0];
-      const f = m.filter || {type: '', other: false};
-      return `<div class="ate-mode" data-mi="${k}">
-        <div class="ate-ab-row ate-mode-head"><b class="small">• Mode ${k + 1}</b>
-          ${modes.length > 2 ? `<button class="ate-x" data-delmode="${k}" title="Retirer ce mode">✕</button>` : ''}</div>
-        <div class="ate-ab-row"><select data-mf="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
-          .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
-          ${e.n ? `<input type="number" data-mf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-        ${e.token ? `<div class="ate-ab-row"><select data-mf="token">${allTokens().map(t => `<option value="${esc(t[0])}"${t[0] === m.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
-        ${e.mana ? `<div class="ate-ab-row"><select data-mf="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (m.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
-        ${e.keyword ? `<div class="ate-ab-row"><select data-mf="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === m.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
-        ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
-          <input type="text" data-mf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
-          <label class="ate-check"><input type="checkbox" data-mf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
-      </div>`;
-    }).join('');
-    return `<div class="ate-modes"><p class="muted small">Au moment de jouer, on choisit un des modes.</p>${boxes}
-      ${modes.length < 3 ? `<button class="btn small" data-addmode>＋ Un autre mode</button>` : ''}</div>`;
+    return `<div class="ate-modes"><p class="muted small">Au moment de jouer, on choisit un des modes.</p>
+      ${modes.map((m, k) => this.subEffectHtml(a, m, k, 'modes', `• Mode ${k + 1}`, modes.length > 2)).join('')}
+      ${modes.length < 3 ? '<button class="btn small" data-addsub="modes">＋ Un autre mode</button>' : ''}</div>`;
+  }
+
+  /**
+   * « Plus d'options » d'une capacité, sans écrire de script : un nombre X calculé pendant la partie, une condition
+   * (« seulement si … ») et jusqu'à deux effets enchaînés (« …, puis … »).
+   */
+  moreHtml(a, i, e) {
+    const then = a.then || [];
+    const used = (a.amount && a.amount !== 'fixed') || (a.cond && a.cond !== 'none') || then.length > 0;
+    const open = this.moreOpen.has(i) || used;
+    const amount = e.n && !e.mana ? `<div class="ate-ab-row"><span class="muted small">Nombre</span>
+        <select data-a="amount">${AMOUNTS.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" list="ate-subtypes" value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}</div>` : '';
+    const cond = a.cond && a.cond !== 'none';
+    return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
+      <summary>Plus d'options${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre variable, condition, « et puis »</span></summary>
+      ${amount}
+      <div class="ate-ab-row"><span class="muted small">Seulement</span>
+        <select data-a="cond">${CONDITIONS.map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
+        ${a.cond === 'control' ? `<input type="text" data-a="condType" list="ate-subtypes" value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>
+      <div class="ate-modes">${then.map((m, k) => this.subEffectHtml(a, m, k, 'then', 'Et puis', true)).join('')}
+        ${then.length < 2 ? '<button class="btn small" data-addsub="then">＋ Et puis… (un autre effet)</button>' : ''}</div>
+    </details>`;
   }
 
   editClick(e) {
@@ -748,13 +785,18 @@ export class Atelier {
       }
       f.abilities.push(a);
       this.renderLeft();
-    } else if (b.dataset.addmode !== undefined || b.dataset.delmode !== undefined) {
-      const a = f.abilities[Number(b.closest('[data-ab]').dataset.ab)];
-      a.modes = a.modes || [];
-      if (b.dataset.addmode !== undefined) {
-        a.modes.push(newMode('gainLife'));
+    } else if (b.dataset.addsub || b.dataset.delsub !== undefined) {
+      const i = Number(b.closest('[data-ab]').dataset.ab);
+      const a = f.abilities[i];
+      const sub = b.dataset.addsub || b.closest('[data-sub]').dataset.sub;
+      a[sub] = a[sub] || [];
+      if (b.dataset.addsub) {
+        a[sub].push(newMode('gainLife'));
       } else {
-        a.modes.splice(Number(b.dataset.delmode), 1);
+        a[sub].splice(Number(b.dataset.delsub), 1);
+      }
+      if (sub === 'then') {
+        this.moreOpen.add(i);
       }
       this.renderLeft();
     } else if (b.dataset.delab !== undefined) {
@@ -805,9 +847,10 @@ export class Atelier {
       return;
     }
     const box = t.closest('[data-ab]');
-    if (box && t.dataset.mf) {
-      const m = this.form.abilities[Number(box.dataset.ab)].modes[Number(t.closest('[data-mi]').dataset.mi)];
-      const k = t.dataset.mf;
+    if (box && t.dataset.sf) {
+      const holder = t.closest('[data-sub]');
+      const m = this.form.abilities[Number(box.dataset.ab)][holder.dataset.sub][Number(holder.dataset.si)];
+      const k = t.dataset.sf;
       if (k === 'ftype') {
         m.filter = {...(m.filter || {other: false}), type: t.value.trim()};
       } else if (k === 'fother') {
@@ -837,7 +880,7 @@ export class Atelier {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
     this.repaintMana(t);
-    if (e.type === 'change' && (k === 'when' || k === 'effect')) {
+    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
       }
@@ -845,6 +888,9 @@ export class Atelier {
         // Deux modes pour commencer ; ceux qui ne vont pas avec ce « quand » (un sort ne se régénère pas) changent.
         a.modes = (a.modes && a.modes.length >= 2 ? a.modes : [newMode('draw'), newMode('gainLife')])
           .map(m => (modeEffectsFor(a.when).some(x => x.id === m.effect) ? m : newMode('draw')));
+      }
+      if (a.then) {
+        a.then = a.then.map(m => (modeEffectsFor(a.when).some(x => x.id === m.effect) ? m : newMode('draw')));
       }
       this.renderLeft();
       return;

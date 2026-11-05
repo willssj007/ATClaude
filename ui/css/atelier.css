@@ -40,6 +40,11 @@
 .ate-mode { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--line-strong); background: rgb(255 255 255 / 0.03); }
 .ate-mode-head { min-height: 30px; }
 .ate-modes > .btn { align-self: flex-start; }
+/* « Plus d'options » d'une capacité : nombre X, condition, « et puis ». */
+.ate-more { border-top: 1px solid var(--line); padding-top: 6px; }
+.ate-more > summary { cursor: pointer; font-size: 13.5px; font-weight: 600; padding: 4px 0; }
+.ate-more[open] > summary { margin-bottom: 6px; }
+.ate-more > .ate-ab-row, .ate-more > .ate-modes { margin-bottom: 8px; }
 
 /* Coût de mana au doigt : le coût en symboles (toucher pour retirer), puis les boutons pour en ajouter. */
 .ate-mana { display: flex; flex-direction: column; gap: 8px; }
