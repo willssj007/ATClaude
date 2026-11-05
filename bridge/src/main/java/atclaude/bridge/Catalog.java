@@ -207,7 +207,13 @@ final class Catalog {
             if (!colors.isEmpty() && !colorsMatch(e.identity(), colors, colorMode)) continue;
             matches.add(e);
         }
-        if (!text.isEmpty()) {
+        // Ordre « les plus jouées » : les cartes des préconstruits Commander (les staples) d'abord ; avec un texte, les noms
+        // qui commencent par lui restent devant.
+        final Map<String, Integer> pop = bool(q, "popular") ? Precons.popularity() : null;
+        if (pop != null) {
+            final Comparator<Entry> byPop = Comparator.comparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0));
+            matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text)).thenComparing(byPop));
+        } else if (!text.isEmpty()) {
             // Les noms qui commencent par le texte cherché passent devant.
             matches.sort(Comparator.comparingInt((Entry e) -> rank(e, text)));
         }
@@ -223,6 +229,9 @@ final class Catalog {
             final JsonObject card = paperJson(pc);
             if (owned != null) {
                 card.addProperty("owned", Career.isBasic(pc) ? -1 : owned.getOrDefault(pc.getName(), 0));
+            }
+            if (pop != null && pop.getOrDefault(pc.getName(), 0) > 0) {
+                card.addProperty("precons", pop.get(pc.getName()));
             }
             cards.add(card);
         }

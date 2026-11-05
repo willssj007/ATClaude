@@ -230,6 +230,8 @@ export class Decks {
     const right = this.root.querySelector('.right');
     right.classList.add('mobile-hidden');
     this.search = new SearchPanel(left, {
+      // Deck builder : les cartes les plus jouées (staples) d'abord.
+      popularFirst: true,
       owned: !!deck.career,
       onAdd: (card) => this.add(card, 'main', true),
       onRemove: (card) => this.remove(card.name, this.count(card.name, 'main') ? 'main' : 'side'),

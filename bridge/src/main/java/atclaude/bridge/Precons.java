@@ -41,8 +41,56 @@ final class Precons {
     }
 
     private static volatile List<Info> all;
+    private static volatile Map<String, Integer> popularity;
 
     private Precons() { }
+
+    /**
+     * Les cartes les plus jouées : pour chaque carte, le nombre de préconstruits Commander de Forge qui la jouent
+     * (terrains de base exceptés). Sol Ring, Cachet d'ésotérisme, Tour de commandement... sortent en tête. Calculé une
+     * fois, sans réseau ; une réédition du même deck ne compte qu'une fois.
+     */
+    static Map<String, Integer> popularity() {
+        Map<String, Integer> map = popularity;
+        if (map != null) {
+            return map;
+        }
+        synchronized (Precons.class) {
+            if (popularity != null) {
+                return popularity;
+            }
+            final Map<String, Integer> counts = new java.util.HashMap<>();
+            final java.util.Set<String> seen = new java.util.HashSet<>();
+            for (final DeckProxy p : DeckProxy.getAllCommanderPreconDecks()) {
+                try {
+                    if (!seen.add(Career.cleanName(p.getName()))) {
+                        continue;
+                    }
+                    final Deck d = p.getDeck();
+                    if (d == null) {
+                        continue;
+                    }
+                    final java.util.Set<String> names = new java.util.HashSet<>();
+                    for (final DeckSection section : new DeckSection[] {DeckSection.Main, DeckSection.Commander}) {
+                        if (d.has(section)) {
+                            for (final Map.Entry<PaperCard, Integer> e : d.get(section)) {
+                                if (!e.getKey().getRules().getType().isBasicLand()) {
+                                    names.add(e.getKey().getName());
+                                }
+                            }
+                        }
+                    }
+                    for (final String n : names) {
+                        counts.merge(n, 1, Integer::sum);
+                    }
+                } catch (final RuntimeException e) {
+                    // préconstruit illisible : ignoré
+                }
+            }
+            popularity = counts;
+            return counts;
+        }
+    }
 
     static List<Info> all() {
         List<Info> list = all;

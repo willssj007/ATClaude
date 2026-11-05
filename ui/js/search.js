@@ -98,7 +98,7 @@ export class SearchPanel {
    * @param options.counts   fonction nom -> exemplaires déjà dans le deck
    * @param options.onRemove si présent, un bouton « − » retire un exemplaire (cartes déjà dans le deck)
    */
-  constructor(root, {onPick, onAdd, onRemove, counts, identityLock, owned = false, onBought} = {}) {
+  constructor(root, {onPick, onAdd, onRemove, counts, identityLock, owned = false, onBought, popularFirst = false} = {}) {
     this.root = root;
     this.onBought = onBought;
     // Mode Planeswalker : seulement les cartes de la collection, avec le nombre d'exemplaires possédés.
@@ -108,7 +108,7 @@ export class SearchPanel {
     this.onRemove = onRemove;
     this.counts = counts || (() => 0);
     this.identityLock = identityLock || (() => null);
-    this.query = {text: '', inText: false, colors: [], colorMode: 'any', types: [], commanderLegal: false, commandersOnly: false};
+    this.query = {text: '', inText: false, colors: [], colorMode: 'any', types: [], commanderLegal: false, commandersOnly: false, popular: popularFirst};
     this.offset = 0;
     this.total = 0;
     this.loading = false;
@@ -146,6 +146,10 @@ export class SearchPanel {
             <label class="sh-ctype" title="Les créatures de ce type (Elfe, Dragon, Zombie…), changelins compris">${icon('swords')}
               <input type="search" class="ctype" list="ctype-list" placeholder="Type de créature (Elfe, Dragon…)" autocomplete="off"></label>
             <datalist id="ctype-list"></datalist>
+            <select class="sort" title="Ordre des cartes">
+              <option value="popular"${this.query.popular ? ' selected' : ''}>Les plus jouées d'abord</option>
+              <option value="name"${this.query.popular ? '' : ' selected'}>Par nom</option>
+            </select>
           </div>
         </div>
       </div>
@@ -220,6 +224,10 @@ export class SearchPanel {
       if (dl && list.length) {
         dl.innerHTML = list.map(x => `<option value="${esc(x.fr)}">${x.fr !== x.en ? esc(x.en) : ''}</option>`).join('');
       }
+    });
+    r.querySelector('.sort').addEventListener('change', (e) => {
+      this.query.popular = e.target.value === 'popular';
+      run();
     });
     r.querySelector('.ctype').addEventListener('input', async (e) => {
       const list = await loadCreatureTypes();
@@ -324,6 +332,10 @@ export class SearchPanel {
     addFlipButton(cell, card);
     if (card.owned > 0) {
       cell.appendChild(el(`<div class="owned-n" title="Exemplaires dans ta collection">${icon('book')}${card.owned}</div>`));
+    }
+    // Les staples : la carte se joue dans beaucoup de préconstruits Commander.
+    if (card.precons >= 10 && !card.basic) {
+      cell.appendChild(el(`<div class="staple" title="Jouée dans ${card.precons} préconstruits Commander">★ ${card.precons}</div>`));
     }
     if (card.owned === 0) {
       const r = rarityKey(card);

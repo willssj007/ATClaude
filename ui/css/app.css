@@ -496,6 +496,9 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   background: rgb(0 0 0 / 0.3); border: 1px solid var(--line-strong); color: var(--gold-2);
 }
 .sh-ctype .ic { width: 16px; height: 16px; }
+/* Staple : jouée dans beaucoup de préconstruits Commander (ordre « les plus jouées »). */
+.cell .staple { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 2; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  color: #1d1606; background: linear-gradient(180deg, #f6dd8c, #d2a63e); box-shadow: 0 1px 3px rgb(0 0 0 / 0.6); pointer-events: none; }
 .sh-ctype input { width: 210px; max-width: 52vw; height: 28px; padding: 0 8px; border-radius: 999px; font-size: 13px; background: none; border: none; box-shadow: none; }
 .sh-cmc i { font-style: normal; opacity: .6; }
 .sh-cmc input[type=number] { width: 42px; height: 26px; padding: 0 4px; border-radius: 999px; text-align: center; font-size: 13px; background: none; border: none; box-shadow: none; -moz-appearance: textfield; appearance: textfield; }
