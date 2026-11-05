@@ -139,7 +139,8 @@ export function forgeCost(text) {
   if (!t) {
     return '';
   }
-  const parts = t.includes('{') ? [...t.matchAll(/\{([^}]+)\}/g)].map(m => m[1]) : t.match(/\d+|[WUBRGCXSP]\/[WUBRGP]|[WUBRGCXS]/g) || [];
+  // « {2}{W} », « 2W », ou un mélange des deux (« 3{G/U} »).
+  const parts = [...t.matchAll(/\{([^}]+)\}|\d+|[WUBRGCXSP]\/[WUBRGP]|[WUBRGCXS]/g)].map(m => m[1] || m[0]);
   const out = [];
   let generic = 0;
   for (const p of parts) {
@@ -149,7 +150,8 @@ export function forgeCost(text) {
       out.push(p.replace('/', ''));
     }
   }
-  return [generic ? String(generic) : '', ...out].filter(Boolean).join(' ');
+  // Dans l'ordre des cartes : X, puis le générique, puis les symboles de couleur.
+  return [...out.filter(p => p === 'X'), generic ? String(generic) : '', ...out.filter(p => p !== 'X')].filter(Boolean).join(' ');
 }
 
 /** Couleurs d'un coût de Forge (« 2 W U » → « WU »). */
@@ -159,7 +161,12 @@ export function costColors(cost) {
 
 /** Coût au format des symboles affichés (« 2 W U » → « {2}{W}{U} »). */
 export function costSymbols(cost) {
-  return String(cost || '').split(/\s+/).filter(Boolean).map(p => `{${p.length === 2 && p !== 'XX' ? p[0] + '/' + p[1] : p}}`).join('');
+  return String(cost || '').split(/\s+/).filter(Boolean).map(p => `{${/^[WUBRG2][WUBRGP]$/.test(p) ? p[0] + '/' + p[1] : p}}`).join('');
+}
+
+/** Symboles d'un coût saisi, un par élément (« 2WU » ou « {2}{W}{U} » → [« 2 », « W », « U »], « {W/U} » → [« W/U »]). */
+export function costParts(text) {
+  return [...costSymbols(forgeCost(text)).matchAll(/\{([^}]+)\}/g)].map(m => m[1]);
 }
 
 function plural(n, one, many) {

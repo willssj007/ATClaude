@@ -29,6 +29,38 @@
 .ate-x { margin-left: auto; border: none; background: rgb(255 255 255 / 0.08); color: var(--muted); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; }
 .ate-x:hover { color: #ff9a8a; }
 .ate-check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+
+/* Coût de mana au doigt : le coût en symboles (toucher pour retirer), puis les boutons pour en ajouter. */
+.ate-mana { display: flex; flex-direction: column; gap: 8px; }
+.ate-mana-show { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; min-height: 44px; padding: 5px 6px 5px 10px; border-radius: 12px;
+  background: rgb(0 0 0 / 0.28); border: 1px solid var(--line); font-size: 25px; }
+.ate-mana-show > .muted { font-size: 13px; }
+.ate-pip-on { border: none; background: none; padding: 1px; cursor: pointer; font-size: inherit; line-height: 0; border-radius: 50%; }
+.ate-pip-on:active { transform: scale(0.88); }
+.ate-mana-clear { margin-left: auto; border: none; background: rgb(255 255 255 / 0.08); color: var(--muted); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; flex: none; }
+.ate-mana-clear:hover { color: #ff9a8a; }
+.ate-mana-pad { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ate-pip { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer; font-size: 28px; line-height: 0;
+  border: 1px solid var(--line-strong); background: rgb(255 255 255 / 0.05); transition: transform 0.1s, box-shadow 0.15s; }
+.ate-pip:active { transform: scale(0.88); }
+@media (hover: hover) { .ate-pip:not(:disabled):hover { transform: scale(1.08); } }
+.ate-pip:disabled { opacity: 0.3; cursor: default; }
+.ate-pip.first { box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgb(var(--gold-rgb) / 0.6); }
+.ate-gen { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 999px; border: 1px solid var(--line-strong);
+  background: rgb(255 255 255 / 0.05); font-size: 28px; line-height: 0; }
+.ate-gen button { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgb(255 255 255 / 0.1); color: var(--text);
+  font-size: 20px; font-weight: 800; cursor: pointer; padding: 0; line-height: 1; }
+.ate-gen button:disabled { opacity: 0.3; cursor: default; }
+.ate-gen button:not(:disabled):active { transform: scale(0.88); }
+.ate-hyb { cursor: pointer; }
+.ate-hyb-hint { flex-basis: 100%; }
+.ate-mana-kb summary { cursor: pointer; width: max-content; }
+.ate-mana-kb input { margin-top: 6px; width: 100%; }
+.ate-ab-cost { display: flex; flex-direction: column; gap: 6px; }
+.ate-ab .ate-mana-show { min-height: 38px; font-size: 21px; }
+.ate-ab .ate-pip { width: 36px; height: 36px; font-size: 23px; }
+.ate-ab .ate-gen { font-size: 23px; }
+.ate-ab .ate-gen button { width: 30px; height: 30px; }
 .ate-script { width: 100%; min-height: 360px; font-size: 12.5px; line-height: 1.45; white-space: pre; }
 
 .ate-side { position: sticky; top: 10px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; border-radius: 14px; }

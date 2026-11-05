@@ -7,8 +7,8 @@ import {bridge} from './bridge.js';
 import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
-import {debounce, el, esc, rulesHtml, toast} from './util.js';
-import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, effectsFor, readDisplay, templates, withDisplay} from './cardscript.js';
+import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
+import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, costParts, effectsFor, readDisplay, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -19,6 +19,42 @@ const NEW_ABILITY = () => ({when: 'etb', effect: 'draw', n: 1, filter: {type: ''
   keyword: 'Flying', cost: '', tap: true, sac: false, loyalty: 1});
 /** Illustration : 480 × 352 (le cadre de l'illustration d'une carte). */
 const ART = {w: 480, h: 352};
+
+// Coût de mana au doigt : on touche les symboles au lieu de taper des lettres. La saisie au clavier reste là pour
+// les coûts rares (phyrexian, hybride à deux, neige).
+const PIPS = [['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['C', 'Incolore'], ['X', 'X']];
+const HYBRIDS = ['W/U', 'U/B', 'B/R', 'R/G', 'G/W', 'W/B', 'U/R', 'B/G', 'R/W', 'G/U'];
+const GENERIC_MAX = 20;
+
+/** Coût découpé : la part générique, et les autres symboles dans l'ordre où on les a ajoutés. */
+function costModel(text) {
+  let generic = 0;
+  const pips = [];
+  for (const p of costParts(text)) {
+    if (/^\d+$/.test(p)) {
+      generic += Number(p);
+    } else {
+      pips.push(p);
+    }
+  }
+  return {generic, pips};
+}
+
+/** Coût écrit dans l'ordre des cartes : X d'abord, puis le générique, puis les symboles de couleur. */
+function costText({generic, pips}) {
+  const parts = [...pips.filter(p => p === 'X'), ...(generic ? [String(generic)] : []), ...pips.filter(p => p !== 'X')];
+  return parts.map(p => `{${p}}`).join('');
+}
+
+/** Les deux couleurs d'un hybride, dans l'ordre des cartes (« {W/U} », « {G/W} »...). */
+function hybridOf(a, b) {
+  return HYBRIDS.includes(`${a}/${b}`) ? `${a}/${b}` : `${b}/${a}`;
+}
+
+/** Coût que les boutons savent refaire ; sinon la saisie au clavier s'ouvre d'elle-même. */
+function simpleCost(text) {
+  return costParts(text).every(p => /^\d+$/.test(p) || 'WUBRGCX'.includes(p) || HYBRIDS.includes(p));
+}
 
 export class Atelier {
   constructor(root, {onChanged = () => {}} = {}) {
@@ -337,6 +373,7 @@ export class Atelier {
     this.root.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', this.tab !== 'look' && b.dataset.mode === this.mode));
     this.root.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', this.tab === 'look'));
     const left = this.root.querySelector('.ate-left');
+    this.hyb = null;
     if (this.tab === 'look') {
       left.innerHTML = this.lookHtml();
       this.renderLook();
@@ -356,7 +393,7 @@ export class Atelier {
     const types = this.data.creatureTypes || [];
     left.innerHTML = `<datalist id="ate-subtypes">${types.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Professeur X" maxlength="60"></label>
-      <label class="ate-field"><span>Coût de mana</span><input type="text" data-k="cost" value="${esc(f.cost)}" placeholder="2WU ou {2}{W}{U} (hybride : {W/U})"></label>
+      <div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>
       <div class="ate-field"><span>Types</span><div class="ate-chips">
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
@@ -404,6 +441,105 @@ export class Atelier {
     }, {narrow: true});
   }
 
+  /** Coût de la carte (« form ») ou d'une capacité activée (« ab:2 »). */
+  manaValue(target) {
+    return target === 'form' ? this.form.cost : (this.form.abilities[Number(target.slice(3))] || {}).cost || '';
+  }
+
+  /** Sélecteur de coût : le coût en symboles (toucher un symbole le retire), les boutons pour en ajouter. */
+  manaHtml(target) {
+    const value = this.manaValue(target);
+    const key = target === 'form' ? 'data-k' : 'data-a';
+    return `<div class="ate-mana" data-mana="${target}">
+      <div class="ate-mana-show">${this.manaShowHtml(value)}</div>
+      <div class="ate-mana-pad">${this.manaPadHtml(value, target)}</div>
+      <details class="ate-mana-kb"${simpleCost(value) ? '' : ' open'}><summary class="muted small">Saisie au clavier</summary>
+        <input type="text" ${key}="cost" value="${esc(value)}" placeholder="2WU ou {2}{W}{U} ; hybride {W/U}, phyrexian {W/P}"></details>
+    </div>`;
+  }
+
+  manaShowHtml(value) {
+    const parts = costParts(value);
+    if (!parts.length) {
+      return '<span class="muted small">Pas de coût : touche les symboles en dessous.</span>';
+    }
+    return parts.map((p, i) => `<button class="ate-pip-on" data-pipat="${i}" title="Retirer ce symbole">${symbol(p)}</button>`).join('')
+      + '<button class="ate-mana-clear" data-pipclear title="Tout effacer">✕</button>';
+  }
+
+  manaPadHtml(value, target) {
+    const {generic} = costModel(value);
+    const hyb = this.hyb && this.hyb.target === target ? this.hyb : null;
+    return PIPS.map(([p, label]) => {
+      const off = hyb && !'WUBRG'.includes(p);
+      return `<button class="ate-pip${hyb && hyb.first === p ? ' first' : ''}" data-pip="${p}" title="${label}"${off ? ' disabled' : ''}>${symbol(p)}</button>`;
+    }).join('')
+      + `<span class="ate-gen" title="Mana générique"><button data-gen="-1" title="Un de moins"${generic ? '' : ' disabled'}>−</button>${symbol(String(generic))}`
+      + `<button data-gen="1" title="Un de plus"${generic < GENERIC_MAX ? '' : ' disabled'}>+</button></span>`
+      + `<button class="chip ate-hyb${hyb ? ' on' : ''}" data-hybrid title="Symbole à deux couleurs">Hybride</button>`
+      + (hyb ? `<span class="muted small ate-hyb-hint">${hyb.first ? 'Et la seconde couleur ?' : 'Touche deux couleurs.'}</span>` : '');
+  }
+
+  /** Un bouton du sélecteur de coût a été touché. */
+  manaClick(box, b) {
+    const target = box.dataset.mana;
+    const value = this.manaValue(target);
+    const m = costModel(value);
+    const hyb = this.hyb && this.hyb.target === target ? this.hyb : null;
+    let next = value;
+    if (b.dataset.hybrid !== undefined) {
+      this.hyb = hyb ? null : {target, first: ''};
+    } else if (b.dataset.pip) {
+      const p = b.dataset.pip;
+      if (hyb && !hyb.first) {
+        hyb.first = p;
+      } else if (hyb && hyb.first === p) {
+        hyb.first = '';
+      } else {
+        m.pips.push(hyb ? hybridOf(hyb.first, p) : p);
+        if (hyb) {
+          hyb.first = '';
+        }
+        next = costText(m);
+      }
+    } else if (b.dataset.gen) {
+      m.generic = Math.max(0, Math.min(GENERIC_MAX, m.generic + Number(b.dataset.gen)));
+      next = costText(m);
+    } else if (b.dataset.pipat !== undefined) {
+      const parts = costParts(value);
+      const i = Number(b.dataset.pipat);
+      if (/^\d+$/.test(parts[i]) && Number(parts[i]) > 1) {
+        parts[i] = String(Number(parts[i]) - 1);
+      } else {
+        parts.splice(i, 1);
+      }
+      next = parts.map(p => `{${p}}`).join('');
+    } else if (b.dataset.pipclear !== undefined) {
+      next = '';
+      this.hyb = null;
+    }
+    if (target === 'form') {
+      this.form.cost = next;
+    } else {
+      this.form.abilities[Number(target.slice(3))].cost = next;
+    }
+    this.paintMana(box, true);
+    if (next !== value) {
+      this.check();
+    }
+  }
+
+  /** Redessine le sélecteur sans toucher à la saisie au clavier (sauf si on le demande : elle suit les boutons). */
+  paintMana(box, input) {
+    const target = box.dataset.mana;
+    const value = this.manaValue(target);
+    box.querySelector('.ate-mana-show').innerHTML = this.manaShowHtml(value);
+    box.querySelector('.ate-mana-pad').innerHTML = this.manaPadHtml(value, target);
+    if (input) {
+      box.querySelector('.ate-mana-kb input').value = value;
+    }
+  }
+
   abilityHtml(a, i) {
     const w = WHEN.find(x => x.id === a.when) || WHEN[0];
     const effects = effectsFor(a.when);
@@ -412,8 +548,8 @@ export class Atelier {
     return `<div class="ate-ab panel" data-ab="${i}">
       <div class="ate-ab-row"><select data-a="when">${WHEN.map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
-      ${w.cost ? `<div class="ate-ab-row"><span class="muted small">Coût</span><input type="text" data-a="cost" value="${esc(a.cost)}" placeholder="{1}{R}" style="width:90px">
-        <label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> {T}</label>
+      ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
+        <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>` : ''}
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span><input type="number" data-a="loyalty" value="${esc(a.loyalty)}" min="-20" max="20" style="width:80px"><span class="muted small">(+1, −2…)</span></div>` : ''}
       <div class="ate-ab-row"><select data-a="effect">${effects.map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
@@ -435,6 +571,11 @@ export class Atelier {
       return;
     }
     const f = this.form;
+    const mana = b.closest('[data-mana]');
+    if (mana) {
+      this.manaClick(mana, b);
+      return;
+    }
     if (b.dataset.importFrame !== undefined) {
       this.importFrame();
     } else if (b.dataset.noframe !== undefined) {
@@ -539,6 +680,7 @@ export class Atelier {
     }
     if (t.dataset.k) {
       this.form[t.dataset.k] = t.type === 'number' ? Number(t.value) : t.value;
+      this.repaintMana(t);
       this.check();
       return;
     }
@@ -557,6 +699,7 @@ export class Atelier {
     } else {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
+    this.repaintMana(t);
     if (e.type === 'change' && (k === 'when' || k === 'effect')) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
@@ -565,6 +708,14 @@ export class Atelier {
       return;
     }
     this.check();
+  }
+
+  /** Saisie au clavier d'un coût : les symboles au-dessus suivent. */
+  repaintMana(input) {
+    const box = input.closest('[data-mana]');
+    if (box) {
+      this.paintMana(box, false);
+    }
   }
 
   async validate() {

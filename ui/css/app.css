@@ -497,8 +497,10 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 }
 .sh-ctype .ic { width: 16px; height: 16px; }
 /* Staple : jouée dans beaucoup de préconstruits Commander (ordre « les plus jouées »). */
-.cell .staple { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 2; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
+.cell .staple { position: absolute; right: 46px; bottom: 14px; z-index: 2; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
   color: #1d1606; background: linear-gradient(180deg, #f6dd8c, #d2a63e); box-shadow: 0 1px 3px rgb(0 0 0 / 0.6); pointer-events: none; }
+/* Cellule étroite avec le « − » affiché : pas la place entre les deux boutons, le badge passe juste au-dessus du « + ». */
+@container (max-width: 140px) { .card-grid .cell.in-deck .staple { right: 6px; bottom: 46px; } }
 .sh-ctype input { width: 210px; max-width: 52vw; height: 28px; padding: 0 8px; border-radius: 999px; font-size: 13px; background: none; border: none; box-shadow: none; }
 .sh-cmc i { font-style: normal; opacity: .6; }
 .sh-cmc input[type=number] { width: 42px; height: 26px; padding: 0 4px; border-radius: 999px; text-align: center; font-size: 13px; background: none; border: none; box-shadow: none; -moz-appearance: textfield; appearance: textfield; }
@@ -876,6 +878,7 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 .edh-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .edh-th { white-space: nowrap; flex: none; }
 .edh-grid .cell .add { bottom: 30px; }
+.edh-grid .cell .staple { bottom: 38px; }
 
 /* ---------- Icônes (trait gravé, couleur du texte) ---------- */
 .ic { width: 1.2em; height: 1.2em; flex: none; vertical-align: -0.22em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
