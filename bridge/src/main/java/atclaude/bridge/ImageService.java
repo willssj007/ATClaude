@@ -65,6 +65,10 @@ public final class ImageService {
             final File back = CardBacks.file(imageKey);
             return back == null ? null : new Served(back, "en", true);
         }
+        if (imageKey.startsWith(CustomCards.FRAME_PREFIX)) {
+            final File frame = CustomCards.frameImage(imageKey);
+            return frame == null ? null : new Served(frame, "en", false);
+        }
         if (imageKey.startsWith(CustomCards.ART_PREFIX)) {
             final File art = CustomCards.art(imageKey);
             return art == null ? null : new Served(art, "en", false);

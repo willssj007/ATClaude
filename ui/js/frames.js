@@ -9,6 +9,9 @@ export const FRAMES = [
   ['modern', 'Moderne'], ['classic', 'Classique'], ['retro', 'Ancien'], ['future', 'Futur'], ['showcase', 'Vitrine'],
   ['nyx', 'Nyx'], ['extended', 'Art étendu'], ['borderless', 'Sans bord'], ['fullart', 'Illustration pleine'], ['token', 'Jeton'],
 ];
+/** Cadre importé : une image PNG de la carte entière, la fenêtre de l'illustration transparente. */
+export const IMPORTED = 'imported';
+export const FRAME_TEXT = [['dark', 'Texte sombre'], ['light', 'Texte clair']];
 
 export const FRAME_COLORS = [
   ['auto', 'Auto'], ['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['M', 'Or'],
@@ -64,6 +67,7 @@ const SPACE = {
   showcase: {t: 82.4, y: 74.4, w: 78, h: 35.3}, fullart: {t: 82.4, y: 74.4, w: 78, h: 35.3},
   classic: {t: 80, y: 72, w: 74.8, h: 31.4}, retro: {t: 82.8, y: 80, w: 72, h: 37},
   future: {t: 84.4, y: 62, w: 83.6, h: 35}, borderless: {t: 84.8, y: 76.8, w: 84, h: 34.8}, token: {t: 57.6, y: 74.4, w: 78, h: 16.6},
+  imported: {t: 82.4, y: 74.4, w: 78, h: 35.3},
 };
 const FONT = '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Noto Serif", serif';
 let measureCtx = null;
@@ -126,9 +130,9 @@ function clampScale(v) {
   return Math.round(Math.max(0.45, Math.min(1, v)) * 100) / 100;
 }
 
-/** Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou ""). */
-export function customFrameHtml(card, art) {
-  const style = FRAMES.some(f => f[0] === card.frame) ? card.frame : 'modern';
+/** Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou "") ; frameUrl : son cadre importé. */
+export function customFrameHtml(card, art, frameUrl = '') {
+  const style = card.frame === IMPORTED && frameUrl ? IMPORTED : FRAMES.some(f => f[0] === card.frame) ? card.frame : 'modern';
   const cols = frameColors(card);
   const l = PALETTE[cols[0]];
   const r = PALETTE[cols[1] || cols[0]];
@@ -147,9 +151,12 @@ export function customFrameHtml(card, art) {
   const st = clampScale(0.93 * box.y / Math.max(1, textWidth(typeLine, true) * (style === 'retro' ? 5 : 5.4)));
   const sr = rulesScale(text, box);
   const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}`;
-  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${art ? '' : ' cf-noart'}" style="${vars}">
+  const overlay = style === IMPORTED ? `<div class="cf-overlay" style="background-image:url(&quot;${esc(frameUrl)}&quot;)"></div>` : '';
+  const light = style === IMPORTED && card.frameText === 'light' ? ' cf-light' : '';
+  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${art ? '' : ' cf-noart'}${light}" style="${vars}">
     <div class="cf-bg"></div>
     <div class="cf-art"${art}></div>
+    ${overlay}
     <div class="cf-crown"></div>
     <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span></div>
     <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span><span class="cf-set">${icon('anvil')}</span></div>

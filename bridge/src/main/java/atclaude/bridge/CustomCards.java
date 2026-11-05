@@ -42,6 +42,8 @@ final class CustomCards {
 
     /** Préfixe des illustrations servies par le pont (comme « back: » pour les dos de cartes). */
     static final String ART_PREFIX = "custom:";
+    /** Préfixe des cadres importés (image PNG transparente posée sur l'illustration). */
+    static final String FRAME_PREFIX = "customframe:";
 
     private static final Pattern TYPE_NAME = Pattern.compile("[\\p{L}][\\p{L}\\p{N}'’-]{0,29}");
 
@@ -71,6 +73,11 @@ final class CustomCards {
         return new File(ForgeConstants.USER_CUSTOM_DIR, "art");
     }
 
+    /** Cadres importés (PNG, la fenêtre de l'illustration transparente). */
+    private static File frameDir() {
+        return new File(ForgeConstants.USER_CUSTOM_DIR, "frames");
+    }
+
     /** Réglages du formulaire de l'Atelier pour chaque carte (pour la rouvrir dans le formulaire) ; Forge ne lit que les .txt. */
     private static File formsDir() {
         return new File(ForgeConstants.USER_CUSTOM_DIR, "forms");
@@ -84,6 +91,7 @@ final class CustomCards {
     static void prepare() {
         cardsDir().mkdirs();
         artDir().mkdirs();
+        frameDir().mkdirs();
         formsDir().mkdirs();
     }
 
@@ -130,6 +138,22 @@ final class CustomCards {
         }
         final File art = new File(artDir(), base(f) + ".jpg");
         return art.isFile() ? art : null;
+    }
+
+    /** Cadre importé d'une carte perso (clé « customframe:Nom »), ou null. */
+    static File frameImage(final String key) {
+        final String name = key.startsWith(FRAME_PREFIX) ? key.substring(FRAME_PREFIX.length()) : key;
+        final File f = FILES.get(name);
+        if (f == null) {
+            return null;
+        }
+        final File img = new File(frameDir(), base(f) + ".png");
+        return img.isFile() ? img : null;
+    }
+
+    /** Clé du cadre importé d'une carte perso, ou null si elle n'en a pas. */
+    static String frameKey(final String name) {
+        return isCustom(name) && frameImage(name) != null ? FRAME_PREFIX + name : null;
     }
 
     /** Clé de l'illustration d'une carte perso, ou null si elle n'en a pas. */
@@ -369,6 +393,11 @@ final class CustomCards {
      * JPEG (data URL ou base64), "" pour la retirer, null pour garder celle qu'elle a.
      */
     static synchronized JsonObject save(final String script, final String previous, final String art, final String form) {
+        return save(script, previous, art, form, null);
+    }
+
+    /** Comme {@link #save(String, String, String, String)}, avec le cadre importé (PNG ; "" le retire, null le garde). */
+    static synchronized JsonObject save(final String script, final String previous, final String art, final String form, final String frame) {
         validate(script, previous);
         final CardRules rules = parse(script, previous);
         final String name = rules.getName();
@@ -377,10 +406,12 @@ final class CustomCards {
             file = new File(cardsDir(), unusedBase(name) + ".txt");
         }
         File oldArt = null;
+        File oldFrame = null;
         if (previous != null && !previous.equals(name) && FILES.containsKey(previous)) {
             // Renommée : l'ancienne carte disparaît (de la base de Forge au prochain lancement), son illustration suit.
             final File old = FILES.remove(previous);
             oldArt = new File(artDir(), base(old) + ".jpg");
+            oldFrame = new File(frameDir(), base(old) + ".png");
             delete(new File(formsDir(), base(old) + ".json"));
             delete(old);
             DELETED.add(previous);
@@ -419,6 +450,33 @@ final class CustomCards {
                 throw new IllegalStateException("Illustration non enregistrée : " + e.getMessage());
             }
         }
+        final File frameFile = new File(frameDir(), base(file) + ".png");
+        if (frame == null) {
+            if (oldFrame != null && oldFrame.isFile()) {
+                try {
+                    Files.move(oldFrame.toPath(), frameFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (final IOException e) {
+                    System.err.println("Cadre non déplacé : " + e.getMessage());
+                }
+            }
+        } else if (frame.isEmpty()) {
+            delete(frameFile);
+        } else {
+            final byte[] bytes = B64.decode(frame.startsWith("data:") ? frame.substring(frame.indexOf(',') + 1) : frame);
+            // Un PNG (signature 89 50 4E 47) : la transparence laisse voir l'illustration.
+            if (bytes.length < 8 || (bytes[0] & 0xff) != 0x89 || bytes[1] != 'P' || bytes[2] != 'N' || bytes[3] != 'G') {
+                throw new IllegalArgumentException("Le cadre doit être une image PNG.");
+            }
+            if (bytes.length > 3_000_000) {
+                throw new IllegalArgumentException("Cadre trop lourd.");
+            }
+            try {
+                frameFile.getParentFile().mkdirs();
+                Files.write(frameFile.toPath(), bytes);
+            } catch (final IOException e) {
+                throw new IllegalStateException("Cadre non enregistré : " + e.getMessage());
+            }
+        }
         // Dans la base de Forge tout de suite, comme au démarrage (édition « USER »), ou modifiée sur place.
         final CardDb db = FModel.getMagicDb().getCommonCards();
         if (db.getRules(name, false) != null) {
@@ -445,6 +503,7 @@ final class CustomCards {
             return false;
         }
         delete(new File(artDir(), base(f) + ".jpg"));
+        delete(new File(frameDir(), base(f) + ".png"));
         delete(new File(formsDir(), base(f) + ".json"));
         delete(f);
         DELETED.add(name);
@@ -508,6 +567,7 @@ final class CustomCards {
         String frame = "modern";
         String color = "auto";
         String lang = "fr";
+        String text = "dark";
         if (rules != null && rules.getMainPart() != null) {
             for (final Map.Entry<String, String> v : rules.getMainPart().getVariables()) {
                 final String value = v.getValue() == null ? "" : v.getValue().trim();
@@ -518,6 +578,7 @@ final class CustomCards {
                     case "AtelierFrame" -> frame = value;
                     case "AtelierFrameColor" -> color = value;
                     case "AtelierLang" -> lang = "en".equals(value) ? "en" : "fr";
+                    case "AtelierFrameText" -> text = "light".equals(value) ? "light" : "dark";
                     default -> { }
                 }
             }
@@ -525,6 +586,7 @@ final class CustomCards {
         o.addProperty("frame", frame);
         o.addProperty("frameColor", color);
         o.addProperty("lang", lang);
+        o.addProperty("frameText", text);
     }
 
     /** La carte perso de ce nom, telle que Forge l'a lue (null si ce n'en est pas une). */
@@ -646,6 +708,14 @@ final class CustomCards {
                     // sans illustration
                 }
             }
+            final File frame = new File(frameDir(), base(e.getValue()) + ".png");
+            if (frame.isFile()) {
+                try {
+                    c.addProperty("frameImage", B64.encode(Files.readAllBytes(frame.toPath())));
+                } catch (final IOException ex) {
+                    // sans cadre importé
+                }
+            }
             cards.add(e.getKey(), c);
         }
         o.add("cards", cards);
@@ -750,7 +820,8 @@ final class CustomCards {
             }
             try {
                 final JsonObject saved = save(c.has("script") ? c.get("script").getAsString() : "", present ? name : null,
-                        c.has("art") ? c.get("art").getAsString() : "", c.has("form") ? c.get("form").getAsString() : null);
+                        c.has("art") ? c.get("art").getAsString() : "", c.has("form") ? c.get("form").getAsString() : null,
+                        c.has("frameImage") ? c.get("frameImage").getAsString() : "");
                 final File f = FILES.get(saved.get("name").getAsString());
                 if (f != null && at > 0) {
                     f.setLastModified(at);

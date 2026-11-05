@@ -9,7 +9,7 @@ import {confirmBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, toast} from './util.js';
 import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, effectsFor, readDisplay, withDisplay} from './cardscript.js';
-import {FRAMES, FRAME_COLORS} from './frames.js';
+import {FRAMES, FRAME_COLORS, FRAME_TEXT, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
@@ -104,6 +104,9 @@ export class Atelier {
     this.previous = entry ? entry.name : null;
     this.art = null;
     this.artUrl = entry && entry.card && entry.card.customArt ? bridge.imageUrl(entry.card.customArt) : '';
+    // Cadre importé : PNG à envoyer (null : garder celui de la carte, "" : le retirer) et son adresse à l'écran.
+    this.frameImg = null;
+    this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : NEW_CARD();
     this.mode = entry && !entry.form ? 'script' : 'form';
     this.formUsed = this.mode === 'form'; // carte faite au formulaire (une carte en script n'en a pas)
@@ -161,7 +164,8 @@ export class Atelier {
 
   /** Présentation de la carte : celle du formulaire, ou celle écrite dans le script. */
   look() {
-    return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang} : readDisplay(this.script);
+    return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang, frameText: this.form.frameText || 'dark'}
+      : readDisplay(this.script);
   }
 
   setLook(patch) {
@@ -182,9 +186,15 @@ export class Atelier {
     return `<div class="ate-field ate-look"><span>Présentation</span>
       <div class="ate-look-row">
         <div class="seg ate-lang">${LANGS.map(([v, l]) => `<button data-lang="${v}">${l}</button>`).join('')}</div>
-        <label class="ate-fcolor">Couleur du cadre <select data-fcolor>${FRAME_COLORS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+        <label class="ate-fcolor" data-fcolor-box>Couleur du cadre <select data-fcolor>${FRAME_COLORS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+        <label class="ate-fcolor" data-ftext-box>Texte <select data-ftext>${FRAME_TEXT.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
       </div>
       <div class="ate-frames"></div>
+      <div class="ate-look-row ate-import">
+        <button class="btn small" data-import-frame>Importer un cadre…</button>
+        <button class="btn small" data-noframe>Retirer le cadre importé</button>
+        <span class="muted small">Une image PNG de la carte entière, la fenêtre de l'illustration transparente.</span>
+      </div>
       ${this.mode === 'script' ? '<p class="muted small">En mode script, le texte de la carte est celui du script : la langue choisie sert au type et aux mots-clés.</p>' : ''}
     </div>`;
   }
@@ -196,20 +206,32 @@ export class Atelier {
     const sel = this.root.querySelector('[data-fcolor]');
     if (sel && sel.value !== look.frameColor) {
       sel.value = look.frameColor;
-      sel.dispatchEvent(new Event('refresh'));
     }
+    const text = this.root.querySelector('[data-ftext]');
+    if (text && text.value !== look.frameText) {
+      text.value = look.frameText;
+    }
+    // Couleur pour les cadres dessinés, couleur du texte pour un cadre importé.
+    const imported = look.frame === IMPORTED && !!this.frameUrl;
+    this.root.querySelectorAll('[data-fcolor-box]').forEach(n => n.classList.toggle('hidden', imported));
+    this.root.querySelectorAll('[data-ftext-box]').forEach(n => n.classList.toggle('hidden', !imported));
+    this.root.querySelectorAll('[data-noframe]').forEach(n => n.classList.toggle('hidden', !this.frameUrl));
     const strip = this.root.querySelector('.ate-frames');
     if (!strip || !this.lastCard) {
       return;
     }
-    if (!strip.children.length) {
-      for (const [id, label] of FRAMES) {
+    const list = this.frameUrl ? [...FRAMES, [IMPORTED, 'Importé']] : FRAMES;
+    const sig = list.map(f => f[0]).join(',');
+    if (strip.dataset.sig !== sig) {
+      strip.innerHTML = '';
+      strip.dataset.sig = sig;
+      for (const [id, label] of list) {
         const b = el(`<button class="ate-frame" data-frame="${id}" title="${esc(label)}"><span>${esc(label)}</span></button>`);
         strip.appendChild(b);
       }
     }
     for (const b of strip.children) {
-      const card = cardElement({...this.lastCard, frame: b.dataset.frame, frameColor: look.frameColor, customArtUrl: this.artUrl});
+      const card = cardElement(this.shown({...this.lastCard, frame: b.dataset.frame, frameColor: look.frameColor, frameText: look.frameText}));
       const old = b.querySelector('.mcard');
       if (old) {
         old.replaceWith(card);
@@ -218,6 +240,46 @@ export class Atelier {
       }
       b.classList.toggle('on', b.dataset.frame === look.frame);
     }
+  }
+
+  /** La carte telle qu'elle sera : l'illustration et le cadre importé choisis ici, pas encore enregistrés. */
+  shown(card) {
+    return {...card, customArt: null, customArtUrl: this.artUrl, customFrame: null, customFrameUrl: this.frameUrl};
+  }
+
+  /** Cadre importé : une image PNG ramenée au format de la carte (504 × 704), transparence gardée. */
+  importFrame() {
+    const input = el('<input type="file" accept="image/png" style="display:none">');
+    document.body.appendChild(input);
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) {
+        return;
+      }
+      if (file.type && file.type !== 'image/png') {
+        toast('Le cadre doit être une image PNG (avec la fenêtre de l\'illustration transparente).', {title: 'Cadre', error: true});
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 504;
+        canvas.height = 704;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        this.frameImg = canvas.toDataURL('image/png');
+        this.frameUrl = this.frameImg;
+        this.setLook({frame: IMPORTED});
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        toast('Image illisible.', {title: 'Cadre', error: true});
+      };
+      img.src = url;
+    });
+    input.click();
   }
 
   renderLeft() {
@@ -282,7 +344,13 @@ export class Atelier {
       return;
     }
     const f = this.form;
-    if (b.dataset.lang) {
+    if (b.dataset.importFrame !== undefined) {
+      this.importFrame();
+    } else if (b.dataset.noframe !== undefined) {
+      this.frameImg = '';
+      this.frameUrl = '';
+      this.setLook(this.look().frame === IMPORTED ? {frame: 'modern'} : {});
+    } else if (b.dataset.lang) {
       this.setLook({lang: b.dataset.lang});
     } else if (b.dataset.frame) {
       this.setLook({frame: b.dataset.frame});
@@ -360,9 +428,9 @@ export class Atelier {
       this.check();
       return;
     }
-    if (t.dataset.fcolor !== undefined) {
+    if (t.dataset.fcolor !== undefined || t.dataset.ftext !== undefined) {
       if (e.type === 'change') {
-        this.setLook({frameColor: t.value});
+        this.setLook(t.dataset.fcolor !== undefined ? {frameColor: t.value} : {frameText: t.value});
       }
       return;
     }
@@ -412,8 +480,8 @@ export class Atelier {
       preview.innerHTML = '';
       this.lastCard = r.card;
       this.renderLook();
-      const node = cardElement({...r.card, customArtUrl: this.artUrl});
-      node.addEventListener('click', () => showZoom({...r.card, customArtUrl: this.artUrl}));
+      const node = cardElement(this.shown(r.card));
+      node.addEventListener('click', () => showZoom(this.shown(r.card)));
       preview.appendChild(node);
       preview.classList.remove('stale');
       msg.className = 'ate-msg small ' + (r.warnings.length ? 'warn' : 'ok');
@@ -438,7 +506,7 @@ export class Atelier {
         Object.assign(this.form, readDisplay(this.script));
       }
       await bridge.request('customSave', {script: this.currentScript(), previous: this.previous, art: this.art,
-        form: kept ? this.form : null});
+        form: kept ? this.form : null, frameImage: this.frameImg});
       toast('Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
       this.onChanged();
       this.close();

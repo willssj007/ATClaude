@@ -364,6 +364,10 @@ final class Catalog {
             if (art != null) {
                 o.addProperty("customArt", art);
             }
+            final String frame = CustomCards.frameKey(nameEn);
+            if (frame != null) {
+                o.addProperty("customFrame", frame);
+            }
         }
         return o;
     }

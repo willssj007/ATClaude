@@ -375,7 +375,7 @@ public final class Bridge {
                 return CustomCards.validate(m.get("script").getAsString(), optString(m, "previous"));
             case "customSave":
                 return CustomCards.save(m.get("script").getAsString(), optString(m, "previous"), optString(m, "art"),
-                        m.has("form") && !m.get("form").isJsonNull() ? m.get("form").toString() : null);
+                        m.has("form") && !m.get("form").isJsonNull() ? m.get("form").toString() : null, optString(m, "frameImage"));
             case "customDelete":
                 return CustomCards.delete(m.get("name").getAsString());
             case "customTypes":

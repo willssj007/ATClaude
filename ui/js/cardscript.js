@@ -355,18 +355,22 @@ export function displayLines(d) {
   if (d.lang === 'en') {
     out.push('SVar:AtelierLang:en');
   }
+  if (d.frameText === 'light') {
+    out.push('SVar:AtelierFrameText:light');
+  }
   return out;
 }
 
 /** Réglages d'affichage écrits dans un script (lignes « SVar:Atelier… »). */
 export function readDisplay(script) {
   const get = (k) => (String(script || '').match(new RegExp(`^SVar:${k}:(\\S+)`, 'm')) || [])[1];
-  return {frame: get('AtelierFrame') || 'modern', frameColor: get('AtelierFrameColor') || 'auto', lang: get('AtelierLang') === 'en' ? 'en' : 'fr'};
+  return {frame: get('AtelierFrame') || 'modern', frameColor: get('AtelierFrameColor') || 'auto', lang: get('AtelierLang') === 'en' ? 'en' : 'fr',
+    frameText: get('AtelierFrameText') === 'light' ? 'light' : 'dark'};
 }
 
 /** Le script avec d'autres réglages d'affichage (pour le mode script). */
 export function withDisplay(script, d) {
-  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|Lang):/.test(l));
+  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|FrameText|Lang):/.test(l));
   while (kept.length && !kept[kept.length - 1].trim()) {
     kept.pop();
   }

@@ -311,6 +311,10 @@ final class GameSerializer {
             if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
             }
+            final String frame = CustomCards.frameKey(s.getName());
+            if (frame != null) {
+                o.addProperty("customFrame", frame);
+            }
             final String art = CustomCards.artKey(s.getName());
             if (art != null) {
                 o.addProperty("customArt", art);

@@ -67,3 +67,26 @@
   .ate-body { grid-template-columns: minmax(0, 1fr); }
   .ate-side { position: static; }
 }
+
+/* Téléphone en portrait : la carte et ses boutons en haut, le formulaire dessous, sur toute la largeur. */
+@media (orientation: portrait) and (max-width: 760px) {
+  .ate-top { gap: 8px; }
+  .ate-top h1 { font-size: 22px; }
+  .ate-body { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .ate-side {
+    position: static; order: -1; display: grid; grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "prev msg" "prev art" "prev act"; align-items: center; justify-items: start; gap: 8px 12px; padding: 12px;
+  }
+  .ate-preview { grid-area: prev; min-height: 0; }
+  .ate-preview .mcard { --w: 148px; }
+  .ate-msg { grid-area: msg; text-align: left; }
+  .ate-art { grid-area: art; justify-content: flex-start; }
+  .ate-actions { grid-area: act; justify-content: flex-start; }
+  .ate-grid { gap: 12px; justify-content: center; }
+  .ate-tile .mcard { --w: 104px; }
+  .ate-name { max-width: 104px; }
+  .ate-addtype input { width: 150px; }
+  .ate-frame .mcard { --w: 64px; }
+  .ate-script { min-height: 300px; font-size: 12px; }
+  .ate-import .muted { flex-basis: 100%; }
+}

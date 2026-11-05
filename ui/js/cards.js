@@ -22,7 +22,8 @@ function artStyle(card) {
 
 function frameHtml(card) {
   if (card.custom) {
-    return customFrameHtml(card, artStyle(card));
+    const frameUrl = card.customFrameUrl || (card.customFrame ? bridge.imageUrl(card.customFrame) : '');
+    return customFrameHtml(card, artStyle(card), frameUrl);
   }
   const pt = ptText(card);
   const name = card.nameFr || card.name || '';

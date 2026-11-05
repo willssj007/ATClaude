@@ -30,10 +30,14 @@ export function symbol(sym) {
     const v1 = COLOR_VAR[a] ? `var(${COLOR_VAR[a]})` : 'var(--mana-C)';
     const v2 = b === 'P' ? '#c9c2d6' : (COLOR_VAR[b] ? `var(${COLOR_VAR[b]})` : 'var(--mana-C)');
     const label = b === 'P' ? a + 'ᵠ' : (/^\d$/.test(a) ? a : '');
-    return `<span class="ms ms-hybrid" style="--h1:${v1};--h2:${v2}" title="${esc(s)}">${esc(label)}</span>`;
+    const glyphs = `${COLOR_VAR[a] ? ' ms-hl-' + a : ''}${COLOR_VAR[b] ? ' ms-hr-' + b : ''}`;
+    return `<span class="ms ms-hybrid${glyphs}" style="--h1:${v1};--h2:${v2}" title="${esc(s)}">${esc(label)}</span>`;
   }
   if (s === 'T') {
-    return '<span class="ms ms-T" title="Engager">↷</span>';
+    return '<span class="ms ms-T" title="Engager"></span>';
+  }
+  if (s === 'C') {
+    return '<span class="ms ms-Cx" title="Incolore"></span>';
   }
   if (s === 'Q') {
     return '<span class="ms ms-T" title="Dégager">↶</span>';

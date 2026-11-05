@@ -223,3 +223,13 @@
 .cf-token .cf-cost, .cf-token .cf-crown { display: none; }
 .cf-token .cf-type { top: 68.8%; }
 .cf-token .cf-box { top: 76%; bottom: 8.4%; }
+
+/* ---------- Cadre importé : l'image PNG par-dessus l'illustration, le texte posé sur ses zones. ---------- */
+.cf-imported .cf-bg, .cf-imported .cf-crown, .cf-imported .cf-foot { display: none; }
+.cf-imported .cf-art { inset: 0; height: auto; box-shadow: none; }
+.cf-imported .cf-overlay { inset: 0; background: center / 100% 100% no-repeat; pointer-events: none; }
+.cf-imported .cf-title, .cf-imported .cf-type, .cf-imported .cf-box, .cf-imported .cf-pt { background: none; box-shadow: none; }
+.cf-imported .cf-name, .cf-imported .cf-tl, .cf-imported .cf-rules, .cf-imported .cf-pt { text-shadow: 0 0 calc(var(--u) * 0.6) rgb(255 255 255 / 0.65); }
+.cf-imported.cf-light { color: #fff; }
+.cf-imported.cf-light .cf-name, .cf-imported.cf-light .cf-tl, .cf-imported.cf-light .cf-rules, .cf-imported.cf-light .cf-pt {
+  text-shadow: 0 0 calc(var(--u) * 0.8) rgb(0 0 0 / 0.9), 0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgb(0 0 0 / 0.8); }
