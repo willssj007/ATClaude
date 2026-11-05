@@ -24,12 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Version 0.4.x : le build 39 est la 0.4.0, chaque build suivant ajoute 1 au dernier chiffre.
-      # (0.3.x : builds 30 à 38.)
+      # Version 0.6.x : le build 43 est la 0.6.0, chaque build suivant ajoute 1 au dernier chiffre.
+      # (0.4.x : builds 39 à 42 ; 0.3.x : builds 30 à 38.)
       - name: Version
         id: version
         run: |
-          VERSION="0.4.$(( ${{ github.run_number }} - 39 ))"
+          VERSION="0.6.$(( ${{ github.run_number }} - 43 ))"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version $VERSION"
@@ -89,9 +89,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag || true
+          # Le patch note de la version (première section de PATCH-NOTES.md), puis comment installer.
+          {
+            awk '/^## /{n++} n==1' PATCH-NOTES.md
+            echo
+            echo "---"
+            echo
+            echo "Construit automatiquement depuis le commit ${{ github.sha }}. Android : télécharge le fichier .apk sur le téléphone puis ouvre-le (autorise l'installation depuis cette source si Android le demande). Windows : télécharge le .zip (ajouté quelques minutes après l'APK), décompresse-le dans un dossier de ton choix, puis lance ArcaneTable.exe. iPhone et iPad : le fichier .ipa (ajouté une vingtaine de minutes après l'APK) s'installe avec AltStore, SideStore ou Sideloadly et ton identifiant Apple (voir le README)."
+          } > release-notes.md
           gh release create apk-latest ArcaneTable-*.apk \
             --title "Arcane Table $VERSION — dernière version (build ${{ github.run_number }})" \
-            --notes "Construit automatiquement depuis le commit ${{ github.sha }}. Android : télécharge le fichier .apk sur le téléphone puis ouvre-le (autorise l'installation depuis cette source si Android le demande). Windows : télécharge le .zip (ajouté quelques minutes après l'APK), décompresse-le dans un dossier de ton choix, puis lance ArcaneTable.exe. iPhone et iPad : le fichier .ipa (ajouté une vingtaine de minutes après l'APK) s'installe avec AltStore, SideStore ou Sideloadly et ton identifiant Apple (voir le README)." \
+            --notes-file release-notes.md \
             --prerelease
 
   windows:

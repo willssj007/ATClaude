@@ -26,9 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # La version en préparation (celle de la prochaine publication, à changer avec build.yml), puis le numéro du build de test.
       - name: Version
         run: |
-          VERSION="test-${{ github.run_number }}"
+          VERSION="0.6.0-test.${{ github.run_number }}"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Version $VERSION"
 
@@ -73,7 +74,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete apk-test --yes --cleanup-tag || true
+          {
+            echo "Version de test construite depuis la branche test (commit ${{ github.sha }}), pour essayer les nouveautés avant de les publier. Elle s'installe à côté d'Arcane Table (appli « AT TEST », données à part). Sa synchronisation GitHub a son propre Gist : à la première synchronisation, elle part d'une copie du compte d'Arcane Table, sans jamais le modifier."
+            echo
+            echo "Nouveautés à essayer :"
+            echo
+            awk '/^## /{n++} n==1' PATCH-NOTES.md
+          } > release-notes.md
           gh release create apk-test AT-TEST-*.apk --target "${{ github.sha }}" \
             --title "AT TEST — version de test $VERSION (build ${{ github.run_number }})" \
-            --notes "Version de test construite depuis la branche test (commit ${{ github.sha }}), pour essayer les nouveautés avant de les publier. Elle s'installe à côté d'Arcane Table (appli « AT TEST », données à part). Sa synchronisation GitHub a son propre Gist : à la première synchronisation, elle part d'une copie du compte d'Arcane Table, sans jamais le modifier." \
+            --notes-file release-notes.md \
             --prerelease
