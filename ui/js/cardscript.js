@@ -277,7 +277,22 @@ export const AMOUNTS = [
   ['opponents', 'X = le nombre d\'adversaires'],
   ['power', 'X = la force de cette carte'],
   ['counters', 'X = le nombre de marqueurs +1/+1 sur cette carte'],
+  ['tapped', 'X = le nombre de permanents engagés pour le coût'],
 ];
+
+/** Coût « engager X … dégagés que vous contrôlez » : ce qu'on engage. */
+export const TAP_WHAT = [['token', 'jetons'], ['creature', 'créatures'], ['artifact', 'artefacts'], ['type', 'créatures d\'un type']];
+
+/** Ce qu'engage le coût : [type pour Forge, pluriel, singulier, accord (« dégagés »/« dégagées »), en anglais]. */
+function tapWhat(a) {
+  const t = typeName(a.tapXType);
+  switch (a.tapXWhat) {
+    case 'creature': return ['Creature', 'créatures', 'créature', 'es', 'creatures'];
+    case 'artifact': return ['Artifact', 'artefacts', 'artefact', 's', 'artifacts'];
+    case 'type': return t ? [`Creature.${t}`, `créatures de type ${t}`, `créature de type ${t}`, 'es', `${t} creatures`] : ['Creature', 'créatures', 'créature', 'es', 'creatures'];
+    default: return ['Card.token', 'jetons', 'jeton', 's', 'tokens'];
+  }
+}
 
 /** Conditions d'une capacité : elle n'agit que si… */
 export const CONDITIONS = [
@@ -287,6 +302,7 @@ export const CONDITIONS = [
   ['lifeAtMost', 'Si vous avez N points de vie ou moins'],
   ['handAtLeast', 'Si vous avez au moins N cartes en main'],
   ['graveyardAtLeast', 'S\'il y a au moins N cartes de créature dans votre cimetière'],
+  ['tappedAtLeast', 'Si vous en avez engagé au moins N (coût « engager X »)'],
 ];
 
 /** Un type de créature saisi (« Elf ») sans ce qui casserait le script. */
@@ -309,6 +325,10 @@ function amountOf(a) {
     case 'opponents': return ['PlayerCountOpponents$Amount', 'le nombre d\'adversaires que vous avez', 'the number of opponents you have'];
     case 'power': return ['Count$CardPower', 'la force de CARDNAME', 'CARDNAME\'s power'];
     case 'counters': return ['Count$CardCounters.P1P1', 'le nombre de marqueurs +1/+1 sur CARDNAME', 'the number of +1/+1 counters on CARDNAME'];
+    case 'tapped': {
+      const w = tapWhat(a);
+      return ['Count$xPaid', `le nombre de ${w[1]} engagé${w[3]} ainsi`, `the number of ${w[4]} tapped this way`];
+    }
     default: return null;
   }
 }
@@ -329,6 +349,12 @@ function conditionOf(a) {
     case 'graveyardAtLeast': return ['Count$ValidGraveyard Creature.YouOwn', `GE${n}`,
       `s'il y a au moins ${many('une carte', word(n, 'fr') + ' cartes')} de créature dans votre cimetière`,
       `if there are ${word(n, 'en')} or more creature ${many('card', 'cards')} in your graveyard`];
+    case 'tappedAtLeast': {
+      const w = tapWhat(a);
+      const fem = w[3] === 'es';
+      return ['Count$xPaid', `GE${n}`, n === 1 ? `si au moins ${fem ? 'une' : 'un'} ${w[2]} a été engagé${fem ? 'e' : ''} ainsi`
+        : `si au moins ${word(n, 'fr')} ${w[1]} ont été engagé${w[3]} ainsi`, `if ${word(n, 'en')} or more ${w[4]} were tapped this way`];
+    }
     default: return null;
   }
 }
@@ -358,17 +384,21 @@ function chainOf(a, id, lang) {
     const name = `${id}T${k + 1}`;
     const e = effect({...newMode(), ...m}, name);
     if (e) {
-      items.push({name, head: e.p, extra: e.extra || [], text: en ? e.en : e.fr});
+      // Un effet enchaîné peut avoir sa propre condition (paliers : « puis, si au moins trois ont été engagés, … »).
+      const own = conditionOf({...m, tapXWhat: a.tapXWhat, tapXType: a.tapXType});
+      items.push({name, head: e.p, extra: e.extra || [], text: en ? e.en : e.fr, own});
     }
   });
   const cond = conditionOf(a);
-  if (cond) {
-    const check = ` | ConditionCheckSVar$ ${id}C | ConditionSVarCompare$ ${cond[1]}`;
-    for (const it of items) {
+  items.forEach((it, k) => {
+    const c = it.own || cond;
+    if (c) {
+      const svar = it.own ? `${id}C${k}` : `${id}C`;
+      const check = ` | ConditionCheckSVar$ ${svar} | ConditionSVarCompare$ ${c[1]}`;
       it.head += check;
       it.extra = it.extra.map(l => l + check);
     }
-  }
+  });
   for (let k = 0; k < items.length - 1; k++) {
     const it = items[k];
     const link = ` | SubAbility$ ${items[k + 1].name}`;
@@ -385,10 +415,18 @@ function chainOf(a, id, lang) {
   if (cond) {
     svars.push(`SVar:${id}C:${cond[0]}`);
   }
+  items.forEach((it, k) => {
+    if (it.own) {
+      svars.push(`SVar:${id}C${k}:${it.own[0]}`);
+    }
+  });
   for (const it of items.slice(1)) {
     svars.push(`SVar:${it.name}:DB$ ${it.head}`, ...it.extra);
   }
-  let body = items.map(it => it.text).join(en ? ', then ' : ', puis ');
+  let body = items[0].text;
+  for (const it of items.slice(1)) {
+    body += (en ? ', then' : ', puis') + (it.own ? `, ${en ? it.own[3] : it.own[2]}, ` : ' ') + it.text;
+  }
   if (cond) {
     body = `${en ? cond[3] : cond[2]}, ${body}`;
   }
@@ -442,6 +480,11 @@ export function templates(type) {
       a: {...base, when: 'etb', effect: 'draw', then: [{...newMode('gainLife'), n: 2}], filter: {type: '', other: false}}},
     {label: `Au début de votre entretien, si vous contrôlez au moins trois ${t || 'créatures'}, piochez une carte`,
       a: {...base, when: 'upkeep', effect: 'draw', cond: 'control', condN: 3, condType: t, filter: {type: '', other: false}}},
+    {label: 'Engagez X jetons dégagés que vous contrôlez : piochez X cartes',
+      a: {...base, when: 'activated', effect: 'draw', cost: '', tap: false, tapX: true, tapXWhat: 'token', amount: 'tapped', filter: {type: '', other: false}}},
+    {label: 'Engagez X créatures dégagées que vous contrôlez : vous gagnez X points de vie, puis, si au moins trois ont été engagées, créez un jeton',
+      a: {...base, when: 'activated', effect: 'gainLife', cost: '', tap: false, tapX: true, tapXWhat: 'creature', amount: 'tapped',
+        then: [{...newMode('token'), n: 1, token: 'w_1_1_spirit_flying', cond: 'tappedAtLeast', condN: 3}], filter: {type: '', other: false}}},
     {label: 'Quand elle meurt, elle inflige X blessures à n\'importe quelle cible, X étant sa force',
       a: {...base, when: 'dies', effect: 'damageAny', amount: 'power', filter: {type: '', other: false}}},
   ];
@@ -786,7 +829,13 @@ function activationCost(a, lang) {
     forge.push('Sac<1/CARDNAME>');
     text.push(lang === 'en' ? (text.length ? 'sacrifice CARDNAME' : 'Sacrifice CARDNAME') : 'sacrifiez CARDNAME');
   }
-  return {forge: forge.join(' ') || '0', text: text.join(', ') || '{0}'};
+  if (a.tapX) {
+    // « Engagez X jetons dégagés que vous contrôlez » : le joueur choisit X en payant (le nombre engagé est lu ensuite).
+    const w = tapWhat(a);
+    forge.push(`tapXType<X/${w[0]}/${w[4]}>`);
+    text.push(lang === 'en' ? `tap X untapped ${w[4]} you control` : `engagez X ${w[1]} dégagé${w[3]} que vous contrôlez`);
+  }
+  return {forge: forge.join(' ') || '0', text: capitalize(text.join(', ')) || '{0}'};
 }
 
 /** Lignes du script et texte (dans la langue de la carte) d'une capacité. i : son numéro (noms des SVar). */
@@ -825,12 +874,15 @@ export function abilityLines(a, i, lang = 'fr') {
     if (a.when === 'loyalty') {
       const k = Math.round(Number(a.loyalty) || 0);
       const cost = k >= 0 ? `AddCounter<${k}/LOYALTY>` : `SubCounter<${-k}/LOYALTY>`;
-      const text = en ? `${k > 0 ? '+' : k < 0 ? '−' : ''}${Math.abs(k)}: ${capitalize(body)}.` : `[${k > 0 ? '+' : ''}${k}] : ${capitalize(body)}.`;
-      return {lines: [`A:AB$ ${e.p} | Cost$ ${cost} | Planeswalker$ True | SpellDescription$ ${text}`, ...extra], text};
+      // Le coût est écrit par CostDesc$ (dans la langue de la carte) : Forge ne le répète pas en anglais devant l'effet.
+      const head = en ? `${k > 0 ? '+' : k < 0 ? '−' : ''}${Math.abs(k)}:` : `[${k > 0 ? '+' : ''}${k}] :`;
+      const text = `${head} ${capitalize(body)}.`;
+      return {lines: [`A:AB$ ${e.p} | Cost$ ${cost} | Planeswalker$ True | CostDesc$ ${head} | SpellDescription$ ${capitalize(body)}.`, ...extra], text};
     }
     const c = activationCost(a, lang);
-    const text = en ? `${c.text}: ${capitalize(body)}.` : `${c.text} : ${capitalize(body)}.`;
-    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge} | SpellDescription$ ${text}`, ...extra], text};
+    const head = en ? `${c.text}:` : `${c.text} :`;
+    const text = `${head} ${capitalize(body)}.`;
+    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge} | CostDesc$ ${head} | SpellDescription$ ${capitalize(body)}.`, ...extra, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])], text};
   }
   const head = triggerHead(a);
   const text = `${head[en ? 2 : 1]}, ${body}.`;
@@ -893,10 +945,11 @@ function modalLines(a, id, w, lang) {
       const k = Math.round(Number(a.loyalty) || 0);
       const cost = k >= 0 ? `AddCounter<${k}/LOYALTY>` : `SubCounter<${-k}/LOYALTY>`;
       const head = en ? `${k > 0 ? '+' : k < 0 ? '−' : ''}${Math.abs(k)}:` : `[${k > 0 ? '+' : ''}${k}] :`;
-      return {lines: [`A:AB$ ${charm} | Cost$ ${cost} | Planeswalker$ True`, ...modes], text: `${head} ${capitalize(choose)}${bullets}`};
+      return {lines: [`A:AB$ ${charm} | Cost$ ${cost} | Planeswalker$ True | CostDesc$ ${head}`, ...modes], text: `${head} ${capitalize(choose)}${bullets}`};
     }
     const c = activationCost(a, lang);
-    return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge}`, ...modes], text: `${c.text}${en ? ':' : ' :'} ${capitalize(choose)}${bullets}`};
+    return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge} | CostDesc$ ${c.text}${en ? ':' : ' :'}`, ...modes, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])],
+      text: `${c.text}${en ? ':' : ' :'} ${capitalize(choose)}${bullets}`};
   }
   const head = triggerHead(a);
   return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${head[en ? 2 : 1]}, ABILITY`, `SVar:${id}:DB$ ${charm}`, ...modes],
@@ -987,6 +1040,12 @@ export function buildScript(f) {
   }
   if (f.token) {
     lines.push('SVar:AtelierToken:True');
+  }
+  // Plusieurs capacités « engager X » : une seule définition de X.
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i] === 'SVar:X:Count$xPaid' && lines.indexOf(lines[i]) !== i) {
+      lines.splice(i, 1);
+    }
   }
   lines.push(...displayLines(f));
   return lines.join('\n');

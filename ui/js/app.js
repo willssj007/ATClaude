@@ -536,10 +536,14 @@ function init() {
   screens.boosters = new BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')});
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
+  let atelierSync = null;
   screens.atelier = new Atelier($('#screen-atelier'), {onChanged: () => {
     // Une carte perso créée ou supprimée : les listes de decks et la recherche se refont.
     decksCache = null;
     screens.cards.reset();
+    // Et elle part sur le compte GitHub quelques secondes après (une seule synchro pour plusieurs changements).
+    clearTimeout(atelierSync);
+    atelierSync = setTimeout(() => syncNow({auto: true, onDone: afterSync}), 4000);
   }});
   screens.replay = new ReplayScreen($('#screen-replay'), {onClose: () => showScreen('stats')});
   screens.stats = new StatsScreen($('#screen-stats'), {onWatch: (id) => {

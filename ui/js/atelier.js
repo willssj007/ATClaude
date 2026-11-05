@@ -8,7 +8,7 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, TAP_WHAT, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
@@ -452,7 +452,8 @@ export class Atelier {
       <div class="ate-field"><span>Mots-clés</span>${this.keywordsHtml(f)}</div>
       <div class="ate-field"><span>Capacités</span><div class="ate-abilities">${f.abilities.map((a, i) => this.abilityHtml(a, i)).join('')}</div>
         <div class="ate-add"><button class="btn small gold" data-template>＋ Capacité toute prête…</button>
-        <button class="btn small" data-addab>＋ Capacité vide</button></div></div>`;
+        <button class="btn small" data-addab>＋ Capacité vide</button>
+        <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>`;
     this.renderLook();
     this.check();
   }
@@ -626,7 +627,11 @@ export class Atelier {
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
-        <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>` : ''}
+        <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>
+        <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tapX"${a.tapX ? ' checked' : ''}> engager X</label>
+        ${a.tapX ? `<select data-a="tapXWhat">${TAP_WHAT.map(([v, l]) => `<option value="${v}"${v === (a.tapXWhat || 'token') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+          ${a.tapXWhat === 'type' ? `<input type="text" data-a="tapXType" list="ate-subtypes" value="${esc(a.tapXType || '')}" placeholder="un type : Elf" style="width:120px">` : ''}
+          <span class="muted small">dégagés que vous contrôlez (X au choix en jouant)</span>` : ''}</div>` : ''}
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span><input type="number" data-a="loyalty" value="${esc(a.loyalty)}" min="-20" max="20" style="width:80px"><span class="muted small">(+1, −2…)</span></div>` : ''}
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
@@ -659,7 +664,18 @@ export class Atelier {
       ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-sf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-sf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
+      ${sub === 'then' ? this.thenCondHtml(a, m) : ''}
     </div>`;
+  }
+
+  /** Condition propre à un effet enchaîné (paliers : « puis, si au moins trois ont été engagés, … »). */
+  thenCondHtml(a, m) {
+    const tapped = a.when === 'activated' && a.tapX;
+    const cond = m.cond && m.cond !== 'none';
+    return `<div class="ate-ab-row"><span class="muted small">Seulement</span>
+      <select data-sf="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
+      ${m.cond === 'control' ? `<input type="text" data-sf="condType" list="ate-subtypes" value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
   }
 
   /** Les modes de « Choisissez l'un — » : chacun son effet et ses réglages ; 2 ou 3 modes. */
@@ -678,15 +694,17 @@ export class Atelier {
     const then = a.then || [];
     const used = (a.amount && a.amount !== 'fixed') || (a.cond && a.cond !== 'none') || then.length > 0;
     const open = this.moreOpen.has(i) || used;
+    const tapped = a.when === 'activated' && a.tapX;
+    const amounts = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped);
     const amount = e.n && !e.mana ? `<div class="ate-ab-row"><span class="muted small">Nombre</span>
-        <select data-a="amount">${AMOUNTS.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <select data-a="amount">${amounts.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" list="ate-subtypes" value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}</div>` : '';
     const cond = a.cond && a.cond !== 'none';
     return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
-      <summary>Plus d'options${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre variable, condition, « et puis »</span></summary>
+      <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre X, condition, « et puis »</span></summary>
       ${amount}
       <div class="ate-ab-row"><span class="muted small">Seulement</span>
-        <select data-a="cond">${CONDITIONS.map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <select data-a="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
         ${a.cond === 'control' ? `<input type="text" data-a="condType" list="ate-subtypes" value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>
       <div class="ate-modes">${then.map((m, k) => this.subEffectHtml(a, m, k, 'then', 'Et puis', true)).join('')}
@@ -776,6 +794,15 @@ export class Atelier {
       this.renderLeft();
     } else if (b.dataset.template !== undefined) {
       this.pickTemplate();
+    } else if (b.dataset.addcustom !== undefined) {
+      // Une capacité vide, ses options d'effet perso ouvertes.
+      f.abilities.push(NEW_ABILITY());
+      this.moreOpen.add(f.abilities.length - 1);
+      this.renderLeft();
+      const box = this.root.querySelector(`[data-ab="${f.abilities.length - 1}"]`);
+      if (box) {
+        box.scrollIntoView({block: 'start', behavior: 'smooth'});
+      }
     } else if (b.dataset.addab !== undefined) {
       const a = NEW_ABILITY();
       if (f.types.includes('Instant') || f.types.includes('Sorcery')) {
@@ -858,7 +885,7 @@ export class Atelier {
       } else {
         m[k] = t.type === 'number' ? Number(t.value) : t.value;
       }
-      if (e.type === 'change' && k === 'effect') {
+      if (e.type === 'change' && (k === 'effect' || k === 'cond')) {
         this.renderLeft();
         return;
       }
@@ -880,7 +907,7 @@ export class Atelier {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
     this.repaintMana(t);
-    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond'].includes(k)) {
+    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
       }
