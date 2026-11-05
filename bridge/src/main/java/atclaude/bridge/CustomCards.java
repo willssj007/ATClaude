@@ -568,6 +568,7 @@ final class CustomCards {
         String color = "auto";
         String lang = "fr";
         String text = "dark";
+        String fx = "none";
         if (rules != null && rules.getMainPart() != null) {
             for (final Map.Entry<String, String> v : rules.getMainPart().getVariables()) {
                 final String value = v.getValue() == null ? "" : v.getValue().trim();
@@ -579,6 +580,7 @@ final class CustomCards {
                     case "AtelierFrameColor" -> color = value;
                     case "AtelierLang" -> lang = "en".equals(value) ? "en" : "fr";
                     case "AtelierFrameText" -> text = "light".equals(value) ? "light" : "dark";
+                    case "AtelierFx" -> fx = value;
                     default -> { }
                 }
             }
@@ -587,6 +589,7 @@ final class CustomCards {
         o.addProperty("frameColor", color);
         o.addProperty("lang", lang);
         o.addProperty("frameText", text);
+        o.addProperty("fx", fx);
     }
 
     /** La carte perso de ce nom, telle que Forge l'a lue (null si ce n'en est pas une). */

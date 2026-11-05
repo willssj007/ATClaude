@@ -12,6 +12,10 @@ export const FRAMES = [
 /** Cadre importé : une image PNG de la carte entière, la fenêtre de l'illustration transparente. */
 export const IMPORTED = 'imported';
 export const FRAME_TEXT = [['dark', 'Texte sombre'], ['light', 'Texte clair']];
+/** Effets visuels (calque animé posé sur toute la carte), comme les cartes premium. */
+export const FX = [
+  ['none', 'Aucun'], ['foil', 'Brillant'], ['etched', 'Gravé'], ['galaxy', 'Galaxie'], ['gilded', 'Doré'], ['pearl', 'Nacré'], ['glitter', 'Paillettes'],
+];
 
 export const FRAME_COLORS = [
   ['auto', 'Auto'], ['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert'], ['M', 'Or'],
@@ -207,5 +211,6 @@ export function customFrameHtml(card, art, frameUrl = '') {
     <div class="cf-box"><div class="cf-rules">${rulesHtml(text)}</div></div>
     ${pt ? `<div class="cf-pt${loyalty ? ' cf-loy' : ''}">${esc(pt)}</div>` : ''}
     <div class="cf-foot">Atelier</div>
+    ${card.fx && card.fx !== 'none' && FX.some(f => f[0] === card.fx) ? `<div class="cf-fx cf-fx-${card.fx}"></div>` : ''}
   </div>`;
 }

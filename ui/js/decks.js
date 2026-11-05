@@ -265,6 +265,109 @@ export class Decks {
     return 'WUBRG'.split('').filter(c => set.has(c)).join('');
   }
 
+  /**
+   * Terrains de base proposés pour compléter le deck : autant qu'il manque de cartes, répartis entre les couleurs du
+   * commandant (en Construit : celles des cartes) selon les symboles de mana des coûts. Incolore : Landes désolées.
+   */
+  basicsPlan() {
+    const s = this.deck.sections;
+    const {total, target} = this.totals();
+    const free = Math.max(0, target - total);
+    // Combien en mettre : de quoi arriver à un nombre de terrains habituel (37 en Commander, 24 en 60 cartes), sans
+    // dépasser les places libres ; si le deck a déjà ses terrains, les places qui restent.
+    const lands = [...s.commander, ...s.main].filter(l => l.card.land).reduce((a, l) => a + l.count, 0);
+    const usual = this.deck.format === 'commander' ? 37 : 24;
+    const missing = Math.min(free, Math.max(0, usual - lands)) || free;
+    let colors = this.deck.format === 'commander' ? this.identity() : '';
+    const pips = {W: 0, U: 0, B: 0, R: 0, G: 0};
+    for (const l of [...s.commander, ...s.main]) {
+      if (l.card.land) {
+        continue;
+      }
+      for (const m of String(l.card.cost || '').matchAll(/\{([^}]+)\}/g)) {
+        for (const c of m[1].split('/')) {
+          if (pips[c] !== undefined) {
+            pips[c] += l.count;
+          }
+        }
+      }
+    }
+    if (this.deck.format !== 'commander') {
+      colors = 'WUBRG'.split('').filter(c => pips[c] > 0).join('');
+    }
+    const list = colors ? colors.split('') : ['C'];
+    const weight = (c) => (c === 'C' ? 1 : pips[c] || 0);
+    const sum = list.reduce((a, c) => a + weight(c), 0);
+    // Répartition au plus fort reste (à parts égales si aucun coût ne compte encore de symbole).
+    const raw = list.map(c => ({c, v: missing * (sum ? weight(c) / sum : 1 / list.length)}));
+    const plan = raw.map(x => ({c: x.c, n: Math.floor(x.v), r: x.v - Math.floor(x.v)}));
+    let left = missing - plan.reduce((a, x) => a + x.n, 0);
+    for (const x of [...plan].sort((a, b) => b.r - a.r)) {
+      if (left <= 0) {
+        break;
+      }
+      x.n++;
+      left--;
+    }
+    return {missing, free, lands, usual, plan: plan.map(({c, n}) => ({c, n}))};
+  }
+
+  async basicsDialog() {
+    const NAMES = {W: 'Plains', U: 'Island', B: 'Swamp', R: 'Mountain', G: 'Forest', C: 'Wastes'};
+    const {missing, free, lands, usual, plan} = this.basicsPlan();
+    if (!free) {
+      const {target} = this.totals();
+      toast(`Le deck a déjà ses ${target} cartes : retire des cartes pour faire de la place aux terrains.`);
+      return;
+    }
+    let cards;
+    try {
+      cards = await Promise.all(plan.map(x => bridge.request('cardInfo', {name: NAMES[x.c]})));
+    } catch (e) {
+      toast(e.message, {error: true});
+      return;
+    }
+    customBox('Terrains de base', (body, footer, close) => {
+      const counts = plan.map(x => x.n);
+      const draw = () => {
+        const sum = counts.reduce((a, n) => a + n, 0);
+        body.innerHTML = `<p class="muted small">Le deck a ${lands} terrain${lands > 1 ? 's' : ''} et ${free} place${free > 1 ? 's' : ''} libre${free > 1 ? 's' : ''} ;
+          un deck ${this.deck.format === 'commander' ? 'Commander' : 'de 60 cartes'} joue en général ${usual} terrains. Répartition proposée d'après les couleurs
+          ${this.deck.format === 'commander' ? 'du commandant' : 'des cartes'} et les symboles de mana des coûts ; change-la si tu veux.</p>
+          <div class="basics">${plan.map((x, i) => `<div class="basic-row">${manaHtml('{' + x.c + '}')}<b>${esc(cards[i].nameFr || cards[i].name)}</b>
+            <button class="btn small" data-minus="${i}">−</button><span class="n">${counts[i]}</span><button class="btn small" data-plus="${i}">＋</button></div>`).join('')}</div>
+          <p class="small ${sum <= free ? 'muted' : 'warn'}">${sum} terrain${sum > 1 ? 's' : ''} de base à ajouter${sum > free ? ` : c'est plus que les ${free} places libres` : ''}.</p>`;
+      };
+      draw();
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) {
+          return;
+        }
+        const i = Number(b.dataset.minus ?? b.dataset.plus);
+        counts[i] = Math.max(0, counts[i] + (b.dataset.plus !== undefined ? 1 : -1));
+        draw();
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      const ok = el('<button class="btn gold">Ajouter les terrains</button>');
+      cancel.addEventListener('click', close);
+      ok.addEventListener('click', () => {
+        close();
+        let added = 0;
+        plan.forEach((x, i) => {
+          for (let k = 0; k < counts[i]; k++) {
+            this.add(cards[i]);
+            added++;
+          }
+        });
+        if (added) {
+          toast(`${added} terrain${added > 1 ? 's' : ''} de base ajouté${added > 1 ? 's' : ''}.`);
+        }
+      });
+      footer.append(cancel, ok);
+    }, {narrow: true});
+  }
+
   count(name, only) {
     const s = this.deck.sections;
     const lines = only ? s[only] : [...s.commander, ...s.main];
@@ -444,6 +547,7 @@ export class Decks {
       <div class="db-actions">
         <button class="btn small" data-act="play">${icon('swords')} Jouer</button>
         <button class="btn small" data-act="analysis">Analyse</button>
+        <button class="btn small" data-act="basics" title="Compléter le deck avec des terrains de base aux couleurs du commandant">${icon('mountain')} Terrains de base</button>
         ${d.format === 'commander' && !d.career ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
         <details class="db-more"><summary class="btn small" title="Autres actions">⋯ Plus</summary>
           <div class="db-menu panel">
@@ -575,6 +679,8 @@ export class Decks {
           } else {
             openEdhrec(s.commander.map(l => l.card), {add: (card) => this.add(card), count: (name) => this.count(name)});
           }
+        } else if (a === 'basics') {
+          this.basicsDialog();
         } else if (a === 'stats') {
           openDeckStats(this.deckKey(d.previousName), d.previousName);
         } else if (a === 'export') {

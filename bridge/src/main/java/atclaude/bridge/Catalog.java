@@ -175,6 +175,8 @@ final class Catalog {
         final int cmcMax = q.has("cmcMax") ? q.get("cmcMax").getAsInt() : -1;
         final boolean commanderLegal = bool(q, "commanderLegal");
         final boolean commandersOnly = bool(q, "commandersOnly");
+        // Type de créature (anglais, celui de Forge : « Elf ») ; les changelins ont tous les types.
+        final String creatureType = str(q, "creatureType").trim();
         final int offset = q.has("offset") ? q.get("offset").getAsInt() : 0;
         final int limit = q.has("limit") ? q.get("limit").getAsInt() : DEFAULT_LIMIT;
         // Extension : les cartes imprimées dans ce set, montrées avec leur impression de ce set.
@@ -198,6 +200,7 @@ final class Catalog {
             }
             if (commanderLegal && !e.commanderLegal()) continue;
             if (commandersOnly && !e.canBeCommander()) continue;
+            if (!creatureType.isEmpty() && !hasCreatureType(e.card(), creatureType)) continue;
             if (cmcMin >= 0 && e.cmc() < cmcMin) continue;
             if (cmcMax >= 0 && e.cmc() > cmcMax) continue;
             if (!types.isEmpty() && types.stream().noneMatch(t -> e.typeEn().contains(t))) continue;
@@ -514,6 +517,47 @@ final class Catalog {
      * « Emeria's Call / Emeria, Shattered Skyclave » (export Moxfield), « Agadeem's Awakening // Agadeem, the
      * Undercrypt », ou la face arrière seule (« Insectile Aberration »).
      */
+    private static boolean hasCreatureType(final PaperCard pc, final String type) {
+        final CardRules rules = pc.getRules();
+        final List<ICardFace> all = new ArrayList<>(2);
+        if (rules.getMainPart() != null) {
+            all.add(rules.getMainPart());
+        }
+        if (rules.getOtherPart() != null) {
+            all.add(rules.getOtherPart());
+        }
+        for (final ICardFace face : all) {
+            if (face.getType() != null && face.getType().isCreature() && face.getType().hasCreatureType(type)) {
+                return true;
+            }
+            for (final String k : face.getKeywords()) {
+                if ("Changeling".equals(k)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Types de créature de Forge (types perso compris), avec leur nom français quand Forge en a un : pour la recherche. */
+    JsonArray creatureTypes() {
+        final JsonArray out = new JsonArray();
+        final forge.util.Localizer loc = forge.util.Localizer.getInstance();
+        for (final String en : new java.util.TreeSet<>(forge.card.CardType.Constant.CREATURE_TYPES)) {
+            final JsonObject o = new JsonObject();
+            o.addProperty("en", en);
+            String fr = French.creatureType(en);
+            if (fr == null) {
+                final String key = "lbl" + en.replaceAll("[^A-Za-z0-9]", "");
+                final String t = loc.getMessageorUseDefault(key, "");
+                fr = t == null || t.isEmpty() || t.startsWith("lbl") ? en : t;
+            }
+            o.addProperty("fr", fr);
+            out.add(o);
+        }
+        return out;
+    }
+
     /** Nom anglais de la carte officielle qui s'appelle {@code name} en français (sans casse ni accents), ou null. */
     String officialFrench(final String name) {
         final String en = frenchToEnglish().get(normalize(name));

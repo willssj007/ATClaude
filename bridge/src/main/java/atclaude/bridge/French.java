@@ -90,6 +90,11 @@ final class French {
             Map.entry("Phyrexian", "Phyrexian"), Map.entry("Thopter", "Mécanoptère"), Map.entry("Scout", "Éclaireur"),
             Map.entry("Powerstone", "Lithoforce"));
 
+    /** Nom français d'un type de créature que Forge traduit mal (« Goblin » : Gobelin, pas Lutin), sinon null. */
+    static String creatureType(final String en) {
+        return TOKEN_TYPES.get(en);
+    }
+
     /** Nom français d'un jeton (« Plant Token ») dont Forge traduit mal le type, sinon null. */
     static String tokenName(final String name) {
         if (name == null || !name.endsWith(" Token")) {

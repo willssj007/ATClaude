@@ -8,6 +8,30 @@ import {icon} from './icons.js';
 import {RARITY_FR, rarityKey, setCareer, wildcardHtml} from './career.js';
 
 const COLOR_NAMES = {W: 'Blanc', U: 'Bleu', B: 'Noir', R: 'Rouge', G: 'Vert', C: 'Incolore'};
+// Types de créature de Forge, avec leur nom français (chargés une fois, pour les suggestions du filtre).
+let creatureTypes = null;
+function loadCreatureTypes() {
+  if (!creatureTypes) {
+    creatureTypes = bridge.request('creatureTypes').catch(() => {
+      creatureTypes = null;
+      return [];
+    });
+  }
+  return creatureTypes;
+}
+
+const plain = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+/** Le type de Forge (anglais) d'un type tapé en français ou en anglais (« elfe », « Elf ») ; sinon le texte tel quel. */
+function creatureTypeOf(text, list) {
+  const t = plain(text);
+  if (!t) {
+    return '';
+  }
+  const hit = list.find(x => plain(x.fr) === t || plain(x.en) === t);
+  return hit ? hit.en : text.trim();
+}
+
 const TYPES = [
   ['creature', 'Créature'], ['instant', 'Éphémère'], ['sorcery', 'Rituel'], ['artifact', 'Artefact'],
   ['enchantment', 'Enchantement'], ['planeswalker', 'Planeswalker'], ['land', 'Terrain'], ['battle', 'Bataille'], ['legendary', 'Légendaire'],
@@ -118,6 +142,11 @@ export class SearchPanel {
             <label class="tchip"><input type="checkbox" class="legal"><i></i><span>Légales en Commander</span></label>
             <label class="tchip"><input type="checkbox" class="cmdonly"><i></i><span>Peuvent être commandant</span></label>
           </div>
+          <div class="sh-row">
+            <label class="sh-ctype" title="Les créatures de ce type (Elfe, Dragon, Zombie…), changelins compris">${icon('swords')}
+              <input type="search" class="ctype" list="ctype-list" placeholder="Type de créature (Elfe, Dragon…)" autocomplete="off"></label>
+            <datalist id="ctype-list"></datalist>
+          </div>
         </div>
       </div>
       <div class="results"><div class="card-grid"></div><div class="more muted small" style="text-align:center;padding:14px"></div></div>`;
@@ -184,6 +213,17 @@ export class SearchPanel {
       }
       c.classList.toggle('on');
       this.query.colors = [...r.querySelectorAll('[data-color].on')].map(x => x.dataset.color);
+      run();
+    });
+    loadCreatureTypes().then((list) => {
+      const dl = r.querySelector('#ctype-list');
+      if (dl && list.length) {
+        dl.innerHTML = list.map(x => `<option value="${esc(x.fr)}">${x.fr !== x.en ? esc(x.en) : ''}</option>`).join('');
+      }
+    });
+    r.querySelector('.ctype').addEventListener('input', async (e) => {
+      const list = await loadCreatureTypes();
+      this.query.creatureType = creatureTypeOf(e.target.value, list) || undefined;
       run();
     });
     r.querySelector('.types').addEventListener('click', (e) => {
@@ -318,7 +358,7 @@ export class SearchPanel {
   countFilters() {
     const q = this.query;
     const n = (q.colors.length ? 1 : 0) + q.types.length + (q.cmcMin !== undefined ? 1 : 0) + (q.cmcMax !== undefined ? 1 : 0)
-      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.set ? 1 : 0);
+      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.set ? 1 : 0) + (q.creatureType ? 1 : 0);
     this.root.querySelector('.filters-btn .n').textContent = n ? String(n) : '';
   }
 

@@ -9,11 +9,11 @@ import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, toast} from './util.js';
 import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, effectsFor, readDisplay, templates, withDisplay} from './cardscript.js';
-import {FRAMES, FRAME_COLORS, FRAME_TEXT, IMPORTED} from './frames.js';
+import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
-  keywords: [], abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr',
+  keywords: [], abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none',
 });
 const NEW_ABILITY = () => ({when: 'etb', effect: 'draw', n: 1, filter: {type: '', other: false}, token: TOKENS[0][0],
   keyword: 'Flying', cost: '', tap: true, sac: false, loyalty: 1});
@@ -38,7 +38,9 @@ export class Atelier {
       }
     } else if (this.lastCard) {
       const look = this.look();
-      showZoom(this.shown(node.dataset.frame ? {...this.lastCard, frame: node.dataset.frame, frameColor: look.frameColor, frameText: look.frameText} : this.lastCard));
+      const shown = node.dataset.frame ? {...this.lastCard, frame: node.dataset.frame, frameColor: look.frameColor, frameText: look.frameText}
+        : node.dataset.fx ? {...this.lastCard, frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: node.dataset.fx} : this.lastCard;
+      showZoom(this.shown(shown));
     }
   }
 
@@ -128,6 +130,7 @@ export class Atelier {
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : NEW_CARD();
     this.mode = entry && !entry.form ? 'script' : 'form';
     this.formUsed = this.mode === 'form'; // carte faite au formulaire (une carte en script n'en a pas)
+    this.tab = 'edit';
     this.script = entry ? entry.script : '';
     // Le script fait foi pour la présentation (cadre, couleur, langue), même pour une carte faite au formulaire.
     if (entry) {
@@ -139,7 +142,7 @@ export class Atelier {
       <div class="ate-top">
         <button class="btn small" data-back>← Retour</button>
         <h1>${entry ? 'Modifier la carte' : 'Nouvelle carte'}</h1>
-        <div class="seg ate-mode"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button></div>
+        <div class="seg ate-mode"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button><button data-tab="look">Apparence</button></div>
       </div>
       <div class="ate-body">
         <div class="ate-left"></div>
@@ -182,7 +185,7 @@ export class Atelier {
 
   /** Présentation de la carte : celle du formulaire, ou celle écrite dans le script. */
   look() {
-    return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang, frameText: this.form.frameText || 'dark'}
+    return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang, frameText: this.form.frameText || 'dark', fx: this.form.fx || 'none'}
       : readDisplay(this.script);
   }
 
@@ -214,6 +217,10 @@ export class Atelier {
         <span class="muted small">Une image PNG de la carte entière, la fenêtre de l'illustration transparente.</span>
       </div>
       ${this.mode === 'script' ? '<p class="muted small">En mode script, le texte de la carte est celui du script : la langue choisie sert au type et aux mots-clés.</p>' : ''}
+    </div>
+    <div class="ate-field ate-look"><span>Effet visuel</span>
+      <div class="ate-frames ate-fx"></div>
+      <p class="muted small">Un reflet animé sur toute la carte, comme une carte premium : dans l'Atelier, la recherche, les decks et en partie. Il reste immobile si les animations sont coupées (Réglages).</p>
     </div>`;
   }
 
@@ -249,7 +256,7 @@ export class Atelier {
       }
     }
     for (const b of strip.children) {
-      const card = cardElement(this.shown({...this.lastCard, frame: b.dataset.frame, frameColor: look.frameColor, frameText: look.frameText}));
+      const card = cardElement(this.shown({...this.lastCard, frame: b.dataset.frame, frameColor: look.frameColor, frameText: look.frameText, fx: 'none'}));
       const old = b.querySelector('.mcard');
       if (old) {
         old.replaceWith(card);
@@ -258,6 +265,7 @@ export class Atelier {
       }
       b.classList.toggle('on', b.dataset.frame === look.frame);
     }
+    this.renderFx();
   }
 
   /** La carte telle qu'elle sera : l'illustration et le cadre importé choisis ici, pas encore enregistrés. */
@@ -300,11 +308,43 @@ export class Atelier {
     input.click();
   }
 
+  /** Vignettes des effets visuels : la carte telle qu'elle est, avec chaque effet. */
+  renderFx() {
+    const strip = this.root.querySelector('.ate-fx');
+    if (!strip || !this.lastCard) {
+      return;
+    }
+    const look = this.look();
+    if (!strip.children.length) {
+      for (const [id, label] of FX) {
+        strip.appendChild(el(`<button class="ate-frame" data-fx="${id}" title="${esc(label)}"><span>${esc(label)}</span></button>`));
+      }
+    }
+    for (const b of strip.children) {
+      const card = cardElement(this.shown({...this.lastCard, frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: b.dataset.fx}));
+      const old = b.querySelector('.mcard');
+      if (old) {
+        old.replaceWith(card);
+      } else {
+        b.prepend(card);
+      }
+      b.classList.toggle('on', b.dataset.fx === look.fx);
+    }
+  }
+
   renderLeft() {
-    this.root.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === this.mode));
+    // Onglets : Formulaire et Script Forge (le contenu de la carte), Apparence (présentation et effets).
+    this.root.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', this.tab !== 'look' && b.dataset.mode === this.mode));
+    this.root.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', this.tab === 'look'));
     const left = this.root.querySelector('.ate-left');
+    if (this.tab === 'look') {
+      left.innerHTML = this.lookHtml();
+      this.renderLook();
+      this.check();
+      return;
+    }
     if (this.mode === 'script') {
-      left.innerHTML = this.lookHtml() + `<p class="muted small">Le script tel que Forge le lit (format des fichiers de cartes de Forge :
+      left.innerHTML = `<p class="muted small">Le script tel que Forge le lit (format des fichiers de cartes de Forge :
         <code>Name:</code>, <code>ManaCost:</code>, <code>Types:</code>, <code>PT:</code>, <code>K:</code>, <code>T:</code>,
         <code>A:</code>, <code>S:</code>, <code>SVar:</code>, <code>Oracle:</code>). Tout ce que Forge sait faire est possible ici.</p>
         <textarea class="ate-script" spellcheck="false">${esc(this.script)}</textarea>`;
@@ -314,7 +354,7 @@ export class Atelier {
     }
     const f = this.form;
     const types = this.data.creatureTypes || [];
-    left.innerHTML = this.lookHtml() + `<datalist id="ate-subtypes">${types.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+    left.innerHTML = `<datalist id="ate-subtypes">${types.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Professeur X" maxlength="60"></label>
       <label class="ate-field"><span>Coût de mana</span><input type="text" data-k="cost" value="${esc(f.cost)}" placeholder="2WU ou {2}{W}{U} (hybride : {W/U})"></label>
       <div class="ate-field"><span>Types</span><div class="ate-chips">
@@ -405,10 +445,20 @@ export class Atelier {
       this.setLook({lang: b.dataset.lang});
     } else if (b.dataset.frame) {
       this.setLook({frame: b.dataset.frame});
+    } else if (b.dataset.fx) {
+      this.setLook({fx: b.dataset.fx});
+    } else if (b.dataset.tab) {
+      this.tab = 'look';
+      this.renderLeft();
     } else if (b.dataset.back !== undefined) {
       this.close();
     } else if (b.dataset.mode) {
+      const fromLook = this.tab === 'look';
+      this.tab = 'edit';
       if (b.dataset.mode === this.mode) {
+        if (fromLook) {
+          this.renderLeft();
+        }
         return;
       }
       if (b.dataset.mode === 'script') {

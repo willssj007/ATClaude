@@ -490,6 +490,13 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   background: rgb(0 0 0 / 0.3); border: 1px solid var(--line-strong); font-size: 13px; color: var(--muted);
 }
 .sh-cmc span { color: var(--gold-2); font-weight: 600; margin-right: 2px; }
+/* Type de créature : même pastille que la valeur de mana, avec un champ texte. */
+.sh-ctype {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px 0 12px; border-radius: 999px;
+  background: rgb(0 0 0 / 0.3); border: 1px solid var(--line-strong); color: var(--gold-2);
+}
+.sh-ctype .ic { width: 16px; height: 16px; }
+.sh-ctype input { width: 210px; max-width: 52vw; height: 28px; padding: 0 8px; border-radius: 999px; font-size: 13px; background: none; border: none; box-shadow: none; }
 .sh-cmc i { font-style: normal; opacity: .6; }
 .sh-cmc input[type=number] { width: 42px; height: 26px; padding: 0 4px; border-radius: 999px; text-align: center; font-size: 13px; background: none; border: none; box-shadow: none; -moz-appearance: textfield; appearance: textfield; }
 .sh-cmc input[type=number]::-webkit-inner-spin-button, .sh-cmc input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -1123,6 +1130,13 @@ body.in-game #menu-fx, body.in-replay #menu-fx { display: none; }
 .db-progress > span { position: relative; display: flex; align-items: center; gap: 4px; height: 100%; padding: 0 10px; font-size: 13px; white-space: nowrap; overflow: hidden; }
 .db-progress b { color: var(--text); font-size: 15px; }
 .db-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+/* Terrains de base : une ligne par couleur, avec son nombre. */
+.basics { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.basic-row { display: flex; align-items: center; gap: 10px; }
+.basic-row .ms { font-size: 20px; }
+.basic-row b { flex: 1; }
+.basic-row .n { min-width: 28px; text-align: center; font-weight: 700; font-size: 16px; }
+.warn { color: #ffd27a; }
 .db-more { position: relative; }
 .db-more > summary { list-style: none; }
 .db-more > summary::-webkit-details-marker { display: none; }
