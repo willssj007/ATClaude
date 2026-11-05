@@ -473,6 +473,10 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   transition: border-color .15s, background .15s, color .15s;
 }
 .sh-pill .ic { width: 17px; height: 17px; color: var(--gold); }
+/* Extension au nom très long (« The Lord of the Rings: Tales of Middle-earth Commander ») : coupée, sans élargir le
+   panneau (sinon l'écran défile de côté et les cartes se décalent). */
+.sh-pill.set-btn { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.sh-pill.set-btn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sh-pill:hover { border-color: rgb(var(--gold-rgb) / 0.55); }
 .sh-pill.on { border-color: var(--gold); background: rgb(var(--gold-rgb) / 0.12); color: var(--gold-2); }
 .filters-btn .n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--gold); color: var(--btn-gold-text); font-size: 11px; display: none; align-items: center; justify-content: center; }
@@ -587,7 +591,7 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 .deck-tile .info { flex: 1; min-width: 0; }
 .deck-tile .info b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .builder { display: grid; grid-template-columns: 1fr 380px; gap: 16px; height: calc(100% - 4px); }
-.builder .left, .builder .right { min-height: 0; display: flex; flex-direction: column; }
+.builder .left, .builder .right { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .builder .right { padding: 14px; overflow: auto; }
 .builder .right > * { flex-shrink: 0; }
 .deck-section h4 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: flex; justify-content: space-between; }

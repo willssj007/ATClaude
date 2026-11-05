@@ -26,6 +26,9 @@
 .ate-ab { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; }
 .ate-ab-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ate-ab-row select { flex: 1 1 220px; min-width: 0; }
+/* Première ligne d'une capacité : le « quand » se coupe au besoin, le ✕ reste à côté. */
+.ate-ab > .ate-ab-row:first-child { flex-wrap: nowrap; }
+.ate-ab-row .csel { min-width: 0; max-width: 100%; }
 .ate-x { margin-left: auto; border: none; background: rgb(255 255 255 / 0.08); color: var(--muted); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; }
 .ate-x:hover { color: #ff9a8a; }
 .ate-check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
@@ -57,10 +60,24 @@
 .ate-mana-kb summary { cursor: pointer; width: max-content; }
 .ate-mana-kb input { margin-top: 6px; width: 100%; }
 .ate-ab-cost { display: flex; flex-direction: column; gap: 6px; }
-.ate-ab .ate-mana-show { min-height: 38px; font-size: 21px; }
-.ate-ab .ate-pip { width: 36px; height: 36px; font-size: 23px; }
-.ate-ab .ate-gen { font-size: 23px; }
-.ate-ab .ate-gen button { width: 30px; height: 30px; }
+.ate-ab .ate-mana-show, .ate-kwv .ate-mana-show { min-height: 38px; font-size: 21px; }
+.ate-ab .ate-pip, .ate-kwv .ate-pip { width: 36px; height: 36px; font-size: 23px; }
+.ate-ab .ate-gen, .ate-kwv .ate-gen { font-size: 23px; }
+.ate-ab .ate-gen button, .ate-kwv .ate-gen button { width: 30px; height: 30px; }
+
+/* Mots-clés par groupes repliables, puis la valeur de ceux qui en ont une. */
+.ate-kwgs { display: flex; flex-direction: column; gap: 6px; }
+.ate-kwg { border: 1px solid var(--line); border-radius: 12px; background: rgb(255 255 255 / 0.025); }
+.ate-kwg > summary { cursor: pointer; padding: 8px 12px; font-size: 13.5px; font-weight: 600; list-style-position: inside; }
+.ate-kwg[open] > summary { border-bottom: 1px solid var(--line); }
+.ate-kwg > .ate-chips { padding: 10px 10px 12px; }
+.ate-kwn { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px;
+  background: var(--gold); color: #241500; font-size: 12px; }
+.ate-kwv { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(var(--gold-rgb) / 0.35);
+  background: rgb(var(--gold-rgb) / 0.06); }
+.ate-kwv-row { display: flex; flex-direction: column; gap: 6px; }
+.ate-kwv-n { flex-direction: row; align-items: center; gap: 10px; }
+.ate-kwv-n input { width: 80px; }
 .ate-script { width: 100%; min-height: 360px; font-size: 12.5px; line-height: 1.45; white-space: pre; }
 
 .ate-side { position: sticky; top: 10px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; border-radius: 14px; }

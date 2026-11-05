@@ -8,15 +8,16 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {CARD_TYPES, KEYWORDS, LANGS, TOKENS, WHEN, buildScript, costParts, effectsFor, readDisplay, templates, withDisplay} from './cardscript.js';
+import {CARD_TYPES, EFFECT_GROUPS, KEYWORDS, KW_ALL, KW_GROUPS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, buildScript, costParts, effectsFor,
+  keywordValue, readDisplay, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
-  keywords: [], abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none',
+  keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none',
 });
 const NEW_ABILITY = () => ({when: 'etb', effect: 'draw', n: 1, filter: {type: '', other: false}, token: TOKENS[0][0],
-  keyword: 'Flying', cost: '', tap: true, sac: false, loyalty: 1});
+  keyword: 'Flying', cost: '', tap: true, sac: false, loyalty: 1, mana: 'Any'});
 /** Illustration : 480 × 352 (le cadre de l'illustration d'une carte). */
 const ART = {w: 480, h: 352};
 
@@ -164,6 +165,8 @@ export class Atelier {
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : NEW_CARD();
+    this.form.kwValues = this.form.kwValues || {};
+    this.kwOpen = new Set(['combat', ...KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3])]);
     this.mode = entry && !entry.form ? 'script' : 'form';
     this.formUsed = this.mode === 'form'; // carte faite au formulaire (une carte en script n'en a pas)
     this.tab = 'edit';
@@ -197,6 +200,17 @@ export class Atelier {
     this.root.addEventListener('click', this.onEditClick = (e) => this.editClick(e));
     this.root.addEventListener('input', this.onEditInput = (e) => this.editInput(e));
     this.root.addEventListener('change', this.onEditInput);
+    // Groupes de mots-clés ouverts ou fermés : retenus d'un affichage du formulaire à l'autre.
+    this.root.addEventListener('toggle', this.onEditToggle = (e) => {
+      const g = e.target.dataset && e.target.dataset.kwg;
+      if (g) {
+        if (e.target.open) {
+          this.kwOpen.add(g);
+        } else {
+          this.kwOpen.delete(g);
+        }
+      }
+    }, true);
     this.renderLeft();
   }
 
@@ -204,6 +218,7 @@ export class Atelier {
     this.root.removeEventListener('click', this.onEditClick);
     this.root.removeEventListener('input', this.onEditInput);
     this.root.removeEventListener('change', this.onEditInput);
+    this.root.removeEventListener('toggle', this.onEditToggle, true);
     this.editing = false;
     this.show();
   }
@@ -402,14 +417,33 @@ export class Atelier {
       ${f.types.includes('Creature') ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
         <input type="number" data-k="power" value="${esc(f.power)}" min="0" max="99"> / <input type="number" data-k="toughness" value="${esc(f.toughness)}" min="0" max="99"></div>` : ''}
       ${f.types.includes('Planeswalker') ? `<label class="ate-field"><span>Loyauté de départ</span><input type="number" data-k="loyaltyStart" value="${esc(f.loyaltyStart)}" min="1" max="20"></label>` : ''}
-      <div class="ate-field"><span>Mots-clés</span><div class="ate-chips">
-        ${KEYWORDS.map(([v, l]) => `<button class="chip ${f.keywords.includes(v) ? 'on' : ''}" data-kw="${v}">${l}</button>`).join('')}
-      </div></div>
+      <div class="ate-field"><span>Mots-clés</span>${this.keywordsHtml(f)}</div>
       <div class="ate-field"><span>Capacités</span><div class="ate-abilities">${f.abilities.map((a, i) => this.abilityHtml(a, i)).join('')}</div>
         <div class="ate-add"><button class="btn small gold" data-template>＋ Capacité toute prête…</button>
         <button class="btn small" data-addab>＋ Capacité vide</button></div></div>`;
     this.renderLook();
     this.check();
+  }
+
+  /** Mots-clés par groupes repliables, puis la valeur de ceux qui en ont une (Annihilateur 2, Recyclage {2}…). */
+  keywordsHtml(f) {
+    const groups = KW_GROUPS.map(([g, label]) => {
+      const list = KW_ALL.filter(k => k[3] === g);
+      const on = list.filter(k => f.keywords.includes(k[0])).length;
+      return `<details class="ate-kwg" data-kwg="${g}"${this.kwOpen.has(g) ? ' open' : ''}>
+        <summary>${esc(label)}${on ? ` <b class="ate-kwn">${on}</b>` : ''}</summary>
+        <div class="ate-chips">${list.map(k => `<button class="chip ${f.keywords.includes(k[0]) ? 'on' : ''}" data-kw="${esc(k[0])}">${esc(k[1])}</button>`).join('')}</div>
+      </details>`;
+    }).join('');
+    const valued = KW_ALL.filter(k => k[4] && f.keywords.includes(k[0]));
+    const values = valued.map((k) => {
+      if (k[4] === 'cost') {
+        return `<div class="ate-kwv-row"><span class="muted small">${esc(k[1])}</span>${this.manaHtml('kw:' + k[0])}</div>`;
+      }
+      return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}${k[4] === 'gen' ? ' (coût générique)' : ''}</span>
+        <input type="number" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" min="${k[4] === 'gen' ? 0 : 1}" max="20"></label>`;
+    }).join('');
+    return `<div class="ate-kwgs">${groups}</div>${values ? `<div class="ate-kwv">${values}</div>` : ''}`;
   }
 
   /** Type proposé dans les capacités toutes prêtes : un type perso de la carte, sinon son dernier sous-type. */
@@ -443,18 +477,31 @@ export class Atelier {
 
   /** Coût de la carte (« form ») ou d'une capacité activée (« ab:2 »). */
   manaValue(target) {
+    if (target.startsWith('kw:')) {
+      return keywordValue(this.form, target.slice(3)) || '';
+    }
     return target === 'form' ? this.form.cost : (this.form.abilities[Number(target.slice(3))] || {}).cost || '';
+  }
+
+  setManaValue(target, value) {
+    if (target === 'form') {
+      this.form.cost = value;
+    } else if (target.startsWith('kw:')) {
+      this.form.kwValues = {...this.form.kwValues, [target.slice(3)]: value};
+    } else {
+      this.form.abilities[Number(target.slice(3))].cost = value;
+    }
   }
 
   /** Sélecteur de coût : le coût en symboles (toucher un symbole le retire), les boutons pour en ajouter. */
   manaHtml(target) {
     const value = this.manaValue(target);
-    const key = target === 'form' ? 'data-k' : 'data-a';
-    return `<div class="ate-mana" data-mana="${target}">
+    const key = target === 'form' ? 'data-k="cost"' : target.startsWith('kw:') ? `data-kwv="${esc(target.slice(3))}"` : 'data-a="cost"';
+    return `<div class="ate-mana" data-mana="${esc(target)}">
       <div class="ate-mana-show">${this.manaShowHtml(value)}</div>
       <div class="ate-mana-pad">${this.manaPadHtml(value, target)}</div>
       <details class="ate-mana-kb"${simpleCost(value) ? '' : ' open'}><summary class="muted small">Saisie au clavier</summary>
-        <input type="text" ${key}="cost" value="${esc(value)}" placeholder="2WU ou {2}{W}{U} ; hybride {W/U}, phyrexian {W/P}"></details>
+        <input type="text" ${key} value="${esc(value)}" placeholder="2WU ou {2}{W}{U} ; hybride {W/U}, phyrexian {W/P}"></details>
     </div>`;
   }
 
@@ -518,11 +565,7 @@ export class Atelier {
       next = '';
       this.hyb = null;
     }
-    if (target === 'form') {
-      this.form.cost = next;
-    } else {
-      this.form.abilities[Number(target.slice(3))].cost = next;
-    }
+    this.setManaValue(target, next);
     this.paintMana(box, true);
     if (next !== value) {
       this.check();
@@ -546,15 +589,18 @@ export class Atelier {
     const e = effects.find(x => x.id === a.effect) || effects[0];
     const filter = w.filter || e.filter;
     return `<div class="ate-ab panel" data-ab="${i}">
-      <div class="ate-ab-row"><select data-a="when">${WHEN.map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
+      <div class="ate-ab-row"><select data-a="when">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind)
+        .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>` : ''}
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span><input type="number" data-a="loyalty" value="${esc(a.loyalty)}" min="-20" max="20" style="width:80px"><span class="muted small">(+1, −2…)</span></div>` : ''}
-      <div class="ate-ab-row"><select data-a="effect">${effects.map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
+      <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
+        .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
       ${e.token ? `<div class="ate-ab-row"><select data-a="token">${TOKENS.map(t => `<option value="${t[0]}"${t[0] === a.token ? ' selected' : ''}>${esc(t[1])}</option>`).join('')}</select></div>` : ''}
+      ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
@@ -676,6 +722,12 @@ export class Atelier {
       if (e.type === 'change') {
         this.setLook(t.dataset.fcolor !== undefined ? {frameColor: t.value} : {frameText: t.value});
       }
+      return;
+    }
+    if (t.dataset.kwv !== undefined) {
+      this.form.kwValues = {...this.form.kwValues, [t.dataset.kwv]: t.type === 'number' ? t.value : t.value};
+      this.repaintMana(t);
+      this.check();
       return;
     }
     if (t.dataset.k) {

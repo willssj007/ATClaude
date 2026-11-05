@@ -206,6 +206,7 @@ export class SearchPanel {
       this.edition = ed.code ? ed : null;
       this.query.set = ed.code || undefined;
       r.querySelector('.set-btn span').textContent = ed.code ? `Extension : ${ed.name}` : 'Extension : toutes';
+      r.querySelector('.set-btn').title = ed.code ? `${ed.name} (${ed.code})` : 'N\'afficher que les cartes d\'une extension';
       r.querySelector('.set-btn').classList.toggle('on', !!ed.code);
       this.countFilters();
       this.search(true);
