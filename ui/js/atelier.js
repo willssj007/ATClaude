@@ -439,6 +439,12 @@ export class Atelier {
     </div>`;
     this.check = debounce(() => this.validate(), 350);
     this.root.addEventListener('click', this.onEditClick = (e) => this.editClick(e));
+    this.root.addEventListener('pointerdown', this.onEditDrag = (e) => {
+      const handle = e.target.closest('.ate-drag');
+      if (handle) {
+        this.startDrag(e, handle);
+      }
+    });
     this.root.addEventListener('input', this.onEditInput = (e) => this.editInput(e));
     this.root.addEventListener('change', this.onEditInput);
     // Groupes de mots-clés ouverts ou fermés : retenus d'un affichage du formulaire à l'autre.
@@ -473,6 +479,7 @@ export class Atelier {
 
   close() {
     this.root.removeEventListener('click', this.onEditClick);
+    this.root.removeEventListener('pointerdown', this.onEditDrag);
     this.root.removeEventListener('input', this.onEditInput);
     this.root.removeEventListener('change', this.onEditInput);
     this.root.removeEventListener('toggle', this.onEditToggle, true);
@@ -686,11 +693,112 @@ export class Atelier {
         <button class="btn small gold" data-template>＋ Capacité toute prête…</button>
         <button class="btn small" data-addab>＋ Capacité vide</button>
         <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>
-      <label class="ate-field"><span>Texte d'ambiance <span class="muted small">(en italique, sous les capacités ; facultatif)</span></span>
+      <label class="ate-field"><span>Texte d'ambiance <span class="muted small">(flavor text : en italique, sous les capacités ; facultatif)</span></span>
         <textarea data-k="flavor" rows="2" maxlength="240" placeholder="« La marée ne choisit pas : elle emporte tout. »">${esc(f.flavor || '')}</textarea></label>`;
     this.renderLook();
     this.check();
     labelSelects(left);
+  }
+
+  /** Les volets ouverts (« plus d'options », « autres coûts ») suivent leur capacité quand l'ordre change. */
+  reindexOpen(map) {
+    for (const key of ['moreOpen', 'costOpen']) {
+      this[key] = new Set([...this[key]].map(map).filter(j => j >= 0));
+    }
+  }
+
+  /** Déplace une capacité (l'ordre des capacités est celui du texte de la carte). */
+  moveAbility(from, to) {
+    if (document.activeElement && this.root.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+    const list = this.form.abilities;
+    if (from === to || to < 0 || to >= list.length) {
+      return;
+    }
+    list.splice(to, 0, list.splice(from, 1)[0]);
+    this.reindexOpen((j) => (j === from ? to : from < to && j > from && j <= to ? j - 1 : to < from && j >= to && j < from ? j + 1 : j));
+    this.renderLeft();
+    const box = this.root.querySelector(`[data-ab="${to}"]`);
+    if (box) {
+      box.classList.add('ate-moved');
+      box.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+      setTimeout(() => box.classList.remove('ate-moved'), 700);
+    }
+  }
+
+  /**
+   * Glisser une capacité par sa poignée ⠿ : elle suit le doigt (ou la souris), les autres s'écartent, et elle prend sa
+   * place en la lâchant. L'écran défile tout seul près des bords.
+   */
+  startDrag(e, handle) {
+    const from = Number(handle.dataset.drag);
+    const box = handle.closest('.ate-ab');
+    const boxes = [...this.root.querySelectorAll('.ate-abilities > .ate-ab')];
+    if (!box || boxes.length < 2) {
+      return;
+    }
+    e.preventDefault();
+    // Un champ en cours de saisie s'enregistre d'abord, à sa capacité (avant que l'ordre change).
+    if (document.activeElement && this.root.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+    // Positions de départ (dans la page) : le milieu de chaque capacité, et la hauteur de celle qu'on déplace.
+    const start = e.clientY + window.scrollY;
+    const mids = boxes.map(b => {
+      const r = b.getBoundingClientRect();
+      return r.top + window.scrollY + r.height / 2;
+    });
+    const height = box.getBoundingClientRect().height + 12;
+    let to = from;
+    let lastY = e.clientY;
+    let scrollTimer = null;
+    box.classList.add('ate-dragging');
+    if (handle.setPointerCapture) {
+      handle.setPointerCapture(e.pointerId);
+    }
+    const update = () => {
+      const y = lastY + window.scrollY;
+      box.style.transform = `translateY(${y - start}px)`;
+      // La nouvelle place : le nombre d'autres capacités dont le milieu est au-dessus du doigt.
+      to = mids.filter((m, k) => k !== from && m < y).length;
+      boxes.forEach((b, k) => {
+        if (b !== box) {
+          const shift = from < to && k > from && k <= to ? -height : to < from && k >= to && k < from ? height : 0;
+          b.style.transform = shift ? `translateY(${shift}px)` : '';
+        }
+      });
+    };
+    const move = (ev) => {
+      lastY = ev.clientY;
+      update();
+      clearInterval(scrollTimer);
+      scrollTimer = null;
+      const edge = 80;
+      if (lastY < edge || lastY > window.innerHeight - edge) {
+        const step = lastY < edge ? -14 : 14;
+        scrollTimer = setInterval(() => {
+          window.scrollBy(0, step);
+          update();
+        }, 16);
+      }
+    };
+    const end = () => {
+      clearInterval(scrollTimer);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      boxes.forEach(b => {
+        b.style.transform = '';
+      });
+      box.classList.remove('ate-dragging');
+      if (to !== from) {
+        this.moveAbility(from, to);
+      }
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
   }
 
   /** La langue des noms de sous-types de la carte : celle choisie dans le sélecteur, sinon celle du texte de la carte. */
@@ -1110,13 +1218,20 @@ export class Atelier {
     const isCase = subs.includes('Case');
     const curse = (attachOf(this.form) || {}).kind === 'player';
     const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
+    const count = this.form.abilities.length;
     return `<div class="ate-ab panel" data-ab="${i}">
+      ${count > 1 ? `<div class="ate-ab-order"><span class="ate-drag" data-drag="${i}" title="Glisser vers le haut ou le bas pour changer l'ordre sur la carte">⠿</span>
+        <span class="muted small">Capacité ${i + 1} sur ${count}</span>
+        <button class="ate-mv" data-mvab="${i}" data-dir="-1" title="Monter"${i === 0 ? ' disabled' : ''}>▲</button>
+        <button class="ate-mv" data-mvab="${i}" data-dir="1" title="Descendre"${i === count - 1 ? ' disabled' : ''}>▼</button></div>` : ''}
       <div class="ate-ab-row"><select data-a="when" aria-label="Quand elle agit">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind
           && (whenFits(x, this.form) || x.id === a.when))
         // Ceux de ce que la carte équipe ou enchante d'abord (« Quand la créature équipée attaque »).
         .sort((p, q) => Number(!!q.attach) - Number(!!p.attach))
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
+      <div class="ate-ab-row"><input type="text" class="ate-abname" data-a="flavor" value="${esc(a.flavor || '')}" maxlength="40"
+        placeholder="Nom de la capacité (facultatif)"></div>
       ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
         <span class="muted small">la capacité marche à partir de ce niveau de la classe</span></div>` : ''}
       ${isCase ? `<div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="solved"${a.solved ? ' checked' : ''}> Résolue —
@@ -1299,9 +1414,11 @@ export class Atelier {
     const f = m.filter || {type: '', other: false};
     return `<div class="ate-mode" data-sub="${sub}" data-si="${k}">
       <div class="ate-ab-row ate-mode-head"><b class="small">${esc(title)}</b>
+        ${sub === 'modes' && (a.modes || []).length > 1 ? `<button class="ate-mv" data-mvsub="modes" data-si="${k}" data-dir="-1" title="Monter"${k === 0 ? ' disabled' : ''}>▲</button>
+          <button class="ate-mv" data-mvsub="modes" data-si="${k}" data-dir="1" title="Descendre"${k === (a.modes || []).length - 1 ? ' disabled' : ''}>▼</button>` : ''}
         ${canDelete ? `<button class="ate-x" data-delsub="${k}" title="Retirer">✕</button>` : ''}</div>
       ${sub === 'modes' ? `<div class="ate-ab-row"><input type="text" class="ate-modename" data-sf="flavor" value="${esc(m.flavor || '')}" maxlength="40"
-        placeholder="Nom du mode (facultatif) : Souffle des marées"></div>` : ''}
+        placeholder="Nom du mode (facultatif)"></div>` : ''}
       <div class="ate-ab-row"><select data-sf="effect" aria-label="Ce qu'il fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
@@ -1515,8 +1632,23 @@ export class Atelier {
       }
       this.renderLeft();
     } else if (b.dataset.delab !== undefined) {
-      f.abilities.splice(Number(b.dataset.delab), 1);
+      const k = Number(b.dataset.delab);
+      f.abilities.splice(k, 1);
+      this.reindexOpen((j) => (j === k ? -1 : j > k ? j - 1 : j));
       this.renderLeft();
+    } else if (b.dataset.mvab !== undefined) {
+      const k = Number(b.dataset.mvab);
+      this.moveAbility(k, k + Number(b.dataset.dir));
+    } else if (b.dataset.mvsub !== undefined) {
+      // Un mode (ou un effet enchaîné) monte ou descend.
+      const a = f.abilities[Number(b.closest('[data-ab]').dataset.ab)];
+      const list = a[b.dataset.mvsub];
+      const k = Number(b.dataset.si);
+      const to = k + Number(b.dataset.dir);
+      if (list && to >= 0 && to < list.length) {
+        list.splice(to, 0, list.splice(k, 1)[0]);
+        this.renderLeft();
+      }
     } else if (b.dataset.art !== undefined) {
       pickPhoto({w: ART.w, h: ART.h, round: false, title: 'Recadrer l\'illustration', use: 'Utiliser cette illustration'}).then((data) => {
         if (data) {

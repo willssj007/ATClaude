@@ -98,6 +98,16 @@
 .ate-costs > summary { font-size: 13px; }
 
 /* Sous-types en pastilles, et le sélecteur de types (français ou anglais). */
+.ate-ab-order { display: flex; align-items: center; gap: 8px; margin: -2px 0 6px; }
+.ate-ab-order .muted { flex: 1; }
+.ate-drag { width: 36px; height: 32px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line-strong);
+  cursor: grab; touch-action: none; user-select: none; font-size: 18px; color: var(--gold); background: rgba(255, 255, 255, .04); }
+.ate-mv { width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .04); cursor: pointer; font-size: 12px; }
+.ate-mv:disabled { opacity: .3; cursor: default; }
+.ate-ab { transition: transform .15s ease; }
+.ate-ab.ate-dragging { transition: none; position: relative; z-index: 6; box-shadow: 0 14px 34px rgba(0, 0, 0, .55); outline: 2px solid var(--gold); cursor: grabbing; }
+.ate-ab.ate-moved { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ate-abname { flex: 1; min-width: 0; font-style: italic; }
 .ate-modename { flex: 1; min-width: 0; font-style: italic; }
 .ate-field textarea[data-k="flavor"] { font-family: inherit; font-size: 14px; font-style: italic; }
 .ate-subbox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

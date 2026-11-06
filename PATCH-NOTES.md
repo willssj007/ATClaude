@@ -2,7 +2,7 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.6.4 — Sous-types, modes nommés et texte d'ambiance
+## 0.6.4 — Sous-types, ordre et noms des capacités, texte d'ambiance
 
 ### Atelier
 - **Les sous-types en pastilles** : on en retire un en touchant ✕. Retirer « Équipement » retire aussi le mot-clé qui le donnait.
@@ -16,6 +16,8 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 - **Noms en français ou en anglais**, au choix : « Elfe Druide » ou « Elf Druid ». Les deux noms s'affichent côte à côte. La saisie au clavier reste possible.
 - **Les champs « un type : Elfe »** (filtres « chaque Elfe… », Appui, conditions, nombre X…) ouvrent le même sélecteur, avec « Toutes » quand on veut toutes les créatures. Ils remplacent la liste de suggestions du téléphone, qui sautait et devenait transparente.
 
+- **Ordre des capacités** : chaque capacité se déplace avec ▲ ▼, ou en glissant sa poignée ⠿ vers le haut ou le bas. Les autres s'écartent et l'écran défile près des bords. L'ordre est celui du texte de la carte. Les modes de « Choisissez l'un » se déplacent aussi avec ▲ ▼.
+- **Nom des capacités** : chaque capacité peut avoir un nom (« Rugissement terrifiant — Quand cette créature arrive, piochez une carte. »). Ça marche pour les déclencheurs, les capacités activées, les effets permanents, les sorts et les chapitres de saga (« I — L'aube — … »), et après la loyauté pour un planeswalker. Le nom apparaît aussi en partie.
 - **Nom des modes** : chaque mode de « Choisissez l'un — », « Choisissez deux — » et « Choisissez un ou plusieurs — » peut avoir un nom, comme sur les cartes récentes (« • Souffle des marées — Piochez une carte. »). Le nom apparaît aussi dans le choix des modes en partie.
 - **Texte d'ambiance** : une phrase en italique, sous un trait, en bas du texte de la carte. Elle s'affiche dans l'Atelier, la recherche, les decks et en partie, et suit la carte sur les autres appareils.
 

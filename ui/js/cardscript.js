@@ -3065,7 +3065,7 @@ function mergeStatics(abilities) {
     }
     const f = a.filter || {};
     const key = JSON.stringify([a.scope || 'you', f.type || '', !!f.other, a.cond || 'none', a.condN ?? 3, a.condType || '', !!a.eminence,
-      Number(a.level) || 1, !!a.solved]);
+      Number(a.level) || 1, !!a.solved, cleanModeName(a.flavor)]);
     const g = groups.get(key);
     const pt = (x) => x.effect !== 'grantKeyword';
     if (g && !(pt(a) && g.parts.some(pt))) {
@@ -3079,6 +3079,43 @@ function mergeStatics(abilities) {
     out.push(entry);
   });
   return out.map(e => (Array.isArray(e) ? e : [e.parts.length > 1 ? {...e.parts[0], effect: 'combo', parts: e.parts} : e.parts[0], e.index]));
+}
+
+/**
+ * Une capacité avec son nom, comme sur les cartes récentes (« Rugissement terrifiant — Quand… ») : dans le texte de la
+ * carte et dans la description que Forge montre (déclencheur, capacité, effet permanent, chapitre de saga ; après la
+ * loyauté pour un planeswalker).
+ */
+function withAbilityName(r, label) {
+  if (!label) {
+    return r;
+  }
+  const w = `${label} — `;
+  let done = false;
+  const lines = r.lines.map((l) => {
+    if (done) {
+      return l;
+    }
+    let out = l;
+    if (/^T:/.test(l)) {
+      out = l.replace('TriggerDescription$ ', `TriggerDescription$ ${w}`);
+    } else if (/^(S|R):/.test(l)) {
+      out = l.replace('| Description$ ', `| Description$ ${w}`);
+    } else if (/^A:/.test(l)) {
+      out = /Planeswalker\$ True/.test(l) || !l.includes('CostDesc$ ') ? l.replace('SpellDescription$ ', `SpellDescription$ ${w}`) : l.replace('CostDesc$ ', `CostDesc$ ${w}`);
+    } else if (r.chapter && /^SVar:[^:]+:DB\$ /.test(l)) {
+      out = l.replace('SpellDescription$ ', `SpellDescription$ ${w}`);
+    }
+    done = out !== l;
+    return out;
+  });
+  let text = w + r.text;
+  if (r.chapter) {
+    text = r.text.replace(/^([IVX]+ — )/, `$1${w}`);
+  } else if (/^(\[[^\]]+\] :|[+−]?\d+:) /.test(r.text)) {
+    text = r.text.replace(/^(\[[^\]]+\] :|[+−]?\d+:) /, `$1 ${w}`);
+  }
+  return {...r, lines, text};
 }
 
 /** Le script complet d'une carte du formulaire. */
@@ -3150,7 +3187,7 @@ export function buildScript(form) {
   const levels = {2: {params: {}, lines: [], text: []}, 3: {params: {}, lines: [], text: []}};
   const solved = [];
   mergeStatics(f.abilities || []).forEach(([a, i]) => {
-    const r = abilityLines(a, i, lang, f);
+    const r = withAbilityName(abilityLines(a, i, lang, f), cleanModeName(a.flavor));
     if (!r) {
       return;
     }
