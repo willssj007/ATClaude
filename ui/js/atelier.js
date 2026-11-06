@@ -10,7 +10,8 @@ import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
-  effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay} from './cardscript.js';
+  effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
+  PLAYER_EFFECTS, SUBTYPES, attachOf, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -196,6 +197,7 @@ export class Atelier {
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : token ? NEW_TOKEN() : NEW_CARD();
+    this.subNotes = [];
     this.form.token = !!(this.form.token || (entry && entry.token));
     this.form.colors = this.form.colors || [];
     this.form.kwValues = this.form.kwValues || {};
@@ -459,7 +461,13 @@ export class Atelier {
     const f = this.form;
     // Suggestions : les types en français (le type de Forge à côté) puis en anglais.
     const list = this.typeList || (this.data.creatureTypes || []).map(en => ({en, fr: en}));
-    const options = [...list.filter(t => t.fr !== t.en).map(t => `<option value="${esc(t.fr)}">${esc(t.en)}</option>`), ...list.map(t => `<option value="${esc(t.en)}">`)];
+    // Les sous-types qui vont avec les types de la carte (équipement, nourriture, forêt…) d'abord, avec ce qu'ils font.
+    const fit = (st) => st[2].some(t => f.types.includes(t));
+    const subOption = (st) => `<option value="${esc(st[1])}">${esc(st[0])}${st[3].no ? ' (sans sa mécanique)' : ''}</option>`;
+    const others = SUBTYPES.filter(st => st[0] !== 'Mount');
+    const options = [...others.filter(fit).map(subOption),
+      ...list.filter(t => t.fr !== t.en).map(t => `<option value="${esc(t.fr)}">${esc(t.en)}</option>`), ...list.map(t => `<option value="${esc(t.en)}">`),
+      ...others.filter(st => !fit(st)).map(subOption)];
     left.innerHTML = `<datalist id="ate-subtypes">${options.join('')}</datalist>
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
       ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
@@ -470,7 +478,8 @@ export class Atelier {
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
-      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Humain Sorcier, ou Human Wizard (séparés par des espaces)"></label>
+      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Humain Sorcier, Équipement, Nourriture, Forêt… (séparés par des espaces)"></label>
+      ${this.subtypeHtml(f)}
       ${needsPT(f) ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
         <input type="number" data-k="power" value="${esc(f.power)}" min="0" max="99"> / <input type="number" data-k="toughness" value="${esc(f.toughness)}" min="0" max="99"></div>` : ''}
       ${f.types.includes('Planeswalker') ? `<label class="ate-field"><span>Loyauté de départ</span><input type="number" data-k="loyaltyStart" value="${esc(f.loyaltyStart)}" min="1" max="20"></label>` : ''}
@@ -481,6 +490,52 @@ export class Atelier {
         <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>`;
     this.renderLook();
     this.check();
+  }
+
+  /**
+   * Ce que font les sous-types de la carte dans le jeu, avec leurs réglages : la capacité d'une nourriture ou d'un indice
+   * (qu'on peut retirer), le mana d'une forêt, les coûts des niveaux d'une classe, la condition d'une affaire, et ce
+   * que l'Atelier vient d'ajouter pour qu'un sous-type marche (le mot-clé Équipement, « Enchanter : joueur »…).
+   */
+  subtypeHtml(f) {
+    const rows = [];
+    for (const en of cardSubtypes(f)) {
+      const st = subtypeInfo(en);
+      if (!st) {
+        continue;
+      }
+      const [, fr, , m] = st;
+      const name = `<b>${esc(fr)}</b>`;
+      if (m.no) {
+        rows.push(`<div class="ate-sub warn">${name} ${esc(m.no)}</div>`);
+      } else if (m.ability) {
+        const on = !(f.subOff || []).includes(en);
+        const t = subtypeAbilityText(en, f.lang).replace(/CARDNAME/g, f.name || (f.lang === 'en' ? 'this card' : 'cette carte'));
+        rows.push(`<label class="ate-sub ate-check"><input type="checkbox" data-subab="${esc(en)}"${on ? ' checked' : ''}> ${name}
+          <span>${rulesHtml(t)}</span> <span class="muted small">(la capacité des jetons ${esc(fr)})</span></label>`);
+      } else if (m.mana) {
+        rows.push(`<div class="ate-sub">${name} ${rulesHtml(`{T} : Ajoutez {${m.mana}}.`)} <span class="muted small">— donné par le type de terrain, comme dans le jeu</span></div>`);
+      } else if (m.levels) {
+        rows.push(`<div class="ate-sub">${name} <span class="muted small">${esc(m.note)}</span>
+          <div class="ate-kwv-row"><span class="muted small">Coût du niveau 2</span>${this.manaHtml('lvl:2')}</div>
+          <div class="ate-kwv-row"><span class="muted small">Coût du niveau 3</span>${this.manaHtml('lvl:3')}</div></div>`);
+      } else if (m.solve) {
+        rows.push(`<div class="ate-sub">${name} <span class="muted small">À résoudre —</span> ${this.caseHtml(f)}<div class="muted small">${esc(m.note)}</div></div>`);
+      } else if (m.note) {
+        rows.push(`<div class="ate-sub">${name} <span class="muted small">${esc(m.note)}</span></div>`);
+      }
+    }
+    const notes = this.subNotes && this.subNotes.length ? `<div class="ate-sub ok">✓ ${this.subNotes.map(esc).join(' · ')}</div>` : '';
+    return rows.length || notes ? `<div class="ate-subs">${notes}${rows.join('')}</div>` : '';
+  }
+
+  /** La condition « À résoudre — » d'une affaire : une des conditions avec un nombre (pas « votre tour », ni le kick). */
+  caseHtml(f) {
+    const list = CONDITIONS.filter(([id]) => !['none', 'yourTurn', 'notYourTurn', 'kicked', 'tappedAtLeast'].includes(id));
+    const c = f.caseCond || '';
+    return `<select data-case="caseCond"><option value="">— choisir —</option>${list.map(([id, l]) => `<option value="${id}"${id === c ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      ${CONDITIONS_N.includes(c) ? `<input type="number" data-case="caseN" value="${esc(f.caseN ?? 3)}" min="0" max="99" style="width:64px" title="N">` : ''}
+      ${c === 'control' ? `<input type="text" data-case="caseType" list="ate-subtypes" value="${esc(f.caseType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}`;
   }
 
   /** Mots-clés par groupes repliables (ou ceux qui correspondent à la recherche), puis la valeur de ceux qui en ont une. */
@@ -563,6 +618,9 @@ export class Atelier {
 
   /** Coût de la carte (« form ») ou d'une capacité activée (« ab:2 »). */
   manaValue(target) {
+    if (target.startsWith('lvl:')) {
+      return (this.form.classCosts || {})[target.slice(4)] || '';
+    }
     if (target.startsWith('kw:')) {
       return keywordValue(this.form, target.slice(3)) || '';
     }
@@ -575,6 +633,8 @@ export class Atelier {
   setManaValue(target, value) {
     if (target === 'form') {
       this.form.cost = value;
+    } else if (target.startsWith('lvl:')) {
+      this.form.classCosts = {...(this.form.classCosts || {}), [target.slice(4)]: value};
     } else if (target.startsWith('kw:')) {
       this.form.kwValues = {...this.form.kwValues, [target.slice(3)]: value};
     } else if (target.startsWith('prod:')) {
@@ -587,7 +647,7 @@ export class Atelier {
   /** Sélecteur de coût : le coût en symboles (toucher un symbole le retire), les boutons pour en ajouter. */
   manaHtml(target) {
     const value = this.manaValue(target);
-    const key = target === 'form' ? 'data-k="cost"' : target.startsWith('kw:') ? `data-kwv="${esc(target.slice(3))}"`
+    const key = target === 'form' ? 'data-k="cost"' : target.startsWith('lvl:') ? `data-lvl="${esc(target.slice(4))}"` : target.startsWith('kw:') ? `data-kwv="${esc(target.slice(3))}"`
       : target.startsWith('prod:') ? 'data-a="manaSymbols"' : 'data-a="cost"';
     return `<div class="ate-mana" data-mana="${esc(target)}">
       <div class="ate-mana-show">${this.manaShowHtml(value, target)}</div>
@@ -688,11 +748,20 @@ export class Atelier {
     const scope = a.scope || 'you';
     const filterShown = isStatic ? e.scope && ['you', 'opp', 'all', 'tokens'].includes(scope) : (w.filter || e.filter);
     const otherShown = !isStatic || ['you', 'all'].includes(scope);
+    const subs = cardSubtypes(this.form);
+    const isClass = subs.includes('Class');
+    const isCase = subs.includes('Case');
+    const curse = (attachOf(this.form) || {}).kind === 'player';
     const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
     return `<div class="ate-ab panel" data-ab="${i}">
-      <div class="ate-ab-row"><select data-a="when">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind)
-        .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
+      <div class="ate-ab-row"><select data-a="when">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind
+          && (whenFits(x, this.form) || x.id === a.when))
+        .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
+      ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
+        <span class="muted small">la capacité marche à partir de ce niveau de la classe</span></div>` : ''}
+      ${isCase ? `<div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="solved"${a.solved ? ' checked' : ''}> Résolue —
+        <span class="muted small">ne marche qu'une fois l'affaire résolue</span></label></div>` : ''}
       ${eminenceOk(a.when) && this.form.legendary ? `<div class="ate-ab-row"><label class="ate-check" title="Pour un commandant : la capacité marche aussi quand il est dans la zone de commandement">
         <input type="checkbox" data-a="eminence"${a.eminence ? ' checked' : ''}> Éminence <span class="muted small">(marche aussi depuis la zone de commandement)</span></label></div>` : ''}
       ${a.when === 'chapter' ? `<div class="ate-ab-row"><span class="muted small">Chapitre</span>${sel('chapter', ROMAN.map((r, k) => [String(k + 1), r]), String(a.chapter || 1))}
@@ -728,7 +797,9 @@ export class Atelier {
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n && !(e.mana && a.mana === 'Symbols') ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-      ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', SCOPES, scope)}</div>` : ''}
+      ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', scopesFor(this.form, scope), scope)}</div>` : ''}
+      ${curse && PLAYER_EFFECTS.has(e.id) ? `<div class="ate-ab-row"><span class="muted small">Joueur</span>${sel('who', [['enchanted', 'le joueur enchanté (malédiction)'],
+        ['target', 'un joueur ciblé']], a.who === 'target' ? 'target' : 'enchanted')}</div>` : ''}
       ${e.modal ? this.modesHtml(a) : ''}
       ${this.optionRows(a, e, 'a', i)}
       ${filterShown ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
@@ -1105,6 +1176,33 @@ export class Atelier {
       }
       return;
     }
+    if (t.dataset.lvl !== undefined) {
+      this.form.classCosts = {...(this.form.classCosts || {}), [t.dataset.lvl]: t.value};
+      this.repaintMana(t);
+      this.check();
+      return;
+    }
+    if (t.dataset.subab !== undefined) {
+      // La capacité d'un sous-type (nourriture, indice…) : cochée, elle est sur la carte.
+      const off = new Set(this.form.subOff || []);
+      if (t.checked) {
+        off.delete(t.dataset.subab);
+      } else {
+        off.add(t.dataset.subab);
+      }
+      this.form.subOff = [...off];
+      this.check();
+      return;
+    }
+    if (t.dataset.case !== undefined) {
+      this.form[t.dataset.case] = t.type === 'number' ? Number(t.value) : t.value;
+      if (e.type === 'change' && t.dataset.case === 'caseCond') {
+        this.renderLeft();
+        return;
+      }
+      this.check();
+      return;
+    }
     if (t.dataset.kwn !== undefined) {
       this.form.kwValues = {...this.form.kwValues, [`${t.dataset.kwn}#n`]: t.value};
       this.check();
@@ -1118,6 +1216,12 @@ export class Atelier {
     }
     if (t.dataset.k) {
       this.form[t.dataset.k] = t.type === 'number' ? Number(t.value) : t.value;
+      if (t.dataset.k === 'subtypes' && e.type === 'change') {
+        // Chaque sous-type avec sa mécanique : le mot-clé Équipement, « Enchanter : joueur » pour une malédiction…
+        this.subNotes = linkSubtypes(this.form);
+        this.renderLeft();
+        return;
+      }
       this.repaintMana(t);
       this.check();
       return;
@@ -1167,6 +1271,13 @@ export class Atelier {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
     this.repaintMana(t);
+    if (e.type === 'change' && k === 'when' && a.when === 'static' && (!a.scope || a.scope === 'you')) {
+      // Sur un équipement, une aura, une fortification, un effet permanent touche d'abord ce qu'elle équipe ou enchante.
+      const at = attachOf(this.form);
+      if (at) {
+        a.scope = at.scope;
+      }
+    }
     if (e.type === 'change' && k === 'when' && a.when === 'chapter' && !this.form.types.includes('Enchantment')) {
       // Un chapitre : la carte est une saga (enchantement).
       this.form.types = [...this.form.types.filter(x => x !== 'Creature'), 'Enchantment'];
@@ -1224,8 +1335,10 @@ export class Atelier {
       node.addEventListener('click', () => this.pressed() || showZoom(this.shown(r.card)));
       preview.appendChild(node);
       preview.classList.remove('stale');
-      msg.className = 'ate-msg small ' + (r.warnings.length ? 'warn' : 'ok');
-      msg.innerHTML = r.warnings.length ? r.warnings.map(esc).join('<br>') : '✓ Forge accepte la carte.';
+      // Ce que le jeu dirait des sous-types (une leçon sur une créature, une saga sans chapitre…), puis Forge.
+      const warnings = [...(this.mode === 'script' ? [] : subtypeIssues(this.form)), ...r.warnings];
+      msg.className = 'ate-msg small ' + (warnings.length ? 'warn' : 'ok');
+      msg.innerHTML = warnings.length ? warnings.map(esc).join('<br>') : '✓ Forge accepte la carte.';
       this.valid = true;
     } catch (err) {
       if (token !== this.vToken) {

@@ -2,11 +2,39 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.6.2 — Équipements et auras
+## 0.6.2 — Les sous-types
 
-### Atelier
-- **Une seule phrase, comme sur les vraies cartes** : un équipement qui donne +2/+0 et l'initiative affiche « La créature équipée gagne +2/+0 et a l'initiative. » au lieu de deux lignes. Pareil pour les auras (« La créature enchantée gagne +2/+2 et a le vol. ») et pour les effets sur vos créatures.
-- **« Équipement {1} » en dernier** : les mots-clés Équipement, Reconfiguration, Fortification, Pilotage et Seller s'écrivent sous les capacités de la carte, comme sur les cartes imprimées.
+### Sous-types : chacun marche comme dans le jeu
+- **Reconnus en français et en anglais**, et proposés selon les types de la carte : Équipement, Aura, Véhicule, Nourriture, Forêt…
+- **Ce qu'ils demandent est ajouté tout seul** :
+  - le type de carte : un équipement est un artefact, une forêt un terrain ;
+  - le mot-clé : Équipement {2}, Fortification, Pilotage, Station, Seller ;
+  - « Enchanter : joueur » pour une malédiction ;
+  - légendaire pour un passé.
+
+  Un encart sous les sous-types dit ce que chacun fait et ce qui a été ajouté.
+- **Capacités des jetons du même nom** : une nourriture a « {2}, {T}, sacrifiez … : Vous gagnez 3 points de vie. ». Pareil pour l'indice, le trésor, le sang, l'or, la carte, la lithoforce, le bric-à-brac, l'atterrisseur, le mutagène et l'éclat. Une case permet de la retirer.
+- **Terrains** : une forêt, une île… donne son mana, écrit sur la carte (« ({T} : Ajoutez {G} ou {U}.) »).
+- **Classe** : chaque capacité a son niveau (1, 2 ou 3), et les niveaux 2 et 3 ont leur coût (« {1}{G} : Niveau 2 »).
+- **Affaire** : une condition « À résoudre — », vérifiée à votre étape de fin, et des capacités « Résolue — ».
+- **Vaisseau spatial** : le mot-clé Station ; à partir de N marqueurs charge, c'est une créature-artefact.
+- **Équipement, aura, fortification** :
+  - nouveaux déclencheurs : quand la créature équipée attaque, inflige des blessures de combat à un joueur ou meurt, ou quand le terrain enchanté devient engagé ;
+  - les textes suivent ce que la carte enchante : « le terrain enchanté », « l'artefact enchanté »…
+- **Malédiction** :
+  - déclencheurs « du joueur enchanté » : à son entretien, à son étape de fin, quand il est attaqué, lance un sort, pioche, ou quand une créature arrive sous son contrôle ;
+  - ses effets touchent ce joueur ;
+  - « Les créatures que contrôle le joueur enchanté… ».
+- **Passé** : « Les créatures Commandant que vous possédez gagnent… ».
+- **De clan** (autrefois « tribal ») : un nouveau type pour mettre un type de créature sur un éphémère ou un artefact.
+- **Avertissements** : l'Atelier signale une leçon sur une créature, une saga sans chapitre, ou un type de créature sur une carte qui n'en est pas une. Les sous-types des cartes doubles (pièce, aventure, présage, incubateur) restent sans leur mécanique.
+
+### Textes
+- **Ligne de type comme sur les cartes françaises** : « Artefact : équipement » (au lieu de « Equipment »), « Créature-artefact : nourriture et golem », « Terrain de base : forêt », « Éphémère de clan : elfe ».
+- **Une seule phrase pour les équipements et les auras** : « La créature équipée gagne +2/+0 et a l'initiative. » au lieu de deux lignes. Pareil pour les effets sur vos créatures.
+- **« Équipement {1}, Pilotage 2… » en dernier**, sous les capacités, comme sur les cartes imprimées.
+- **En partie** : « Niveau 2 », « Résolue » et le rappel des classes en français, « Station » avant « STATION N+ ».
+- « Un joueur ciblé se défausse **d'**une carte » (au lieu de « de une »).
 
 ## 0.6.1 — L'Atelier complet
 

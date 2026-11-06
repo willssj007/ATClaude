@@ -406,8 +406,9 @@ final class CustomCards {
             }
             if (line.startsWith("K:")) {
                 final String k = line.substring(2).trim();
-                // Lignes que Forge lit sans en faire un mot-clé de sa liste : chapitres de saga, marqueurs à l'arrivée.
-                final boolean special = k.startsWith("Chapter:") || k.startsWith("etbCounter:");
+                // Lignes que Forge lit sans en faire un mot-clé de sa liste : chapitres de saga, marqueurs à l'arrivée,
+                // niveaux de classe.
+                final boolean special = k.startsWith("Chapter:") || k.startsWith("etbCounter:") || k.startsWith("Class:");
                 if (!special && forge.game.keyword.Keyword.getInstance(k).getKeyword() == forge.game.keyword.Keyword.UNDEFINED) {
                     throw new IllegalArgumentException("Mot-clé inconnu de Forge : « " + k + " »" + where + ".");
                 }
@@ -721,6 +722,7 @@ final class CustomCards {
             Map.entry("job select", "Choix de job"),
             Map.entry("reconfigure", "Reconfiguration"),
             Map.entry("fortify", "Fortification"),
+            Map.entry("station", "Station"),
             Map.entry("umbra armor", "Armure totémique"),
             Map.entry("living metal", "Métal vivant"),
             Map.entry("kicker", "Kick"),
@@ -881,7 +883,13 @@ final class CustomCards {
         }
         final StringBuilder out = new StringBuilder(text.length());
         // « Choisissez l'un — » : Forge écrit toujours en anglais la tête d'une capacité à modes.
-        final String[] lines = text.replace("Choose one or more —", "Choisissez un ou plusieurs —").replace("choose one or more —", "choisissez un ou plusieurs —")
+        // Classes et affaires : les lignes que Forge écrit lui-même (rappel, niveaux, « Solved »).
+        final String[] lines = text.replace("(Gain the next level as a sorcery to add its ability.)",
+                        "(Acquérez le prochain niveau lorsque vous pourriez lancer un rituel pour ajouter sa capacité.)")
+                .replaceAll("(?m)^(\\{[^\\n]*\\}): Level (\\d+)\\s*$", "$1 : Niveau $2")
+                .replaceAll("\\(Class Level: (\\d+)\\)", "(Niveau de classe : $1)")
+                .replaceAll("(?m)^Solved\\s*$", "Résolue")
+                .replace("Choose one or more —", "Choisissez un ou plusieurs —").replace("choose one or more —", "choisissez un ou plusieurs —")
                 .replace("Choose two —", "Choisissez deux —").replace("choose two —", "choisissez deux —")
                 .replace("Choose one —", "Choisissez l'un —").replace("choose one —", "choisissez l'un —")
                 .split("\n", -1);
@@ -990,28 +998,118 @@ final class CustomCards {
         return sb.toString().trim();
     }
 
-    /** Ligne de type en français (Forge n'a pas de traduction pour une carte perso) : « Créature légendaire : Human X-Men ». */
+    /**
+     * Sous-types non-créature en français, comme sur les cartes (« Artefact : équipement », « Enchantement : aura et
+     * malédiction »). Généré depuis SUBTYPES (ui/js/cardscript.js).
+     */
+    private static final Map<String, String> SUBTYPES_FR = Map.ofEntries(
+            Map.entry("Equipment", "équipement"),
+            Map.entry("Fortification", "fortification"),
+            Map.entry("Vehicle", "véhicule"),
+            Map.entry("Spacecraft", "vaisseau spatial"),
+            Map.entry("Food", "nourriture"),
+            Map.entry("Clue", "indice"),
+            Map.entry("Treasure", "trésor"),
+            Map.entry("Blood", "sang"),
+            Map.entry("Gold", "or"),
+            Map.entry("Map", "carte"),
+            Map.entry("Powerstone", "lithoforce"),
+            Map.entry("Junk", "bric-à-brac"),
+            Map.entry("Lander", "atterrisseur"),
+            Map.entry("Mutagen", "mutagène"),
+            Map.entry("Incubator", "incubateur"),
+            Map.entry("Attraction", "attraction"),
+            Map.entry("Bobblehead", "figurine"),
+            Map.entry("Book", "livre"),
+            Map.entry("Communicator", "communicateur"),
+            Map.entry("Heartwood", "heartwood"),
+            Map.entry("Infinity", "infinité"),
+            Map.entry("Stone", "pierre"),
+            Map.entry("Vibranium", "vibranium"),
+            Map.entry("Aura", "aura"),
+            Map.entry("Curse", "malédiction"),
+            Map.entry("Role", "rôle"),
+            Map.entry("Cartouche", "cartouche"),
+            Map.entry("Rune", "rune"),
+            Map.entry("Saga", "saga"),
+            Map.entry("Class", "classe"),
+            Map.entry("Case", "affaire"),
+            Map.entry("Background", "passé"),
+            Map.entry("Shard", "éclat"),
+            Map.entry("Shrine", "reliquaire"),
+            Map.entry("Plan", "plan"),
+            Map.entry("Room", "pièce"),
+            Map.entry("Plains", "plaine"),
+            Map.entry("Island", "île"),
+            Map.entry("Swamp", "marais"),
+            Map.entry("Mountain", "montagne"),
+            Map.entry("Forest", "forêt"),
+            Map.entry("Cave", "caverne"),
+            Map.entry("Desert", "désert"),
+            Map.entry("Gate", "porte"),
+            Map.entry("Lair", "repaire"),
+            Map.entry("Locus", "site"),
+            Map.entry("Sphere", "sphère"),
+            Map.entry("Town", "ville"),
+            Map.entry("Planet", "planète"),
+            Map.entry("Urza's", "d'urza"),
+            Map.entry("Mine", "mine"),
+            Map.entry("Power-Plant", "centrale"),
+            Map.entry("Tower", "tour"),
+            Map.entry("Arcane", "arcane"),
+            Map.entry("Lesson", "leçon"),
+            Map.entry("Trap", "piège"),
+            Map.entry("Chorus", "chorus"),
+            Map.entry("Adventure", "aventure"),
+            Map.entry("Omen", "présage")
+    );
+
+    /**
+     * Ligne de type en français (Forge n'a pas de traduction pour une carte perso), comme sur les cartes françaises :
+     * « Créature-artefact légendaire : golem », « Terrain de base : forêt », « Éphémère de clan : elfe ».
+     */
     static String typeLine(final forge.card.CardTypeView type) {
+        // Le type principal d'abord, les autres accrochés par un trait d'union (« Créature-artefact », « Terrain-artefact »).
+        final CardType.CoreType[] order = {CardType.CoreType.Creature, CardType.CoreType.Planeswalker, CardType.CoreType.Land,
+            CardType.CoreType.Artifact, CardType.CoreType.Enchantment, CardType.CoreType.Battle, CardType.CoreType.Instant, CardType.CoreType.Sorcery};
         final List<String> core = new ArrayList<>();
-        for (final CardType.CoreType c : type.getCoreTypes()) {
-            core.add(switch (c) {
-                case Creature -> "Créature";
-                case Artifact -> "Artefact";
-                case Enchantment -> "Enchantement";
-                case Instant -> "Éphémère";
-                case Sorcery -> "Rituel";
-                case Land -> "Terrain";
-                case Battle -> "Bataille";
-                case Kindred -> "Tribal";
-                default -> c.name();
-            });
+        for (final CardType.CoreType c : order) {
+            if (type.hasType(c)) {
+                core.add(switch (c) {
+                    case Creature -> "Créature";
+                    case Artifact -> "Artefact";
+                    case Enchantment -> "Enchantement";
+                    case Instant -> "Éphémère";
+                    case Sorcery -> "Rituel";
+                    case Land -> "Terrain";
+                    case Battle -> "Bataille";
+                    default -> c.name();
+                });
+            }
         }
-        final StringBuilder sb = new StringBuilder(String.join(" ", core));
+        for (final CardType.CoreType c : type.getCoreTypes()) {
+            if (!Arrays.asList(order).contains(c) && c != CardType.CoreType.Kindred) {
+                core.add(c.name());
+            }
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < core.size(); i++) {
+            sb.append(i == 0 ? core.get(i) : "-" + core.get(i).toLowerCase(Locale.ROOT));
+        }
+        final boolean fem = !core.isEmpty() && "Créature".equals(core.get(0));
+        if (type.hasType(CardType.CoreType.Kindred)) {
+            sb.append(" de clan");
+        }
+        for (final CardType.Supertype st : type.getSupertypes()) {
+            if (st == CardType.Supertype.Snow) {
+                sb.append(fem ? " neigeuse" : " neigeux");
+            }
+        }
         for (final CardType.Supertype st : type.getSupertypes()) {
             sb.append(switch (st) {
                 case Legendary -> " légendaire";
                 case Basic -> " de base";
-                case Snow -> " neigeux";
+                case Snow -> "";
                 case World -> " du monde";
                 default -> " " + st.name().toLowerCase(Locale.ROOT);
             });
@@ -1020,7 +1118,10 @@ final class CustomCards {
             // Comme sur les cartes françaises : « Créature : elfe et druide » (un type inventé reste tel quel).
             final List<String> subs = new ArrayList<>();
             for (final String t : type.getSubtypes()) {
-                final String fr = French.creatureTypesFr().get(t);
+                String fr = French.creatureTypesFr().get(t);
+                if (fr == null) {
+                    fr = SUBTYPES_FR.get(t);
+                }
                 subs.add(fr != null ? fr : t);
             }
             final String last = subs.remove(subs.size() - 1);

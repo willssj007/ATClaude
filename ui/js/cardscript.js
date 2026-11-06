@@ -5,6 +5,8 @@
 export const CARD_TYPES = [
   ['Creature', 'Créature'], ['Artifact', 'Artefact'], ['Enchantment', 'Enchantement'], ['Land', 'Terrain'],
   ['Planeswalker', 'Planeswalker'], ['Instant', 'Éphémère'], ['Sorcery', 'Rituel'],
+  // « De clan » (autrefois « tribal ») : une carte non-créature qui a des types de créature (« Éphémère de clan : elfe »).
+  ['Kindred', 'De clan'],
 ];
 
 /**
@@ -132,6 +134,8 @@ export const KW_ALL = [
   ['Job select', 'Choix de job', 'Job select', 'equip', null, null, null, {sub: 'Equipment', base: 'Artifact'}],
   ['Reconfigure', 'Reconfiguration', 'Reconfigure', 'equip', 'cost', null, '{2}', {sub: 'Equipment', base: 'Artifact'}],
   ['Fortify', 'Fortification', 'Fortify', 'equip', 'cost', null, '{1}', {sub: 'Fortification', base: 'Artifact'}],
+  // Station : le vaisseau spatial devient une créature-artefact à partir de N marqueurs charge (ligne « STATION N+ » écrite par buildScript).
+  ['Station', 'Station', 'Station', 'equip', 'n', null, 6, {fr: 'Station', en: 'Station', sub: 'Spacecraft', base: 'Artifact', pt: true}],
   ['Umbra armor', 'Armure totémique', 'Umbra armor', 'equip', null, null, null, {sub: 'Aura', base: 'Enchantment'}],
   ['Living metal', 'Métal vivant', 'Living metal', 'equip', null],
   ['Kicker', 'Kick', 'Kicker', 'alt', 'cost', null, '{2}'],
@@ -234,7 +238,7 @@ export const KW_OPTIONS = {
   Affinity: [['Artifact', 'les artefacts', 'artifacts'], ['Equipment', 'les équipements', 'Equipment'], ['Creature', 'les créatures', 'creatures'],
     ['Enchantment', 'les enchantements', 'enchantments'], ['Plains', 'les plaines', 'Plains'], ['Island', 'les îles', 'Islands'],
     ['Swamp', 'les marais', 'Swamps'], ['Mountain', 'les montagnes', 'Mountains'], ['Forest', 'les forêts', 'Forests']],
-  Enchant: [['Creature', 'créature', 'creature'], ['Creature.YouCtrl:creature you control', 'créature que vous contrôlez', 'creature you control'],
+  Enchant: [['Creature', 'créature', 'creature'], ['Player', 'joueur', 'player'], ['Opponent', 'adversaire', 'opponent'], ['Creature.YouCtrl:creature you control', 'créature que vous contrôlez', 'creature you control'],
     ['Creature.OppCtrl:creature an opponent controls', 'créature qu\'un adversaire contrôle', 'creature an opponent controls'],
     ['Artifact', 'artefact', 'artifact'], ['Enchantment', 'enchantement', 'enchantment'], ['Land', 'terrain', 'land'],
     ['Land.YouCtrl:land you control', 'terrain que vous contrôlez', 'land you control'], ['Permanent', 'permanent', 'permanent'],
@@ -339,6 +343,18 @@ export const WHEN = [
   {id: 'endCombat', kind: 'T', label: 'À la fin du combat de votre tour'},
   {id: 'end', kind: 'T', label: 'Au début de votre étape de fin'},
   {id: 'eachEnd', kind: 'T', label: 'Au début de chaque étape de fin'},
+  // Équipements, auras, fortifications : la carte attachée (le libellé suit la carte, voir whenLabel).
+  {id: 'attachedAttacks', kind: 'T', label: 'Quand la créature équipée ou enchantée attaque', attach: 'creature'},
+  {id: 'attachedCombatDamage', kind: 'T', label: 'Quand la créature équipée ou enchantée inflige des blessures de combat à un joueur', attach: 'creature'},
+  {id: 'attachedDies', kind: 'T', label: 'Quand la créature équipée ou enchantée meurt', attach: 'creature'},
+  {id: 'attachedTapped', kind: 'T', label: 'Quand le permanent enchanté ou fortifié devient engagé', attach: 'permanent'},
+  // Malédictions (aura qui enchante un joueur).
+  {id: 'ePlayerUpkeep', kind: 'T', label: 'Au début de l\'entretien du joueur enchanté', attach: 'player'},
+  {id: 'ePlayerEnd', kind: 'T', label: 'Au début de l\'étape de fin du joueur enchanté', attach: 'player'},
+  {id: 'ePlayerAttacked', kind: 'T', label: 'Quand le joueur enchanté est attaqué', attach: 'player'},
+  {id: 'ePlayerCasts', kind: 'T', label: 'Quand le joueur enchanté lance un sort', attach: 'player'},
+  {id: 'ePlayerDraws', kind: 'T', label: 'Quand le joueur enchanté pioche une carte', attach: 'player'},
+  {id: 'ePlayerCreature', kind: 'T', label: 'Quand une créature arrive sous le contrôle du joueur enchanté', attach: 'player'},
   {id: 'activated', kind: 'A', label: 'Capacité activée (coût : effet)', cost: true},
   {id: 'loyalty', kind: 'A', label: 'Capacité de loyauté (planeswalker)', loyalty: true},
   {id: 'spell', kind: 'SP', label: 'Effet du sort (éphémère, rituel)'},
@@ -579,6 +595,7 @@ export const SCOPES = [
   ['you', 'Les créatures que vous contrôlez'], ['opp', 'Les créatures que vos adversaires contrôlent'], ['all', 'Toutes les créatures'],
   ['self', 'Cette carte (elle-même)'], ['enchanted', 'La créature enchantée (aura)'], ['equipped', 'La créature équipée (équipement)'],
   ['tokens', 'Les jetons de créature que vous contrôlez'], ['attacking', 'Les créatures attaquantes que vous contrôlez'],
+  ['fortified', 'Le terrain fortifié (fortification)'], ['commanders', 'Les créatures Commandant que vous possédez (passé)'],
 ];
 
 /** Types de permanents ciblés : [id, pour Forge, « un … ciblé », « target … », « tous les … », « all … »]. */
@@ -725,13 +742,359 @@ const plainType = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036
 export function setTypeNames(list) {
   typesByName.clear();
   typeFr.clear();
+  creatureTypes.clear();
   for (const t of list || []) {
     typesByName.set(plainType(t.en), t.en);
+    creatureTypes.add(t.en);
     if (t.fr && t.fr !== t.en) {
       typesByName.set(plainType(t.fr), t.en);
       typeFr.set(t.en, t.fr);
     }
   }
+  registerSubtypes();
+}
+
+/** Les types de créature connus (liste du pont), pour reconnaître un type de créature sur une carte non-créature. */
+const creatureTypes = new Set();
+
+/**
+ * Sous-types qui ne sont pas des types de créature (et Monture) : [type de Forge, nom sur les cartes françaises, types
+ * de carte qui le portent, mécanique]. La mécanique dit ce que le sous-type demande pour marcher comme dans le jeu :
+ * kw (les mots-clés qui le font marcher ; le premier est ajouté s'il n'y en a aucun), aura (la cible de l'aura :
+ * « Enchanter : joueur » pour une malédiction), ability (la capacité des jetons du même nom, voir SUBTYPE_ABILITIES),
+ * mana (type de terrain de base : « {T} : Ajoutez {G} »), legendary (un passé est légendaire), saga, levels (classe),
+ * solve (affaire), commanders (passé), no (pas encore possible dans l'Atelier : la raison).
+ */
+export const SUBTYPES = [
+  ['Equipment', 'Équipement', ['Artifact'], {kw: ['Equip', 'Reconfigure', 'Living Weapon', 'For Mirrodin', 'Job select'],
+    note: 'S\'attache à une créature avec le mot-clé Équipement. « Qui » propose « La créature équipée ».'}],
+  ['Fortification', 'Fortification', ['Artifact'], {kw: ['Fortify'], note: 'S\'attache à un terrain avec le mot-clé Fortification. « Qui » propose « Le terrain fortifié ».'}],
+  ['Vehicle', 'Véhicule', ['Artifact'], {kw: ['Crew'], note: 'Devient une créature-artefact quand on le pilote (mot-clé Pilotage) : il a une force et une endurance.'}],
+  ['Spacecraft', 'Vaisseau spatial', ['Artifact'], {kw: ['Station'], note: 'Devient une créature-artefact à partir de N marqueurs charge (mot-clé Station).'}],
+  ['Food', 'Nourriture', ['Artifact'], {ability: true}],
+  ['Clue', 'Indice', ['Artifact'], {ability: true}],
+  ['Treasure', 'Trésor', ['Artifact'], {ability: true}],
+  ['Blood', 'Sang', ['Artifact'], {ability: true}],
+  ['Gold', 'Or', ['Artifact'], {ability: true}],
+  ['Map', 'Carte', ['Artifact'], {ability: true}],
+  ['Powerstone', 'Lithoforce', ['Artifact'], {ability: true}],
+  ['Junk', 'Bric-à-brac', ['Artifact'], {ability: true}],
+  ['Lander', 'Atterrisseur', ['Artifact'], {ability: true}],
+  ['Mutagen', 'Mutagène', ['Artifact'], {ability: true}],
+  ['Incubator', 'Incubateur', ['Artifact'], {no: 'Un incubateur se transforme en créature : c\'est une carte à deux faces, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
+  ['Attraction', 'Attraction', ['Artifact'], {no: 'Les attractions se jouent depuis un paquet d\'attractions à part, absent de ces parties. Le sous-type reste sans sa mécanique.'}],
+  ['Bobblehead', 'Figurine', ['Artifact'], {}], ['Book', 'Livre', ['Artifact'], {}], ['Communicator', 'Communicateur', ['Artifact'], {}],
+  ['Heartwood', 'Heartwood', ['Artifact'], {}], ['Infinity', 'Infinité', ['Artifact'], {}], ['Stone', 'Pierre', ['Artifact'], {}],
+  ['Vibranium', 'Vibranium', ['Artifact'], {}],
+  ['Aura', 'Aura', ['Enchantment'], {kw: ['Enchant'], note: 'S\'attache avec « Enchanter : … ». « Qui » propose ce qu\'elle enchante.'}],
+  ['Curse', 'Malédiction', ['Enchantment'], {aura: 'Player', note: 'Une aura qui enchante un joueur (« Enchanter : joueur ») : déclencheurs et effets « du joueur enchanté ».'}],
+  ['Role', 'Rôle', ['Enchantment'], {aura: 'Creature', note: 'Une aura qui enchante une créature ; une créature n\'a qu\'un seul rôle de chaque joueur.'}],
+  ['Cartouche', 'Cartouche', ['Enchantment'], {aura: 'Creature.YouCtrl:creature you control', note: 'Une aura qui enchante une créature que vous contrôlez.'}],
+  ['Rune', 'Rune', ['Enchantment'], {aura: 'Permanent', note: 'Une aura qui enchante un permanent.'}],
+  ['Saga', 'Saga', ['Enchantment'], {saga: true, note: 'Ses capacités sont des chapitres (I, II, III…) : un marqueur de chapitre par tour, puis elle est sacrifiée.'}],
+  ['Class', 'Classe', ['Enchantment'], {levels: true, note: 'Ses capacités ont un niveau : on paie le coût du niveau 2, puis du niveau 3, pour les ajouter.'}],
+  ['Case', 'Affaire', ['Enchantment'], {solve: true, note: 'À résoudre — une condition vérifiée à votre étape de fin ; ensuite ses capacités « Résolue — » marchent.'}],
+  ['Background', 'Passé', ['Enchantment'], {legendary: true, note: 'Un enchantement légendaire pour le commandant (« Choisissez un passé ») : « Qui » propose « Les créatures Commandant que vous possédez ».'}],
+  ['Shard', 'Éclat', ['Enchantment'], {ability: true}],
+  ['Shrine', 'Reliquaire', ['Enchantment'], {}], ['Plan', 'Plan', ['Enchantment'], {}],
+  ['Room', 'Pièce', ['Enchantment'], {no: 'Une pièce a deux portes : c\'est une carte double, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
+  ['Plains', 'Plaine', ['Land'], {mana: 'W'}], ['Island', 'Île', ['Land'], {mana: 'U'}], ['Swamp', 'Marais', ['Land'], {mana: 'B'}],
+  ['Mountain', 'Montagne', ['Land'], {mana: 'R'}], ['Forest', 'Forêt', ['Land'], {mana: 'G'}],
+  ['Cave', 'Caverne', ['Land'], {}], ['Desert', 'Désert', ['Land'], {}], ['Gate', 'Porte', ['Land'], {}], ['Lair', 'Repaire', ['Land'], {}],
+  ['Locus', 'Site', ['Land'], {}], ['Sphere', 'Sphère', ['Land'], {}], ['Town', 'Ville', ['Land'], {}], ['Planet', 'Planète', ['Land'], {}],
+  ['Urza\'s', 'd\'Urza', ['Land'], {}], ['Mine', 'Mine', ['Land'], {}], ['Power-Plant', 'Centrale', ['Land'], {}], ['Tower', 'Tour', ['Land'], {}],
+  ['Arcane', 'Arcane', ['Instant', 'Sorcery'], {note: 'Les sorts d\'arcane reçoivent l\'Imprégnation d\'arcane.'}],
+  ['Lesson', 'Leçon', ['Instant', 'Sorcery'], {note: 'Une leçon se cherche hors de la partie (réserve) avec Apprentissage.'}],
+  ['Trap', 'Piège', ['Instant', 'Sorcery'], {}], ['Chorus', 'Chorus', ['Instant', 'Sorcery'], {}],
+  ['Adventure', 'Aventure', ['Instant', 'Sorcery'], {no: 'Une aventure est la seconde moitié d\'une carte de créature : c\'est une carte double, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
+  ['Omen', 'Présage', ['Instant', 'Sorcery'], {no: 'Un présage est la seconde moitié d\'une carte de créature : c\'est une carte double, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
+  ['Mount', 'Monture', ['Creature'], {kw: ['Saddle'], note: 'Une monture se selle (mot-clé Seller) : elle est « sellée » jusqu\'à la fin du tour.'}],
+];
+const SUB_BY = new Map(SUBTYPES.map(s => [s[0], s]));
+
+/** Les noms des sous-types (« Équipement », « Nourriture »…) reconnus en français comme en anglais. */
+function registerSubtypes() {
+  for (const [en, fr] of SUBTYPES) {
+    typesByName.set(plainType(en), en);
+    typesByName.set(plainType(fr), en);
+    typeFr.set(en, fr);
+  }
+}
+registerSubtypes();
+
+/** Un sous-type de la table (« Food ») : [type, nom français, types de carte, mécanique], ou null. */
+export function subtypeInfo(en) {
+  return SUB_BY.get(en) || null;
+}
+
+/** Les sous-types de la carte en types de Forge : ceux tapés, puis ceux qu'imposent ses mots-clés et ses chapitres. */
+export function cardSubtypes(f) {
+  const sub = forgeSubtypes(f.subtypes);
+  for (const t of autoSubtypes(f)) {
+    if (!sub.includes(t)) {
+      sub.push(t);
+    }
+  }
+  // « Enchantement : aura et malédiction » : l'aura d'abord, comme sur les cartes.
+  return sub.includes('Aura') ? ['Aura', ...sub.filter(t => t !== 'Aura')] : sub;
+}
+
+/** Le mot-clé qui fait marcher un sous-type (Équipement : Équipement, ou Reconfiguration sur une créature). */
+function linkKeyword(m, f) {
+  if (m.kw[0] === 'Equip' && (f.types || []).includes('Creature')) {
+    return 'Reconfigure';
+  }
+  return m.kw[0];
+}
+
+/**
+ * Relie chaque sous-type à sa mécanique, comme dans le jeu : le type de carte qu'il demande (un équipement est un
+ * artefact), le mot-clé qui le fait marcher (Équipement, Enchanter, Pilotage, Fortification, Station, Seller), la cible
+ * d'une malédiction (un joueur), un passé légendaire. Change la carte (f) et renvoie ce qui a été ajouté, en français.
+ */
+export function linkSubtypes(f, {keepTypes = false} = {}) {
+  const added = [];
+  f.types = f.types || [];
+  f.keywords = f.keywords || [];
+  f.kwValues = f.kwValues || {};
+  for (const en of forgeSubtypes(f.subtypes)) {
+    const s = SUB_BY.get(en);
+    if (!s || s[3].no) {
+      continue;
+    }
+    const [, fr, allowed, m] = s;
+    // Le type de carte : une seule possibilité (un équipement est un artefact, une forêt un terrain).
+    if (allowed.length === 1 && !f.types.includes(allowed[0])) {
+      if (!keepTypes) {
+        // Un sort n'a pas de sous-type de permanent ; la créature d'une nouvelle carte devient l'artefact, l'aura, le
+        // terrain demandé (on peut remettre « Créature » ensuite : créature-artefact équipement, créature-terrain forêt).
+        if (allowed[0] !== 'Creature') {
+          f.types = f.types.filter(t => t !== 'Instant' && t !== 'Sorcery');
+        }
+        if (allowed[0] !== 'Creature' && (f.types.length === 1 && f.types[0] === 'Creature' || allowed[0] === 'Enchantment')) {
+          f.types = f.types.filter(t => t !== 'Creature');
+        }
+      }
+      f.types.push(allowed[0]);
+      added.push(`${fr} : la carte est ${typeArticle(allowed[0])}`);
+    }
+    if (m.kw && !m.kw.some(k => f.keywords.includes(k))) {
+      const k = linkKeyword(m, f);
+      f.keywords.push(k);
+      added.push(`${fr} : mot-clé ${keywordText(f, k, 'fr')} ajouté`);
+    }
+    if (m.aura) {
+      if (!f.keywords.includes('Enchant')) {
+        f.keywords.push('Enchant');
+      }
+      const cur = f.kwValues.Enchant;
+      if (!cur || cur === 'Creature' || (m.aura === 'Player' && !/^(Player|Opponent)/.test(cur))) {
+        if (cur !== m.aura) {
+          f.kwValues = {...f.kwValues, Enchant: m.aura};
+          added.push(`${fr} : ${keywordText(f, 'Enchant', 'fr')}`);
+        }
+      }
+    }
+    if (m.legendary && !f.legendary) {
+      f.legendary = true;
+      added.push(`${fr} : la carte est légendaire`);
+    }
+  }
+  return added;
+}
+
+/** « un artefact », « un enchantement »… : le type de carte avec son article, pour les messages. */
+function typeArticle(t) {
+  return {Artifact: 'un artefact', Enchantment: 'un enchantement', Land: 'un terrain', Creature: 'une créature',
+    Instant: 'un éphémère', Sorcery: 'un rituel', Planeswalker: 'un planeswalker'}[t] || t;
+}
+
+/** Ce qui ne va pas avec les sous-types de la carte, comme le jeu le verrait : des phrases à montrer dans l'Atelier. */
+export function subtypeIssues(f) {
+  const out = [];
+  const types = f.types || [];
+  const subs = forgeSubtypes(f.subtypes);
+  for (const en of subs) {
+    const s = SUB_BY.get(en);
+    if (s) {
+      if (s[3].no) {
+        out.push(`${s[1]} : ${s[3].no}`);
+      } else if (!s[2].some(t => types.includes(t))) {
+        out.push(`${s[1]} ne va que sur ${s[2].map(typeArticle).join(' ou ')}.`);
+      }
+      continue;
+    }
+    if (creatureTypes.has(en) && !types.includes('Creature') && !types.includes('Kindred')) {
+      out.push(`${frType(en)} est un type de créature : sur une carte qui n'est pas une créature, il faut le type « De clan ».`);
+    }
+  }
+  if (subs.includes('Saga') && !(f.abilities || []).some(a => a.when === 'chapter')) {
+    out.push('Une saga a besoin d\'au moins un chapitre (capacité « Chapitre de saga ») : sans chapitre, elle est sacrifiée dès son arrivée.');
+  }
+  if (subs.includes('Class') && !(f.abilities || []).some(a => Number(a.level) >= 2)) {
+    out.push('Une classe a des capacités de niveau 2 ou 3 : choisis le niveau de chaque capacité.');
+  }
+  if (subs.includes('Case') && !f.caseCond) {
+    out.push('Une affaire a une condition « À résoudre — » : choisis-la sous les sous-types.');
+  }
+  const at = attachOf(f);
+  if (at && at.kind !== 'creature' && (f.abilities || []).some(a => a.when === 'static' && ['enchanted', 'equipped', 'fortified'].includes(a.scope)
+    && ['anthem', 'anthemPower', 'debuff'].includes(a.effect))) {
+    out.push(`${capitalize(at.fr)} n'a pas de force ni d'endurance : un bonus +N/+N ne lui fait rien.`);
+  }
+  return out;
+}
+
+/**
+ * Ce à quoi la carte s'attache, d'après ses mots-clés et ses sous-types : {kind (creature, land, player, permanent),
+ * scope (la portée « Qui » qui la désigne), v (pour Forge), fr, en, fem (féminin)}. null si elle ne s'attache à rien.
+ */
+export function attachOf(card) {
+  if (!card) {
+    return null;
+  }
+  const kws = card.keywords || [];
+  const subs = forgeSubtypes(card.subtypes);
+  if (kws.includes('Fortify') || subs.includes('Fortification')) {
+    return {kind: 'land', scope: 'fortified', v: 'Land.FortifiedBy', fr: 'le terrain fortifié', en: 'fortified land', fem: false};
+  }
+  if (kws.includes('Enchant') || subs.includes('Aura') || subs.some(t => (SUB_BY.get(t) || [])[3]?.aura)) {
+    const raw = keywordValue({...card, keywords: kws}, 'Enchant') || 'Creature';
+    const e = raw.split(':')[0];
+    if (/^(Player|Opponent)/.test(e)) {
+      return {kind: 'player', scope: 'enchanted', v: 'Player.EnchantedBy', fr: 'le joueur enchanté', en: 'enchanted player', fem: false};
+    }
+    const t = (e.split('.')[0] || 'Creature').split(',');
+    if (t.length === 1 && t[0] === 'Creature') {
+      return {kind: 'creature', scope: 'enchanted', v: 'Creature.EnchantedBy', fr: 'la créature enchantée', en: 'enchanted creature', fem: true};
+    }
+    const one = t.length === 1 ? t[0] : 'Permanent';
+    const words = {Artifact: ['l\'artefact enchanté', 'enchanted artifact'], Enchantment: ['l\'enchantement enchanté', 'enchanted enchantment'],
+      Land: ['le terrain enchanté', 'enchanted land'], Planeswalker: ['le planeswalker enchanté', 'enchanted planeswalker'],
+      Permanent: ['le permanent enchanté', 'enchanted permanent']}[one] || ['le permanent enchanté', 'enchanted permanent'];
+    return {kind: one === 'Land' ? 'land' : 'permanent', scope: 'enchanted', v: `${one === 'Permanent' ? 'Card' : one}.EnchantedBy`,
+      fr: words[0], en: words[1], fem: false};
+  }
+  if (kws.includes('Bestow')) {
+    return {kind: 'creature', scope: 'enchanted', v: 'Creature.EnchantedBy', fr: 'la créature enchantée', en: 'enchanted creature', fem: true};
+  }
+  if (subs.includes('Equipment') || kws.some(k => ['Equip', 'Reconfigure', 'Living Weapon', 'For Mirrodin', 'Job select'].includes(k))) {
+    return {kind: 'creature', scope: 'equipped', v: 'Creature.EquippedBy', fr: 'la créature équipée', en: 'equipped creature', fem: true};
+  }
+  return null;
+}
+
+/** Le libellé d'un déclencheur dans l'Atelier, avec ce que la carte équipe ou enchante (« Quand la créature équipée attaque »). */
+export function whenLabel(w, card) {
+  if (!w.attach || w.attach === 'player') {
+    return w.label;
+  }
+  const at = attachOf(card);
+  if (!at) {
+    return w.label;
+  }
+  return w.label.replace('la créature équipée ou enchantée', at.fr).replace('le permanent enchanté ou fortifié', at.fr)
+    .replace(/engagé$/, at.fem ? 'engagée' : 'engagé');
+}
+
+/** Le déclencheur va-t-il avec ce à quoi la carte s'attache (« quand la créature équipée attaque » : un équipement) ? */
+export function whenFits(w, card) {
+  if (!w.attach) {
+    return true;
+  }
+  const at = attachOf(card);
+  if (!at) {
+    return false;
+  }
+  return w.attach === 'creature' ? at.kind === 'creature' : w.attach === 'player' ? at.kind === 'player' : at.kind === 'land' || at.kind === 'permanent';
+}
+
+/** Les portées « Qui » qui vont avec la carte : la créature équipée pour un équipement, le joueur enchanté pour une malédiction… */
+export function scopesFor(card, current) {
+  const at = attachOf(card);
+  const subs = card ? cardSubtypes(card) : [];
+  return SCOPES.filter(([id]) => {
+    if (id === current) {
+      return true;
+    }
+    if (id === 'enchanted' || id === 'equipped' || id === 'fortified') {
+      return !!at && at.scope === id;
+    }
+    if (id === 'commanders') {
+      return subs.includes('Background');
+    }
+    return true;
+  }).map(([id, label]) => {
+    if (at && at.scope === id) {
+      return [id, at.kind === 'player' ? 'Les créatures que contrôle le joueur enchanté (malédiction)' : capitalize(at.fr)];
+    }
+    return [id, label];
+  });
+}
+
+/**
+ * Capacités des sous-types qui en ont une, écrites comme sur les jetons du même nom : [coût de Forge, coût en
+ * français, coût en anglais, effet de Forge (« {id} » : le nom de la capacité), effet en français, en anglais, lignes en plus].
+ */
+const SUBTYPE_ABILITIES = {
+  Food: ['2 T Sac<1/CARDNAME>', '{2}, {T}, sacrifiez CARDNAME', '{2}, {T}, Sacrifice CARDNAME', 'GainLife | Defined$ You | LifeAmount$ 3',
+    'Vous gagnez 3 points de vie.', 'You gain 3 life.'],
+  Clue: ['2 Sac<1/CARDNAME>', '{2}, sacrifiez CARDNAME', '{2}, Sacrifice CARDNAME', 'Draw | Defined$ You | NumCards$ 1', 'Piochez une carte.', 'Draw a card.'],
+  Treasure: ['T Sac<1/CARDNAME>', '{T}, sacrifiez CARDNAME', '{T}, Sacrifice CARDNAME', 'Mana | Produced$ Any | Amount$ 1',
+    'Ajoutez un mana de la couleur de votre choix.', 'Add one mana of any color.'],
+  Blood: ['1 T Discard<1/Card> Sac<1/CARDNAME>', '{1}, {T}, défaussez-vous d\'une carte, sacrifiez CARDNAME', '{1}, {T}, Discard a card, Sacrifice CARDNAME',
+    'Draw | Defined$ You | NumCards$ 1', 'Piochez une carte.', 'Draw a card.'],
+  Gold: ['Sac<1/CARDNAME>', 'Sacrifiez CARDNAME', 'Sacrifice CARDNAME', 'Mana | Produced$ Any | Amount$ 1',
+    'Ajoutez un mana de la couleur de votre choix.', 'Add one mana of any color.'],
+  Map: ['1 T Sac<1/CARDNAME>', '{1}, {T}, sacrifiez CARDNAME', '{1}, {T}, Sacrifice CARDNAME',
+    'Explore | ValidTgts$ Creature.YouCtrl | TgtPrompt$ Choisissez une créature ciblée que vous contrôlez | SorcerySpeed$ True',
+    'Une créature ciblée que vous contrôlez explore. N\'activez que lorsque vous pourriez lancer un rituel.',
+    'Target creature you control explores. Activate only as a sorcery.'],
+  Powerstone: ['T', '{T}', '{T}', 'Mana | Produced$ C | RestrictValid$ CantCastNonArtifactSpells',
+    'Ajoutez {C}. Ce mana ne peut pas être dépensé pour lancer un sort non-artefact.', 'Add {C}. This mana can\'t be spent to cast a nonartifact spell.'],
+  Junk: ['T Sac<1/CARDNAME>', '{T}, sacrifiez CARDNAME', '{T}, Sacrifice CARDNAME',
+    'Dig | SorcerySpeed$ True | Defined$ You | DigNum$ 1 | ChangeNum$ All | DestinationZone$ Exile | RememberChanged$ True | SubAbility$ {id}E',
+    'Exilez la carte du dessus de votre bibliothèque. Vous pouvez jouer cette carte ce tour-ci. N\'activez que lorsque vous pourriez lancer un rituel.',
+    'Exile the top card of your library. You may play that card this turn. Activate only as a sorcery.',
+    ['SVar:{id}E:DB$ Effect | StaticAbilities$ {id}P | RememberObjects$ Remembered | ForgetOnMoved$ Exile | SubAbility$ {id}C',
+      'SVar:{id}P:Mode$ Continuous | MayPlay$ True | Affected$ Card.IsRemembered | AffectedZone$ Exile | Description$ Vous pouvez jouer cette carte ce tour-ci.',
+      'SVar:{id}C:DB$ Cleanup | ClearRemembered$ True']],
+  Lander: ['2 T Sac<1/CARDNAME>', '{2}, {T}, sacrifiez CARDNAME', '{2}, {T}, Sacrifice CARDNAME',
+    'ChangeZone | Origin$ Library | Destination$ Battlefield | Tapped$ True | ChangeType$ Land.Basic | ChangeNum$ 1',
+    'Cherchez dans votre bibliothèque une carte de terrain de base, mettez-la sur le champ de bataille engagée, puis mélangez.',
+    'Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.'],
+  Mutagen: ['1 T Sac<1/CARDNAME>', '{1}, {T}, sacrifiez CARDNAME', '{1}, {T}, Sacrifice CARDNAME',
+    'PutCounter | ValidTgts$ Creature | TgtPrompt$ Choisissez une créature ciblée | CounterType$ P1P1 | CounterNum$ 1 | SorcerySpeed$ True',
+    'Mettez un marqueur +1/+1 sur une créature ciblée. N\'activez que lorsque vous pourriez lancer un rituel.',
+    'Put a +1/+1 counter on target creature. Activate only as a sorcery.'],
+  Shard: ['2 Sac<1/CARDNAME>', '{2}, sacrifiez CARDNAME', '{2}, Sacrifice CARDNAME', 'Scry | ScryNum$ 1 | SubAbility$ {id}D',
+    'Regard 1, puis piochez une carte.', 'Scry 1, then draw a card.', ['SVar:{id}D:DB$ Draw | Defined$ You | NumCards$ 1']],
+};
+
+/** La capacité d'un sous-type (« {2}, {T}, sacrifiez CARDNAME : Vous gagnez 3 points de vie. ») dans la langue de la carte, ou null. */
+export function subtypeAbilityText(en, lang = 'fr') {
+  const s = SUBTYPE_ABILITIES[en];
+  return s ? (lang === 'en' ? `${s[2]}: ${s[5]}` : `${s[1]} : ${s[4]}`) : null;
+}
+
+/** Lignes du script et texte de la capacité d'un sous-type ; id : le nom de la capacité. */
+function subtypeAbilityLines(en, id, lang) {
+  const s = SUBTYPE_ABILITIES[en];
+  const head = lang === 'en' ? `${s[2]}:` : `${s[1]} :`;
+  const desc = lang === 'en' ? s[5] : s[4];
+  const sub = (l) => l.replace(/\{id\}/g, id);
+  return {lines: [`A:AB$ ${sub(s[3])} | Cost$ ${s[0]} | CostDesc$ ${head} | SpellDescription$ ${desc}`, ...(s[6] || []).map(sub)], text: `${head} ${desc}`};
+}
+
+/** Le texte des types de terrain de base de la carte : « ({T} : Ajoutez {G} ou {U}.) », comme sur les terrains doubles. */
+function basicManaText(subs, lang) {
+  const syms = subs.map(t => (SUB_BY.get(t) || [])[3]).filter(m => m && m.mana).map(m => `{${m.mana}}`);
+  if (!syms.length) {
+    return '';
+  }
+  const list = lang === 'en' ? (syms.length < 3 ? syms.join(' or ') : `${syms.slice(0, -1).join(', ')}, or ${syms[syms.length - 1]}`)
+    : (syms.length < 2 ? syms[0] : `${syms.slice(0, -1).join(', ')} ou ${syms[syms.length - 1]}`);
+  return lang === 'en' ? `({T}: Add ${list}.)` : `({T} : Ajoutez ${list}.)`;
 }
 
 /** Le type de Forge d'un type tapé en français ou en anglais (« Dieu », « God ») ; un type inconnu reste tel quel. */
@@ -1319,7 +1682,28 @@ function hasKw(kw, pl) {
 }
 
 /** Paramètres de Forge et texte (français et anglais) d'un effet. id : préfixe des SVar de cette capacité. */
+/** Effets qui visent un joueur : sur une malédiction, ils peuvent toucher le joueur enchanté au lieu d'un joueur ciblé. */
+export const PLAYER_EFFECTS = new Set(['damagePlayer', 'damageOpponent', 'targetLoseLife', 'drainTarget', 'targetGainLife', 'targetDraw',
+  'targetDiscard', 'targetMill', 'targetSacrifice']);
+
+/**
+ * Un effet : ses paramètres de Forge (p), ses lignes en plus, son texte. who « enchanted » : l'effet touche le joueur
+ * enchanté (malédiction) ; « ce joueur » quand le déclencheur vient de lui (« Au début de l'entretien du joueur enchanté »).
+ */
 function effect(a, id) {
+  const r = effectBase(a, id);
+  if (!r || a.who !== 'enchanted' || !PLAYER_EFFECTS.has(a.effect)) {
+    return r;
+  }
+  const that = (WHEN.find(x => x.id === a.when) || {}).attach === 'player';
+  const fr = that ? 'ce joueur' : 'le joueur enchanté';
+  const en = that ? 'that player' : 'enchanted player';
+  return {...r, p: r.p.replace(/ValidTgts\$ [^|]+\| TgtPrompt\$ [^|]+/, 'Defined$ EnchantedPlayer '),
+    fr: r.fr.replace(/un joueur ou un planeswalker ciblé|un adversaire ciblé|un joueur ciblé/, fr).replace(/\bà le joueur\b/, 'au joueur'),
+    en: r.en.replace(/target player or planeswalker|target opponent|target player/, en)};
+}
+
+function effectBase(a, id) {
   const n = Math.max(0, Math.round(Number(a.n) || 0));
   const n1 = Math.max(1, n);
   const target = (what) => `ValidTgts$ ${what.v} | TgtPrompt$ ${what.prompt}`;
@@ -1498,7 +1882,7 @@ function effect(a, id) {
         fr: `un joueur ciblé pioche ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`, en: `target player draws ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
     case 'targetDiscard':
       return {p: `Discard | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1} | Mode$ TgtChoose`,
-        fr: `un joueur ciblé se défausse de ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`, en: `target player discards ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
+        fr: `un joueur ciblé se défausse ${n1 === 1 ? 'd\'une carte' : 'de ' + word(n1, 'fr') + ' cartes'}`, en: `target player discards ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
     case 'targetMill':
       return {p: `Mill | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1}`,
         fr: `un joueur ciblé meule ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`, en: `target player mills ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
@@ -1751,8 +2135,16 @@ function capitalize(s) {
 }
 
 /** Ce que touche un effet permanent : pour Forge, et le sujet de la phrase (et s'il est au pluriel). */
-function scopeOf(a) {
+function scopeOf(a, card = null) {
   const s = SCOPES.some(x => x[0] === a.scope) ? a.scope : 'you';
+  // La carte attachée suit ce que la carte équipe, fortifie ou enchante (« le terrain enchanté », « le joueur enchanté »).
+  const at = ['enchanted', 'equipped', 'fortified'].includes(s) ? attachOf(card) : null;
+  if (at && at.scope === s) {
+    if (at.kind === 'player') {
+      return {v: 'Creature.EnchantedPlayerCtrl', fr: 'les créatures que contrôle le joueur enchanté', en: 'creatures enchanted player controls', pl: true};
+    }
+    return {v: at.v, fr: at.fr, en: at.en, pl: false};
+  }
   const f = a.filter || {type: '', other: false};
   const t = f.type ? typeName(f.type) : '';
   const other = !!f.other;
@@ -1764,6 +2156,8 @@ function scopeOf(a) {
     case 'self': return {v: 'Card.Self', fr: 'CARDNAME', en: 'CARDNAME', pl: false, self: true};
     case 'enchanted': return {v: 'Creature.EnchantedBy', fr: 'la créature enchantée', en: 'enchanted creature', pl: false};
     case 'equipped': return {v: 'Creature.EquippedBy', fr: 'la créature équipée', en: 'equipped creature', pl: false};
+    case 'fortified': return {v: 'Land.FortifiedBy', fr: 'le terrain fortifié', en: 'fortified land', pl: false};
+    case 'commanders': return {v: 'Creature.IsCommander+YouOwn', fr: 'les créatures Commandant que vous possédez', en: 'commander creatures you own', pl: true};
     case 'tokens': return {v: t ? `Creature.${t}+token+YouCtrl` : 'Creature.token+YouCtrl',
       fr: t ? `les jetons ${frType(f.type)} que vous contrôlez` : 'les jetons de créature que vous contrôlez', en: `${t ? t + ' ' : ''}creature tokens you control`, pl: true};
     case 'attacking': return {v: 'Creature.attacking+YouCtrl', fr: 'les créatures attaquantes que vous contrôlez', en: 'attacking creatures you control', pl: true};
@@ -1835,7 +2229,7 @@ function thisCard(card) {
 function staticCore(a, id, lang, card) {
   const en = lang === 'en';
   const n = Math.max(0, Math.round(Number(a.n) || 0));
-  const sc = scopeOf(a);
+  const sc = scopeOf(a, card);
   const S = en ? capitalize(sc.en) : capitalize(sc.fr);
   const pl = sc.pl;
   const v3 = (sg, plural) => (pl ? plural : sg);
@@ -1905,8 +2299,12 @@ function staticCore(a, id, lang, card) {
       return {lines: [`R:Event$ Untap | ActiveZones$ Battlefield | ValidCard$ ${sc.v} | ValidStepTurnToController$ You | Layer$ CantHappen`],
         text: en ? `${S} ${v3('doesn\'t untap during its controller\'s untap step', 'don\'t untap during their controllers\' untap steps')}`
           : `${S} ${v3('ne se dégage pas pendant l\'étape de dégagement de son contrôleur', 'ne se dégagent pas pendant l\'étape de dégagement de leur contrôleur')}`};
-    case 'controlEnchanted':
-      return {s: 'Mode$ Continuous | AffectedDefined$ Enchanted | GainControl$ You', text: en ? 'You control enchanted creature' : 'Vous contrôlez la créature enchantée'};
+    case 'controlEnchanted': {
+      // « Vous contrôlez l'artefact enchanté » : ce que l'aura enchante (une créature par défaut).
+      const at = attachOf(card);
+      const w = at && at.kind !== 'player' && at.scope === 'enchanted' ? at : {fr: 'la créature enchantée', en: 'enchanted creature'};
+      return {s: 'Mode$ Continuous | AffectedDefined$ Enchanted | GainControl$ You', text: en ? `You control ${w.en}` : `Vous contrôlez ${w.fr}`};
+    }
     case 'cdaPT': {
       const x = amountOf({...a, amount: a.amount && a.amount !== 'fixed' && a.amount !== 'tapped' && a.amount !== 'xPaid' ? a.amount : 'creatures'});
       return {s: `Mode$ Continuous | CharacteristicDefining$ True | SetPower$ ${id}X | SetToughness$ ${id}X`, svars: [`SVar:${id}X:${x[0]}`],
@@ -2211,6 +2609,10 @@ function withWord(aw, text) {
 export function abilityLines(a, i, lang = 'fr', card = null) {
   const en = lang === 'en';
   const id = `Atelier${i + 1}`;
+  // Sur une malédiction, un effet qui vise un joueur touche le joueur enchanté, sauf si la capacité dit « ciblé ».
+  if (a.who === undefined && PLAYER_EFFECTS.has(a.effect) && (attachOf(card) || {}).kind === 'player') {
+    a = {...a, who: 'enchanted'};
+  }
   const w = WHEN.find(x => x.id === a.when);
   if (!w) {
     return null;
@@ -2253,7 +2655,7 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
     const text = withWord(e.aw, `${head} ${desc}`);
     return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc}`, ...extra, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])], text};
   }
-  const head = triggerHead(a);
+  const head = triggerHead(a, card);
   const text = withWord(e.aw, endDot(`${head[en ? 2 : 1]}, ${body}`));
   return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, `SVar:${id}:DB$ ${e.p}`, ...extra], text};
 }
@@ -2274,8 +2676,8 @@ const TRIGGER_WORDS = {
 };
 
 /** Déclencheur d'une capacité, avec l'Éminence si demandée (aussi depuis la zone de commandement). */
-function triggerHead(a) {
-  const h = triggerTable(a);
+function triggerHead(a, card = null) {
+  const h = triggerTable(a, card);
   if (!h) {
     return h;
   }
@@ -2294,8 +2696,11 @@ function triggerHead(a) {
 }
 
 /** Déclencheur d'une capacité : [condition pour Forge, début de phrase en français, en anglais]. */
-function triggerTable(a) {
+function triggerTable(a, card = null) {
   const f = a.filter;
+  // La carte attachée (équipement, aura, fortification) ; sans carte, une créature équipée.
+  const at = attachOf(card) || {kind: 'creature', v: 'Creature.EquippedBy', fr: 'la créature équipée', en: 'equipped creature', fem: true, scope: 'equipped'};
+  const aura = at.scope === 'enchanted';
   const enters = (v) => `Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ ${v} | TriggerZones$ Battlefield`;
   const dies = (v) => `Mode$ ChangesZone | Origin$ Battlefield | Destination$ Graveyard | ValidCard$ ${v} | TriggerZones$ Battlefield`;
   const phase = (p, who) => `Mode$ Phase | Phase$ ${p}${who ? ` | ValidPlayer$ ${who}` : ''} | TriggerZones$ Battlefield`;
@@ -2364,6 +2769,25 @@ function triggerTable(a) {
     endCombat: [phase('EndCombat', 'You'), 'À la fin du combat de votre tour', 'At end of combat on your turn'],
     end: [phase('End of Turn', 'You'), 'Au début de votre étape de fin', 'At the beginning of your end step'],
     eachEnd: [phase('End of Turn'), 'Au début de chaque étape de fin', 'At the beginning of each end step'],
+    attachedAttacks: [`Mode$ Attacks | ValidCard$ ${at.v}`, `À chaque fois que ${at.fr} attaque`, `Whenever ${at.en} attacks`],
+    attachedCombatDamage: [`Mode$ DamageDone | ValidSource$ ${at.v} | ValidTarget$ Player | CombatDamage$ True | TriggerZones$ Battlefield`,
+      `À chaque fois que ${at.fr} inflige des blessures de combat à un joueur`, `Whenever ${at.en} deals combat damage to a player`],
+    // Une aura part au cimetière avec sa créature : « Quand » ; un équipement reste : « À chaque fois que ».
+    attachedDies: [`Mode$ ChangesZone | Origin$ Battlefield | Destination$ Graveyard | ValidCard$ ${at.v}`,
+      `${aura ? 'Quand' : 'À chaque fois que'} ${at.fr} meurt`, `${aura ? 'When' : 'Whenever'} ${at.en} dies`],
+    attachedTapped: [`Mode$ Taps | ValidCard$ ${at.v}`, `À chaque fois que ${at.fr} devient engagé${at.fem ? 'e' : ''}`, `Whenever ${at.en} becomes tapped`],
+    ePlayerUpkeep: ['Mode$ Phase | Phase$ Upkeep | ValidPlayer$ Player.EnchantedBy | TriggerZones$ Battlefield', 'Au début de l\'entretien du joueur enchanté',
+      'At the beginning of enchanted player\'s upkeep'],
+    ePlayerEnd: ['Mode$ Phase | Phase$ End of Turn | ValidPlayer$ Player.EnchantedBy | TriggerZones$ Battlefield', 'Au début de l\'étape de fin du joueur enchanté',
+      'At the beginning of enchanted player\'s end step'],
+    ePlayerAttacked: ['Mode$ AttackersDeclared | AttackedTarget$ Player.EnchantedBy | TriggerZones$ Battlefield', 'À chaque fois que le joueur enchanté est attaqué',
+      'Whenever enchanted player is attacked'],
+    ePlayerCasts: ['Mode$ SpellCast | ValidCard$ Card | ValidActivatingPlayer$ Player.EnchantedBy | TriggerZones$ Battlefield',
+      'À chaque fois que le joueur enchanté lance un sort', 'Whenever enchanted player casts a spell'],
+    ePlayerDraws: ['Mode$ Drawn | ValidCard$ Card.OwnedBy Player.EnchantedBy | TriggerZones$ Battlefield', 'À chaque fois que le joueur enchanté pioche une carte',
+      'Whenever enchanted player draws a card'],
+    ePlayerCreature: [enters('Creature.EnchantedPlayerCtrl'), 'À chaque fois qu\'une créature arrive sur le champ de bataille sous le contrôle du joueur enchanté',
+      'Whenever a creature enters under enchanted player\'s control'],
   }[a.when];
 }
 
@@ -2412,7 +2836,7 @@ function modalLines(a, id, w, lang, card) {
     return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${c.text}${en ? ':' : ' :'}`, ...modes, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])],
       text: `${c.text}${en ? ':' : ' :'} ${capitalize(choose)}${bullets}${lim.text}`};
   }
-  const head = triggerHead(a);
+  const head = triggerHead(a, card);
   return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${head[en ? 2 : 1]}, ABILITY`, `SVar:${id}:DB$ ${charm}`, ...modes],
     text: `${head[en ? 2 : 1]}, ${choose}${bullets}`};
 }
@@ -2473,8 +2897,8 @@ export function autoSubtypes(f) {
 /** La carte a-t-elle une force et une endurance : créature, véhicule (Pilotage) ou monture. */
 export function needsPT(f) {
   const types = f.types || [];
-  const subs = String(f.subtypes || '').toLowerCase();
-  return types.includes('Creature') || (f.keywords || []).includes('Crew') || /\b(vehicle|véhicule|spacecraft)\b/.test(subs);
+  const subs = forgeSubtypes(f.subtypes);
+  return types.includes('Creature') || (f.keywords || []).some(k => keywordOptions(k).pt) || subs.includes('Vehicle') || subs.includes('Spacecraft');
 }
 
 /** L'IA d'une aura : la mettre sur ses créatures (Pump), sur celles de l'adversaire (Curse) ou en prendre le contrôle. */
@@ -2484,7 +2908,7 @@ function auraLogic(f) {
   if (statics.some(a => a.effect === 'controlEnchanted')) {
     return 'GainControl';
   }
-  if (/OppCtrl/.test(enchant) || statics.some(a => ['cantAttack', 'cantBlock', 'cantAttackBlock', 'debuff', 'noActivated', 'doesntUntap'].includes(a.effect))) {
+  if (/OppCtrl|^(Player|Opponent)/.test(enchant) || statics.some(a => ['cantAttack', 'cantBlock', 'cantAttackBlock', 'debuff', 'noActivated', 'doesntUntap'].includes(a.effect))) {
     return 'Curse';
   }
   return 'Pump';
@@ -2515,7 +2939,8 @@ function mergeStatics(abilities) {
       return;
     }
     const f = a.filter || {};
-    const key = JSON.stringify([a.scope || 'you', f.type || '', !!f.other, a.cond || 'none', a.condN ?? 3, a.condType || '', !!a.eminence]);
+    const key = JSON.stringify([a.scope || 'you', f.type || '', !!f.other, a.cond || 'none', a.condN ?? 3, a.condType || '', !!a.eminence,
+      Number(a.level) || 1, !!a.solved]);
     const g = groups.get(key);
     const pt = (x) => x.effect !== 'grantKeyword';
     if (g && !(pt(a) && g.parts.some(pt))) {
@@ -2532,8 +2957,12 @@ function mergeStatics(abilities) {
 }
 
 /** Le script complet d'une carte du formulaire. */
-export function buildScript(f) {
+export function buildScript(form) {
+  // Les sous-types marchent comme dans le jeu : le mot-clé qui les fait marcher, le type de carte qu'ils demandent.
+  const f = {...form, types: [...(form.types || [])], keywords: [...(form.keywords || [])], kwValues: {...(form.kwValues || {})}};
+  linkSubtypes(f, {keepTypes: true});
   const lang = f.lang === 'en' ? 'en' : 'fr';
+  const en = lang === 'en';
   const lines = [];
   const name = String(f.name || '').trim();
   lines.push(`Name:${name}`);
@@ -2545,12 +2974,7 @@ export function buildScript(f) {
     lines.push(`Colors:${colors.join(',') || 'colorless'}`);
   }
   const types = (f.types || []).filter(t => CARD_TYPES.some(c => c[0] === t));
-  const sub = forgeSubtypes(f.subtypes);
-  for (const t of autoSubtypes(f)) {
-    if (!sub.includes(t)) {
-      sub.push(t);
-    }
-  }
+  const sub = cardSubtypes(f);
   lines.push(`Types:${[f.legendary ? 'Legendary' : '', ...types, ...sub].filter(Boolean).join(' ')}`);
   const cda = (f.abilities || []).some(a => a.when === 'static' && a.effect === 'cdaPT');
   if (needsPT(f) || types.includes('Creature')) {
@@ -2560,6 +2984,11 @@ export function buildScript(f) {
     lines.push(`Loyalty:${Math.max(1, Number(f.loyaltyStart) || 3)}`);
   }
   const text = [];
+  // Types de terrain de base : Forge donne la capacité de mana ; la carte l'écrit (« ({T} : Ajoutez {G} ou {U}.) »).
+  const mana = types.includes('Land') ? basicManaText(sub, lang) : '';
+  if (mana) {
+    text.push(mana);
+  }
   const kws = (f.keywords || []).filter(k => KW_FR[k]);
   for (const k of kws) {
     const line = keywordLine(f, k);
@@ -2580,9 +3009,21 @@ export function buildScript(f) {
     if (t) {
       text.push(t);
     }
+    if (k === 'Station') {
+      // « STATION 6+ » : à partir de N marqueurs charge, le vaisseau est une créature-artefact (sa force et son endurance).
+      const n = Math.max(1, Number(keywordValue(f, 'Station')) || 1);
+      const st = en ? `STATION ${n}+ — It's an artifact creature.` : `STATION ${n}+ — C'est une créature-artefact.`;
+      lines.push(`S:Mode$ Continuous | AffectedDefined$ Self | Affected$ Card.counters_GE${n}_CHARGE | AddType$ Creature | Description$ ${st}`);
+      text.push(st);
+    }
   }
   // Chapitres de saga : un par numéro (le premier compte), dans l'ordre ; « K:Chapter » les nomme tous.
   const chapters = new Map();
+  // Classe : les capacités des niveaux 2 et 3 ; affaire : les capacités « Résolue — ».
+  const isClass = sub.includes('Class');
+  const isCase = sub.includes('Case');
+  const levels = {2: {params: {}, lines: [], text: []}, 3: {params: {}, lines: [], text: []}};
+  const solved = [];
   mergeStatics(f.abilities || []).forEach(([a, i]) => {
     const r = abilityLines(a, i, lang, f);
     if (!r) {
@@ -2594,9 +3035,75 @@ export function buildScript(f) {
       }
       return;
     }
+    const t = named(r.text, name);
+    const lvl = isClass ? Math.max(1, Math.min(3, Math.round(Number(a.level) || 1))) : 1;
+    if (lvl > 1) {
+      // Une capacité de niveau : une SVar que « K:Class » ajoute (AddTrigger$, AddStaticAbility$…).
+      const L = levels[lvl];
+      r.lines.forEach((l, k) => {
+        const m = /^(T|S|R|A):(.*)$/.exec(l);
+        if (!m) {
+          L.lines.push(l);
+          return;
+        }
+        const id = `Atelier${i + 1}L${k}`;
+        const param = {T: 'AddTrigger', S: 'AddStaticAbility', R: 'AddReplacementEffect', A: 'AddAbility'}[m[1]];
+        L.lines.push(`SVar:${id}:${m[2]}${m[1] === 'A' ? '' : ' | Secondary$ True'}`);
+        (L.params[param] = L.params[param] || []).push(id);
+      });
+      L.text.push(t);
+      return;
+    }
+    if (isCase && a.solved) {
+      // « Résolue — » : la capacité ne marche qu'une fois l'affaire résolue.
+      const word = `${en ? 'Solved' : 'Résolue'} — `;
+      const desc = (l) => (/^A:/.test(l) ? l.replace(/\| CostDesc\$ /, `| CostDesc$ ${word}`) : l.replace(/\| (Trigger)?Description\$ /, (m) => m + word));
+      solved.push({lines: r.lines.map(l => (/^(T|S|R|A):/.test(l) ? `${desc(l)} | IsPresent$ Card.Self+IsSolved` : l)), text: `${word}${t}`});
+      return;
+    }
     lines.push(...r.lines);
-    text.push(named(r.text, name));
+    text.push(t);
   });
+  if (isClass) {
+    for (const lvl of [2, 3]) {
+      const L = levels[lvl];
+      if (!L.text.length && !(lvl === 2 && levels[3].text.length)) {
+        continue;
+      }
+      const lc = forgeCost(((f.classCosts || {})[lvl]) || '') || '0';
+      let params = Object.entries(L.params).map(([k, v]) => `${k}$ ${v.join(' & ')}`).join(' | ');
+      if (!params) {
+        // Un niveau sans capacité (il faut le niveau 2 pour le niveau 3) : une capacité qui ne fait rien.
+        lines.push(`SVar:AtelierLv${lvl}:Mode$ Continuous | Affected$ Card.Self | Secondary$ True | Description$ —`);
+        params = `AddStaticAbility$ AtelierLv${lvl}`;
+      }
+      lines.push(`K:Class:${lvl}:${lc}:${params}`, ...L.lines);
+      text.push(`${costSymbols(lc) || '{0}'}${en ? ':' : ' :'} ${en ? 'Level' : 'Niveau'} ${lvl}`, ...L.text);
+    }
+  }
+  if (isCase) {
+    // « À résoudre — » : vérifié au début de votre étape de fin ; l'affaire devient résolue.
+    const c = f.caseCond ? conditionOf({cond: f.caseCond, condN: f.caseN, condType: f.caseType}) : null;
+    if (c && c.count) {
+      const what = en ? c.en.replace(/^if /, '') : c.fr.replace(/^si /, '').replace(/^s'il /, 'il ');
+      const t = `${en ? 'To solve' : 'À résoudre'} — ${endDot(capitalize(what))}`;
+      lines.push(`T:Mode$ Phase | Phase$ End of Turn | ValidPlayer$ You | TriggerZones$ Battlefield | IsPresent$ Card.Self+!IsSolved | CheckSVar$ AtelierSolveC | SVarCompare$ ${c.cmp} | Execute$ AtelierSolve | TriggerDescription$ ${t}`,
+        'SVar:AtelierSolve:DB$ AlterAttribute | Defined$ Self | Attributes$ Solved', `SVar:AtelierSolveC:${c.count}`);
+      text.push(t);
+    }
+    for (const s of solved) {
+      lines.push(...s.lines);
+      text.push(s.text);
+    }
+  }
+  // Nourriture, indice, trésor… : la capacité des jetons du même nom (sauf si l'Atelier l'a retirée).
+  for (const t of sub) {
+    if (SUBTYPE_ABILITIES[t] && !(f.subOff || []).includes(t)) {
+      const r = subtypeAbilityLines(t, `AtelierSub${t.replace(/\W/g, '')}`, lang);
+      lines.push(...r.lines);
+      text.push(named(r.text, name));
+    }
+  }
   // Comme sur les cartes imprimées : « Équipement {1} », « Pilotage 2 »… en dernier, après les capacités.
   for (const k of kws.filter(k => TRAILING_KEYWORDS.has(k))) {
     const t = keywordText(f, k, lang);

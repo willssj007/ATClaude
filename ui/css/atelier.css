@@ -83,6 +83,15 @@
 .ate-kwq { width: 100%; }
 .ate-kwhits { padding: 4px 2px; }
 .ate-costs > summary { font-size: 13px; }
+
+/* Sous-types : ce qu'ils font dans le jeu (capacité de la nourriture, mana de la forêt, niveaux de la classe…). */
+.ate-subs { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 10px; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 12px; background: rgb(255 255 255 / 0.025); font-size: 13.5px; }
+.ate-sub { line-height: 1.45; }
+.ate-sub.ate-check { display: block; }
+.ate-sub.warn { color: #ffd27a; }
+.ate-sub.ok { color: #9be39b; font-size: 12.5px; }
+.ate-sub select, .ate-sub input[type="text"] { margin: 4px 4px 0 0; }
 .ate-kwgs { display: flex; flex-direction: column; gap: 6px; }
 .ate-kwg { border: 1px solid var(--line); border-radius: 12px; background: rgb(255 255 255 / 0.025); }
 .ate-kwg > summary { cursor: pointer; padding: 8px 12px; font-size: 13.5px; font-weight: 600; list-style-position: inside; }

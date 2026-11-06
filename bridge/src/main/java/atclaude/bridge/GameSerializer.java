@@ -309,7 +309,7 @@ final class GameSerializer {
             CustomCards.addDisplay(o, CustomCards.rules(s.getName()));
             final boolean english = "en".equals(o.get("lang").getAsString());
             o.addProperty("typeLine", CustomCards.typeLine(s.getType(), o.get("lang").getAsString()));
-            o.addProperty("text", withoutEngineLines(o.get("text").getAsString()));
+            o.addProperty("text", customOrder(withoutEngineLines(o.get("text").getAsString()), s, english));
             if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
             }
@@ -379,6 +379,46 @@ final class GameSerializer {
             + "|Loyalty counters: \\d+|=.+=)\\s*$");
 
     private static final Pattern NON_ABILITY = Pattern.compile("(?im)^\\s*Non[\\s:-]*ability features");
+
+    /**
+     * Texte d'une carte perso comme sur une carte imprimée : un terrain avec des types de terrain de base dit son mana
+     * (« ({T} : Ajoutez {G} ou {U}.) », que Forge ne montre pas), et « Station » vient avant « STATION N+ ».
+     */
+    static String customOrder(final String text, final CardStateView s, final boolean english) {
+        String t = text == null ? "" : text;
+        final java.util.regex.Matcher station = STATION_KW.matcher(t);
+        if (station.find() && t.contains("STATION ")) {
+            final String kw = station.group(2).trim();
+            t = t.substring(0, station.start()) + t.substring(station.end());
+            t = t.replaceFirst("STATION ", java.util.regex.Matcher.quoteReplacement(kw + "\n\nSTATION "));
+        }
+        if (s.isLand() && s.getType() != null) {
+            final List<String> syms = new ArrayList<>();
+            for (final String sub : s.getType().getSubtypes()) {
+                final String c = switch (sub) {
+                    case "Plains" -> "{W}";
+                    case "Island" -> "{U}";
+                    case "Swamp" -> "{B}";
+                    case "Mountain" -> "{R}";
+                    case "Forest" -> "{G}";
+                    default -> null;
+                };
+                if (c != null && !syms.contains(c)) {
+                    syms.add(c);
+                }
+            }
+            if (!syms.isEmpty() && !t.contains(english ? "Add {" : "Ajoutez {")) {
+                final String last = syms.remove(syms.size() - 1);
+                final String list = syms.isEmpty() ? last : String.join(", ", syms) + (english ? (syms.size() > 1 ? ", or " : " or ") : " ou ") + last;
+                final String mana = english ? "({T}: Add " + list + ".)" : "({T} : Ajoutez " + list + ".)";
+                t = t.isBlank() ? mana : mana + "\n\n" + t;
+            }
+        }
+        return t;
+    }
+
+    /** La ligne « Station » (le mot-clé seul) dans le texte d'une carte : Forge l'écrit après « STATION N+ ». */
+    private static final Pattern STATION_KW = Pattern.compile("(?m)(^|\\r?\\n)\\s*(Station(?:\\s*\\([^\\r\\n]*\\))?)\\s*(?=\\r?\\n|$)");
 
     static String withoutEngineLines(final String text) {
         if (text == null || text.isEmpty()) {
