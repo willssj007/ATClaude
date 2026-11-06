@@ -120,7 +120,7 @@ function showUpdate(info) {
     const go = el(`<button class="btn gold">${info.install ? 'Mettre à jour' : 'Ouvrir la page de téléchargement'}</button>`);
     go.addEventListener('click', async () => {
       if (!info.install) {
-        bridge.openUrl((info.asset && info.platform === 'ios' ? info.page : info.page) || 'https://github.com/willssj007/atclaude/releases');
+        bridge.openUrl(info.page || 'https://github.com/willssj007/atclaude/releases');
         close();
         return;
       }
