@@ -2,6 +2,12 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.2 — Équipements et auras
+
+### Atelier
+- **Une seule phrase, comme sur les vraies cartes** : un équipement qui donne +2/+0 et l'initiative affiche « La créature équipée gagne +2/+0 et a l'initiative. » au lieu de deux lignes. Pareil pour les auras (« La créature enchantée gagne +2/+2 et a le vol. ») et pour les effets sur vos créatures.
+- **« Équipement {1} » en dernier** : les mots-clés Équipement, Reconfiguration, Fortification, Pilotage et Seller s'écrivent sous les capacités de la carte, comme sur les cartes imprimées.
+
 ## 0.6.1 — L'Atelier complet
 
 ### Mots-clés : presque tous ceux de Magic

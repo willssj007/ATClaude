@@ -1771,6 +1771,19 @@ function scopeOf(a) {
   }
 }
 
+/** « le vol, la vigilance et l'initiative ». */
+function joinFr(words) {
+  return words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} et ${words[words.length - 1]}`;
+}
+
+/** « flying, vigilance, and first strike ». */
+function joinEn(words) {
+  if (words.length < 3) {
+    return words.join(' and ');
+  }
+  return `${words.slice(0, -1).join(', ')}, and ${words[words.length - 1]}`;
+}
+
 /** « au nombre de… », « à votre total… », « à la force… » : « à » devant un groupe de mots. */
 function aWord(w) {
   if (/^le /.test(w)) return 'au ' + w.slice(3);
@@ -1831,6 +1844,36 @@ function staticCore(a, id, lang, card) {
     case 'grantKeyword': {
       const kw = a.keyword || 'Flying';
       return {s: `Mode$ Continuous | Affected$ ${sc.v} | AddKeyword$ ${kw}`, text: en ? `${S} ${v3('has', 'have')} ${keywordLower(kw)}` : `${S} ${hasKw(kw, pl)}`};
+    }
+    case 'combo': {
+      // Un bonus de force (au plus) et des mots-clés sur les mêmes créatures : une ligne, une phrase.
+      const pt = a.parts.find(x => x.effect !== 'grantKeyword');
+      const kws = [...new Set(a.parts.filter(x => x.effect === 'grantKeyword').map(x => x.keyword || 'Flying'))];
+      let line = `Mode$ Continuous | Affected$ ${sc.v}`;
+      const fr = [];
+      const enParts = [];
+      if (pt) {
+        const k = Math.max(0, Math.round(Number(pt.n) || 0));
+        const [p, t] = pt.effect === 'anthem' ? [k, k] : pt.effect === 'anthemPower' ? [k, 0] : [-k, -k];
+        line += ` | AddPower$ ${p}${t ? ` | AddToughness$ ${t}` : ''}`;
+        const sign = (v) => (v < 0 ? `-${-v}` : `+${v}`);
+        const delta = `${sign(p)}/${pt.effect === 'debuff' ? sign(t) : sign(t)}`;
+        fr.push(`${v3('gagne', 'gagnent')} ${delta}`);
+        enParts.push(`${v3('gets', 'get')} ${delta}`);
+      }
+      if (kws.length) {
+        line += ` | AddKeyword$ ${kws.join(' & ')}`;
+        // « a le vol et l'initiative », « est indestructible » : les mots-clés regroupés par verbe.
+        const byVerb = new Map();
+        for (const kw of kws) {
+          const h = hasKw(kw, pl);
+          const verb = h.split(' ')[0];
+          byVerb.set(verb, [...(byVerb.get(verb) || []), h.slice(verb.length + 1)]);
+        }
+        fr.push([...byVerb].map(([verb, objs]) => `${verb} ${joinFr(objs)}`).join(' et '));
+        enParts.push(`${v3('has', 'have')} ${joinEn(kws.map(keywordLower))}`);
+      }
+      return {s: line, text: en ? `${S} ${enParts.join(' and ')}` : `${S} ${fr.join(' et ')}`};
     }
     case 'anthem':
       return {s: `Mode$ Continuous | Affected$ ${sc.v} | AddPower$ ${n} | AddToughness$ ${n}`, text: en ? `${S} ${v3('gets', 'get')} +${n}/+${n}` : `${S} ${v3('gagne', 'gagnent')} +${n}/+${n}`};
@@ -2453,6 +2496,41 @@ function named(text, name) {
   return String(text).replace(/\b(de|que) CARDNAME/g, (m, w) => (vowel ? `${w[0]}'${name}` : `${w} ${name}`)).replace(/CARDNAME/g, name);
 }
 
+/** Mots-clés écrits après les capacités, comme sur les cartes imprimées (Équipement, Pilotage…). */
+const TRAILING_KEYWORDS = new Set(['Equip', 'Reconfigure', 'Fortify', 'Crew', 'Saddle']);
+
+/** Effets permanents qu'une carte imprimée écrit en une phrase : « gagne +2/+0 et a l'initiative ». */
+const MERGEABLE = new Set(['anthem', 'anthemPower', 'debuff', 'grantKeyword']);
+
+/**
+ * Les capacités, avec leur numéro, après regroupement des effets permanents sur les mêmes créatures (même portée,
+ * filtre, condition, Éminence) : un bonus de force et des mots-clés deviennent une seule capacité « combo ».
+ */
+function mergeStatics(abilities) {
+  const out = [];
+  const groups = new Map();
+  abilities.forEach((a, i) => {
+    if (a.when !== 'static' || !MERGEABLE.has(a.effect)) {
+      out.push([a, i]);
+      return;
+    }
+    const f = a.filter || {};
+    const key = JSON.stringify([a.scope || 'you', f.type || '', !!f.other, a.cond || 'none', a.condN ?? 3, a.condType || '', !!a.eminence]);
+    const g = groups.get(key);
+    const pt = (x) => x.effect !== 'grantKeyword';
+    if (g && !(pt(a) && g.parts.some(pt))) {
+      g.parts.push(a);
+      return;
+    }
+    const entry = {parts: [a], index: i};
+    if (!g) {
+      groups.set(key, entry);
+    }
+    out.push(entry);
+  });
+  return out.map(e => (Array.isArray(e) ? e : [e.parts.length > 1 ? {...e.parts[0], effect: 'combo', parts: e.parts} : e.parts[0], e.index]));
+}
+
 /** Le script complet d'une carte du formulaire. */
 export function buildScript(f) {
   const lang = f.lang === 'en' ? 'en' : 'fr';
@@ -2497,7 +2575,7 @@ export function buildScript(f) {
   if (simple.length) {
     text.push(simple.map((k, i) => i ? keywordName(k, lang).toLowerCase() : keywordName(k, lang)).join(', '));
   }
-  for (const k of kws.filter(k => !simpleKeyword(k))) {
+  for (const k of kws.filter(k => !simpleKeyword(k) && !TRAILING_KEYWORDS.has(k))) {
     const t = keywordText(f, k, lang);
     if (t) {
       text.push(t);
@@ -2505,7 +2583,7 @@ export function buildScript(f) {
   }
   // Chapitres de saga : un par numéro (le premier compte), dans l'ordre ; « K:Chapter » les nomme tous.
   const chapters = new Map();
-  (f.abilities || []).forEach((a, i) => {
+  mergeStatics(f.abilities || []).forEach(([a, i]) => {
     const r = abilityLines(a, i, lang, f);
     if (!r) {
       return;
@@ -2519,6 +2597,13 @@ export function buildScript(f) {
     lines.push(...r.lines);
     text.push(named(r.text, name));
   });
+  // Comme sur les cartes imprimées : « Équipement {1} », « Pilotage 2 »… en dernier, après les capacités.
+  for (const k of kws.filter(k => TRAILING_KEYWORDS.has(k))) {
+    const t = keywordText(f, k, lang);
+    if (t) {
+      text.push(t);
+    }
+  }
   if (chapters.size) {
     const max = Math.max(...chapters.keys());
     const ids = [];
