@@ -3707,11 +3707,6 @@ export function cleanArtist(a) {
   return String(a || '').replace(/[|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
-/** Un nom de groupe utilisable dans un script : une ligne, sans « | » ni « : », 30 caractères au plus. */
-export function cleanGroup(g) {
-  return String(g || '').replace(/[|:\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30);
-}
-
 /** Un texte d'ambiance pour le script : sur une ligne (« \\n » pour aller à la ligne), sans « | », 240 caractères au plus. */
 export function cleanFlavor(t) {
   return String(t || '').replace(/\r/g, '').trim().slice(0, 240).replace(/\|/g, '/').replace(/\n/g, '\\n');
@@ -3720,23 +3715,6 @@ export function cleanFlavor(t) {
 /** Le nom d'un mode (« Souffle des marées — … ») : une ligne, sans « | » ni tiret long, 40 caractères au plus. */
 export function cleanModeName(t) {
   return String(t || '').replace(/[|\r\n—]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
-}
-
-/** Le groupe d'une carte perso, écrit dans son script (« SVar:AtelierGroup:Dragons »), ou "". */
-export function readGroup(script) {
-  return cleanGroup((String(script || '').match(/^SVar:AtelierGroup:(.*)$/m) || [])[1]);
-}
-
-/** Le script avec un autre groupe ("" : sans groupe) ; le reste ne change pas. */
-export function withGroup(script, group) {
-  const kept = String(script || '').split('\n').filter(l => !/^SVar:AtelierGroup:/.test(l));
-  const g = cleanGroup(group);
-  if (g) {
-    // Avant les lignes de présentation, pour que le script reste lisible.
-    const i = kept.findIndex(l => /^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx|Set|Rarity|Artist):/.test(l));
-    kept.splice(i < 0 ? kept.length : i, 0, `SVar:AtelierGroup:${g}`);
-  }
-  return kept.join('\n');
 }
 
 /** Réglages d'affichage écrits dans un script (lignes « SVar:Atelier… »). */
@@ -4065,10 +4043,6 @@ export function buildScript(form) {
   // Texte d'ambiance, en italique sous les capacités (Forge ne s'en sert pas).
   if (cleanFlavor(f.flavor)) {
     lines.push(`SVar:AtelierFlavor:${cleanFlavor(f.flavor)}`);
-  }
-  // Le groupe où la carte est rangée dans l'Atelier (il suit la carte sur les autres appareils).
-  if (cleanGroup(f.group)) {
-    lines.push(`SVar:AtelierGroup:${cleanGroup(f.group)}`);
   }
   lines.push(...displayLines(f));
   return lines.join('\n');

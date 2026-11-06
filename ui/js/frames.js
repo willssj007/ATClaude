@@ -197,6 +197,18 @@ function planeswalkerRules(text) {
 const RARITY_LETTER = {C: 'C', U: 'U', R: 'R', M: 'M', S: 'S'};
 
 /**
+ * Une adresse complète : dans une variable CSS (« --logo: url(…) »), une adresse relative (« cardimg?key=… » sur
+ * téléphone) serait lue depuis le dossier de la feuille de style, et l'image introuvable.
+ */
+export function absoluteUrl(u) {
+  try {
+    return new URL(u, document.baseURI).href;
+  } catch (e) {
+    return u;
+  }
+}
+
+/**
  * Symbole d'extension (à droite du type) : le logo de l'extension perso, teint selon la rareté si elle le demande
  * (comme les vrais symboles), sinon l'enclume de l'Atelier, de la couleur de la rareté.
  */
@@ -204,7 +216,7 @@ function setSymbol(card, logoUrl) {
   const r = RARITY_LETTER[card.crarity] ? ` cf-r${card.crarity}` : '';
   const set = card.cset;
   if (set && logoUrl) {
-    const url = `url(&quot;${esc(logoUrl)}&quot;)`;
+    const url = `url(&quot;${esc(absoluteUrl(logoUrl))}&quot;)`;
     // Teint : la silhouette (masque) colorée, l'ombre autour sur l'enveloppe (le masque l'effacerait).
     return set.tint ? `<span class="cf-set cf-slogo cf-tint${r || ' cf-rC'}" style="--logo:${url}" title="${esc(set.name)}"><i></i></span>`
       : `<span class="cf-set cf-slogo${r}" style="background-image:${url}" title="${esc(set.name)}"></span>`;

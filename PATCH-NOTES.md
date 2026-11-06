@@ -130,7 +130,19 @@ J'ai comparé l'Atelier à tout ce que Forge sait faire, en comptant combien de 
   - Forge accepte les 4 452 combinaisons (chaque effet, chaque déclencheur, chaque effet permanent et chaque choix « Joueur », en français et en anglais) ;
   - 46 essais réussis en vraie partie.
 
+### Atelier : les cartes rangées par extension
+- **Plus de groupes** : les extensions les remplacent. Le champ « Groupe », ses onglets et « Renommer » disparaissent.
+- **Un bloc par extension** dans l'Atelier, avec son logo, son nom et son code, puis les cartes « Sans extension ».
+- **Les onglets d'extension** filtrent toujours les cartes et les jetons.
+- **« Organiser »** range plusieurs cartes d'un coup avec « Mettre dans une extension… » (ou « Aucune extension »).
+- Une carte rangée dans un ancien groupe perd ce groupe la prochaine fois qu'elle est enregistrée.
+
 ### Corrections
+- **Logo d'extension en « Couleur de la rareté »** : il ne s'affichait pas sur téléphone (sur la carte comme dans l'aperçu de l'extension), ni sur PC. Il s'affiche maintenant partout, coloré selon la rareté.
+- **« Partenariat avec »** :
+  - le jeu ne demande plus de choisir un joueur : c'est vous, ou le joueur dont la bibliothèque contient le partenaire ;
+  - si le partenaire n'est pas dans votre bibliothèque (déjà en jeu, en main…), le jeu ne propose plus de la fouiller ;
+  - la question s'écrit « Fouiller votre bibliothèque ? », et la pile comme le journal sont en français.
 - « Chaque adversaire se défausse d'une carte », au lieu de « défausse une carte ».
 - « Qu'Essai… » devant un nom qui commence par une voyelle, au lieu de « q'Essai… ».
 - Un point à la fin des phrases qui finissent par un marqueur (« … deux marqueurs « poison ». »).

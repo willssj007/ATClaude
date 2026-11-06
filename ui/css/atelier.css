@@ -10,7 +10,8 @@
 /* Groupes : un onglet par groupe, puis un bloc par groupe ; « Organiser » choisit des cartes à ranger. */
 .ate-groups { margin: 10px 0 2px; align-items: center; }
 .ate-gn { margin-left: 4px; padding: 0 6px; border-radius: 999px; background: rgba(255, 255, 255, .08); font-size: 11.5px; }
-.ate-gtitle { margin: 16px 0 -4px; font-size: 15px; color: var(--gold-2); }
+.ate-gtitle { display: flex; align-items: center; gap: 2px; margin: 16px 0 -4px; font-size: 15px; color: var(--gold-2); }
+.ate-gtitle .muted { margin-left: 6px; font-weight: 400; }
 .ate-selbar { position: sticky; top: 8px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin: 10px 0; }
 .ate-selbar > span { flex: 1 1 200px; font-size: 13.5px; }
 .ate-tile { position: relative; }

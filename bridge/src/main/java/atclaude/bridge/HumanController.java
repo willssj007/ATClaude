@@ -1,10 +1,14 @@
 package atclaude.bridge;
 
 import forge.game.Game;
+import forge.game.ability.ApiType;
 import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.card.CardCollectionView;
+import forge.game.card.CardLists;
+import forge.game.keyword.Keyword;
 import forge.game.player.Player;
+import forge.game.player.PlayerActionConfirmMode;
 import forge.game.spellability.SpellAbility;
 import forge.game.undo.UndoManager;
 import forge.game.zone.ZoneType;
@@ -13,6 +17,9 @@ import forge.player.PlayerControllerHuman;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Contrôleur du joueur humain (et du joueur qu'il contrôle par la triche) :
@@ -22,7 +29,10 @@ import java.lang.reflect.Method;
  *    mais pas ce qui ne se rembourse pas : points de vie payés (« Payer N points de vie », capacité de mana payée en
  *    vie pendant le paiement, qui reste alors engagée avec son mana dans la réserve), cartes sacrifiées ou défaussées.
  *    Si quelque chose a changé, la partie revient à l'instantané pris par Forge à cette priorité (le même que
- *    « Défaire ») ; s'il n'y en a pas (« Défaire » désactivé, hasard utilisé), au moins les points de vie reviennent.
+ *    « Défaire ») ; s'il n'y en a pas (« Défaire » désactivé, hasard utilisé), au moins les points de vie reviennent ;
+ *  - « Partenariat avec » (« un joueur ciblé peut chercher [le partenaire] dans sa bibliothèque ») : le joueur est
+ *    choisi sans question (celui dont la bibliothèque contient le partenaire, soi-même d'abord), et sans partenaire
+ *    dans la bibliothèque (déjà en jeu, en main…), plus de proposition de fouiller pour rien.
  */
 final class HumanController extends PlayerControllerHuman {
 
@@ -81,6 +91,61 @@ final class HumanController extends PlayerControllerHuman {
             restoreLife(p, life, lostThisTurn);
         }
         return played;
+    }
+
+    @Override
+    public boolean chooseTargetsFor(final SpellAbility sa) {
+        if (isPartnerWith(sa)) {
+            final Player me = getPlayer();
+            final List<Player> order = new ArrayList<>();
+            order.add(me);
+            for (final Player p : getGame().getPlayers()) {
+                if (p != me) {
+                    order.add(p);
+                }
+            }
+            Player pick = null;
+            for (final Player p : order) {
+                if (sa.canTarget(p) && !partnersIn(sa, p).isEmpty()) {
+                    pick = p;
+                    break;
+                }
+            }
+            if (pick == null && sa.canTarget(me)) {
+                pick = me;
+            }
+            if (pick != null) {
+                sa.resetTargets();
+                sa.getTargets().add(pick);
+                return true;
+            }
+        }
+        return super.chooseTargetsFor(sa);
+    }
+
+    @Override
+    public boolean confirmAction(final SpellAbility sa, final PlayerActionConfirmMode mode, final String message, final List<String> options,
+                                 final Card cardToShow, final Map<String, Object> params) {
+        // Fouiller sa bibliothèque pour un partenaire qui n'y est pas : non, sans le demander.
+        if (mode == PlayerActionConfirmMode.ChangeZoneGeneral && isPartnerWith(sa) && partnersIn(sa, getPlayer()).isEmpty()) {
+            return false;
+        }
+        return super.confirmAction(sa, mode, message, options, cardToShow, params);
+    }
+
+    /** La capacité du mot-clé « Partenariat avec » (Forge : chercher la carte nommée dans la bibliothèque du joueur ciblé). */
+    private static boolean isPartnerWith(final SpellAbility sa) {
+        if (sa == null || sa.getApi() != ApiType.ChangeZone || !String.valueOf(sa.getParam("ChangeType")).startsWith("Card.named")) {
+            return false;
+        }
+        final SpellAbility root = sa.getRootAbility();
+        return sa.isKeyword(Keyword.PARTNER_WITH) || root.isKeyword(Keyword.PARTNER_WITH)
+            || (root.getTrigger() != null && root.getTrigger().isKeyword(Keyword.PARTNER_WITH));
+    }
+
+    /** Les cartes de la bibliothèque du joueur que la capacité peut aller chercher. */
+    private static CardCollectionView partnersIn(final SpellAbility sa, final Player p) {
+        return CardLists.getValidCards(p.getCardsIn(ZoneType.Library), sa.getParam("ChangeType"), sa.getActivatingPlayer(), sa.getHostCard(), sa);
     }
 
     /** Ce qu'un lancement annulé ne doit pas changer : vie, réserve, cartes et leur engagement, marqueurs. */

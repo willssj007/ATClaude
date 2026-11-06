@@ -6,10 +6,12 @@ import forge.game.Game;
 import forge.game.card.Card;
 import forge.game.card.CardView;
 import forge.game.card.CardView.CardStateView;
+import forge.game.keyword.Keyword;
 import forge.game.player.PlayerView;
 import forge.game.spellability.SpellAbility;
 import forge.game.spellability.SpellAbilityStackInstance;
 import forge.game.spellability.StackItemView;
+import forge.game.trigger.Trigger;
 import forge.game.zone.ZoneType;
 import forge.item.PaperCard;
 import forge.model.FModel;
@@ -203,6 +205,9 @@ final class French {
                 for (final SpellAbilityStackInstance si : game.getStack()) {
                     if (si.getId() == item.getId()) {
                         out = fromAbility(si.getSpellAbility(), forge);
+                        if (out == null) {
+                            out = keywordTrigger(si.getSpellAbility(), forge);
+                        }
                         break;
                     }
                 }
@@ -359,6 +364,28 @@ final class French {
             fr += " (X = " + sa.getXManaCostPaid() + ")";
         }
         return name + " — " + fr;
+    }
+
+    /**
+     * Déclencheur que Forge tire d'un mot-clé et écrit toujours en anglais quand la carte n'a pas de traduction (cartes
+     * perso) : « Partner with X (When this creature enters, target player may put X into their hand…) ».
+     */
+    private static String keywordTrigger(final SpellAbility sa, final String forge) {
+        if (sa == null || !sa.isTrigger() || sa.getHostCard() == null || !looksEnglish(forge)) {
+            return null;
+        }
+        final Trigger trig = sa.getTrigger();
+        if (trig == null || !trig.isKeyword(Keyword.PARTNER_WITH) || trig.getKeyword() == null) {
+            return null;
+        }
+        final String[] k = trig.getKeyword().getOriginal().split(":");
+        if (k.length < 2) {
+            return null;
+        }
+        final String partner = cardName(k[1]);
+        final String name = GameSerializer.translatedName(sa.getHostCard().getView().getCurrentState());
+        return name + " — Partenariat avec " + partner + " : le joueur ciblé peut mettre " + partner
+            + " dans sa main depuis sa bibliothèque, puis mélanger.";
     }
 
     /** Description de la capacité et de tous ses sous-effets. */

@@ -168,6 +168,13 @@ public final class DesktopMain {
         // L'anglais servi en attendant la version française ne doit pas rester dans le cache du navigateur.
         exchange.getResponseHeaders().add("Cache-Control", img.cacheable() ? "max-age=604800" : "no-store");
         exchange.getResponseHeaders().add("Content-Language", img.lang());
+        // Logo d'extension teint : l'image sert de masque CSS, chargé en mode CORS depuis l'interface (127.0.0.1),
+        // les images venant d'imgN.localhost. Le filtre n'a laissé passer que l'origine de l'interface locale.
+        final String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin != null) {
+            exchange.getResponseHeaders().add("Access-Control-Allow-Origin", origin);
+        }
+        exchange.getResponseHeaders().add("Vary", "Origin");
         reply(exchange, 200, ImageService.contentType(img.file()), Files.readAllBytes(img.file().toPath()));
     }
 

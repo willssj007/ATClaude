@@ -11,8 +11,8 @@ import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
-  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
-import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
+  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './frames.js';
 
 /** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
 const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scope: 'Qui', keyword: 'Mot-clé', token: 'Jeton', mana: 'Mana',
@@ -173,23 +173,6 @@ export class Atelier {
 
   // ------------------------------------------------------------------ liste
 
-  /** Le groupe d'une carte perso (écrit dans son script), "" sans groupe. */
-  groupOf(c) {
-    return readGroup(c.script) || cleanGroup(c.form && c.form.group);
-  }
-
-  /** Les groupes existants, avec leur nombre de cartes et de jetons, par ordre alphabétique. */
-  groups() {
-    const n = new Map();
-    for (const c of this.data.cards) {
-      const g = this.groupOf(c);
-      if (g) {
-        n.set(g, (n.get(g) || 0) + 1);
-      }
-    }
-    return [...n].sort((a, b) => a[0].localeCompare(b[0], 'fr'));
-  }
-
   /** L'extension perso d'une carte (son identifiant, si l'extension existe encore), "" sans extension. */
   setOf(c) {
     const id = setIdOf(c.script);
@@ -198,7 +181,6 @@ export class Atelier {
 
   renderList() {
     const d = this.data;
-    const groups = this.groups();
     const sets = d.sets || [];
     let setFilter = this.setFilter;
     if (setFilter === undefined) {
@@ -212,44 +194,22 @@ export class Atelier {
       setFilter = '';
     }
     this.setFilter = setFilter;
-    let filter = this.groupFilter;
-    if (filter === undefined) {
-      try {
-        filter = JSON.parse(localStorage.getItem('at.atelier.group') || '""');
-      } catch (e) {
-        filter = '';
-      }
-    }
-    // Un groupe qui n'existe plus (vidé ou renommé ailleurs) : toutes les cartes.
-    if (filter && filter !== '-' && !groups.some(g => g[0] === filter)) {
-      filter = '';
-    }
-    this.groupFilter = filter;
     const inSet = (c) => !setFilter || (setFilter === '-' ? !this.setOf(c) : this.setOf(c) === setFilter);
-    const shown = (c) => inSet(c) && (!filter || (filter === '-' ? !this.groupOf(c) : this.groupOf(c) === filter));
-    const cards = d.cards.filter(c => !c.token && shown(c));
-    const tokens = d.cards.filter(c => c.token && shown(c));
-    const loose = d.cards.filter(c => !this.groupOf(c)).length;
+    const cards = d.cards.filter(c => !c.token && inSet(c));
+    const tokens = d.cards.filter(c => c.token && inSet(c));
     const noSet = d.cards.filter(c => !this.setOf(c)).length;
     const setChip = (v, label, count, set) => `<button class="chip${setFilter === v ? ' on' : ''}" data-sfilter="${esc(v)}">${set ? setLogoHtml(set) : ''}${esc(label)}
       <span class="ate-gn">${count}</span></button>`;
     const sel = this.selection;
-    const chip = (v, label, count) => `<button class="chip${filter === v ? ' on' : ''}" data-gfilter="${esc(v)}">${esc(label)}
-      <span class="ate-gn">${count}</span></button>`;
     this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
       <div class="ate-top"><h1>Atelier</h1>${d.cards.length ? `<button class="btn" data-organize>${sel ? 'Terminé' : 'Organiser'}</button>` : ''}
         <button class="btn gold" data-new>＋ Nouvelle carte</button></div>
       <p class="muted small">Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles
         se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker).</p>
-      ${groups.length || sel ? `<div class="ate-groups chips">${chip('', 'Toutes', d.cards.length)}${groups.map(([g, n]) => chip(g, g, n)).join('')}
-        ${groups.length && loose ? chip('-', 'Sans groupe', loose) : ''}
-        ${filter && filter !== '-' ? `<button class="btn small" data-grename title="Renommer ce groupe">Renommer</button>` : ''}</div>` : ''}
       ${sets.length ? `<div class="ate-groups chips ate-setfilter">${setChip('', 'Toutes les extensions', d.cards.length)}${sets.map(x => setChip(x.id, x.name, d.cards.filter(c => this.setOf(c) === x.id).length, x)).join('')}
         ${noSet ? setChip('-', 'Sans extension', noSet) : ''}</div>` : ''}
       ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
-        <button class="btn small gold" data-gput${sel.size ? '' : ' disabled'}>Mettre dans un groupe…</button>
-        <button class="btn small" data-gout${sel.size ? '' : ' disabled'}>Retirer du groupe</button>
-        <button class="btn small" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
+        <button class="btn small gold" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
         <button class="btn small" data-gall>${cards.length + tokens.length && [...cards, ...tokens].every(c => sel.has(c.name)) ? 'Aucune' : 'Toutes'}</button></div>` : ''}
       <div class="ate-cardgroups"></div>
       <div class="ate-top"><h2>Mes extensions</h2><button class="btn" data-newset>＋ Nouvelle extension</button></div>
@@ -263,7 +223,7 @@ export class Atelier {
       <div class="ate-top"><h2>Mes jetons</h2><button class="btn" data-new-token>＋ Nouveau jeton</button></div>
       <p class="muted small">Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso
         les créent (effet « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.</p>
-      <div class="ate-grid ate-tokens">${tokens.length ? '' : `<p class="muted">${filter ? 'Aucun jeton dans ce groupe.' : 'Aucun jeton perso pour l\'instant.'}</p>`}</div>
+      <div class="ate-grid ate-tokens">${tokens.length ? '' : `<p class="muted">${setFilter ? 'Aucun jeton dans cette extension.' : 'Aucun jeton perso pour l\'instant.'}</p>`}</div>
       <h2>Types de créature perso</h2>
       <p class="muted small">Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et
         un effet qui cite un type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.</p>
@@ -280,18 +240,19 @@ export class Atelier {
       }
       return tile;
     };
-    // Toutes les cartes : un bloc par groupe (puis celles sans groupe) ; un groupe choisi : ses cartes seulement.
+    // Toutes les extensions : un bloc par extension (puis les cartes sans extension) ; une extension choisie : ses cartes.
     const holder = this.root.querySelector('.ate-cardgroups');
-    const blocks = !filter && groups.length
-      ? [...groups.map(([g]) => [g, cards.filter(c => this.groupOf(c) === g)]), ['Sans groupe', cards.filter(c => !this.groupOf(c))]].filter(b => b[1].length)
-      : [['', cards]];
-    for (const [title, list] of blocks) {
-      if (title) {
-        holder.appendChild(el(`<h3 class="ate-gtitle">${esc(title)} <span class="ate-gn">${list.length}</span></h3>`));
+    const blocks = !setFilter && sets.some(x => cards.some(c => this.setOf(c) === x.id))
+      ? [...sets.map(x => [x, cards.filter(c => this.setOf(c) === x.id)]), ['-', cards.filter(c => !this.setOf(c))]].filter(b => b[1].length)
+      : [[null, cards]];
+    for (const [set, list] of blocks) {
+      if (set) {
+        holder.appendChild(el(`<h3 class="ate-gtitle">${set === '-' ? 'Sans extension' : `${setLogoHtml(set)}${esc(set.name)} <span class="muted small">${esc(set.code)}</span>`}
+          <span class="ate-gn">${list.length}</span></h3>`));
       }
       const grid = el('<div class="ate-grid ate-cards"></div>');
       if (!list.length) {
-        grid.appendChild(el(`<p class="muted">${filter ? 'Aucune carte dans ce groupe.' : 'Aucune carte perso pour l\'instant.'}</p>`));
+        grid.appendChild(el(`<p class="muted">${setFilter ? 'Aucune carte dans cette extension.' : 'Aucune carte perso pour l\'instant.'}</p>`));
       }
       list.forEach(c => grid.appendChild(tileOf(c)));
       holder.appendChild(grid);
@@ -303,7 +264,6 @@ export class Atelier {
         return;
       }
       const tile = e.target.closest('.ate-tile');
-      const gf = e.target.closest('[data-gfilter]');
       const sf = e.target.closest('[data-sfilter]');
       if (sf) {
         this.setFilter = sf.dataset.sfilter;
@@ -328,15 +288,7 @@ export class Atelier {
         this.askSet([...this.selection]);
         return;
       }
-      if (gf) {
-        this.groupFilter = gf.dataset.gfilter;
-        try {
-          localStorage.setItem('at.atelier.group', JSON.stringify(this.groupFilter));
-        } catch (err) {
-          // mémoire du navigateur indisponible : le filtre ne sera pas retenu
-        }
-        this.renderList();
-      } else if (e.target.closest('[data-organize]')) {
+      if (e.target.closest('[data-organize]')) {
         this.selection = this.selection ? null : new Set();
         this.renderList();
       } else if (tile && this.selection) {
@@ -353,12 +305,6 @@ export class Atelier {
         const all = visible.every(n => this.selection.has(n));
         visible.forEach(n => (all ? this.selection.delete(n) : this.selection.add(n)));
         this.renderList();
-      } else if (e.target.closest('[data-gput]')) {
-        this.askGroup([...this.selection]);
-      } else if (e.target.closest('[data-gout]')) {
-        await this.setGroup([...this.selection], '');
-      } else if (e.target.closest('[data-grename]')) {
-        this.renameGroup(this.groupFilter);
       } else if (e.target.closest('[data-new]')) {
         this.edit(null);
       } else if (e.target.closest('[data-new-token]')) {
@@ -379,93 +325,6 @@ export class Atelier {
         this.root.querySelector('[data-addtype]').click();
       }
     });
-  }
-
-  /** Choisir le groupe des cartes choisies : un groupe existant, ou un nouveau nom. */
-  askGroup(names) {
-    const groups = this.groups();
-    customBox(`Ranger ${names.length} carte${names.length > 1 ? 's' : ''}`, (body, footer, close) => {
-      body.innerHTML = `${groups.length ? `<p class="muted small">Dans un groupe existant :</p>
-        <div class="chips ate-gpick">${groups.map(([g, n]) => `<button class="chip" data-gpick="${esc(g)}">${esc(g)} <span class="ate-gn">${n}</span></button>`).join('')}</div>` : ''}
-        <label class="ate-field"><span>${groups.length ? 'Ou un nouveau groupe' : 'Nouveau groupe'}</span>
-        <input type="text" class="ate-gnew" maxlength="30" placeholder="Dragons, Deck d'Ilona, À finir…"></label>`;
-      const input = body.querySelector('.ate-gnew');
-      const go = async (g) => {
-        if (!cleanGroup(g)) {
-          input.focus();
-          return;
-        }
-        close();
-        await this.setGroup(names, g);
-      };
-      body.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-gpick]');
-        if (b) {
-          go(b.dataset.gpick);
-        }
-      });
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          go(input.value);
-        }
-      });
-      const ok = el('<button class="btn gold">Ranger</button>');
-      ok.addEventListener('click', () => go(input.value));
-      const cancel = el('<button class="btn">Annuler</button>');
-      cancel.addEventListener('click', close);
-      footer.append(cancel, ok);
-    }, {narrow: true});
-  }
-
-  /** Renommer un groupe : toutes ses cartes passent dans le nouveau nom (ou dans un groupe existant). */
-  renameGroup(group) {
-    const names = this.data.cards.filter(c => this.groupOf(c) === group).map(c => c.name);
-    customBox(`Renommer « ${group} »`, (body, footer, close) => {
-      body.innerHTML = `<label class="ate-field"><span>Nouveau nom</span><input type="text" class="ate-gnew" maxlength="30" value="${esc(group)}"></label>
-        <p class="muted small">Pour défaire le groupe, utilise « Organiser » puis « Retirer du groupe ».</p>`;
-      const input = body.querySelector('.ate-gnew');
-      const go = async () => {
-        const g = cleanGroup(input.value);
-        if (!g) {
-          input.focus();
-          return;
-        }
-        close();
-        this.groupFilter = g;
-        await this.setGroup(names, g);
-      };
-      input.addEventListener('keydown', (e) => e.key === 'Enter' && go());
-      const ok = el('<button class="btn gold">Renommer</button>');
-      ok.addEventListener('click', go);
-      const cancel = el('<button class="btn">Annuler</button>');
-      cancel.addEventListener('click', close);
-      footer.append(cancel, ok);
-    }, {narrow: true});
-  }
-
-  /** Met les cartes nommées dans un groupe ("" : sans groupe) : leur script (et leur formulaire) gardent le groupe. */
-  async setGroup(names, group) {
-    const g = cleanGroup(group);
-    let done = 0;
-    for (const name of names) {
-      const c = this.data.cards.find(x => x.name === name);
-      if (!c || this.groupOf(c) === g) {
-        continue;
-      }
-      try {
-        await bridge.request('customSave', {script: withGroup(c.script, g), previous: c.name, art: null,
-          form: c.form ? {...c.form, group: g} : null});
-        done++;
-      } catch (e) {
-        toast(`${name} : ${e.message}`, {error: true, duration: 6000});
-      }
-    }
-    if (done) {
-      toast(g ? `${done} carte${done > 1 ? 's' : ''} dans « ${g} ».` : `${done} carte${done > 1 ? 's' : ''} sans groupe.`, {title: 'Atelier'});
-      this.onChanged();
-    }
-    this.selection = this.selection ? new Set() : null;
-    await this.show();
   }
 
   /**
@@ -491,7 +350,7 @@ export class Atelier {
       const tint = body.querySelector('.es-tint');
       const previews = () => {
         const box = body.querySelector('.ate-esp');
-        const url = logoUrl ? `url(&quot;${esc(logoUrl)}&quot;)` : '';
+        const url = logoUrl ? `url(&quot;${esc(absoluteUrl(logoUrl))}&quot;)` : '';
         box.innerHTML = !url ? '<span class="muted small">Pas de logo : l\'enclume de l\'Atelier, de la couleur de la rareté.</span>'
           : ['C', 'U', 'R', 'M'].map(r => tint.checked ? `<span class="cf-set cf-slogo cf-tint cf-r${r}" style="--logo:${url}"><i></i></span>`
             : `<span class="cf-set cf-slogo" style="background-image:${url}"></span>`).join('');
@@ -627,8 +486,13 @@ export class Atelier {
         continue;
       }
       try {
-        await bridge.request('customSave', {script: withDisplay(c.script, {...readDisplay(c.script), set: id}), previous: c.name, art: null,
-          form: c.form ? {...c.form, set: id} : null});
+        // La ligne de groupe d'avant la 0.6.6 (les groupes ont laissé la place aux extensions) s'en va au passage.
+        const script = String(c.script || '').split('\n').filter(l => !/^SVar:AtelierGroup:/.test(l)).join('\n');
+        const form = c.form ? {...c.form, set: id} : null;
+        if (form) {
+          delete form.group;
+        }
+        await bridge.request('customSave', {script: withDisplay(script, {...readDisplay(script), set: id}), previous: c.name, art: null, form});
         done++;
       } catch (e) {
         toast(`${name} : ${e.message}`, {error: true, duration: 6000});
@@ -668,10 +532,8 @@ export class Atelier {
     if (!entry) {
       this.form.artist = lastArtist();
     }
-    // Le groupe est dans le script (il a pu être changé par « Organiser », ou sur un autre appareil).
-    if (entry && entry.script) {
-      this.form.group = readGroup(entry.script);
-    }
+    // Les groupes (avant la 0.6.6) ont laissé la place aux extensions.
+    delete this.form.group;
     this.subNotes = [];
     this.form.token = !!(this.form.token || (entry && entry.token));
     this.form.colors = this.form.colors || [];
@@ -967,9 +829,6 @@ export class Atelier {
     const f = this.form;
     left.innerHTML = `
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
-      <label class="ate-field"><span>Groupe <span class="muted small">(pour ranger tes cartes dans l'Atelier)</span></span>
-        <input type="text" data-k="group" list="ate-groups" value="${esc(f.group || '')}" placeholder="Aucun : Dragons, Deck d'Ilona, À finir…" maxlength="30">
-        <datalist id="ate-groups">${(this.data ? this.groups() : []).map(([g]) => `<option value="${esc(g)}">`).join('')}</datalist></label>
       ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
         `<button class="ate-pip${f.colors.includes(c) ? ' first' : ''}" data-tcolor="${c}" title="${l}">${symbol(c)}</button>`).join('')}
         <span class="muted small">${f.colors.length ? '' : 'Incolore'}</span></div></div>` : `<div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>`}
