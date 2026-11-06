@@ -239,7 +239,7 @@ public final class Bridge {
         runOnEdt(() -> dispatch(type, message));
     }
 
-    private static final java.util.Set<String> NETWORK_REQUESTS = java.util.Set.of("sync", "linkGithub");
+    private static final java.util.Set<String> NETWORK_REQUESTS = java.util.Set.of("sync", "linkGithub", "updateCheck", "updateDownload", "updateInstall");
     private static final java.util.Set<String> CATALOG_REQUESTS = java.util.Set.of(
             "searchCards", "cardInfo", "prints", "chooseArt", "editions", "listDecks", "loadDeck", "saveDeck", "deleteDeck",
             "parseDeck", "validateDeck", "analyzeDeck", "randomCommanderDeck", "profile", "updateProfile", "trophies", "stats",
@@ -361,6 +361,29 @@ public final class Bridge {
         }
     }
 
+    /** Mises à jour : vérifier la dernière version, la télécharger (avec sa progression), l'installer (Windows). */
+    private JsonElement updates(final String type, final JsonObject m) throws java.io.IOException {
+        if ("updateCheck".equals(type)) {
+            return Updates.check(appVersion, System.getProperty("atclaude.channel", ""), ios);
+        }
+        if ("updateDownload".equals(type)) {
+            // Le téléchargement avance : l'interface montre une barre (updateProgress).
+            final java.io.File file = Updates.download(m.get("url").getAsString(), m.has("name") ? m.get("name").getAsString() : "", (done, total) -> {
+                final JsonObject p = new JsonObject();
+                p.addProperty("type", "updateProgress");
+                p.addProperty("done", done);
+                p.addProperty("total", total);
+                send(p);
+            });
+            final JsonObject o = new JsonObject();
+            o.addProperty("file", file.getAbsolutePath());
+            return o;
+        }
+        // Windows : la nouvelle version remplace l'appli, qui se relance (Android : c'est l'appli qui installe l'APK).
+        Updates.installWindows(new java.io.File(m.get("file").getAsString()));
+        return new JsonObject();
+    }
+
     private JsonElement handle(final String type, final JsonObject m) {
         switch (type) {
             case "imageDirect":
@@ -435,6 +458,14 @@ public final class Bridge {
                 return account.link(m.has("token") ? m.get("token").getAsString() : "");
             case "unlinkGithub":
                 return account.unlink();
+            case "updateCheck":
+            case "updateDownload":
+            case "updateInstall":
+                try {
+                    return updates(type, m);
+                } catch (final java.io.IOException e) {
+                    throw new IllegalStateException("Mise à jour impossible : " + e.getMessage(), e);
+                }
             case "sync":
                 return account.sync(m.has("prefs") && m.get("prefs").isJsonObject() ? m.getAsJsonObject("prefs") : new JsonObject(),
                         m.has("prefsAt") ? m.get("prefsAt").getAsLong() : 0, () -> session != null);

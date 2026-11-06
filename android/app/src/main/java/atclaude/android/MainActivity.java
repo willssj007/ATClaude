@@ -93,6 +93,8 @@ public class MainActivity extends Activity {
             System.setProperty("atclaude.channel", "test");
         }
         current = this;
+        // Mises à jour : l'APK téléchargé va dans le cache de l'appli, d'où UpdateProvider le donne à l'installateur.
+        System.setProperty("atclaude.updatesDir", UpdateProvider.dir(this).getPath());
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         web = new WebView(this);
@@ -280,6 +282,35 @@ public class MainActivity extends Activity {
             }
         }
 
+        /**
+         * Installe l'APK d'une mise à jour téléchargée : « installing » (l'installateur d'Android s'ouvre), « permission »
+         * (Android demande d'abord d'autoriser l'installation depuis cette appli : ses réglages s'ouvrent, et
+         * l'installation reprend au retour), ou « missing » (fichier introuvable).
+         */
+        @JavascriptInterface
+        public String installUpdate(final String path) {
+            final MainActivity activity = current;
+            final java.io.File file = new java.io.File(path == null ? "" : path);
+            if (activity == null || !file.isFile() || !file.getName().endsWith(".apk")
+                    || !file.getParentFile().equals(UpdateProvider.dir(activity))) {
+                return "missing";
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.getPackageManager().canRequestPackageInstalls()) {
+                activity.pendingUpdate = file;
+                activity.ui.post(() -> {
+                    try {
+                        activity.startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + activity.getPackageName())));
+                    } catch (final ActivityNotFoundException e) {
+                        activity.startInstall(file);
+                    }
+                });
+                return "permission";
+            }
+            activity.ui.post(() -> activity.startInstall(file));
+            return "installing";
+        }
+
         @JavascriptInterface
         public void openUrl(final String url) {
             final MainActivity activity = current;
@@ -405,6 +436,28 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         web.onResume();
+        // Retour des réglages « installer des applis inconnues » : l'installation reprend si elle est permise.
+        final java.io.File file = pendingUpdate;
+        if (file != null && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || getPackageManager().canRequestPackageInstalls())) {
+            pendingUpdate = null;
+            startInstall(file);
+        }
+    }
+
+    /** Mise à jour en attente de la permission d'installer (réglages ouverts). */
+    private java.io.File pendingUpdate;
+
+    /** Ouvre l'installateur d'Android sur l'APK de la mise à jour (il demande confirmation ; les données sont gardées). */
+    private void startInstall(final java.io.File file) {
+        final Uri uri = Uri.parse("content://" + getPackageName() + ".updates/" + Uri.encode(file.getName()));
+        final Intent install = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, UpdateProvider.MIME)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(install);
+        } catch (final ActivityNotFoundException e) {
+            Log.w(TAG, "installateur introuvable", e);
+        }
     }
 
     @Override

@@ -2,7 +2,15 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.6.4 — Sous-types, ordre et noms des capacités, texte d'ambiance
+## 0.6.4 — Mises à jour automatiques, sous-types, ordre et noms des capacités
+
+### Mises à jour automatiques
+- **Au lancement**, l'appli regarde s'il y a une nouvelle version, au plus une fois toutes les six heures. AT TEST regarde les versions d'AT TEST. Une fenêtre montre ses nouveautés, avec trois choix : « Mettre à jour », « Plus tard » ou « Ignorer cette version ».
+- **Android** : la nouvelle version se télécharge dans l'appli, avec une barre de progression, puis l'installateur d'Android s'ouvre. Il suffit de confirmer. La première fois, Android demande d'autoriser l'installation depuis Arcane Table ; l'installation reprend au retour.
+- **Windows** : la nouvelle version se télécharge, puis Arcane Table se ferme, se remplace et se relance tout seul.
+- **iPhone et iPad** : l'appli prévient et ouvre la page de téléchargement. L'IPA se réinstalle avec l'outil qui l'a installé (AltStore, SideStore, Sideloadly…).
+- **Tes decks, ton compte et tes cartes perso sont gardés.**
+- **Réglages** : « Chercher les mises à jour au lancement » (activé par défaut) et « Vérifier maintenant ».
 
 ### Atelier
 - **Les sous-types en pastilles** : on en retire un en touchant ✕. Retirer « Équipement » retire aussi le mot-clé qui le donnait.

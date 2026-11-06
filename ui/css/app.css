@@ -1534,3 +1534,16 @@ body.in-game #menu-fx, body.in-replay #menu-fx { display: none; }
 /* AT TEST (version de test) : un badge à côté du logo, pour ne pas confondre avec l'appli publiée. */
 body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800;
   letter-spacing: 0.06em; color: #1b0f00; background: #ff9f43; align-self: center; }
+
+/* Mise à jour : barre de téléchargement et nouveautés de la version. */
+.upd-bar { position: relative; height: 26px; margin: 10px 0 12px; border-radius: 999px; background: rgba(0, 0, 0, .35); border: 1px solid var(--line-strong); overflow: hidden; }
+.upd-bar.hidden { display: none; }
+.upd-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--gold), var(--gold-2)); transition: width .25s; }
+.upd-text { position: relative; display: block; padding: 4px 12px; line-height: 18px; color: var(--text); text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
+.upd-notes { margin-top: 6px; }
+.upd-notes > summary { cursor: pointer; font-weight: 600; }
+.upd-md { max-height: 46vh; overflow: auto; margin-top: 6px; padding-right: 6px; font-size: 14px; line-height: 1.45; }
+.upd-md h3 { margin: 10px 0 4px; font-size: 16px; color: var(--gold-2); }
+.upd-md h4, .upd-md h5 { margin: 8px 0 4px; font-size: 14px; }
+.upd-md ul { margin: 4px 0 8px; padding-left: 20px; }
+.upd-md p { margin: 4px 0; }

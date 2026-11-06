@@ -138,6 +138,11 @@ export const bridge = {
     };
   },
 
+  /** Android : installe l'APK d'une mise à jour téléchargée (« installing », « permission » ou « missing »). */
+  installUpdate(path) {
+    return android && window.AndroidBridge.installUpdate ? window.AndroidBridge.installUpdate(path) : 'missing';
+  },
+
   /** Ouvre un lien dans le navigateur du système. */
   openUrl(url) {
     if (android && window.AndroidBridge.openUrl) {

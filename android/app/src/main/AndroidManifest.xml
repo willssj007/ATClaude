@@ -4,6 +4,8 @@
     <!-- Images des cartes (Scryfall) et import des decks Moxfield. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Mise à jour depuis l'appli : l'APK téléchargé est confié à l'installateur d'Android (qui demande confirmation). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="${appLabel}"
@@ -27,5 +29,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- L'APK de la mise à jour, en lecture pour l'installateur seulement. -->
+        <provider
+            android:name=".UpdateProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

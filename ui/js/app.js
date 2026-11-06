@@ -13,6 +13,7 @@ import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
 import {enhanceSelects} from './select.js';
+import {checkUpdates} from './updates.js';
 import {icon} from './icons.js';
 import {ReplayScreen} from './replay.js';
 import {StatsScreen} from './stats.js';
@@ -395,6 +396,10 @@ function settingsScreen() {
         <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques, bruitages, icônes et illustrations des apparences : composés, synthétisés et dessinés pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
+        <h2 style="margin-top:26px">Mises à jour</h2>
+        ${row('autoUpdate', 'Chercher les mises à jour au lancement', bridge.ios ? 'Prévenir quand une nouvelle version est publiée (sur iPhone et iPad, elle se réinstalle avec ton outil d\'installation).'
+          : 'Prévenir quand une nouvelle version est publiée, et l\'installer en un toucher (tes decks, ton compte et tes cartes perso restent).')}
+        <button class="btn" data-update-check>Vérifier maintenant</button>
       </div>`;
       root.querySelectorAll('[data-pref-select]').forEach(sel => {
         sel.value = prefs.get(sel.dataset.prefSelect);
@@ -431,6 +436,10 @@ function settingsScreen() {
         livePreviews(root.querySelector('.appearance'));
       });
       root.onclick = (e) => {
+        if (e.target.closest('[data-update-check]')) {
+          checkUpdates();
+          return;
+        }
         if (e.target.closest('[data-a]') && isPlaneswalker()) {
           openLedger();
           return;
@@ -472,6 +481,12 @@ function onReady(hello) {
   ready = true;
   applyMode();
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
+  // Une nouvelle version publiée ? Un peu après le lancement, pour ne pas ralentir l'arrivée sur l'accueil.
+  setTimeout(() => {
+    if (!inMatch) {
+      checkUpdates({auto: true});
+    }
+  }, 4000);
   checkUnlocks();
   $('#loading').classList.add('hidden');
   if (autotest) {

@@ -113,6 +113,8 @@ const DEFAULTS = {
   holdPriority: false,
   autoPass: true,
   discordPresence: true,
+  // Chercher une nouvelle version au lancement de l'appli.
+  autoUpdate: true,
   showEnglish: false,
   lastSetup: null,
   menuTheme: 'arcane',
