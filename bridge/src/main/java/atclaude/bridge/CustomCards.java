@@ -672,7 +672,10 @@ final class CustomCards {
                 final String k = line.substring(2).trim();
                 // Lignes que Forge lit sans en faire un mot-clé de sa liste : chapitres de saga, marqueurs à l'arrivée,
                 // niveaux de classe.
-                final boolean special = k.startsWith("Chapter:") || k.startsWith("etbCounter:") || k.startsWith("Class:");
+                // Lignes K: que Forge lit sans en faire un mot-clé : chapitres, marqueurs à l'arrivée, classes, copie à l'arrivée,
+                // et les mots-clés en phrase (« CARDNAME must be blocked if able. »).
+                final boolean special = k.startsWith("Chapter:") || k.startsWith("etbCounter:") || k.startsWith("Class:") || k.startsWith("ETBReplacement:")
+                        || KW_TEXT_LINES.contains(k);
                 if (!special && forge.game.keyword.Keyword.getInstance(k).getKeyword() == forge.game.keyword.Keyword.UNDEFINED) {
                     throw new IllegalArgumentException("Mot-clé inconnu de Forge : « " + k + " »" + where + ".");
                 }
@@ -959,7 +962,7 @@ final class CustomCards {
             Map.entry("outlast", "Résilience"),
             Map.entry("champion", "Appui"),
             Map.entry("annihilator", "Annihilateur"),
-            Map.entry("bushido", "Bushido"),
+            Map.entry("bushido", "Bushido"), Map.entry("hideaway", "Cachette"),
             Map.entry("toxic", "Toxique"),
             Map.entry("afterlife", "Au-delà"),
             Map.entry("fabricate", "Fabrication"),
@@ -1111,7 +1114,33 @@ final class CustomCards {
     }
 
     /** Les mots-clés que Forge écrit en phrase (« Suspend 3—{1}{U} », « Escape—… ») : leur texte des cartes françaises, ou null. */
+    /** Mots-clés en phrase que l'Atelier écrit (Forge les connaît, sans en faire des mots-clés). */
+    private static final Set<String> KW_TEXT_LINES = Set.of("CARDNAME must be blocked if able.", "All creatures able to block CARDNAME do so.",
+            "CARDNAME can't attack or block alone.", "CARDNAME can't attack alone.", "Prevent all damage that would be dealt to CARDNAME.",
+            "Prevent all combat damage that would be dealt to CARDNAME.", "You may choose not to untap CARDNAME during your untap step.",
+            "CARDNAME can be your commander.", "A deck can have any number of cards named CARDNAME.");
+
+    /** Mots-clés en phrase (« CARDNAME must be blocked if able. ») : Forge les écrit en anglais, avec le nom de la carte. */
+    private static final String[][] KW_SENTENCES = {
+        {"^(.+?) must be blocked if able\\.?$", "$1 doit être bloquée si possible."},
+        {"^All creatures able to block (.+?) do so\\.?$", "Toutes les créatures capables de bloquer $1 le font."},
+        {"^(.+?) can't attack or block alone\\.?$", "$1 ne peut pas attaquer ou bloquer seule."},
+        {"^(.+?) can't attack alone\\.?$", "$1 ne peut pas attaquer seule."},
+        {"^Prevent all combat damage that would be dealt to (.+?)\\.?$", "Prévenez toutes les blessures de combat qui devraient être infligées à $1."},
+        {"^Prevent all damage that would be dealt to (.+?)\\.?$", "Prévenez toutes les blessures qui devraient être infligées à $1."},
+        {"^You may choose not to untap (.+?) during your untap step\\.?$", "Vous pouvez choisir de ne pas dégager $1 pendant votre étape de dégagement."},
+        {"^(.+?) can be your commander\\.?$", "$1 peut être votre commandant."},
+        {"^A deck can have any number of cards named (.+?)\\.?$", "Un deck peut contenir n'importe quel nombre de cartes appelées $1."},
+    };
+    private static final Pattern[] KW_SENTENCE_PATTERNS = java.util.Arrays.stream(KW_SENTENCES).map(x -> Pattern.compile(x[0])).toArray(Pattern[]::new);
+
     static String keywordPhrase(final String core) {
+        for (int i = 0; i < KW_SENTENCE_PATTERNS.length; i++) {
+            final java.util.regex.Matcher s = KW_SENTENCE_PATTERNS[i].matcher(core);
+            if (s.matches()) {
+                return s.replaceFirst(KW_SENTENCES[i][1]);
+            }
+        }
         java.util.regex.Matcher m = KW_NCOST.matcher(core);
         if (m.matches()) {
             final String name = Map.of("Suspend", "Suspension", "Awaken", "Éveil", "Reinforce", "Renfort", "Impending", "Imminence").get(m.group(1));

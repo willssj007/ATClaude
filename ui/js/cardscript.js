@@ -108,6 +108,7 @@ export const KW_ALL = [
   ['Champion', 'Appui', 'Champion', 'ability', 'type', null, 'Creature', {fr: 'Appui {deType}', en: 'Champion {aType}'}],
   ['Annihilator', 'Annihilateur', 'Annihilator', 'number', 'n', null, 2],
   ['Bushido', 'Bushido', 'Bushido', 'number', 'n', null, 1],
+  ['Hideaway', 'Cachette', 'Hideaway', 'number', 'n', null, 4],
   ['Toxic', 'Toxique', 'Toxic', 'number', 'n', null, 1],
   ['Afterlife', 'Au-delà', 'Afterlife', 'number', 'n', null, 1],
   ['Fabricate', 'Fabrication', 'Fabricate', 'number', 'n', null, 1],
@@ -301,6 +302,11 @@ export const WHEN = [
   {id: 'attacks', kind: 'T', label: 'Quand elle attaque'},
   {id: 'blocks', kind: 'T', label: 'Quand elle bloque'},
   {id: 'blocked', kind: 'T', label: 'Quand elle devient bloquée'},
+  {id: 'unblocked', kind: 'T', label: 'Quand elle attaque et n\'est pas bloquée'},
+  {id: 'blocksCreature', kind: 'T', label: 'Quand elle devient bloquée par une créature (une fois par bloqueur)'},
+  {id: 'becomesTarget', kind: 'T', label: 'Quand elle devient la cible d\'un sort ou d\'une capacité'},
+  {id: 'becomesTargetOpp', kind: 'T', label: 'Quand elle devient la cible d\'un sort ou d\'une capacité qu\'un adversaire contrôle'},
+  {id: 'untaps', kind: 'T', label: 'Quand elle se dégage'},
   {id: 'combatDamage', kind: 'T', label: 'Quand elle inflige des blessures de combat à un joueur'},
   {id: 'dealsDamage', kind: 'T', label: 'Quand elle inflige des blessures'},
   {id: 'enrage', kind: 'T', label: 'Quand elle subit des blessures (Rage)'},
@@ -313,6 +319,13 @@ export const WHEN = [
   {id: 'attacksAlly', kind: 'T', label: 'Quand une de vos créatures attaque', filter: true},
   {id: 'youAttack', kind: 'T', label: 'Quand vous attaquez'},
   {id: 'combatDamageAlly', kind: 'T', label: 'Quand une de vos créatures inflige des blessures de combat à un joueur', filter: true},
+  {id: 'combatDamageOnce', kind: 'T', label: 'Quand une ou plusieurs de vos créatures infligent des blessures de combat à un joueur'},
+  {id: 'attacksYou', kind: 'T', label: 'Quand une créature vous attaque (vous ou un de vos planeswalkers)'},
+  {id: 'anyEnters', kind: 'T', label: 'Quand une autre créature arrive (sous n\'importe quel contrôle)'},
+  {id: 'tokenEnters', kind: 'T', label: 'Quand un jeton arrive sous votre contrôle'},
+  {id: 'nontokenDies', kind: 'T', label: 'Quand une créature non-jeton que vous contrôlez meurt'},
+  {id: 'artifactDies', kind: 'T', label: 'Quand un artefact que vous contrôlez est mis dans un cimetière depuis le champ de bataille'},
+  {id: 'oppLandfall', kind: 'T', label: 'Quand un terrain arrive sous le contrôle d\'un adversaire'},
   {id: 'allyDies', kind: 'T', label: 'Quand une de vos créatures meurt', filter: true},
   {id: 'anyDies', kind: 'T', label: 'Quand une créature meurt (n\'importe laquelle)'},
   {id: 'oppCreatureDies', kind: 'T', label: 'Quand une créature d\'un adversaire meurt'},
@@ -330,6 +343,17 @@ export const WHEN = [
   {id: 'magecraft', kind: 'T', label: 'Quand vous lancez ou copiez un éphémère ou un rituel (Sorcellerie)'},
   {id: 'secondSpell', kind: 'T', label: 'Quand vous lancez votre deuxième sort de chaque tour'},
   {id: 'oppCasts', kind: 'T', label: 'Quand un adversaire lance un sort'},
+  {id: 'playerCasts', kind: 'T', label: 'Quand un joueur lance un sort'},
+  {id: 'firstSpell', kind: 'T', label: 'Quand vous lancez votre premier sort de chaque tour'},
+  {id: 'abilityCast', kind: 'T', label: 'Quand vous activez une capacité qui n\'est pas une capacité de mana'},
+  {id: 'landPlayed', kind: 'T', label: 'Quand vous jouez un terrain'},
+  {id: 'tapsForMana', kind: 'T', label: 'Quand un joueur engage un terrain pour du mana'},
+  {id: 'oppDraws', kind: 'T', label: 'Quand un adversaire pioche une carte'},
+  {id: 'youDiscard', kind: 'T', label: 'Quand vous vous défaussez d\'une carte'},
+  {id: 'youScry', kind: 'T', label: 'Quand vous regardez (regard N)'},
+  {id: 'youSurveil', kind: 'T', label: 'Quand vous surveillez'},
+  {id: 'youLoseLife', kind: 'T', label: 'Quand vous perdez des points de vie'},
+  {id: 'youSacCreature', kind: 'T', label: 'Quand vous sacrifiez une créature'},
   {id: 'drawCard', kind: 'T', label: 'Quand vous piochez une carte'},
   {id: 'cycle', kind: 'T', label: 'Quand vous recyclez une carte'},
   {id: 'sacrifice', kind: 'T', label: 'Quand vous sacrifiez un permanent'},
@@ -343,6 +367,10 @@ export const WHEN = [
   {id: 'drawStep', kind: 'T', label: 'Au début de votre étape de pioche'},
   {id: 'main1', kind: 'T', label: 'Au début de votre phase principale précombat'},
   {id: 'beginCombat', kind: 'T', label: 'Au début du combat de votre tour'},
+  {id: 'eachCombat', kind: 'T', label: 'Au début de chaque combat'},
+  {id: 'main2', kind: 'T', label: 'Au début de votre phase principale postcombat'},
+  {id: 'eachDraw', kind: 'T', label: 'Au début de l\'étape de pioche de chaque joueur'},
+  {id: 'oppEnd', kind: 'T', label: 'Au début de l\'étape de fin de chaque adversaire'},
   {id: 'endCombat', kind: 'T', label: 'À la fin du combat de votre tour'},
   {id: 'end', kind: 'T', label: 'Au début de votre étape de fin'},
   {id: 'eachEnd', kind: 'T', label: 'Au début de chaque étape de fin'},
@@ -430,6 +458,7 @@ export const EFFECTS = [
   {id: 'loseLifeYou', group: 'life', label: 'Vous perdez des points de vie', n: true},
   {id: 'drain', group: 'life', label: 'Chaque adversaire perd des PV, vous les gagnez', n: true},
   {id: 'fog', group: 'life', label: 'Prévenir toutes les blessures de combat ce tour-ci (brouillard)'},
+  {id: 'preventDamage', group: 'life', label: 'Prévenir les N prochaines blessures infligées à une cible ce tour-ci', n: true},
   {id: 'poison', group: 'life', label: 'Chaque adversaire reçoit des marqueurs poison', n: true},
   {id: 'energy', group: 'life', label: 'Vous obtenez de l\'énergie ({E})', n: true},
   {id: 'experience', group: 'life', label: 'Vous gagnez des marqueurs « expérience »', n: true},
@@ -452,6 +481,10 @@ export const EFFECTS = [
   {id: 'tutorBattlefield', group: 'cards', label: 'Chercher une carte d\'un type et la mettre sur le champ de bataille', ct: true},
   {id: 'regrowth', group: 'cards', label: 'Renvoyer une créature du cimetière en main'},
   {id: 'regrowthTyped', group: 'cards', label: 'Renvoyer une carte d\'un type du cimetière en main', ct: true},
+  {id: 'reanimateTyped', group: 'cards', label: 'Renvoyer une carte d\'un type de votre cimetière sur le champ de bataille', ct: true},
+  {id: 'playHideaway', group: 'cards', label: 'Jouer la carte exilée par Cachette sans payer son coût de mana'},
+  {id: 'castFromGraveyard', group: 'cards', label: 'Lancer un éphémère ou un rituel ciblé de votre cimetière sans payer son coût'},
+  {id: 'digUntil', group: 'cards', label: 'Révéler jusqu\'à une carte d\'un type, la mettre en main', ct: true},
   {id: 'reanimate', group: 'cards', label: 'Renvoyer une créature du cimetière sur le champ de bataille'},
   {id: 'shuffleGraveyard', group: 'cards', label: 'Mélanger votre cimetière dans votre bibliothèque'},
   {id: 'exileGraveyard', group: 'cards', label: 'Exiler le cimetière d\'un joueur ciblé'},
@@ -463,6 +496,24 @@ export const EFFECTS = [
   {id: 'removeCountersSelf', group: 'creatures', label: 'Retirer des marqueurs de cette carte', n: true, counter: true},
   {id: 'removeCountersTarget', group: 'creatures', label: 'Retirer des marqueurs d\'un permanent ciblé', n: true, counter: true, pt: true},
   {id: 'proliferate', group: 'creatures', label: 'Proliférer'},
+  {id: 'doubleCountersTarget', group: 'creatures', label: 'Doubler les marqueurs (d\'un type) sur une créature ciblée', counter: true},
+  {id: 'moveCounters', group: 'creatures', label: 'Déplacer des marqueurs de cette carte sur une autre créature ciblée', n: true, counter: true},
+  {id: 'removeAllCounters', group: 'creatures', label: 'Retirer tous les marqueurs (d\'un type) de toutes les créatures', counter: true},
+  {id: 'animateSelf', group: 'creatures', label: 'Elle devient une créature N/N jusqu\'à la fin du tour (terrain, artefact…)', n: true},
+  {id: 'animateTarget', group: 'creatures', label: 'Une créature ciblée a une force et une endurance de base N/N jusqu\'à la fin du tour', n: true},
+  {id: 'animateLands', group: 'creatures', label: 'Les terrains que vous contrôlez deviennent des créatures N/N jusqu\'à la fin du tour', n: true},
+  {id: 'protectionTarget', group: 'creatures', label: 'Une créature ciblée que vous contrôlez acquiert la protection contre la couleur de votre choix'},
+  {id: 'protectionAll', group: 'creatures', label: 'Les créatures que vous contrôlez acquièrent la protection contre la couleur de votre choix'},
+  {id: 'debuffTarget', group: 'creatures', label: 'Une créature ciblée perd un mot-clé jusqu\'à la fin du tour (le vol…)', keyword: true},
+  {id: 'regenerateTarget', group: 'creatures', label: 'Régénérer une créature ciblée'},
+  {id: 'mustBlock', group: 'creatures', label: 'Une créature ciblée bloque cette créature ce tour-ci si elle le peut'},
+  {id: 'removeFromCombat', group: 'creatures', label: 'Retirer du combat une créature attaquante ou bloqueuse ciblée'},
+  {id: 'endure', group: 'creatures', label: 'Elle endure N (marqueurs +1/+1 ou un jeton Esprit N/N)', n: true, self: true},
+  {id: 'sacrificeEndStep', group: 'creatures', label: 'La sacrifier au début de la prochaine étape de fin', self: true},
+  {id: 'exileEndStep', group: 'creatures', label: 'L\'exiler au début de la prochaine étape de fin', self: true},
+  {id: 'flicker', group: 'creatures', label: 'Exiler une créature ciblée que vous contrôlez, puis la renvoyer sur le champ de bataille'},
+  {id: 'flickerEnd', group: 'creatures', label: 'Exiler une créature ciblée, la renvoyer au début de la prochaine étape de fin'},
+  {id: 'attachSelf', group: 'creatures', label: 'Attacher cet équipement ou cette aura à une créature ciblée que vous contrôlez', attach: 'creature'},
   {id: 'pumpSelf', group: 'creatures', label: 'Elle gagne +N/+N jusqu\'à la fin du tour', n: true, self: true},
   {id: 'pumpTarget', group: 'creatures', label: '+N/+N à une créature ciblée jusqu\'à la fin du tour', n: true},
   {id: 'shrinkTarget', group: 'creatures', label: '-N/-N à une créature ciblée jusqu\'à la fin du tour', n: true},
@@ -497,6 +548,11 @@ export const EFFECTS = [
   {id: 'bounceTyped', group: 'removal', label: 'Renvoyer un permanent ciblé d\'un type dans la main', pt: true},
   {id: 'bounceAllTyped', group: 'removal', label: 'Renvoyer tous les permanents d\'un type dans la main', pt: true},
   {id: 'tuck', group: 'removal', label: 'Mettre un permanent ciblé au-dessous de la bibliothèque', pt: true},
+  {id: 'tuckTop', group: 'removal', label: 'Mettre un permanent ciblé au-dessus de la bibliothèque de son propriétaire', pt: true},
+  {id: 'exileUntilLeaves', group: 'removal', label: 'Exiler un permanent ciblé jusqu\'à ce que cette carte quitte le champ de bataille', pt: true},
+  {id: 'sacrificeAllYours', group: 'removal', label: 'Sacrifier tous les permanents d\'un type que vous contrôlez', pt: true},
+  {id: 'phaseOut', group: 'removal', label: 'Une créature ciblée passe hors phase'},
+  {id: 'detain', group: 'removal', label: 'Détenir un permanent non-terrain ciblé qu\'un adversaire contrôle'},
   {id: 'fight', group: 'removal', label: 'Se battre contre une créature adverse ciblée', self: true},
   {id: 'counterSpell', group: 'removal', label: 'Contrecarrer un sort ciblé'},
   {id: 'counterCreature', group: 'removal', label: 'Contrecarrer un sort de créature ciblé'},
@@ -504,6 +560,8 @@ export const EFFECTS = [
   {id: 'counterUnless', group: 'removal', label: 'Contrecarrer un sort ciblé à moins que son contrôleur ne paie {N}', n: true},
   {id: 'counterAbility', group: 'removal', label: 'Contrecarrer une capacité activée ou déclenchée ciblée'},
   {id: 'tap', group: 'control', label: 'Engager une créature ciblée'},
+  {id: 'tapOrUntap', group: 'control', label: 'Engager ou dégager un permanent ciblé'},
+  {id: 'exchangeControlSelf', group: 'control', label: 'Échanger le contrôle de cette carte contre celui d\'une créature ciblée qu\'un adversaire contrôle'},
   {id: 'untap', group: 'control', label: 'Dégager un permanent ciblé'},
   {id: 'tapAllOpp', group: 'control', label: 'Engager toutes les créatures que vos adversaires contrôlent'},
   {id: 'cantBlockOpp', group: 'control', label: 'Les créatures adverses ne peuvent pas bloquer ce tour-ci'},
@@ -524,8 +582,28 @@ export const EFFECTS = [
   {id: 'targetMill', group: 'players', label: 'Un joueur ciblé meule des cartes', n: true},
   {id: 'targetSacrifice', group: 'players', label: 'Un joueur ciblé sacrifie une créature'},
   {id: 'targetPoison', group: 'players', label: 'Un joueur ciblé reçoit des marqueurs poison', n: true},
+  {id: 'targetRadiation', group: 'players', label: 'Un joueur ciblé gagne des marqueurs « radiation »', n: true},
+  {id: 'targetRevealHand', group: 'players', label: 'Un joueur ciblé révèle sa main'},
+  {id: 'lookHand', group: 'players', label: 'Regarder la main d\'un joueur ciblé'},
+  {id: 'targetDiscardHand', group: 'players', label: 'Un joueur ciblé se défausse de sa main'},
+  {id: 'targetDiscardRandom', group: 'players', label: 'Un joueur ciblé se défausse de cartes au hasard', n: true},
+  {id: 'targetExileTop', group: 'players', label: 'Exiler les N cartes du dessus de la bibliothèque d\'un joueur ciblé', n: true},
+  {id: 'targetSacrificeType', group: 'players', label: 'Un joueur ciblé sacrifie un permanent d\'un type (artefact, enchantement, terrain…)', sacKind: true},
+  {id: 'playerCreaturesDebuff', group: 'players', label: 'Les créatures que contrôle un joueur ciblé gagnent -N/-N jusqu\'à la fin du tour', n: true},
+  {id: 'playerTapAll', group: 'players', label: 'Engager toutes les créatures que contrôle un joueur ciblé'},
+  {id: 'playerDestroyAll', group: 'players', label: 'Détruire toutes les créatures que contrôle un joueur ciblé'},
+  {id: 'targetToken', group: 'players', label: 'Un joueur ciblé crée des jetons (cadeau à un adversaire…)', n: true, token: true},
+  {id: 'targetMonarch', group: 'players', label: 'Un joueur ciblé devient le monarque'},
+  {id: 'targetSetLife', group: 'players', label: 'Le total de points de vie d\'un joueur ciblé devient N', n: true},
+  {id: 'exchangeLife', group: 'players', label: 'Échanger votre total de points de vie contre celui d\'un adversaire ciblé'},
+  {id: 'targetSkipTurn', group: 'players', label: 'Un joueur ciblé passe son prochain tour'},
+  {id: 'targetLoseGame', group: 'players', label: 'Un joueur ciblé perd la partie'},
+  {id: 'silence', group: 'players', label: 'Vos adversaires ne peuvent pas lancer de sorts ce tour-ci'},
   {id: 'extraTurn', group: 'turns', label: 'Jouer un tour supplémentaire après celui-ci'},
   {id: 'extraCombat', group: 'turns', label: 'Une phase de combat supplémentaire après cette phase principale'},
+  {id: 'extraLandTurn', group: 'turns', label: 'Vous pouvez jouer un terrain supplémentaire ce tour-ci'},
+  {id: 'endTurn', group: 'turns', label: 'Terminer le tour'},
+  {id: 'flipCoin', group: 'turns', label: 'Jouer à pile ou face (si vous gagnez : le premier « Et puis », si vous perdez : le second)'},
   {id: 'copySpell', group: 'turns', label: 'Copier un sort d\'éphémère ou de rituel ciblé'},
   {id: 'emblem', group: 'turns', label: 'Obtenir un emblème (effet permanent pour toute la partie)', emblem: true},
   {id: 'winGame', group: 'turns', label: 'Gagner la partie'},
@@ -555,6 +633,10 @@ export const EFFECTS = [
   {id: 'notBlockedByPower', group: 'stCreature', label: 'Les créatures de force N ou moins ne peuvent pas les bloquer', n: true, scope: true, only: ['static']},
   {id: 'mustAttack', group: 'stCreature', label: 'Elles attaquent à chaque combat si possible', scope: true, only: ['static']},
   {id: 'blockExtra', group: 'stCreature', label: 'Elles peuvent bloquer une créature supplémentaire', scope: true, only: ['static']},
+  {id: 'maxOneBlocker', group: 'stCreature', label: 'Elles ne peuvent pas être bloquées par plus d\'une créature', scope: true, only: ['static']},
+  {id: 'minBlockers', group: 'stCreature', label: 'Elles ne peuvent pas être bloquées excepté par N créatures ou plus', n: true, scope: true, only: ['static']},
+  {id: 'canAttackDefender', group: 'stCreature', label: 'Elles peuvent attaquer comme si elles n\'avaient pas le défenseur', scope: true, only: ['static']},
+  {id: 'damageToughness', group: 'stCreature', label: 'Elles infligent des blessures de combat égales à leur endurance plutôt qu\'à leur force', scope: true, only: ['static']},
   {id: 'noActivated', group: 'stCreature', label: 'Leurs capacités activées ne peuvent pas être activées', scope: true, only: ['static']},
   {id: 'doesntUntap', group: 'stCreature', label: 'Elles ne se dégagent pas pendant l\'étape de dégagement', scope: true, only: ['static']},
   {id: 'controlEnchanted', group: 'stCreature', label: 'Vous contrôlez la créature enchantée (aura)', only: ['static']},
@@ -562,7 +644,19 @@ export const EFFECTS = [
   {id: 'entersTapped', group: 'stSelf', label: 'Elle arrive sur le champ de bataille engagée', only: ['static']},
   {id: 'etbCounters', group: 'stSelf', label: 'Elle arrive avec N marqueurs (+1/+1 ou autre)', n: true, counter: true, only: ['static']},
   {id: 'uncounterable', group: 'stSelf', label: 'Ce sort ne peut pas être contrecarré', only: ['static']},
+  {id: 'selfCostReduction', group: 'stSelf', label: 'Ce sort coûte {X} de moins à lancer (X au choix : créatures, artefacts, cartes au cimetière…)', amountSel: true, only: ['static']},
+  {id: 'kwMustBeBlocked', group: 'stSelf', label: 'Elle doit être bloquée si possible', only: ['static']},
+  {id: 'kwLure', group: 'stSelf', label: 'Toutes les créatures capables de la bloquer le font', only: ['static']},
+  {id: 'kwCantAttackBlockAlone', group: 'stSelf', label: 'Elle ne peut pas attaquer ou bloquer seule', only: ['static']},
+  {id: 'kwCantAttackAlone', group: 'stSelf', label: 'Elle ne peut pas attaquer seule', only: ['static']},
+  {id: 'kwPreventAll', group: 'stSelf', label: 'Prévenez toutes les blessures qui devraient lui être infligées', only: ['static']},
+  {id: 'kwPreventCombat', group: 'stSelf', label: 'Prévenez toutes les blessures de combat qui devraient lui être infligées', only: ['static']},
+  {id: 'kwMayNotUntap', group: 'stSelf', label: 'Vous pouvez choisir de ne pas la dégager pendant votre étape de dégagement', only: ['static']},
+  {id: 'kwCanBeCommander', group: 'stSelf', label: 'Elle peut être votre commandant (même si ce n\'est pas une créature légendaire)', only: ['static']},
+  {id: 'kwAnyNumber', group: 'stSelf', label: 'Un deck peut contenir n\'importe quel nombre d\'exemplaires de cette carte', only: ['static']},
+  {id: 'cloneEtb', group: 'stSelf', label: 'Elle peut arriver comme une copie de n\'importe quelle créature sur le champ de bataille', only: ['static']},
   {id: 'noMaxHand', group: 'stPlayer', label: 'Vous n\'avez pas de taille maximale de main', only: ['static']},
+  {id: 'oppMaxHandMinus', group: 'stPlayer', label: 'La taille maximale de main de chaque adversaire est réduite de N', n: true, only: ['static']},
   {id: 'maxHandPlus', group: 'stPlayer', label: 'Votre taille maximale de main augmente de N', n: true, only: ['static']},
   {id: 'extraLand', group: 'stPlayer', label: 'Vous pouvez jouer N terrains supplémentaires à chacun de vos tours', n: true, only: ['static']},
   {id: 'reduceCost', group: 'stPlayer', label: 'Vos sorts (d\'un type) coûtent {N} de moins', n: true, spellType: true, only: ['static']},
@@ -579,12 +673,23 @@ export const EFFECTS = [
   {id: 'propaganda', group: 'stPlayer', label: 'Les créatures ne peuvent pas vous attaquer à moins que leur contrôleur ne paie {N} chacune', n: true, only: ['static']},
   {id: 'panharmonicon', group: 'stPlayer', label: 'Les capacités qui se déclenchent à l\'arrivée d\'une créature ou d\'un artefact se déclenchent une fois de plus', only: ['static']},
   {id: 'oppEnterTapped', group: 'stPlayer', label: 'Les créatures de vos adversaires arrivent engagées', only: ['static']},
+  {id: 'oppCantCastYourTurn', group: 'stPlayer', label: 'Vos adversaires ne peuvent pas lancer de sorts pendant votre tour', only: ['static']},
+  {id: 'oneSpellEach', group: 'stPlayer', label: 'Chaque joueur ne peut pas lancer plus d\'un sort par tour', only: ['static']},
+  {id: 'oppOneSpell', group: 'stPlayer', label: 'Chaque adversaire ne peut pas lancer plus d\'un sort par tour', only: ['static']},
+  {id: 'oppDrawLimit', group: 'stPlayer', label: 'Chaque adversaire ne peut pas piocher plus d\'une carte par tour', only: ['static']},
+  {id: 'playersCantGainLife', group: 'stPlayer', label: 'Les joueurs ne peuvent pas gagner de points de vie', only: ['static']},
+  {id: 'cantPreventDamage', group: 'stPlayer', label: 'Les blessures ne peuvent pas être prévenues', only: ['static']},
+  {id: 'playLandsGraveyard', group: 'stPlayer', label: 'Vous pouvez jouer des terrains depuis votre cimetière', only: ['static']},
   {id: 'doubleTokens', group: 'stRepl', label: 'Vos effets créent deux fois plus de jetons', only: ['static']},
   {id: 'doubleCounters', group: 'stRepl', label: 'Deux fois plus de marqueurs +1/+1 sur vos créatures', only: ['static']},
   {id: 'plusOneCounter', group: 'stRepl', label: 'Un marqueur +1/+1 de plus sur vos créatures', only: ['static']},
   {id: 'doubleDamage', group: 'stRepl', label: 'Vos sources infligent le double de blessures aux adversaires et à leurs permanents', only: ['static']},
   {id: 'damagePlus', group: 'stRepl', label: 'Vos sources infligent N blessures de plus aux adversaires et à leurs permanents', n: true, only: ['static']},
   {id: 'doubleLife', group: 'stRepl', label: 'Vous gagnez deux fois plus de points de vie', only: ['static']},
+  {id: 'graveyardHate', group: 'stRepl', label: 'Si une carte devait aller dans le cimetière d\'un adversaire, elle est exilée à la place', only: ['static']},
+  {id: 'creaturesDieExile', group: 'stRepl', label: 'Si une créature devait mourir, elle est exilée à la place', only: ['static']},
+  {id: 'manaDouble', group: 'stRepl', label: 'Si vous engagez un permanent pour du mana, il produit deux fois plus de mana', only: ['static']},
+  {id: 'labManiac', group: 'stRepl', label: 'Si vous deviez piocher avec une bibliothèque vide, vous gagnez la partie à la place', only: ['static']},
 ];
 
 /** Groupes des effets dans le formulaire. */
@@ -598,6 +703,8 @@ export const EFFECT_GROUPS = [
 
 /** Effets permanents écrits par un remplacement (« R: ») : leur condition ne peut pas être « votre tour ». */
 export const STATIC_REPLACEMENTS = new Set(['doesntUntap', 'entersTapped', 'etbCounters', 'uncounterable', 'cantLose', 'oppEnterTapped', 'doubleTokens',
+  'graveyardHate', 'creaturesDieExile', 'manaDouble', 'labManiac', 'cloneEtb', 'kwMustBeBlocked', 'kwLure', 'kwCantAttackBlockAlone', 'kwCantAttackAlone',
+  'kwPreventAll', 'kwPreventCombat', 'kwMayNotUntap', 'kwCanBeCommander', 'kwAnyNumber',
   'doubleCounters', 'plusOneCounter', 'doubleDamage', 'damagePlus', 'doubleLife']);
 
 /** Qui un effet permanent touche : [id, libellé]. */
@@ -632,6 +739,7 @@ export const PERM_TYPES = [
 /** Types de cartes cherchées : [id, pour Forge, « une carte de … », « a … card »]. */
 export const CARD_KINDS = [
   ['card', 'Card', 'une carte', 'a card'], ['creature', 'Creature', 'une carte de créature', 'a creature card'],
+  ['permanent', 'Permanent', 'une carte de permanent', 'a permanent card'],
   ['land', 'Land', 'une carte de terrain', 'a land card'], ['basic', 'Land.Basic', 'une carte de terrain de base', 'a basic land card'],
   ['instantSorcery', 'Instant,Sorcery', 'une carte d\'éphémère ou de rituel', 'an instant or sorcery card'],
   ['artifact', 'Artifact', 'une carte d\'artefact', 'an artifact card'], ['enchantment', 'Enchantment', 'une carte d\'enchantement', 'an enchantment card'],
@@ -672,6 +780,15 @@ function ordinal(n, lang) {
   const en = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
   return (lang === 'en' ? en : fr)[n - 1] || (lang === 'en' ? `${n}th` : `${n}e`);
 }
+
+/** Ce qu'un joueur sacrifie : [id, pour Forge, « une créature », « a creature »]. */
+export const SAC_KINDS = [
+  ['creature', 'Creature', 'une créature', 'a creature'], ['artifact', 'Artifact', 'un artefact', 'an artifact'],
+  ['enchantment', 'Enchantment', 'un enchantement', 'an enchantment'], ['land', 'Land', 'un terrain', 'a land'],
+  ['nonland', 'Permanent.nonLand', 'un permanent non-terrain', 'a nonland permanent'], ['planeswalker', 'Planeswalker', 'un planeswalker', 'a planeswalker'],
+  ['artEnch', 'Artifact,Enchantment', 'un artefact ou un enchantement', 'an artifact or enchantment'], ['permanent', 'Permanent', 'un permanent', 'a permanent'],
+  ['nontokenCreature', 'Creature.nonToken', 'une créature non-jeton', 'a nontoken creature'],
+];
 
 /** Types de sorts (coûts réduits, flash…) : [id, pour Forge, « les sorts … », « … spells »]. */
 export const SPELL_TYPES = [
@@ -1360,7 +1477,12 @@ function chainOf(a, id, lang) {
       it.extra = it.extra.map(l => (isDb(l) ? l + check : l));
     }
   });
-  for (let k = 0; k < items.length - 1; k++) {
+  // Pile ou face : le premier « Et puis » si vous gagnez, le second si vous perdez.
+  const coin = a.effect === 'flipCoin' && items.length > 1;
+  if (coin) {
+    items[0].head += ` | WinSubAbility$ ${items[1].name}${items[2] ? ` | LoseSubAbility$ ${items[2].name}` : ''}`;
+  }
+  for (let k = 0; k < (coin ? 0 : items.length - 1); k++) {
     const it = items[k];
     const link = ` | SubAbility$ ${items[k + 1].name}`;
     const last = it.extra.map(isDb).lastIndexOf(true);
@@ -1386,7 +1508,13 @@ function chainOf(a, id, lang) {
     svars.push(`SVar:${it.name}:DB$ ${it.head}`, ...it.extra, ...it.aux);
   }
   let body = items[0].text;
-  for (const it of items.slice(1)) {
+  if (coin) {
+    body += `. ${en ? 'If you win the flip,' : 'Si vous gagnez,'} ${items[1].text}`;
+    if (items[2]) {
+      body += `. ${en ? 'If you lose the flip,' : 'Si vous perdez,'} ${items[2].text}`;
+    }
+  }
+  for (const it of coin ? [] : items.slice(1)) {
     body += (en ? ', then' : ', puis') + (it.own ? `, ${en ? it.own.en : it.own.fr}, ` : ' ') + it.text;
   }
   if (cond) {
@@ -1592,6 +1720,32 @@ export function templates(type) {
     {label: 'Payez {E}{E} : elle gagne +2/+2 jusqu\'à la fin du tour', a: {...one, n: 2, when: 'activated', effect: 'pumpSelf', cost: '', tap: false, payEnergy: 2}},
     {label: 'Au début de votre étape de fin, si vous avez au moins cinq marqueurs « expérience », piochez une carte',
       a: {...one, when: 'end', effect: 'draw', cond: 'experienceAtLeast', condN: 5}},
+    // Effets de base de beaucoup de cartes : prison, clignotement, animation, sorts adverses, cimetière…
+    {label: 'Quand elle arrive, exilez un permanent non-terrain ciblé qu\'un adversaire contrôle jusqu\'à ce qu\'elle quitte le champ de bataille',
+      a: {...one, when: 'etb', effect: 'exileUntilLeaves', permType: 'oppNonland'}},
+    {label: 'Quand elle arrive, exilez une autre créature ciblée que vous contrôlez, puis renvoyez-la sur le champ de bataille',
+      a: {...one, when: 'etb', effect: 'flicker'}},
+    {label: '{1} : jusqu\'à la fin du tour, elle devient une créature 3/3 en plus de ses autres types (terrain, artefact)',
+      a: {...one, n: 3, when: 'activated', effect: 'animateSelf', cost: '{1}', tap: false}},
+    {label: 'Sacrifiez-la au début de la prochaine étape de fin (quand elle arrive)', a: {...one, when: 'etb', effect: 'sacrificeEndStep'}},
+    {label: 'Quand elle attaque et n\'est pas bloquée, le joueur défenseur se défausse d\'une carte', a: {...one, when: 'unblocked', effect: 'targetDiscard', who: 'that'}},
+    {label: 'Quand elle arrive, un adversaire ciblé révèle sa main et se défausse d\'une carte au hasard',
+      a: {...one, when: 'etb', effect: 'targetRevealHand', who: 'opponent', then: [{...newMode('targetDiscardRandom'), n: 1, who: 'opponent'}]}},
+    {label: 'Quand elle arrive, chaque adversaire sacrifie un artefact ou un enchantement', a: {...one, when: 'etb', effect: 'targetSacrificeType', who: 'eachOpp', sacKind: 'artEnch'}},
+    {label: 'À chaque fois qu\'un adversaire pioche une carte, elle inflige 1 blessure à ce joueur', a: {...one, when: 'oppDraws', effect: 'damageOpponent', who: 'that'}},
+    {label: 'Vos adversaires ne peuvent pas lancer de sorts pendant votre tour', a: {...one, when: 'static', effect: 'oppCantCastYourTurn'}},
+    {label: 'La taille maximale de main de chaque adversaire est réduite de un', a: {...one, when: 'static', effect: 'oppMaxHandMinus'}},
+    {label: 'Si une carte devait être mise dans le cimetière d\'un adversaire de n\'importe où, exilez-la à la place', a: {...one, when: 'static', effect: 'graveyardHate'}},
+    {label: 'Ce sort coûte {X} de moins à lancer, X étant le nombre de cartes de créature dans votre cimetière',
+      a: {...one, when: 'static', effect: 'selfCostReduction', amount: 'graveyard'}},
+    {label: 'Elle peut arriver comme une copie de n\'importe quelle créature sur le champ de bataille', a: {...one, when: 'static', effect: 'cloneEtb'}},
+    {label: 'Elle doit être bloquée si possible', a: {...one, when: 'static', effect: 'kwMustBeBlocked'}},
+    {label: '{T} : vous pouvez lancer un éphémère ou un rituel ciblé de votre cimetière sans payer son coût de mana',
+      a: {...one, when: 'activated', effect: 'castFromGraveyard', cost: '', tap: true, sorcery: true}},
+    {label: 'Quand elle arrive, révélez des cartes jusqu\'à révéler une carte de terrain et mettez-la dans votre main',
+      a: {...one, when: 'etb', effect: 'digUntil', cardKind: 'land'}},
+    {label: 'Quand elle arrive, jouez à pile ou face : si vous gagnez, piochez deux cartes',
+      a: {...one, when: 'etb', effect: 'flipCoin', then: [{...newMode('draw'), n: 2}]}},
   ];
 }
 
@@ -1869,11 +2023,16 @@ export const PLAYER_EFFECTS = new Set(['damagePlayer', 'damageOpponent', 'target
  */
 const WHO_BASE = {damagePlayer: 'any', damageOpponent: 'opponent', targetLoseLife: 'player', drainTarget: 'player', targetGainLife: 'player',
   targetDraw: 'player', targetDiscard: 'player', targetMill: 'player', targetSacrifice: 'player', targetPoison: 'player', thoughtseize: 'player',
-  exileGraveyard: 'player', damageOpponents: 'eachOpp', drain: 'eachOpp', poison: 'eachOpp', discard: 'eachOpp', millOpponents: 'eachOpp', edict: 'eachOpp'};
+  exileGraveyard: 'player', damageOpponents: 'eachOpp', drain: 'eachOpp', poison: 'eachOpp', discard: 'eachOpp', millOpponents: 'eachOpp', edict: 'eachOpp',
+  targetRadiation: 'player', targetRevealHand: 'player', lookHand: 'player', targetDiscardHand: 'player', targetDiscardRandom: 'player',
+  targetExileTop: 'player', targetSacrificeType: 'player', playerCreaturesDebuff: 'player', playerTapAll: 'player', playerDestroyAll: 'player',
+  targetToken: 'opponent', targetMonarch: 'player', targetSetLife: 'player', exchangeLife: 'opponent', targetSkipTurn: 'player', targetLoseGame: 'player'};
 /** Effets dont le joueur peut changer (« Joueur : le joueur défenseur »). */
 export const PLAYER_WHO = new Set(Object.keys(WHO_BASE));
 /** Effets qui ne visent qu'un joueur à la fois (pas « chaque adversaire »). */
-const WHO_ONE = new Set(['thoughtseize', 'exileGraveyard']);
+const WHO_ONE = new Set(['thoughtseize', 'exileGraveyard', 'lookHand', 'exchangeLife', 'targetMonarch']);
+/** Effets qui ne marchent qu'avec un joueur ciblé (Forge lit la cible, pas « le joueur défenseur »). */
+const WHO_TARGET_ONLY = new Set(['playerDestroyAll']);
 
 /**
  * Le joueur dont parle un déclencheur : [pour Forge, en français, en anglais, libellé du choix]. « Quand elle attaque » :
@@ -1896,6 +2055,16 @@ const THAT_PLAYER = (() => {
     oppCreatureEnters: ['TriggeredCardController', 'ce joueur', 'that player', 'Ce joueur (celui qui contrôle la créature)'],
     oppCreatureDies: ['TriggeredCardController', 'ce joueur', 'that player', 'Ce joueur (celui qui contrôlait la créature)'],
     anyDies: ['TriggeredCardController', 'le contrôleur de cette créature', 'its controller', 'Le contrôleur de la créature morte'],
+    unblocked: defending,
+    combatDamageOnce: damaged,
+    attacksYou: ['TriggeredAttackerController', 'le contrôleur de cette créature', 'its controller', 'Le contrôleur de la créature qui attaque'],
+    anyEnters: ['TriggeredCardController', 'le contrôleur de cette créature', 'its controller', 'Le contrôleur de la créature qui arrive'],
+    oppLandfall: ['TriggeredCardController', 'ce joueur', 'that player', 'Ce joueur (celui qui contrôle le terrain)'],
+    playerCasts: ['TriggeredActivator', 'ce joueur', 'that player', 'Ce joueur (celui qui a lancé le sort)'],
+    tapsForMana: ['TriggeredActivator', 'ce joueur', 'that player', 'Ce joueur (celui qui a engagé le terrain)'],
+    oppDraws: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui qui a pioché)'],
+    eachDraw: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui dont c\'est l\'étape de pioche)'],
+    oppEnd: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui dont c\'est le tour)'],
   };
 })();
 
@@ -1913,9 +2082,12 @@ export function whoChoices(effectId, when, card = null) {
   }
   const list = [['target', WHO_LABELS[base]]];
   for (const v of ['player', 'opponent', 'eachOpp', 'each']) {
-    if (v !== base && !(WHO_ONE.has(effectId) && v.startsWith('each'))) {
+    if (v !== base && !((WHO_ONE.has(effectId) || WHO_TARGET_ONLY.has(effectId)) && v.startsWith('each'))) {
       list.push([v, WHO_LABELS[v]]);
     }
+  }
+  if (WHO_TARGET_ONLY.has(effectId)) {
+    return list;
   }
   const that = THAT_PLAYER[when];
   if (that) {
@@ -1932,13 +2104,19 @@ function whoTarget(a) {
   switch (a.who) {
     case 'player': return {p: 'ValidTgts$ Player | TgtPrompt$ Choisissez un joueur ciblé', fr: 'un joueur ciblé', en: 'target player'};
     case 'opponent': return {p: 'ValidTgts$ Opponent | TgtPrompt$ Choisissez un adversaire ciblé', fr: 'un adversaire ciblé', en: 'target opponent'};
-    case 'eachOpp': return WHO_ONE.has(a.effect) ? null : {p: 'Defined$ Player.Opponent', fr: 'chaque adversaire', en: 'each opponent'};
-    case 'each': return WHO_ONE.has(a.effect) ? null : {p: 'Defined$ Player', fr: 'chaque joueur', en: 'each player'};
+    case 'eachOpp': return WHO_ONE.has(a.effect) || WHO_TARGET_ONLY.has(a.effect) ? null : {p: 'Defined$ Player.Opponent', fr: 'chaque adversaire', en: 'each opponent'};
+    case 'each': return WHO_ONE.has(a.effect) || WHO_TARGET_ONLY.has(a.effect) ? null : {p: 'Defined$ Player', fr: 'chaque joueur', en: 'each player'};
     case 'that': {
+      if (WHO_TARGET_ONLY.has(a.effect)) {
+        return null;
+      }
       const t = THAT_PLAYER[a.when];
       return t ? {p: `Defined$ ${t[0]}`, fr: t[1], en: t[2]} : null;
     }
     case 'enchanted': {
+      if (WHO_TARGET_ONLY.has(a.effect)) {
+        return null;
+      }
       // « ce joueur » quand le déclencheur vient de lui (« Au début de l'entretien du joueur enchanté »).
       const that = (WHEN.find(x => x.id === a.when) || {}).attach === 'player';
       return {p: 'Defined$ EnchantedPlayer', fr: that ? 'ce joueur' : 'le joueur enchanté', en: that ? 'that player' : 'enchanted player'};
@@ -1967,7 +2145,12 @@ function effect(a, id) {
   }
   const fr = r.fr.replace(WHO_FR, (m, d) => (d ? 'de ' : '') + to.fr)
     .replace(/(^|\s)à le /g, '$1au ').replace(/\bde le /g, 'du ').replace(/\bde un /g, 'd\'un ');
-  return {...r, p: r.p.replace(WHO_SPEC, to.p), fr, en: r.en.replace(WHO_EN, to.en)};
+  let p = r.p.replace(WHO_SPEC, to.p);
+  // Des jetons créés par un autre joueur : « TokenOwner$ … » au lieu de « Defined$ … ».
+  if (/TokenOwner\$ Targeted\b/.test(p) && to.p.startsWith('Defined$ ')) {
+    p = p.replace(`${to.p} | `, '').replace(/TokenOwner\$ Targeted\b/, `TokenOwner$ ${to.p.slice(9)}`);
+  }
+  return {...r, p, fr, en: r.en.replace(WHO_EN, to.en)};
 }
 
 function effectBase(a, id) {
@@ -2165,6 +2348,187 @@ function effectBase(a, id) {
     case 'targetSacrifice':
       return {p: `Sacrifice | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | SacValid$ Creature`,
         fr: 'un joueur ciblé sacrifie une créature', en: 'target player sacrifices a creature'};
+    case 'doubleCountersTarget':
+      return {p: `MultiplyCounter | ${target(creature)} | CounterType$ ${ct[0]}`, fr: `doublez le nombre de marqueurs ${ct[1]} sur une créature ciblée`,
+        en: `double the number of ${ct[2]} counters on target creature`};
+    case 'moveCounters':
+      return {p: `MoveCounter | Source$ Self | ${target({v: 'Creature.Other', prompt: 'Choisissez une autre créature ciblée'})} | CounterType$ ${ct[0]} | CounterNum$ ${n1}`,
+        fr: `déplacez ${countersFr(n1)} de CARDNAME sur une autre créature ciblée`, en: `move ${countersEn(n1)} from CARDNAME onto another target creature`};
+    case 'removeAllCounters':
+      return {p: `RemoveCounterAll | ValidCards$ Creature | CounterType$ ${ct[0]} | AllCounters$ True`, fr: `retirez tous les marqueurs ${ct[1]} de toutes les créatures`,
+        en: `remove all ${ct[2]} counters from all creatures`};
+    case 'animateSelf':
+      return {p: `Animate | Defined$ Self | Power$ ${n} | Toughness$ ${n} | Types$ Creature`,
+        fr: `jusqu'à la fin du tour, CARDNAME devient une créature ${n}/${n} en plus de ses autres types`,
+        en: `until end of turn, CARDNAME becomes a ${n}/${n} creature in addition to its other types`};
+    case 'animateTarget':
+      return {p: `Animate | ${target(creature)} | Power$ ${n} | Toughness$ ${n}`, fr: `une créature ciblée a une force et une endurance de base de ${n}/${n} jusqu'à la fin du tour`,
+        en: `target creature has base power and toughness ${n}/${n} until end of turn`};
+    case 'animateLands':
+      return {p: `AnimateAll | ValidCards$ Land.YouCtrl | Power$ ${n} | Toughness$ ${n} | Types$ Creature`,
+        fr: `jusqu'à la fin du tour, les terrains que vous contrôlez deviennent des créatures ${n}/${n} qui sont toujours des terrains`,
+        en: `until end of turn, lands you control become ${n}/${n} creatures that are still lands`};
+    case 'protectionTarget':
+      return {p: `Protection | ${target({v: 'Creature.YouCtrl', prompt: 'Choisissez une créature ciblée que vous contrôlez'})} | Gains$ Choice | Choices$ AnyColor`,
+        fr: 'une créature ciblée que vous contrôlez acquiert la protection contre la couleur de votre choix jusqu\'à la fin du tour',
+        en: 'target creature you control gains protection from the color of your choice until end of turn'};
+    case 'protectionAll':
+      return {p: 'ProtectionAll | ValidCards$ Creature.YouCtrl | Gains$ Choice | Choices$ AnyColor',
+        fr: 'les créatures que vous contrôlez acquièrent la protection contre la couleur de votre choix jusqu\'à la fin du tour',
+        en: 'creatures you control gain protection from the color of your choice until end of turn'};
+    case 'debuffTarget': {
+      const kw = a.keyword || 'Flying';
+      const has = KW_GRANT[kw] || 'ont ' + (KW_FR[kw] || kw).toLowerCase();
+      const obj = has.startsWith('sont ') ? 'l\'indestructible' : has.slice(4);
+      return {p: `Debuff | ${target(creature)} | Keywords$ ${kw}`, fr: `une créature ciblée perd ${obj} jusqu'à la fin du tour`,
+        en: `target creature loses ${keywordLower(kw)} until end of turn`};
+    }
+    case 'regenerateTarget':
+      return {p: `Regenerate | ${target(creature)}`, fr: 'régénérez une créature ciblée', en: 'regenerate target creature'};
+    case 'mustBlock':
+      return {p: `MustBlock | ${target(creature)}`, fr: 'une créature ciblée bloque CARDNAME ce tour-ci si elle le peut', en: 'target creature blocks CARDNAME this turn if able'};
+    case 'removeFromCombat':
+      return {p: `RemoveFromCombat | ${target({v: 'Creature.attacking,Creature.blocking', prompt: 'Choisissez une créature attaquante ou bloqueuse ciblée'})}`,
+        fr: 'retirez du combat une créature attaquante ou bloqueuse ciblée', en: 'remove target attacking or blocking creature from combat'};
+    case 'endure':
+      return {p: `Endure | Num$ ${n1}`, fr: `CARDNAME endure ${n1}`, en: `CARDNAME endures ${n1}`};
+    case 'sacrificeEndStep':
+      return {p: `DelayedTrigger | Mode$ Phase | Phase$ End of Turn | Execute$ ${id}Sac | TriggerDescription$ Sacrifiez CARDNAME.`,
+        aux: [`SVar:${id}Sac:DB$ Sacrifice | SacValid$ Self`], fr: 'sacrifiez CARDNAME au début de la prochaine étape de fin',
+        en: 'sacrifice CARDNAME at the beginning of the next end step'};
+    case 'exileEndStep':
+      return {p: `DelayedTrigger | Mode$ Phase | Phase$ End of Turn | Execute$ ${id}Exi | TriggerDescription$ Exilez CARDNAME.`,
+        aux: [`SVar:${id}Exi:DB$ ChangeZone | Defined$ Self | Origin$ Battlefield | Destination$ Exile`], fr: 'exilez CARDNAME au début de la prochaine étape de fin',
+        en: 'exile CARDNAME at the beginning of the next end step'};
+    case 'flicker':
+      return {p: `ChangeZone | ${target({v: 'Creature.YouCtrl', prompt: 'Choisissez une créature ciblée que vous contrôlez'})} | Origin$ Battlefield | Destination$ Exile | RememberTargets$ True | SubAbility$ ${id}Ret`,
+        extra: [`SVar:${id}Ret:DB$ ChangeZone | Defined$ Remembered | Origin$ All | Destination$ Battlefield | GainControl$ True | SubAbility$ ${id}Clr`,
+          `SVar:${id}Clr:DB$ Cleanup | ClearRemembered$ True`],
+        fr: 'exilez une créature ciblée que vous contrôlez, puis renvoyez cette carte sur le champ de bataille sous le contrôle de son propriétaire',
+        en: 'exile target creature you control, then return that card to the battlefield under its owner\'s control'};
+    case 'flickerEnd':
+      return {p: `ChangeZone | ${target(creature)} | Origin$ Battlefield | Destination$ Exile | RememberChanged$ True | SubAbility$ ${id}Del`,
+        extra: [`SVar:${id}Del:DB$ DelayedTrigger | Mode$ Phase | Phase$ End of Turn | Execute$ ${id}Ret | RememberObjects$ Remembered | SubAbility$ ${id}Clr | TriggerDescription$ Renvoyez la carte exilée sur le champ de bataille.`,
+          `SVar:${id}Clr:DB$ Cleanup | ClearRemembered$ True`],
+        aux: [`SVar:${id}Ret:DB$ ChangeZone | Defined$ DelayTriggerRememberedLKI | Origin$ Exile | Destination$ Battlefield`],
+        fr: 'exilez une créature ciblée. Renvoyez cette carte sur le champ de bataille sous le contrôle de son propriétaire au début de la prochaine étape de fin',
+        en: 'exile target creature. Return that card to the battlefield under its owner\'s control at the beginning of the next end step'};
+    case 'attachSelf':
+      return {p: `Attach | ${target({v: 'Creature.YouCtrl', prompt: 'Choisissez une créature ciblée que vous contrôlez'})}`,
+        fr: 'attachez CARDNAME à une créature ciblée que vous contrôlez', en: 'attach CARDNAME to target creature you control'};
+    case 'tuckTop': {
+      const pt = permType(a);
+      return {p: `ChangeZone | ${target({v: pt[1], prompt: 'Choisissez ' + pt[2]})} | Origin$ Battlefield | Destination$ Library | LibraryPosition$ 0`,
+        fr: `mettez ${pt[2]} au-dessus de la bibliothèque de son propriétaire`, en: `put ${pt[3]} on top of its owner's library`};
+    }
+    case 'exileUntilLeaves': {
+      const pt = permType(a);
+      return {p: `ChangeZone | ${target({v: pt[1], prompt: 'Choisissez ' + pt[2]})} | Origin$ Battlefield | Destination$ Exile | Duration$ UntilHostLeavesPlay`,
+        fr: `exilez ${pt[2]} jusqu'à ce que CARDNAME quitte le champ de bataille`, en: `exile ${pt[3]} until CARDNAME leaves the battlefield`};
+    }
+    case 'sacrificeAllYours': {
+      const pt = permType(a);
+      return {p: `SacrificeAll | ValidCards$ ${owned(pt[1]).replace(/YouOwn/g, 'YouCtrl')}`, fr: `sacrifiez ${pt[4]} que vous contrôlez`, en: `sacrifice ${pt[5]} you control`};
+    }
+    case 'phaseOut':
+      return {p: `Phases | ${target(creature)}`, fr: 'une créature ciblée passe hors phase', en: 'target creature phases out'};
+    case 'detain':
+      return {p: `Detain | ${target({v: 'Permanent.nonLand+OppCtrl', prompt: 'Choisissez un permanent non-terrain ciblé qu\'un adversaire contrôle'})}`,
+        fr: 'détenez un permanent non-terrain ciblé qu\'un adversaire contrôle', en: 'detain target nonland permanent an opponent controls'};
+    case 'tapOrUntap':
+      return {p: `TapOrUntap | ${target({v: 'Permanent', prompt: 'Choisissez un permanent ciblé'})}`, fr: 'engagez ou dégagez un permanent ciblé', en: 'tap or untap target permanent'};
+    case 'exchangeControlSelf':
+      return {p: `ExchangeControl | Defined$ Self | ${target({v: 'Creature.OppCtrl', prompt: 'Choisissez une créature ciblée qu\'un adversaire contrôle'})}`,
+        fr: 'échangez le contrôle de CARDNAME contre celui d\'une créature ciblée qu\'un adversaire contrôle',
+        en: 'exchange control of CARDNAME and target creature an opponent controls'};
+    case 'reanimateTyped': {
+      // Sur le champ de bataille : une carte de permanent (pas un éphémère ni un rituel).
+      const k = ['card', 'instantSorcery'].includes(a.cardKind || 'card') ? CARD_KINDS.find(x => x[0] === 'permanent') : cardKind(a);
+      return {p: `ChangeZone | Origin$ Graveyard | Destination$ Battlefield | ${target({v: owned(k[1]), prompt: 'Choisissez ' + k[2] + ' de votre cimetière'})} | TgtZone$ Graveyard`,
+        fr: `renvoyez ${k[2]} ciblée de votre cimetière sur le champ de bataille`.replace(/(un|une) carte(.*) ciblée/, '$1 carte$2 ciblée'),
+        en: `return target ${k[3].replace(/^an? /, '')} from your graveyard to the battlefield`};
+    }
+    case 'playHideaway':
+      return {p: 'Play | Defined$ ExiledWith | Amount$ All | Controller$ You | WithoutManaCost$ True | Optional$ True',
+        fr: 'vous pouvez jouer la carte exilée sans payer son coût de mana', en: 'you may play the exiled card without paying its mana cost'};
+    case 'castFromGraveyard':
+      return {p: `Play | ${target({v: 'Instant.YouOwn,Sorcery.YouOwn', prompt: 'Choisissez un éphémère ou un rituel de votre cimetière'})} | TgtZone$ Graveyard | ValidSA$ Spell | WithoutManaCost$ True | ReplaceGraveyard$ Exile | Optional$ True`,
+        fr: 'vous pouvez lancer une carte d\'éphémère ou de rituel ciblée de votre cimetière sans payer son coût de mana. Si cette carte devait être mise dans votre cimetière, exilez-la à la place',
+        en: 'you may cast target instant or sorcery card from your graveyard without paying its mana cost. If that card would be put into your graveyard, exile it instead'};
+    case 'digUntil': {
+      const k = cardKind(a);
+      return {p: `DigUntil | Valid$ ${k[1]} | ValidDescription$ ${k[3].replace(/^an? /, '')} | FoundDestination$ Hand | RevealedDestination$ Library | RevealedLibraryPosition$ -1 | RevealRandomOrder$ True`,
+        fr: `révélez des cartes du dessus de votre bibliothèque jusqu'à révéler ${k[2]}. Mettez-la dans votre main et le reste au-dessous de votre bibliothèque dans un ordre aléatoire`,
+        en: `reveal cards from the top of your library until you reveal ${k[3]}. Put that card into your hand and the rest on the bottom of your library in a random order`};
+    }
+    case 'preventDamage':
+      return {p: `PreventDamage | ValidTgts$ Any | TgtPrompt$ Choisissez une cible | Amount$ ${n1}`,
+        fr: `prévenez les ${n1} prochaines blessures qui devraient être infligées à n'importe quelle cible ce tour-ci`.replace('les 1 prochaines blessures qui devraient', 'la prochaine blessure qui devrait'),
+        en: `prevent the next ${n1} damage that would be dealt to any target this turn`};
+    case 'extraLandTurn':
+      return {p: `Effect | StaticAbilities$ ${id}Land`, aux: [`SVar:${id}Land:Mode$ Continuous | Affected$ You | AdjustLandPlays$ 1 | Description$ Vous pouvez jouer un terrain supplémentaire ce tour-ci.`],
+        fr: 'vous pouvez jouer un terrain supplémentaire ce tour-ci', en: 'you may play an additional land this turn'};
+    case 'endTurn':
+      return {p: 'EndTurn', fr: 'terminez le tour', en: 'end the turn'};
+    case 'flipCoin':
+      return {p: 'FlipCoin', fr: 'jouez à pile ou face', en: 'flip a coin'};
+    case 'targetRadiation':
+      return {p: `Radiation | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | Num$ ${n1}`,
+        fr: `un joueur ciblé gagne ${n1 === 1 ? 'un marqueur' : word(n1, 'fr') + ' marqueurs'} « radiation »`,
+        en: `target player gets ${n1 === 1 ? 'a rad counter' : word(n1, 'en') + ' rad counters'}`};
+    case 'targetRevealHand':
+      return {p: `RevealHand | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})}`, fr: 'un joueur ciblé révèle sa main', en: 'target player reveals their hand'};
+    case 'lookHand':
+      return {p: `RevealHand | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | Look$ True`, fr: 'regardez la main d\'un joueur ciblé',
+        en: 'look at target player\'s hand'};
+    case 'targetDiscardHand':
+      return {p: `Discard | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | Mode$ Hand`, fr: 'un joueur ciblé se défausse de sa main',
+        en: 'target player discards their hand'};
+    case 'targetDiscardRandom':
+      return {p: `Discard | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1} | Mode$ Random`,
+        fr: `un joueur ciblé se défausse ${n1 === 1 ? 'd\'une carte' : 'de ' + word(n1, 'fr') + ' cartes'} au hasard`,
+        en: `target player discards ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'} at random`};
+    case 'targetExileTop':
+      return {p: `Mill | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumCards$ ${n1} | Destination$ Exile`,
+        fr: `exilez ${n1 === 1 ? 'la carte' : 'les ' + word(n1, 'fr') + ' cartes'} du dessus de la bibliothèque d'un joueur ciblé`,
+        en: `exile the top ${n1 === 1 ? 'card' : word(n1, 'en') + ' cards'} of target player's library`};
+    case 'targetSacrificeType': {
+      const k = SAC_KINDS.find(x => x[0] === a.sacKind) || SAC_KINDS[0];
+      return {p: `Sacrifice | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | SacValid$ ${k[1]} | SacMessage$ ${k[3].replace(/^an? /, '')}`,
+        fr: `un joueur ciblé sacrifie ${k[2]}`, en: `target player sacrifices ${k[3]}`};
+    }
+    case 'playerCreaturesDebuff':
+      return {p: `PumpAll | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | ValidCards$ Creature | NumAtt$ -${n} | NumDef$ -${n} | IsCurse$ True`,
+        fr: `les créatures que contrôle un joueur ciblé gagnent -${n}/-${n} jusqu'à la fin du tour`,
+        en: `creatures target player controls get -${n}/-${n} until end of turn`};
+    case 'playerTapAll':
+      return {p: `TapAll | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | ValidCards$ Creature`, fr: 'engagez toutes les créatures que contrôle un joueur ciblé',
+        en: 'tap all creatures target player controls'};
+    case 'playerDestroyAll':
+      return {p: `DestroyAll | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | ValidCards$ Creature`, fr: 'détruisez toutes les créatures que contrôle un joueur ciblé',
+        en: 'destroy all creatures target player controls'};
+    case 'targetToken': {
+      const t = allTokens().find(x => x[0] === a.token) || (Array.isArray(a.tokenDef) && a.tokenDef[0] === a.token ? a.tokenDef : null) || TOKENS[0];
+      const enT = `${n1 === 1 ? article(t[3]) : word(n1, 'en')} ${t[3]} ${plural(n1, 'token', 'tokens')}${t[4] ? ' with ' + t[4] : ''}`;
+      return {p: `Token | ${target({v: 'Opponent', prompt: 'Choisissez un adversaire ciblé'})} | TokenAmount$ ${n1} | TokenScript$ ${t[0]} | TokenOwner$ Targeted`,
+        fr: `un adversaire ciblé crée ${n1 === 1 ? 'un jeton' : word(n1, 'fr') + ' jetons'} ${t[2]}`, en: `target opponent creates ${enT}`};
+    }
+    case 'targetMonarch':
+      return {p: `BecomeMonarch | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})}`, fr: 'un joueur ciblé devient le monarque', en: 'target player becomes the monarch'};
+    case 'targetSetLife':
+      return {p: `SetLife | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | LifeAmount$ ${n}`,
+        fr: `le total de points de vie d'un joueur ciblé devient ${n}`, en: `target player's life total becomes ${n}`};
+    case 'exchangeLife':
+      return {p: `ExchangeLife | ${target({v: 'Opponent', prompt: 'Choisissez un adversaire ciblé'})}`,
+        fr: 'échangez votre total de points de vie contre celui d\'un adversaire ciblé', en: 'exchange life totals with target opponent'};
+    case 'targetSkipTurn':
+      return {p: `SkipTurn | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | NumTurns$ 1`, fr: 'un joueur ciblé passe son prochain tour',
+        en: 'target player skips their next turn'};
+    case 'targetLoseGame':
+      return {p: `LosesGame | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})}`, fr: 'un joueur ciblé perd la partie', en: 'target player loses the game'};
+    case 'silence':
+      return {p: `Effect | StaticAbilities$ ${id}Silence`, aux: [`SVar:${id}Silence:Mode$ CantBeCast | ValidCard$ Card | Caster$ Opponent | Description$ Vos adversaires ne peuvent pas lancer de sorts.`],
+        fr: 'vos adversaires ne peuvent pas lancer de sorts ce tour-ci', en: 'your opponents can\'t cast spells this turn'};
     case 'targetPoison':
       return {p: `Poison | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | Num$ ${n1}`,
         fr: `un joueur ciblé gagne ${n1 === 1 ? 'un marqueur' : word(n1, 'fr') + ' marqueurs'} « poison »`,
@@ -2620,6 +2984,11 @@ function staticCore(a, id, lang, card) {
       return {s: `Mode$ Continuous | CharacteristicDefining$ True | SetPower$ ${id}X | SetToughness$ ${id}X`, svars: [`SVar:${id}X:${x[0]}`],
         text: en ? `CARDNAME's power and toughness are each equal to ${x[2]}` : `La force et l'endurance de CARDNAME sont chacune égales ${aWord(x[1])}`};
     }
+    case 'cloneEtb':
+      return {lines: [`K:ETBReplacement:Copy:${id}Copy:Optional`,
+        `SVar:${id}Copy:DB$ Clone | Choices$ Creature.Other | SpellDescription$ Vous pouvez faire arriver CARDNAME sur le champ de bataille comme une copie de n'importe quelle créature sur le champ de bataille.`],
+        text: en ? 'You may have CARDNAME enter as a copy of any creature on the battlefield'
+          : 'Vous pouvez faire arriver CARDNAME sur le champ de bataille comme une copie de n\'importe quelle créature sur le champ de bataille'};
     case 'entersTapped': {
       const t = thisCard(card);
       return {lines: [`R:Event$ Moved | ValidCard$ Card.Self | Destination$ Battlefield | ReplacementResult$ Updated | ReplaceWith$ ${id}Tap`,
@@ -2635,6 +3004,92 @@ function staticCore(a, id, lang, card) {
     }
     case 'uncounterable':
       return {lines: ['R:Event$ Counter | ValidCard$ Card.Self | ValidSA$ Spell | Layer$ CantHappen'], text: en ? 'This spell can\'t be countered' : 'Ce sort ne peut pas être contrecarré'};
+    case 'oppCantCastYourTurn':
+      return {s: 'Mode$ CantBeCast | ValidCard$ Card | Caster$ Opponent | Condition$ PlayerTurn',
+        text: en ? 'Your opponents can\'t cast spells during your turn' : 'Vos adversaires ne peuvent pas lancer de sorts pendant votre tour'};
+    case 'oneSpellEach':
+      return {s: 'Mode$ CantBeCast | ValidCard$ Card | Caster$ Player | NumLimitEachTurn$ 1',
+        text: en ? 'Each player can\'t cast more than one spell each turn' : 'Chaque joueur ne peut pas lancer plus d\'un sort par tour'};
+    case 'oppOneSpell':
+      return {s: 'Mode$ CantBeCast | ValidCard$ Card | Caster$ Opponent | NumLimitEachTurn$ 1',
+        text: en ? 'Each opponent can\'t cast more than one spell each turn' : 'Chaque adversaire ne peut pas lancer plus d\'un sort par tour'};
+    case 'oppDrawLimit':
+      return {s: 'Mode$ CantDraw | ValidPlayer$ Opponent | DrawLimit$ 1',
+        text: en ? 'Each opponent can\'t draw more than one card each turn' : 'Chaque adversaire ne peut pas piocher plus d\'une carte par tour'};
+    case 'playersCantGainLife':
+      return {s: 'Mode$ CantGainLife | ValidPlayer$ Player', text: en ? 'Players can\'t gain life' : 'Les joueurs ne peuvent pas gagner de points de vie'};
+    case 'cantPreventDamage':
+      return {s: 'Mode$ CantPreventDamage', text: en ? 'Damage can\'t be prevented' : 'Les blessures ne peuvent pas être prévenues'};
+    case 'playLandsGraveyard':
+      return {s: 'Mode$ Continuous | Affected$ Land.YouOwn | MayPlay$ True | AffectedZone$ Graveyard',
+        text: en ? 'You may play lands from your graveyard' : 'Vous pouvez jouer des terrains depuis votre cimetière'};
+    case 'maxOneBlocker':
+      return {s: `Mode$ MinMaxBlocker | ValidCard$ ${sc.v} | Max$ 1`,
+        text: en ? `${S} can't be blocked by more than one creature` : `${S} ${v3('ne peut pas être bloquée', 'ne peuvent pas être bloquées')} par plus d'une créature`};
+    case 'minBlockers': {
+      const k = Math.max(2, n);
+      return {s: `Mode$ MinMaxBlocker | ValidCard$ ${sc.v} | Min$ ${k}`,
+        text: en ? `${S} can't be blocked except by ${word(k, 'en')} or more creatures`
+          : `${S} ${v3('ne peut pas être bloquée', 'ne peuvent pas être bloquées')} excepté par ${word(k, 'fr')} créatures ou plus`};
+    }
+    case 'canAttackDefender':
+      return {s: `Mode$ CanAttackDefender | ValidCard$ ${sc.v}`,
+        text: en ? `${S} can attack as though ${v3('it', 'they')} didn't have defender` : `${S} ${v3('peut attaquer comme si elle n\'avait', 'peuvent attaquer comme si elles n\'avaient')} pas le défenseur`};
+    case 'damageToughness':
+      return {s: `Mode$ CombatDamageToughness | ValidCard$ ${sc.v}`,
+        text: en ? `${S} ${v3('assigns', 'assign')} combat damage equal to ${v3('its', 'their')} toughness rather than ${v3('its', 'their')} power`
+          : `${S} ${v3('inflige des blessures de combat égales à son endurance plutôt qu\'à sa force', 'infligent des blessures de combat égales à leur endurance plutôt qu\'à leur force')}`};
+    case 'selfCostReduction': {
+      const x = amountOf({...a, amount: a.amount && !['fixed', 'tapped', 'xPaid'].includes(a.amount) ? a.amount : 'creatures'});
+      return {s: `Mode$ ReduceCost | ValidCard$ Card.Self | Type$ Spell | Amount$ ${id}X | EffectZone$ All`, svars: [`SVar:${id}X:${x[0]}`],
+        text: en ? `This spell costs {X} less to cast, where X is ${x[2]}` : `Ce sort coûte {X} de moins à lancer, X étant ${x[1]}`};
+    }
+    case 'kwMustBeBlocked':
+      return {lines: ['K:CARDNAME must be blocked if able.'], text: en ? 'CARDNAME must be blocked if able' : 'CARDNAME doit être bloquée si possible'};
+    case 'kwLure':
+      return {lines: ['K:All creatures able to block CARDNAME do so.'], text: en ? 'All creatures able to block CARDNAME do so' : 'Toutes les créatures capables de bloquer CARDNAME le font'};
+    case 'kwCantAttackBlockAlone':
+      return {lines: ['K:CARDNAME can\'t attack or block alone.'], text: en ? 'CARDNAME can\'t attack or block alone' : 'CARDNAME ne peut pas attaquer ou bloquer seule'};
+    case 'kwCantAttackAlone':
+      return {lines: ['K:CARDNAME can\'t attack alone.'], text: en ? 'CARDNAME can\'t attack alone' : 'CARDNAME ne peut pas attaquer seule'};
+    case 'kwPreventAll':
+      return {lines: ['K:Prevent all damage that would be dealt to CARDNAME.'],
+        text: en ? 'Prevent all damage that would be dealt to CARDNAME' : 'Prévenez toutes les blessures qui devraient être infligées à CARDNAME'};
+    case 'kwPreventCombat':
+      return {lines: ['K:Prevent all combat damage that would be dealt to CARDNAME.'],
+        text: en ? 'Prevent all combat damage that would be dealt to CARDNAME' : 'Prévenez toutes les blessures de combat qui devraient être infligées à CARDNAME'};
+    case 'kwMayNotUntap':
+      return {lines: ['K:You may choose not to untap CARDNAME during your untap step.'],
+        text: en ? 'You may choose not to untap CARDNAME during your untap step' : 'Vous pouvez choisir de ne pas dégager CARDNAME pendant votre étape de dégagement'};
+    case 'kwCanBeCommander':
+      return {lines: ['K:CARDNAME can be your commander.'], text: en ? 'CARDNAME can be your commander' : 'CARDNAME peut être votre commandant'};
+    case 'kwAnyNumber':
+      return {lines: ['K:A deck can have any number of cards named CARDNAME.'],
+        text: en ? 'A deck can have any number of cards named CARDNAME' : 'Un deck peut contenir n\'importe quel nombre de cartes appelées CARDNAME'};
+    case 'graveyardHate':
+      return {lines: [`R:Event$ Moved | ActiveZones$ Battlefield | Destination$ Graveyard | ValidCard$ Card.!token+OppOwn | ReplaceWith$ ${id}Exi`,
+        `SVar:${id}Exi:DB$ ChangeZone | Hidden$ True | Origin$ All | Destination$ Exile | Defined$ ReplacedCard`],
+        text: en ? 'If a card would be put into an opponent\'s graveyard from anywhere, exile it instead'
+          : 'Si une carte devait être mise dans le cimetière d\'un adversaire de n\'importe où, exilez-la à la place'};
+    case 'creaturesDieExile':
+      return {lines: [`R:Event$ Moved | ActiveZones$ Battlefield | Origin$ Battlefield | Destination$ Graveyard | ValidLKI$ Creature | ReplaceWith$ ${id}Exi`,
+        `SVar:${id}Exi:DB$ ChangeZone | Hidden$ True | Origin$ All | Destination$ Exile | Defined$ ReplacedCard`],
+        text: en ? 'If a creature would die, exile it instead' : 'Si une créature devait mourir, exilez-la à la place'};
+    case 'manaDouble':
+      return {lines: [`R:Event$ ProduceMana | ActiveZones$ Battlefield | ValidActivator$ You | ValidCard$ Permanent | ReplaceWith$ ${id}Two`,
+        `SVar:${id}Two:DB$ ReplaceMana | ReplaceAmount$ 2`],
+        text: en ? 'If you tap a permanent for mana, it produces twice as much of that mana instead'
+          : 'Si vous engagez un permanent pour du mana, il produit deux fois plus de ce mana à la place'};
+    case 'labManiac':
+      return {lines: [`R:Event$ Draw | ActiveZones$ Battlefield | ValidPlayer$ You | IsPresent$ Card.YouOwn | PresentZone$ Library | PresentCompare$ EQ0 | ReplaceWith$ ${id}Win`,
+        `SVar:${id}Win:DB$ WinsGame | Defined$ You`],
+        text: en ? 'If you would draw a card while your library has no cards in it, you win the game instead'
+          : 'Si vous deviez piocher une carte alors que votre bibliothèque ne contient aucune carte, vous gagnez la partie à la place'};
+    case 'oppMaxHandMinus': {
+      const k = Math.max(1, n);
+      return {s: `Mode$ Continuous | Affected$ Opponent | RaiseMaxHandSize$ -${k}`,
+        text: en ? `Each opponent's maximum hand size is reduced by ${word(k, 'en')}` : `La taille maximale de main de chaque adversaire est réduite de ${word(k, 'fr')}`};
+    }
     case 'noMaxHand':
       return {s: 'Mode$ Continuous | Affected$ You | SetMaxHandSize$ Unlimited', text: en ? 'You have no maximum hand size' : 'Vous n\'avez pas de taille maximale de main'};
     case 'maxHandPlus':
@@ -3059,6 +3514,47 @@ function triggerTable(a, card = null) {
       'Whenever an artifact you control enters'],
     counterAdded: ['Mode$ CounterAddedOnce | ValidCard$ Creature.YouCtrl | CounterType$ P1P1 | TriggerZones$ Battlefield',
       'À chaque fois qu\'au moins un marqueur +1/+1 est mis sur une créature que vous contrôlez', 'Whenever one or more +1/+1 counters are put on a creature you control'],
+    unblocked: ['Mode$ AttackerUnblocked | ValidCard$ Card.Self', 'À chaque fois que CARDNAME attaque et n\'est pas bloquée', 'Whenever CARDNAME attacks and isn\'t blocked'],
+    blocksCreature: ['Mode$ AttackerBlockedByCreature | ValidCard$ Card.Self', 'À chaque fois que CARDNAME devient bloquée par une créature',
+      'Whenever CARDNAME becomes blocked by a creature'],
+    becomesTarget: ['Mode$ BecomesTarget | ValidTarget$ Card.Self | TriggerZones$ Battlefield', 'À chaque fois que CARDNAME devient la cible d\'un sort ou d\'une capacité',
+      'Whenever CARDNAME becomes the target of a spell or ability'],
+    becomesTargetOpp: ['Mode$ BecomesTarget | ValidTarget$ Card.Self | ValidSource$ Card.OppCtrl,Emblem.OppCtrl | TriggerZones$ Battlefield',
+      'À chaque fois que CARDNAME devient la cible d\'un sort ou d\'une capacité qu\'un adversaire contrôle',
+      'Whenever CARDNAME becomes the target of a spell or ability an opponent controls'],
+    untaps: ['Mode$ Untaps | ValidCard$ Card.Self | TriggerZones$ Battlefield', 'À chaque fois que CARDNAME se dégage', 'Whenever CARDNAME becomes untapped'],
+    combatDamageOnce: ['Mode$ DamageDoneOnce | ValidSource$ Creature.YouCtrl | ValidTarget$ Player | CombatDamage$ True | TriggerZones$ Battlefield',
+      'À chaque fois qu\'une ou plusieurs créatures que vous contrôlez infligent des blessures de combat à un joueur',
+      'Whenever one or more creatures you control deal combat damage to a player'],
+    attacksYou: ['Mode$ Attacks | ValidCard$ Creature.OppCtrl | Attacked$ You,Planeswalker.YouCtrl | TriggerZones$ Battlefield',
+      'À chaque fois qu\'une créature vous attaque ou attaque un planeswalker que vous contrôlez', 'Whenever a creature attacks you or a planeswalker you control'],
+    anyEnters: [enters('Creature.Other'), 'À chaque fois qu\'une autre créature arrive sur le champ de bataille', 'Whenever another creature enters'],
+    tokenEnters: [enters('Card.token+YouCtrl'), 'À chaque fois qu\'un jeton arrive sur le champ de bataille sous votre contrôle', 'Whenever a token you control enters'],
+    nontokenDies: [dies('Creature.nonToken+YouCtrl'), 'À chaque fois qu\'une créature non-jeton que vous contrôlez meurt', 'Whenever a nontoken creature you control dies'],
+    artifactDies: [dies('Artifact.YouCtrl'), 'À chaque fois qu\'un artefact que vous contrôlez est mis dans un cimetière depuis le champ de bataille',
+      'Whenever an artifact you control is put into a graveyard from the battlefield'],
+    oppLandfall: [enters('Land.OppCtrl'), 'À chaque fois qu\'un terrain arrive sur le champ de bataille sous le contrôle d\'un adversaire',
+      'Whenever a land an opponent controls enters'],
+    playerCasts: ['Mode$ SpellCast | ValidCard$ Card | ValidActivatingPlayer$ Player | TriggerZones$ Battlefield', 'À chaque fois qu\'un joueur lance un sort',
+      'Whenever a player casts a spell'],
+    firstSpell: ['Mode$ SpellCast | ValidCard$ Card | ValidActivatingPlayer$ You | ActivatorThisTurnCast$ EQ1 | TriggerZones$ Battlefield',
+      'À chaque fois que vous lancez votre premier sort de chaque tour', 'Whenever you cast your first spell each turn'],
+    abilityCast: ['Mode$ AbilityCast | ValidActivatingPlayer$ You | ValidSA$ Activated.nonManaAbility | TriggerZones$ Battlefield',
+      'À chaque fois que vous activez une capacité qui n\'est pas une capacité de mana', 'Whenever you activate an ability that isn\'t a mana ability'],
+    landPlayed: ['Mode$ LandPlayed | ValidCard$ Land.YouCtrl | TriggerZones$ Battlefield', 'À chaque fois que vous jouez un terrain', 'Whenever you play a land'],
+    tapsForMana: ['Mode$ TapsForMana | ValidCard$ Land | TriggerZones$ Battlefield', 'À chaque fois qu\'un joueur engage un terrain pour du mana',
+      'Whenever a player taps a land for mana'],
+    oppDraws: ['Mode$ Drawn | ValidCard$ Card.OppOwn | TriggerZones$ Battlefield', 'À chaque fois qu\'un adversaire pioche une carte', 'Whenever an opponent draws a card'],
+    youDiscard: ['Mode$ Discarded | ValidCard$ Card.YouOwn | TriggerZones$ Battlefield', 'À chaque fois que vous vous défaussez d\'une carte', 'Whenever you discard a card'],
+    youScry: ['Mode$ Scry | ValidPlayer$ You | TriggerZones$ Battlefield', 'À chaque fois que vous regardez', 'Whenever you scry'],
+    youSurveil: ['Mode$ Surveil | ValidPlayer$ You | TriggerZones$ Battlefield', 'À chaque fois que vous surveillez', 'Whenever you surveil'],
+    youLoseLife: ['Mode$ LifeLost | ValidPlayer$ You | TriggerZones$ Battlefield', 'À chaque fois que vous perdez des points de vie', 'Whenever you lose life'],
+    youSacCreature: ['Mode$ Sacrificed | ValidCard$ Creature.YouCtrl | ValidPlayer$ You | TriggerZones$ Battlefield', 'À chaque fois que vous sacrifiez une créature',
+      'Whenever you sacrifice a creature'],
+    eachCombat: [phase('BeginCombat'), 'Au début de chaque combat', 'At the beginning of each combat'],
+    main2: [phase('Main2', 'You'), 'Au début de votre phase principale postcombat', 'At the beginning of your postcombat main phase'],
+    eachDraw: [phase('Draw'), 'Au début de l\'étape de pioche de chaque joueur', 'At the beginning of each player\'s draw step'],
+    oppEnd: [phase('End of Turn', 'Opponent'), 'Au début de l\'étape de fin de chaque adversaire', 'At the beginning of each opponent\'s end step'],
     counterPutSelf: [`Mode$ CounterAddedOnce | ValidCard$ Card.Self | CounterType$ ${wc[0]} | TriggerZones$ Battlefield`,
       `À chaque fois qu'au moins un marqueur ${wc[1]} est mis sur CARDNAME`, `Whenever one or more ${wc[2]} counters are put on CARDNAME`],
     counterNth: [`Mode$ CounterAdded | ValidCard$ Card.Self | CounterType$ ${wc[0]} | CounterAmount$ EQ${wn} | TriggerZones$ Battlefield`,

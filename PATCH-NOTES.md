@@ -37,6 +37,99 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
   - l'énergie à dépenser.
 - **En partie**, les marqueurs portent leur nom français : Pétrole, Sapience, Quête, Fatalité…
 
+### Atelier : tout ce qui manquait
+J'ai comparé l'Atelier à tout ce que Forge sait faire, en comptant combien de vraies cartes s'en servent. J'ai ajouté tout ce qui manquait de courant.
+
+- **Joueurs** (avec le choix « Joueur ») :
+  - révéler sa main, ou regarder la main d'un joueur ;
+  - se défausser de sa main, ou de cartes au hasard ;
+  - exiler les cartes du dessus de sa bibliothèque ;
+  - sacrifier un permanent d'un type : artefact, enchantement, terrain, permanent non-terrain… ;
+  - toutes ses créatures gagnent -N/-N, s'engagent ou sont détruites ;
+  - un adversaire crée des jetons (un cadeau) ;
+  - devenir le monarque ;
+  - un total de points de vie qui devient N, ou échanger son total contre celui d'un adversaire ;
+  - passer son prochain tour, ou perdre la partie ;
+  - gagner des marqueurs « radiation » ;
+  - « Vos adversaires ne peuvent pas lancer de sorts ce tour-ci ».
+- **Effets** :
+  - **Animer** : devenir une créature N/N jusqu'à la fin du tour (terrain, artefact), une force et une endurance de base N/N, des terrains qui deviennent des créatures.
+  - **Exiler** :
+    - exiler jusqu'à ce que cette carte quitte le champ de bataille (une prison) ;
+    - exiler puis renvoyer, tout de suite ou au début de la prochaine étape de fin ;
+    - sacrifier ou exiler cette carte au début de la prochaine étape de fin.
+  - **Cimetière et bibliothèque** :
+    - lancer un éphémère ou un rituel de votre cimetière sans payer son coût ;
+    - renvoyer une carte d'un type de votre cimetière sur le champ de bataille ;
+    - révéler des cartes jusqu'à une carte d'un type ;
+    - mettre un permanent au-dessus de la bibliothèque.
+  - **Marqueurs** : doubler, déplacer ou retirer tous les marqueurs.
+  - **Créatures** :
+    - protection contre la couleur de votre choix, pour une créature ou toutes ;
+    - perdre un mot-clé (« perd le vol ») ;
+    - passer hors phase ;
+    - détenir ;
+    - engager ou dégager ;
+    - régénérer une créature ciblée ;
+    - bloquer si possible ;
+    - retirer du combat ;
+    - endurer N.
+  - **Le reste** :
+    - attacher un équipement ou une aura ;
+    - échanger le contrôle ;
+    - prévenir les N prochaines blessures ;
+    - un terrain supplémentaire ce tour-ci ;
+    - terminer le tour ;
+    - **pile ou face** (le premier « Et puis » si vous gagnez, le second si vous perdez) ;
+    - **Cachette N**, et jouer la carte cachée.
+- **Déclencheurs** :
+  - quand elle attaque et n'est pas bloquée ;
+  - quand elle devient bloquée par une créature ;
+  - quand elle devient la cible (d'un adversaire ou de n'importe qui) ;
+  - quand elle se dégage ;
+  - quand une ou plusieurs de vos créatures infligent des blessures de combat à un joueur ;
+  - quand une créature vous attaque ;
+  - quand une autre créature arrive, ou quand un jeton arrive sous votre contrôle ;
+  - quand une créature non-jeton meurt, ou quand un artefact va au cimetière ;
+  - quand un terrain arrive chez un adversaire ;
+  - quand un joueur lance un sort, ou quand vous lancez votre premier sort du tour ;
+  - quand vous activez une capacité ;
+  - quand vous jouez un terrain, ou quand un joueur engage un terrain pour du mana ;
+  - quand un adversaire pioche ;
+  - quand vous vous défaussez, regardez ou surveillez ;
+  - quand vous perdez des points de vie, ou quand vous sacrifiez une créature ;
+  - au début de chaque combat, de votre phase principale postcombat, de l'étape de pioche de chaque joueur, ou de l'étape de fin de chaque adversaire.
+
+  Avec « ce joueur » quand le déclencheur parle d'un joueur.
+- **Effets permanents** :
+  - la taille maximale de main des adversaires est réduite ;
+  - les adversaires ne peuvent pas lancer de sorts pendant votre tour ;
+  - un seul sort par tour, et une seule pioche par tour pour les adversaires ;
+  - personne ne peut gagner de points de vie ;
+  - les blessures ne peuvent pas être prévenues ;
+  - jouer des terrains depuis le cimetière ;
+  - ne peut pas être bloquée par plus d'une créature, ou seulement par N créatures ou plus ;
+  - attaquer malgré le défenseur ;
+  - des blessures égales à l'endurance ;
+  - ce sort coûte {X} de moins ;
+  - arriver comme une copie ;
+  - doit être bloquée si possible ;
+  - toutes les créatures doivent la bloquer ;
+  - ne peut pas attaquer (ou bloquer) seule ;
+  - prévenir les blessures qui lui sont infligées ;
+  - choisir de ne pas la dégager ;
+  - peut être votre commandant ;
+  - autant d'exemplaires qu'on veut dans un deck.
+- **Remplacements** :
+  - les cartes qui iraient au cimetière d'un adversaire sont exilées ;
+  - les créatures qui meurent sont exilées ;
+  - le mana est doublé ;
+  - piocher avec une bibliothèque vide fait gagner la partie.
+- **17 capacités toutes prêtes en plus**, dont la prison, le clignotement, le terrain qui s'anime et pile ou face.
+- **Vérifié** :
+  - Forge accepte les 4 452 combinaisons (chaque effet, chaque déclencheur, chaque effet permanent et chaque choix « Joueur », en français et en anglais) ;
+  - 46 essais réussis en vraie partie.
+
 ### Corrections
 - « Chaque adversaire se défausse d'une carte », au lieu de « défausse une carte ».
 - « Qu'Essai… » devant un nom qui commence par une voyelle, au lieu de « q'Essai… ».

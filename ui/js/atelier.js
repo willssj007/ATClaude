@@ -11,7 +11,7 @@ import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
-  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 /** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
@@ -19,7 +19,7 @@ const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scop
   cond: 'Condition', amount: 'Nombre X', counter: 'Marqueur', permType: 'Type de permanent', cardKind: 'Type de carte', spellType: 'Type de sort',
   emblem: 'Emblème', level: 'Niveau de la classe', who: 'Joueur', chapter: 'Chapitre', sacWhat: 'Sacrifier', zone: 'D\'où elle s\'active',
   addCost: 'Coût en plus', tapXWhat: 'Engager X…', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre',
-  whenCounter: 'Marqueur', amountCounter: 'Marqueur', condCounter: 'Marqueur', removeCounterType: 'Marqueur'};
+  whenCounter: 'Marqueur', amountCounter: 'Marqueur', condCounter: 'Marqueur', removeCounterType: 'Marqueur', sacKind: 'Sacrifie'};
 
 /** Les types de marqueurs d'une liste déroulante (« charge », « temps », +1/+1…). */
 const COUNTER_OPTIONS = COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]);
@@ -1612,6 +1612,9 @@ export class Atelier {
     }
     if (e.ct) {
       out += row('Quelle carte', sel('cardKind', CARD_KINDS.map(t => [t[0], t[2]]), h.cardKind || 'card'));
+    }
+    if (e.sacKind) {
+      out += row('Sacrifie', sel('sacKind', SAC_KINDS.map(k => [k[0], k[2]]), h.sacKind || 'creature'));
     }
     if (e.counter) {
       out += row('Marqueurs', sel('counter', COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]), h.counter || 'P1P1'));
