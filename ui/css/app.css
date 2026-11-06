@@ -145,6 +145,27 @@ select.csel-native { position: absolute; width: 1px; height: 1px; min-height: 0;
 .csel-item .ic { width: 16px; height: 16px; flex: none; color: var(--gold); }
 .csel-item:disabled { opacity: .45; cursor: default; }
 .csel-empty { padding: 12px; text-align: center; }
+/* Sur téléphone (portrait ou paysage) : un panneau au-dessus d'un voile, avec le nom du champ et une grande recherche. */
+.csel-backdrop { position: fixed; inset: 0; z-index: 119; background: rgba(0, 0, 0, .5); animation: csel-fade .14s ease-out; }
+.csel-backdrop.closing { background: transparent; transition: background .15s; }
+@keyframes csel-fade { from { opacity: 0; } }
+.csel-panel.sheet { border-radius: 16px; animation: csel-up .18s ease-out; }
+@keyframes csel-up { from { opacity: 0; transform: translateY(14px); } }
+.csel-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 10px 6px 16px; }
+.csel-title { flex: 1; min-width: 0; font: 600 15px/1.25 var(--title-font); color: var(--gold-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csel-close { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .04); font-size: 15px; }
+.csel-panel.sheet .csel-search { padding: 4px 12px 10px; border-bottom: 1px solid var(--line); }
+.csel-panel.sheet .csel-search input { min-height: 42px; font-size: 16px; }
+.csel-panel.sheet .csel-list { flex: 1; padding: 6px 8px 10px; }
+.csel-panel.sheet .csel-item { min-height: 46px; padding: 10px 12px; font-size: 15px; }
+.csel-panel.sheet .csel-group { padding: 12px 12px 5px; }
+.csel-item span { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+.csel-close2 { display: none; }
+.csel-panel.compact.has-search .csel-head { display: none; }
+.csel-panel.compact.has-search .csel-close2 { display: inline-flex; align-items: center; justify-content: center; }
+.csel-panel.sheet.compact .csel-search { padding: 8px 10px; }
+.csel-panel.sheet.compact .csel-item { min-height: 40px; padding: 8px 12px; }
+.csel-item b { color: var(--gold-2); }
 textarea { width: 100%; resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
 label.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }

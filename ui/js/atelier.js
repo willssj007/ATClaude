@@ -11,8 +11,25 @@ import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
-  PLAYER_EFFECTS, SUBTYPES, attachOf, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+  PLAYER_EFFECTS, SUBTYPES, attachOf, attachTemplates, cleanGroup, readGroup, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
+
+/** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
+const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scope: 'Qui', keyword: 'Mot-clé', token: 'Jeton', mana: 'Mana',
+  cond: 'Condition', amount: 'Nombre X', counter: 'Marqueur', permType: 'Type de permanent', cardKind: 'Type de carte', spellType: 'Type de sort',
+  emblem: 'Emblème', level: 'Niveau de la classe', who: 'Joueur', chapter: 'Chapitre', sacWhat: 'Sacrifier', zone: 'D\'où elle s\'active',
+  addCost: 'Coût en plus', tapXWhat: 'Engager X…', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre'};
+
+function labelSelects(root) {
+  root.querySelectorAll('select:not([aria-label])').forEach((sel) => {
+    const k = sel.dataset.a || sel.dataset.sf || sel.dataset.case;
+    const kw = sel.dataset.kwv;
+    const t = k ? SELECT_TITLES[k] : kw ? (KW_ALL.find(x => x[0] === kw) || [])[1] : null;
+    if (t) {
+      sel.setAttribute('aria-label', t);
+    }
+  });
+}
 
 const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
@@ -120,19 +137,63 @@ export class Atelier {
 
   // ------------------------------------------------------------------ liste
 
+  /** Le groupe d'une carte perso (écrit dans son script), "" sans groupe. */
+  groupOf(c) {
+    return readGroup(c.script) || cleanGroup(c.form && c.form.group);
+  }
+
+  /** Les groupes existants, avec leur nombre de cartes et de jetons, par ordre alphabétique. */
+  groups() {
+    const n = new Map();
+    for (const c of this.data.cards) {
+      const g = this.groupOf(c);
+      if (g) {
+        n.set(g, (n.get(g) || 0) + 1);
+      }
+    }
+    return [...n].sort((a, b) => a[0].localeCompare(b[0], 'fr'));
+  }
+
   renderList() {
     const d = this.data;
-    const cards = d.cards.filter(c => !c.token);
-    const tokens = d.cards.filter(c => c.token);
-    this.root.innerHTML = `<div class="page atelier">
-      <div class="ate-top"><h1>Atelier</h1><button class="btn gold" data-new>＋ Nouvelle carte</button></div>
+    const groups = this.groups();
+    let filter = this.groupFilter;
+    if (filter === undefined) {
+      try {
+        filter = JSON.parse(localStorage.getItem('at.atelier.group') || '""');
+      } catch (e) {
+        filter = '';
+      }
+    }
+    // Un groupe qui n'existe plus (vidé ou renommé ailleurs) : toutes les cartes.
+    if (filter && filter !== '-' && !groups.some(g => g[0] === filter)) {
+      filter = '';
+    }
+    this.groupFilter = filter;
+    const shown = (c) => !filter || (filter === '-' ? !this.groupOf(c) : this.groupOf(c) === filter);
+    const cards = d.cards.filter(c => !c.token && shown(c));
+    const tokens = d.cards.filter(c => c.token && shown(c));
+    const loose = d.cards.filter(c => !this.groupOf(c)).length;
+    const sel = this.selection;
+    const chip = (v, label, count) => `<button class="chip${filter === v ? ' on' : ''}" data-gfilter="${esc(v)}">${esc(label)}
+      <span class="ate-gn">${count}</span></button>`;
+    this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
+      <div class="ate-top"><h1>Atelier</h1>${d.cards.length ? `<button class="btn" data-organize>${sel ? 'Terminé' : 'Organiser'}</button>` : ''}
+        <button class="btn gold" data-new>＋ Nouvelle carte</button></div>
       <p class="muted small">Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles
         se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker).</p>
-      <div class="ate-grid ate-cards">${cards.length ? '' : '<p class="muted">Aucune carte perso pour l\'instant.</p>'}</div>
+      ${groups.length || sel ? `<div class="ate-groups chips">${chip('', 'Toutes', d.cards.length)}${groups.map(([g, n]) => chip(g, g, n)).join('')}
+        ${groups.length && loose ? chip('-', 'Sans groupe', loose) : ''}
+        ${filter && filter !== '-' ? `<button class="btn small" data-grename title="Renommer ce groupe">Renommer</button>` : ''}</div>` : ''}
+      ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
+        <button class="btn small gold" data-gput${sel.size ? '' : ' disabled'}>Mettre dans un groupe…</button>
+        <button class="btn small" data-gout${sel.size ? '' : ' disabled'}>Retirer du groupe</button>
+        <button class="btn small" data-gall>${cards.length + tokens.length && [...cards, ...tokens].every(c => sel.has(c.name)) ? 'Aucune' : 'Toutes'}</button></div>` : ''}
+      <div class="ate-cardgroups"></div>
       <div class="ate-top"><h2>Mes jetons</h2><button class="btn" data-new-token>＋ Nouveau jeton</button></div>
       <p class="muted small">Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso
         les créent (effet « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.</p>
-      <div class="ate-grid ate-tokens">${tokens.length ? '' : '<p class="muted">Aucun jeton perso pour l\'instant.</p>'}</div>
+      <div class="ate-grid ate-tokens">${tokens.length ? '' : `<p class="muted">${filter ? 'Aucun jeton dans ce groupe.' : 'Aucun jeton perso pour l\'instant.'}</p>`}</div>
       <h2>Types de créature perso</h2>
       <p class="muted small">Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et
         un effet qui cite un type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.</p>
@@ -140,20 +201,71 @@ export class Atelier {
         <span class="ate-addtype"><input type="text" placeholder="Nouveau type (un mot)" maxlength="30"><button class="btn small" data-addtype>Ajouter</button></span>
       </div>
     </div>`;
-    for (const [list, grid] of [[cards, this.root.querySelector('.ate-cards')], [tokens, this.root.querySelector('.ate-tokens')]]) {
-      for (const c of list) {
-        const tile = el(`<div class="ate-tile" data-name="${esc(c.name)}"></div>`);
-        tile.appendChild(c.card ? cardElement(c.card) : el(`<div class="mcard"><div class="face"></div></div>`));
-        tile.appendChild(el(`<div class="ate-name">${esc(c.name)}</div>`));
-        grid.appendChild(tile);
+    const tileOf = (c) => {
+      const tile = el(`<div class="ate-tile${sel && sel.has(c.name) ? ' picked' : ''}" data-name="${esc(c.name)}"></div>`);
+      tile.appendChild(c.card ? cardElement(c.card) : el(`<div class="mcard"><div class="face"></div></div>`));
+      tile.appendChild(el(`<div class="ate-name">${esc(c.name)}</div>`));
+      if (sel) {
+        tile.appendChild(el(`<span class="ate-pick">${sel.has(c.name) ? '✓' : ''}</span>`));
       }
+      return tile;
+    };
+    // Toutes les cartes : un bloc par groupe (puis celles sans groupe) ; un groupe choisi : ses cartes seulement.
+    const holder = this.root.querySelector('.ate-cardgroups');
+    const blocks = !filter && groups.length
+      ? [...groups.map(([g]) => [g, cards.filter(c => this.groupOf(c) === g)]), ['Sans groupe', cards.filter(c => !this.groupOf(c))]].filter(b => b[1].length)
+      : [['', cards]];
+    for (const [title, list] of blocks) {
+      if (title) {
+        holder.appendChild(el(`<h3 class="ate-gtitle">${esc(title)} <span class="ate-gn">${list.length}</span></h3>`));
+      }
+      const grid = el('<div class="ate-grid ate-cards"></div>');
+      if (!list.length) {
+        grid.appendChild(el(`<p class="muted">${filter ? 'Aucune carte dans ce groupe.' : 'Aucune carte perso pour l\'instant.'}</p>`));
+      }
+      list.forEach(c => grid.appendChild(tileOf(c)));
+      holder.appendChild(grid);
     }
+    const tgrid = this.root.querySelector('.ate-tokens');
+    tokens.forEach(c => tgrid.appendChild(tileOf(c)));
     this.root.onclick = async (e) => {
       if (this.pressed()) {
         return;
       }
       const tile = e.target.closest('.ate-tile');
-      if (e.target.closest('[data-new]')) {
+      const gf = e.target.closest('[data-gfilter]');
+      if (gf) {
+        this.groupFilter = gf.dataset.gfilter;
+        try {
+          localStorage.setItem('at.atelier.group', JSON.stringify(this.groupFilter));
+        } catch (err) {
+          // mémoire du navigateur indisponible : le filtre ne sera pas retenu
+        }
+        this.renderList();
+      } else if (e.target.closest('[data-organize]')) {
+        this.selection = this.selection ? null : new Set();
+        this.renderList();
+      } else if (tile && this.selection) {
+        // Mode « Organiser » : toucher une carte la choisit (ou la retire du choix).
+        const n = tile.dataset.name;
+        if (this.selection.has(n)) {
+          this.selection.delete(n);
+        } else {
+          this.selection.add(n);
+        }
+        this.renderList();
+      } else if (e.target.closest('[data-gall]')) {
+        const visible = [...this.root.querySelectorAll('.ate-tile')].map(t => t.dataset.name);
+        const all = visible.every(n => this.selection.has(n));
+        visible.forEach(n => (all ? this.selection.delete(n) : this.selection.add(n)));
+        this.renderList();
+      } else if (e.target.closest('[data-gput]')) {
+        this.askGroup([...this.selection]);
+      } else if (e.target.closest('[data-gout]')) {
+        await this.setGroup([...this.selection], '');
+      } else if (e.target.closest('[data-grename]')) {
+        this.renameGroup(this.groupFilter);
+      } else if (e.target.closest('[data-new]')) {
         this.edit(null);
       } else if (e.target.closest('[data-new-token]')) {
         this.edit(null, {token: true});
@@ -173,6 +285,93 @@ export class Atelier {
         this.root.querySelector('[data-addtype]').click();
       }
     });
+  }
+
+  /** Choisir le groupe des cartes choisies : un groupe existant, ou un nouveau nom. */
+  askGroup(names) {
+    const groups = this.groups();
+    customBox(`Ranger ${names.length} carte${names.length > 1 ? 's' : ''}`, (body, footer, close) => {
+      body.innerHTML = `${groups.length ? `<p class="muted small">Dans un groupe existant :</p>
+        <div class="chips ate-gpick">${groups.map(([g, n]) => `<button class="chip" data-gpick="${esc(g)}">${esc(g)} <span class="ate-gn">${n}</span></button>`).join('')}</div>` : ''}
+        <label class="ate-field"><span>${groups.length ? 'Ou un nouveau groupe' : 'Nouveau groupe'}</span>
+        <input type="text" class="ate-gnew" maxlength="30" placeholder="Dragons, Deck d'Ilona, À finir…"></label>`;
+      const input = body.querySelector('.ate-gnew');
+      const go = async (g) => {
+        if (!cleanGroup(g)) {
+          input.focus();
+          return;
+        }
+        close();
+        await this.setGroup(names, g);
+      };
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-gpick]');
+        if (b) {
+          go(b.dataset.gpick);
+        }
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          go(input.value);
+        }
+      });
+      const ok = el('<button class="btn gold">Ranger</button>');
+      ok.addEventListener('click', () => go(input.value));
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel, ok);
+    }, {narrow: true});
+  }
+
+  /** Renommer un groupe : toutes ses cartes passent dans le nouveau nom (ou dans un groupe existant). */
+  renameGroup(group) {
+    const names = this.data.cards.filter(c => this.groupOf(c) === group).map(c => c.name);
+    customBox(`Renommer « ${group} »`, (body, footer, close) => {
+      body.innerHTML = `<label class="ate-field"><span>Nouveau nom</span><input type="text" class="ate-gnew" maxlength="30" value="${esc(group)}"></label>
+        <p class="muted small">Pour défaire le groupe, utilise « Organiser » puis « Retirer du groupe ».</p>`;
+      const input = body.querySelector('.ate-gnew');
+      const go = async () => {
+        const g = cleanGroup(input.value);
+        if (!g) {
+          input.focus();
+          return;
+        }
+        close();
+        this.groupFilter = g;
+        await this.setGroup(names, g);
+      };
+      input.addEventListener('keydown', (e) => e.key === 'Enter' && go());
+      const ok = el('<button class="btn gold">Renommer</button>');
+      ok.addEventListener('click', go);
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel, ok);
+    }, {narrow: true});
+  }
+
+  /** Met les cartes nommées dans un groupe ("" : sans groupe) : leur script (et leur formulaire) gardent le groupe. */
+  async setGroup(names, group) {
+    const g = cleanGroup(group);
+    let done = 0;
+    for (const name of names) {
+      const c = this.data.cards.find(x => x.name === name);
+      if (!c || this.groupOf(c) === g) {
+        continue;
+      }
+      try {
+        await bridge.request('customSave', {script: withGroup(c.script, g), previous: c.name, art: null,
+          form: c.form ? {...c.form, group: g} : null});
+        done++;
+      } catch (e) {
+        toast(`${name} : ${e.message}`, {error: true, duration: 6000});
+      }
+    }
+    if (done) {
+      toast(g ? `${done} carte${done > 1 ? 's' : ''} dans « ${g} ».` : `${done} carte${done > 1 ? 's' : ''} sans groupe.`, {title: 'Atelier'});
+      this.onChanged();
+    }
+    this.selection = this.selection ? new Set() : null;
+    await this.show();
   }
 
   async setTypes(types) {
@@ -197,6 +396,10 @@ export class Atelier {
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : token ? NEW_TOKEN() : NEW_CARD();
+    // Le groupe est dans le script (il a pu être changé par « Organiser », ou sur un autre appareil).
+    if (entry && entry.script) {
+      this.form.group = readGroup(entry.script);
+    }
     this.subNotes = [];
     this.form.token = !!(this.form.token || (entry && entry.token));
     this.form.colors = this.form.colors || [];
@@ -470,6 +673,9 @@ export class Atelier {
       ...others.filter(st => !fit(st)).map(subOption)];
     left.innerHTML = `<datalist id="ate-subtypes">${options.join('')}</datalist>
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
+      <label class="ate-field"><span>Groupe <span class="muted small">(pour ranger tes cartes dans l'Atelier)</span></span>
+        <input type="text" data-k="group" list="ate-groups" value="${esc(f.group || '')}" placeholder="Aucun : Dragons, Deck d'Ilona, À finir…" maxlength="30">
+        <datalist id="ate-groups">${(this.data ? this.groups() : []).map(([g]) => `<option value="${esc(g)}">`).join('')}</datalist></label>
       ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
         `<button class="ate-pip${f.colors.includes(c) ? ' first' : ''}" data-tcolor="${c}" title="${l}">${symbol(c)}</button>`).join('')}
         <span class="muted small">${f.colors.length ? '' : 'Incolore'}</span></div></div>` : `<div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>`}
@@ -485,11 +691,13 @@ export class Atelier {
       ${f.types.includes('Planeswalker') ? `<label class="ate-field"><span>Loyauté de départ</span><input type="number" data-k="loyaltyStart" value="${esc(f.loyaltyStart)}" min="1" max="20"></label>` : ''}
       <div class="ate-field"><span>Mots-clés</span>${this.keywordsHtml(f)}</div>
       <div class="ate-field"><span>Capacités</span><div class="ate-abilities">${f.abilities.map((a, i) => this.abilityHtml(a, i)).join('')}</div>
-        <div class="ate-add"><button class="btn small gold" data-template>＋ Capacité toute prête…</button>
+        <div class="ate-add">${attachOf(f) ? `<button class="btn small gold" data-template-attach>＋ Pour ${esc(attachOf(f).fr)}…</button>` : ''}
+        <button class="btn small gold" data-template>＋ Capacité toute prête…</button>
         <button class="btn small" data-addab>＋ Capacité vide</button>
         <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>`;
     this.renderLook();
     this.check();
+    labelSelects(left);
   }
 
   /**
@@ -595,11 +803,35 @@ export class Atelier {
   }
 
   /** Liste de phrases toutes faites ; celle qu'on touche devient une capacité du formulaire, à ajuster ensuite. */
-  pickTemplate() {
-    const list = templates(this.guessType());
-    customBox('Capacité toute prête', (body, footer, close) => {
+  pickTemplate(onlyAttach = false) {
+    // Celles de ce que la carte équipe ou enchante d'abord (« La créature équipée a le contact mortel »), puis les autres.
+    const at = attachOf(this.form);
+    const own = attachTemplates(this.form).map(t => ({...t, group: at ? `Pour ${at.fr}` : ''}));
+    const list = onlyAttach ? own : [...own, ...templates(this.guessType()).map(t => ({...t, group: own.length ? 'Autres capacités' : ''}))];
+    const plain = (x) => String(x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    customBox(onlyAttach && at ? `Pour ${at.fr}` : 'Capacité toute prête', (body, footer, close) => {
       body.innerHTML = `<p class="muted small">Touche une phrase : elle s'ajoute aux capacités, et tu peux ensuite changer le type, le mot-clé ou le nombre.</p>
-        <div class="ate-templates">${list.map((t, i) => `<button class="ate-template" data-i="${i}">${rulesHtml(t.label)}</button>`).join('')}</div>`;
+        <input type="search" class="ate-tplq" placeholder="Chercher : contact mortel, +1/+1, attaque, pioche…" enterkeyhint="search">
+        <div class="ate-templates"></div>`;
+      const box = body.querySelector('.ate-templates');
+      const paint = (q) => {
+        const f = plain(q.trim());
+        let group = null;
+        let html = '';
+        list.forEach((t, i) => {
+          if (f && !plain(t.label).includes(f)) {
+            return;
+          }
+          if (t.group && t.group !== group) {
+            group = t.group;
+            html += `<div class="ate-tplgroup">${esc(group)}</div>`;
+          }
+          html += `<button class="ate-template" data-i="${i}">${rulesHtml(t.label)}</button>`;
+        });
+        box.innerHTML = html || '<p class="muted small">Aucune phrase ne correspond : essaie un autre mot, ou ajoute une capacité vide.</p>';
+      };
+      paint('');
+      body.querySelector('.ate-tplq').addEventListener('input', (e) => paint(e.target.value));
       body.addEventListener('click', (e) => {
         const b = e.target.closest('[data-i]');
         if (!b) {
@@ -741,7 +973,7 @@ export class Atelier {
 
   abilityHtml(a, i) {
     const w = WHEN.find(x => x.id === a.when) || WHEN[0];
-    const effects = effectsFor(a.when);
+    const effects = effectsFor(a.when, this.form);
     const e = effects.find(x => x.id === a.effect) || effects[0];
     const isStatic = a.when === 'static';
     const sel = (attr, list, value, extra = '') => `<select data-a="${attr}"${extra}>${list.map(([v, l]) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
@@ -754,8 +986,10 @@ export class Atelier {
     const curse = (attachOf(this.form) || {}).kind === 'player';
     const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
     return `<div class="ate-ab panel" data-ab="${i}">
-      <div class="ate-ab-row"><select data-a="when">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind
+      <div class="ate-ab-row"><select data-a="when" aria-label="Quand elle agit">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind
           && (whenFits(x, this.form) || x.id === a.when))
+        // Ceux de ce que la carte équipe ou enchante d'abord (« Quand la créature équipée attaque »).
+        .sort((p, q) => Number(!!q.attach) - Number(!!p.attach))
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
@@ -794,7 +1028,7 @@ export class Atelier {
       ${a.when === 'spell' ? `<div class="ate-ab-row"><span class="muted small">Coût en plus</span>${sel('addCost', SPELL_COSTS.map(c => [c[0], c[0] ? c[2] : 'aucun']), a.addCost || '')}
         ${a.addCost === 'payLife' ? `<input type="number" data-a="addCostN" value="${esc(a.addCostN || 2)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span>${this.loyaltyHtml(a)}<span class="muted small">− pour retirer des marqueurs, + pour en ajouter</span></div>` : ''}
-      <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
+      <div class="ate-ab-row"><select data-a="effect" aria-label="Ce qu'elle fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n && !(e.mana && a.mana === 'Symbols') ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
       ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', scopesFor(this.form, scope), scope)}</div>` : ''}
@@ -935,13 +1169,13 @@ export class Atelier {
 
   /** Un effet dans un encadré : un mode de « Choisissez l'un — » (sub « modes ») ou un effet enchaîné (sub « then »). */
   subEffectHtml(a, m, k, sub, title, canDelete) {
-    const effects = modeEffectsFor(a.when);
+    const effects = modeEffectsFor(a.when, this.form);
     const e = effects.find(x => x.id === m.effect) || effects[0];
     const f = m.filter || {type: '', other: false};
     return `<div class="ate-mode" data-sub="${sub}" data-si="${k}">
       <div class="ate-ab-row ate-mode-head"><b class="small">${esc(title)}</b>
         ${canDelete ? `<button class="ate-x" data-delsub="${k}" title="Retirer">✕</button>` : ''}</div>
-      <div class="ate-ab-row"><select data-sf="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
+      <div class="ate-ab-row"><select data-sf="effect" aria-label="Ce qu'il fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
       ${this.optionRows(m, e, 'sf', null)}
@@ -1096,6 +1330,8 @@ export class Atelier {
       this.renderLeft();
     } else if (b.dataset.template !== undefined) {
       this.pickTemplate();
+    } else if (b.dataset.templateAttach !== undefined) {
+      this.pickTemplate(true);
     } else if (b.dataset.addcustom !== undefined) {
       // Une capacité vide, ses options d'effet perso ouvertes.
       f.abilities.push(NEW_ABILITY());
@@ -1286,8 +1522,8 @@ export class Atelier {
       a.manaSymbols = '{G}{U}';
     }
     if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
-      if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
-        a.effect = effectsFor(a.when)[0].id;
+      if (k === 'when' && !effectsFor(a.when, this.form).some(x => x.id === a.effect)) {
+        a.effect = effectsFor(a.when, this.form)[0].id;
       }
       if (a.effect === 'modal') {
         // Deux modes pour commencer ; ceux qui ne vont pas avec ce « quand » (un sort ne se régénère pas) changent.

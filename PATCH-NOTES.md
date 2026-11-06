@@ -2,6 +2,37 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.3 — Menus et groupes de l'Atelier
+
+### Menus déroulants
+- **Sur téléphone, un panneau** au-dessus de l'écran, en portrait comme en paysage. On y trouve le nom du champ (« Quand elle agit », « Ce qu'elle fait », « Qui », « Mot-clé »…), une croix pour fermer, des lignes plus grandes au doigt et les libellés complets, sur plusieurs lignes si besoin.
+- **La recherche ne ferme plus la liste** : avant, toucher le champ de recherche ouvrait le clavier et fermait le menu. Le panneau suit maintenant la partie visible de l'écran au-dessus du clavier, même en paysage.
+- **Recherche sans accents**, aussi dans les titres de groupes (« equipee » trouve « équipée »), avec le mot trouvé en gras. Entrée choisit la première ligne.
+
+### Atelier
+- **« ＋ Pour la créature équipée… »** (ou enchantée, le terrain fortifié, le joueur enchanté) : les phrases toutes prêtes pour ce que la carte équipe ou enchante :
+  - « La créature équipée a le contact mortel », pour chacun des mots-clés ;
+  - « gagne +1/+1 », « ne peut pas bloquer », ses déclencheurs et ses marqueurs ;
+  - pour une malédiction : « ce joueur perd 1 point de vie »…
+- **Recherche dans les capacités toutes prêtes** : taper « contact mortel », « +1/+1 » ou « pioche ».
+- **Déclencheurs de l'équipement en tête de liste** (« Quand la créature équipée attaque »…). Un effet permanent ajouté sur un équipement touche d'abord la créature équipée.
+- **Marqueurs sur la créature équipée ou enchantée** :
+  - « À chaque fois que la créature équipée attaque, mettez un marqueur +1/+1 sur elle. » ;
+  - « {1}, {T} : Mettez un marqueur « bouclier » sur la créature équipée. ».
+- **Nouveau déclencheur** : « À chaque fois que cet équipement devient attaché à une créature ».
+- **Groupes de cartes perso**, pour ranger ses cartes :
+  - un champ « Groupe » dans chaque carte (et chaque jeton) ;
+  - des onglets en haut de l'Atelier (Toutes, chaque groupe, Sans groupe), et un bloc par groupe ;
+  - « Organiser » : choisir plusieurs cartes, puis « Mettre dans un groupe… » ou « Retirer du groupe » ;
+  - « Renommer » un groupe.
+
+  Le groupe est écrit dans la carte : il suit le compte sur les autres appareils.
+
+### Corrections
+- « Affinité pour les artefacts » en français en partie (au lieu de l'anglais).
+- Un mot-clé que Forge écrit déjà en français n'a plus son long rappel (« Équipement {1} » seul).
+- Surcharge : refusée sur une carte qui n'est pas un éphémère ou un rituel avec une cible (Forge plantait en partie). Elle marche sur un sort qui cible.
+
 ## 0.6.2 — Les sous-types
 
 ### Sous-types : chacun marche comme dans le jeu

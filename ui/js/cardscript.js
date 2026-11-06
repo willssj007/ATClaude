@@ -347,6 +347,7 @@ export const WHEN = [
   {id: 'attachedAttacks', kind: 'T', label: 'Quand la créature équipée ou enchantée attaque', attach: 'creature'},
   {id: 'attachedCombatDamage', kind: 'T', label: 'Quand la créature équipée ou enchantée inflige des blessures de combat à un joueur', attach: 'creature'},
   {id: 'attachedDies', kind: 'T', label: 'Quand la créature équipée ou enchantée meurt', attach: 'creature'},
+  {id: 'becomesAttached', kind: 'T', label: 'Quand cet équipement ou cette aura devient attaché à une créature', attach: 'creature'},
   {id: 'attachedTapped', kind: 'T', label: 'Quand le permanent enchanté ou fortifié devient engagé', attach: 'permanent'},
   // Malédictions (aura qui enchante un joueur).
   {id: 'ePlayerUpkeep', kind: 'T', label: 'Au début de l\'entretien du joueur enchanté', attach: 'player'},
@@ -454,6 +455,7 @@ export const EFFECTS = [
   {id: 'countersSelf', group: 'creatures', label: 'Marqueurs sur cette créature (+1/+1 ou autre)', n: true, counter: true},
   {id: 'countersEach', group: 'creatures', label: 'Marqueurs sur chaque créature choisie (chaque Elfe, chaque autre…)', n: true, filter: true, counter: true},
   {id: 'countersTarget', group: 'creatures', label: 'Marqueurs sur une créature ciblée (+1/+1, -1/-1, bouclier…)', n: true, counter: true},
+  {id: 'countersAttached', group: 'creatures', label: 'Marqueurs sur la créature équipée ou enchantée (équipement, aura)', n: true, counter: true, attach: 'creature'},
   {id: 'proliferate', group: 'creatures', label: 'Proliférer'},
   {id: 'pumpSelf', group: 'creatures', label: 'Elle gagne +N/+N jusqu\'à la fin du tour', n: true, self: true},
   {id: 'pumpTarget', group: 'creatures', label: '+N/+N à une créature ciblée jusqu\'à la fin du tour', n: true},
@@ -657,8 +659,8 @@ export const EMBLEMS = [
 export const PICKS = [['one', 'Choisissez l\'un —'], ['two', 'Choisissez deux — (trois modes)'], ['oneOrMore', 'Choisissez un ou plusieurs —']];
 
 /** Effets possibles pour un mode de « Choisissez l'un — » (pas un autre choix de modes). */
-export function modeEffectsFor(when) {
-  return effectsFor(when).filter(e => !e.modal);
+export function modeEffectsFor(when, card = null) {
+  return effectsFor(when, card).filter(e => !e.modal);
 }
 
 /** Nombre d'un effet : celui indiqué, ou X calculé pendant la partie. */
@@ -993,6 +995,9 @@ export function whenLabel(w, card) {
   if (!at) {
     return w.label;
   }
+  if (w.id === 'becomesAttached') {
+    return at.scope === 'enchanted' ? 'Quand cette aura devient attachée à une créature' : 'Quand cet équipement devient attaché à une créature';
+  }
   return w.label.replace('la créature équipée ou enchantée', at.fr).replace('le permanent enchanté ou fortifié', at.fr)
     .replace(/engagé$/, at.fem ? 'engagée' : 'engagé');
 }
@@ -1276,7 +1281,7 @@ function chainOf(a, id, lang) {
   const items = [{head: toForge(main.p), extra: (main.extra || []).map(toForge), aux: (main.aux || []).map(toForge), text: toText(en ? main.en : main.fr) + suffix}];
   (a.then || []).slice(0, 2).forEach((m, k) => {
     const name = `${id}T${k + 1}`;
-    const e = effect({...newMode(), ...m}, name);
+    const e = effect({...newMode(), ...m, attachTo: a.attachTo, attachWhen: a.attachWhen}, name);
     if (e) {
       // Un effet enchaîné peut avoir sa propre condition (paliers : « puis, si au moins trois ont été engagés, … »).
       const own = conditionOf({...m, tapXWhat: a.tapXWhat, tapXType: a.tapXType});
@@ -1341,6 +1346,63 @@ export const MANA_CHOICES = [['Symbols', 'Ces symboles (ex. {G}{U}, plusieurs co
  * Capacités toutes prêtes : une phrase complète, puis la capacité du formulaire qu'elle donne (le type et le mot-clé
  * restent à changer). type : le type de la carte proposé par défaut (« Elfe »...), ou "" pour toutes les créatures.
  */
+/**
+ * Phrases toutes prêtes pour ce que la carte équipe ou enchante : « La créature équipée a le contact mortel » (un par
+ * mot-clé), « gagne +1/+1 », ses déclencheurs ; « Le terrain fortifié a… » ; les malédictions (« ce joueur perd… »).
+ * Vide si la carte ne s'attache à rien.
+ */
+export function attachTemplates(card) {
+  const at = attachOf(card);
+  if (!at) {
+    return [];
+  }
+  const base = {n: 1, filter: {type: '', other: false}, token: 'w_1_1_spirit_flying', keyword: 'Flying', cost: '{1}', tap: true, sac: false, loyalty: 1,
+    counter: 'P1P1'};
+  const S = capitalize(at.fr);
+  const st = (x) => ({...base, when: 'static', scope: at.scope, ...x});
+  if (at.kind === 'player') {
+    return [
+      {label: 'Au début de l\'entretien du joueur enchanté, ce joueur perd 1 point de vie', a: {...base, when: 'ePlayerUpkeep', effect: 'targetLoseLife'}},
+      {label: 'Au début de l\'entretien du joueur enchanté, cette malédiction lui inflige 1 blessure', a: {...base, when: 'ePlayerUpkeep', effect: 'damagePlayer'}},
+      {label: 'À chaque fois que le joueur enchanté est attaqué, piochez une carte', a: {...base, when: 'ePlayerAttacked', effect: 'draw', who: 'target'}},
+      {label: 'À chaque fois que le joueur enchanté lance un sort, ce joueur perd 1 point de vie', a: {...base, when: 'ePlayerCasts', effect: 'targetLoseLife'}},
+      {label: 'Les créatures que contrôle le joueur enchanté attaquent à chaque combat si possible', a: st({effect: 'mustAttack'})},
+      {label: 'Les créatures que contrôle le joueur enchanté ne peuvent pas bloquer', a: st({effect: 'cantBlock'})},
+    ];
+  }
+  const out = [];
+  if (at.kind === 'creature') {
+    out.push({label: `${S} gagne +1/+1`, a: st({effect: 'anthem'})}, {label: `${S} gagne +2/+0`, a: st({effect: 'anthemPower', n: 2})},
+      {label: `${S} gagne -1/-1`, a: st({effect: 'debuff'})});
+  }
+  // Un mot-clé par phrase : on trouve « contact mortel » en le tapant dans la recherche.
+  for (const [kw] of KEYWORDS) {
+    out.push({label: `${S} ${hasKw(kw, false)}`, a: st({effect: 'grantKeyword', keyword: kw})});
+  }
+  if (at.kind === 'creature') {
+    const aura = at.scope === 'enchanted';
+    out.push(
+      {label: `${S} ne peut pas bloquer`, a: st({effect: 'cantBlock'})},
+      {label: `${S} ne peut ni attaquer ni bloquer`, a: st({effect: 'cantAttackBlock'})},
+      {label: `${S} attaque à chaque combat si possible`, a: st({effect: 'mustAttack'})},
+      {label: `${S} est imblocable`, a: st({effect: 'unblockable'})},
+      {label: `À chaque fois que ${at.fr} attaque, mettez un marqueur +1/+1 sur elle`, a: {...base, when: 'attachedAttacks', effect: 'countersAttached'}},
+      {label: `À chaque fois que ${aura ? 'cette aura devient attachée' : 'cet équipement devient attaché'} à une créature, mettez un marqueur +1/+1 sur cette créature`,
+        a: {...base, when: 'becomesAttached', effect: 'countersAttached'}},
+      {label: `À chaque fois que ${at.fr} inflige des blessures de combat à un joueur, piochez une carte`, a: {...base, when: 'attachedCombatDamage', effect: 'draw'}},
+      {label: `${aura ? 'Quand' : 'À chaque fois que'} ${at.fr} meurt, piochez une carte`, a: {...base, when: 'attachedDies', effect: 'draw'}},
+      {label: `{1}, {T} : mettez un marqueur +1/+1 sur ${at.fr}`, a: {...base, when: 'activated', effect: 'countersAttached'}},
+    );
+    if (aura) {
+      out.push({label: 'Vous contrôlez la créature enchantée', a: st({effect: 'controlEnchanted'})});
+    }
+  } else {
+    out.push({label: `À chaque fois que ${at.fr} devient engagé, vous gagnez 1 point de vie`, a: {...base, when: 'attachedTapped', effect: 'gainLife'}},
+      {label: `${S} ne se dégage pas pendant l'étape de dégagement de son contrôleur`, a: st({effect: 'doesntUntap'})});
+  }
+  return out;
+}
+
 export function templates(type) {
   const t = type || '';
   const others = t ? `les autres ${t}` : 'les autres créatures';
@@ -1393,6 +1455,10 @@ export function templates(type) {
     {label: 'Aura : la créature enchantée gagne +2/+2 et a le vol', a: {...base, n: 2, when: 'static', effect: 'anthem', scope: 'enchanted', filter: {type: '', other: false}}},
     {label: 'Aura : la créature enchantée ne peut ni attaquer ni bloquer', a: {...base, when: 'static', effect: 'cantAttackBlock', scope: 'enchanted', filter: {type: '', other: false}}},
     {label: 'Équipement : la créature équipée gagne +2/+0', a: {...base, n: 2, when: 'static', effect: 'anthemPower', scope: 'equipped', filter: {type: '', other: false}}},
+    {label: 'Équipement : à chaque fois que la créature équipée attaque, mettez un marqueur +1/+1 sur elle',
+      a: {...base, n: 1, when: 'attachedAttacks', effect: 'countersAttached', counter: 'P1P1'}},
+    {label: 'Équipement : à chaque fois que cet équipement devient attaché à une créature, mettez un marqueur +1/+1 sur cette créature',
+      a: {...base, n: 1, when: 'becomesAttached', effect: 'countersAttached', counter: 'P1P1'}},
     {label: 'Elle ne peut pas être bloquée', a: {...base, when: 'static', effect: 'unblockable', scope: 'self', filter: {type: '', other: false}}},
     {label: 'Elle arrive sur le champ de bataille avec deux marqueurs +1/+1', a: {...base, n: 2, when: 'static', effect: 'etbCounters', filter: {type: '', other: false}}},
     {label: 'Seuil — Tant qu\'il y a au moins sept cartes dans votre cimetière, elle gagne +2/+2',
@@ -1422,8 +1488,11 @@ export function templates(type) {
 }
 
 /** Effets proposés pour un « quand » donné. */
-export function effectsFor(when) {
-  return EFFECTS.filter(e => (e.only ? e.only.includes(when) : when !== 'static') && !(e.self && when === 'spell'));
+export function effectsFor(when, card = null) {
+  // Un effet sur la carte attachée (« la créature équipée ») : seulement pour un équipement ou une aura de créature.
+  const at = card ? attachOf(card) : null;
+  return EFFECTS.filter(e => (e.only ? e.only.includes(when) : when !== 'static') && !(e.self && when === 'spell')
+    && !(e.attach && (when === 'spell' || (card && (!at || at.kind !== e.attach)))));
 }
 
 const KW_FR = Object.fromEntries(KW_ALL.map(k => [k[0], k[1]]));
@@ -1738,6 +1807,15 @@ function effectBase(a, id) {
     case 'countersEach':
       return {p: `PutCounterAll | ValidCards$ ${valid(a.filter)} | CounterType$ ${ct[0]} | CounterNum$ ${n}`,
         fr: `mettez ${countersFr(n)} sur chaque ${eachFr(a.filter)} que vous contrôlez`, en: `put ${countersEn(n)} on each ${eachEn(a.filter)} you control`};
+    case 'countersAttached': {
+      // « …sur la créature équipée » ; « sur elle » quand le déclencheur parle d'elle ; « cette créature » quand l'équipement s'y attache.
+      const k = Math.max(1, n);
+      const aura = a.attachTo === 'enchanted';
+      const on = a.attachWhen === 'becomesAttached' ? ['TriggeredTarget', 'cette créature', 'that creature']
+        : ['attachedAttacks', 'attachedCombatDamage'].includes(a.attachWhen) ? [aura ? 'Enchanted' : 'Equipped', 'elle', 'it']
+          : [aura ? 'Enchanted' : 'Equipped', aura ? 'la créature enchantée' : 'la créature équipée', aura ? 'enchanted creature' : 'equipped creature'];
+      return {p: `PutCounter | Defined$ ${on[0]} | CounterType$ ${ct[0]} | CounterNum$ ${k}`, fr: `mettez ${countersFr(k)} sur ${on[1]}`, en: `put ${countersEn(k)} on ${on[2]}`};
+    }
     case 'countersTarget':
       return {p: `PutCounter | ${target(creature)} | CounterType$ ${ct[0]} | CounterNum$ ${n}${ct[0] === 'M1M1' ? ' | IsCurse$ True' : ''}`, fr: `mettez ${countersFr(n)} sur une créature ciblée`,
         en: `put ${countersEn(n)} on target creature`};
@@ -2613,6 +2691,11 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
   if (a.who === undefined && PLAYER_EFFECTS.has(a.effect) && (attachOf(card) || {}).kind === 'player') {
     a = {...a, who: 'enchanted'};
   }
+  // Un équipement ou une aura de créature : « la créature équipée » (ou enchantée) pour les effets qui la touchent.
+  const at = attachOf(card);
+  if (at && at.kind === 'creature') {
+    a = {...a, attachTo: at.scope, attachWhen: a.when};
+  }
   const w = WHEN.find(x => x.id === a.when);
   if (!w) {
     return null;
@@ -2775,6 +2858,9 @@ function triggerTable(a, card = null) {
     // Une aura part au cimetière avec sa créature : « Quand » ; un équipement reste : « À chaque fois que ».
     attachedDies: [`Mode$ ChangesZone | Origin$ Battlefield | Destination$ Graveyard | ValidCard$ ${at.v}`,
       `${aura ? 'Quand' : 'À chaque fois que'} ${at.fr} meurt`, `${aura ? 'When' : 'Whenever'} ${at.en} dies`],
+    becomesAttached: ['Mode$ Attached | ValidSource$ Card.Self | ValidTarget$ Creature | TriggerZones$ Battlefield',
+      `À chaque fois que ${aura ? 'cette aura devient attachée' : 'cet équipement devient attaché'} à une créature`,
+      `Whenever this ${aura ? 'Aura' : 'Equipment'} becomes attached to a creature`],
     attachedTapped: [`Mode$ Taps | ValidCard$ ${at.v}`, `À chaque fois que ${at.fr} devient engagé${at.fem ? 'e' : ''}`, `Whenever ${at.en} becomes tapped`],
     ePlayerUpkeep: ['Mode$ Phase | Phase$ Upkeep | ValidPlayer$ Player.EnchantedBy | TriggerZones$ Battlefield', 'Au début de l\'entretien du joueur enchanté',
       'At the beginning of enchanted player\'s upkeep'],
@@ -2800,7 +2886,7 @@ function modalLines(a, id, w, lang, card) {
   const parts = [];
   (a.modes || []).slice(0, 3).forEach((m, k) => {
     const mid = `${id}M${k + 1}`;
-    const e = effect({...newMode(), ...m}, mid);
+    const e = effect({...newMode(), ...m, attachTo: a.attachTo, attachWhen: a.attachWhen}, mid);
     if (e) {
       parts.push({mid, e, text: capitalize(en ? e.en : e.fr) + '.'});
     }
@@ -2860,6 +2946,28 @@ export function displayLines(d) {
     out.push(`SVar:AtelierFx:${d.fx}`);
   }
   return out;
+}
+
+/** Un nom de groupe utilisable dans un script : une ligne, sans « | » ni « : », 30 caractères au plus. */
+export function cleanGroup(g) {
+  return String(g || '').replace(/[|:\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30);
+}
+
+/** Le groupe d'une carte perso, écrit dans son script (« SVar:AtelierGroup:Dragons »), ou "". */
+export function readGroup(script) {
+  return cleanGroup((String(script || '').match(/^SVar:AtelierGroup:(.*)$/m) || [])[1]);
+}
+
+/** Le script avec un autre groupe ("" : sans groupe) ; le reste ne change pas. */
+export function withGroup(script, group) {
+  const kept = String(script || '').split('\n').filter(l => !/^SVar:AtelierGroup:/.test(l));
+  const g = cleanGroup(group);
+  if (g) {
+    // Avant les lignes de présentation, pour que le script reste lisible.
+    const i = kept.findIndex(l => /^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx):/.test(l));
+    kept.splice(i < 0 ? kept.length : i, 0, `SVar:AtelierGroup:${g}`);
+  }
+  return kept.join('\n');
 }
 
 /** Réglages d'affichage écrits dans un script (lignes « SVar:Atelier… »). */
@@ -3134,11 +3242,22 @@ export function buildScript(form) {
   if (f.token) {
     lines.push('SVar:AtelierToken:True');
   }
+  // Surcharge recopie le sort de la carte : Forge doit lire le sort (« A:SP$ ») avant le mot-clé.
+  const over = lines.findIndex(l => l.startsWith('K:Overload'));
+  if (over >= 0) {
+    const [k] = lines.splice(over, 1);
+    const lastSp = lines.reduce((m, l, i) => (l.startsWith('A:SP$') ? i : m), -1);
+    lines.splice(lastSp >= 0 ? lastSp + 1 : lines.length, 0, k);
+  }
   // Plusieurs capacités « engager X » : une seule définition de X.
   for (let i = lines.length - 1; i >= 0; i--) {
     if (lines[i] === 'SVar:X:Count$xPaid' && lines.indexOf(lines[i]) !== i) {
       lines.splice(i, 1);
     }
+  }
+  // Le groupe où la carte est rangée dans l'Atelier (il suit la carte sur les autres appareils).
+  if (cleanGroup(f.group)) {
+    lines.push(`SVar:AtelierGroup:${cleanGroup(f.group)}`);
   }
   lines.push(...displayLines(f));
   return lines.join('\n');

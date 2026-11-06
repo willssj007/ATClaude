@@ -367,6 +367,11 @@ final class CustomCards {
                 }
             }
         }
+        // Surcharge : Forge recopie les cibles du sort ; sans cible, la carte plante quand elle arrive en partie.
+        if (Arrays.stream(lines).anyMatch(l -> l.trim().startsWith("K:Overload"))
+                && Arrays.stream(lines).noneMatch(l -> l.trim().startsWith("A:SP$") && l.contains("ValidTgts$"))) {
+            throw new IllegalArgumentException("Surcharge ne va que sur un éphémère ou un rituel qui cible (« …ciblé ») : la version surchargée touche chaque cible possible.");
+        }
         for (int i = 0; i < lines.length; i++) {
             final String line = lines[i].trim();
             final String where = " (ligne " + (i + 1) + ")";
@@ -810,6 +815,15 @@ final class CustomCards {
     /** Mot-clé avec sa valeur, tel que Forge l'écrit (« Annihilator 2 », « Cycling {1}{U} », « Ward {3} »). */
     /** Ligne de mot-clé avec son texte de rappel (« Undying (When this creature dies, …) ») : le rappel en anglais tombe. */
     private static final Pattern REMINDER = Pattern.compile("^(.*?)\\s*\\((?:[^()]|\\([^()]*\\))*\\)$");
+    /** Les noms français des mots-clés (« équipement », « pilotage »), pour reconnaître un mot-clé que Forge écrit déjà en français. */
+    private static final java.util.Set<String> FR_KEYWORD_NAMES = new java.util.HashSet<>();
+
+    static {
+        for (final String fr : KEYWORDS_FR.values()) {
+            FR_KEYWORD_NAMES.add(fr.toLowerCase(Locale.ROOT));
+        }
+    }
+
     private static final Pattern KEYWORD_VALUE = Pattern.compile("^(.+?)\\s+((?:\\{[^}]*\\})+|\\d+)$");
     private static final Pattern COUNTERS_LINE = Pattern.compile("^(.+) counters: (\\d+)$");
 
@@ -825,6 +839,7 @@ final class CustomCards {
     private static final Pattern KW_OFFERING = Pattern.compile("^(.+) offering$");
     private static final Pattern KW_STRIVE = Pattern.compile("^Strive - .+ costs (.+) more to cast for each target beyond the first\\.?$");
     private static final Pattern KW_WARD_LIFE = Pattern.compile("^Ward—Pay (\\d+) life\\.?$");
+    private static final Pattern KW_AFFINITY = Pattern.compile("^Affinity for (.+?)\\.?$");
 
     /** « de créature », « d'elfe » : un type de créature dans un nom de mot-clé (Appui, Offrande). */
     private static String deType(final String en) {
@@ -864,6 +879,15 @@ final class CustomCards {
         m = KW_WARD_LIFE.matcher(core);
         if (m.matches()) {
             return "Parade — Payez " + m.group(1) + " points de vie.";
+        }
+        m = KW_AFFINITY.matcher(core);
+        if (m.matches()) {
+            final String what = Map.of("artifacts", "les artefacts", "equipment", "les équipements", "creatures", "les créatures",
+                    "enchantments", "les enchantements", "plains", "les plaines", "islands", "les îles", "swamps", "les marais",
+                    "mountains", "les montagnes", "forests", "les forêts").get(m.group(1).trim().toLowerCase(Locale.ROOT));
+            if (what != null) {
+                return "Affinité pour " + what;
+            }
         }
         if (core.matches("^Ward—Discard a card\\.?$")) {
             return "Parade — Défaussez-vous d'une carte.";
@@ -917,9 +941,16 @@ final class CustomCards {
             final List<String> fr = new ArrayList<>();
             for (final String part : parts) {
                 String k = KEYWORDS_FR.get(part.trim().toLowerCase(Locale.ROOT));
+                if (k == null && FR_KEYWORD_NAMES.contains(part.trim().toLowerCase(Locale.ROOT))) {
+                    // Déjà en français (Forge a repris le texte d'une carte traduite) : seulement sans son rappel.
+                    k = part.trim();
+                }
                 if (k == null) {
                     final java.util.regex.Matcher v = KEYWORD_VALUE.matcher(part.trim());
-                    final String name = v.matches() ? KEYWORDS_FR.get(v.group(1).toLowerCase(Locale.ROOT)) : null;
+                    String name = v.matches() ? KEYWORDS_FR.get(v.group(1).toLowerCase(Locale.ROOT)) : null;
+                    if (name == null && v.matches() && FR_KEYWORD_NAMES.contains(v.group(1).toLowerCase(Locale.ROOT))) {
+                        name = v.group(1);
+                    }
                     if (name == null) {
                         break;
                     }
