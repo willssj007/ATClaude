@@ -375,8 +375,8 @@ final class GameSerializer {
     private static final Pattern ENGINE_LINE = Pattern.compile(
             "^(.+'s (Commander|Oathbreaker|Signature Spell)|Lancer depuis la zone de commande \\d+ fois|Cast from command zone \\d+ times?"
             + "|Dégâts du commandant à .*|Commander damage to .*"
-            // La loyauté est dans l'écusson du cadre.
-            + "|Loyalty counters: \\d+)\\s*$");
+            // La loyauté est dans l'écusson du cadre ; « =Attached: … = » : les auras et équipements sont dessinés dessous.
+            + "|Loyalty counters: \\d+|=.+=)\\s*$");
 
     private static final Pattern NON_ABILITY = Pattern.compile("(?im)^\\s*Non[\\s:-]*ability features");
 

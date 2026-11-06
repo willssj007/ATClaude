@@ -406,7 +406,9 @@ final class CustomCards {
             }
             if (line.startsWith("K:")) {
                 final String k = line.substring(2).trim();
-                if (forge.game.keyword.Keyword.getInstance(k).getKeyword() == forge.game.keyword.Keyword.UNDEFINED) {
+                // Lignes que Forge lit sans en faire un mot-clé de sa liste : chapitres de saga, marqueurs à l'arrivée.
+                final boolean special = k.startsWith("Chapter:") || k.startsWith("etbCounter:");
+                if (!special && forge.game.keyword.Keyword.getInstance(k).getKeyword() == forge.game.keyword.Keyword.UNDEFINED) {
                     throw new IllegalArgumentException("Mot-clé inconnu de Forge : « " + k + " »" + where + ".");
                 }
             }
@@ -606,6 +608,7 @@ final class CustomCards {
     }
 
     /** Mots-clés de l'Atelier (ceux du formulaire) : Forge les écrit en anglais pour une carte sans traduction. */
+    // Généré depuis KW_ALL (ui/js/cardscript.js) : nom anglais de Forge en minuscules → nom français des cartes.
     private static final Map<String, String> KEYWORDS_FR = Map.ofEntries(
             Map.entry("flying", "Vol"),
             Map.entry("first strike", "Initiative"),
@@ -616,6 +619,7 @@ final class CustomCards {
             Map.entry("menace", "Menace"),
             Map.entry("reach", "Portée"),
             Map.entry("trample", "Piétinement"),
+            Map.entry("trample over planeswalkers", "Piétinement au-dessus des planeswalkers"),
             Map.entry("vigilance", "Vigilance"),
             Map.entry("defender", "Défenseur"),
             Map.entry("infect", "Infection"),
@@ -626,12 +630,24 @@ final class CustomCards {
             Map.entry("skulk", "Furtivité"),
             Map.entry("horsemanship", "Équitation"),
             Map.entry("flanking", "Débordement"),
+            Map.entry("banding", "Regroupement"),
             Map.entry("plainswalk", "Traversée des plaines"),
             Map.entry("islandwalk", "Traversée des îles"),
             Map.entry("swampwalk", "Traversée des marais"),
             Map.entry("mountainwalk", "Traversée des montagnes"),
             Map.entry("forestwalk", "Traversée des forêts"),
+            Map.entry("legendary landwalk", "Traversée des terrains légendaires"),
+            Map.entry("afflict", "Affliction"),
+            Map.entry("provoke", "Provocation"),
+            Map.entry("enlist", "Enrôlement"),
             Map.entry("hexproof", "Défense talismanique"),
+            Map.entry("hexproof from white", "Défense talismanique contre le blanc"),
+            Map.entry("hexproof from blue", "Défense talismanique contre le bleu"),
+            Map.entry("hexproof from black", "Défense talismanique contre le noir"),
+            Map.entry("hexproof from red", "Défense talismanique contre le rouge"),
+            Map.entry("hexproof from green", "Défense talismanique contre le vert"),
+            Map.entry("hexproof from monocolored", "Défense talismanique contre le monochrome"),
+            Map.entry("hexproof from artifacts", "Défense talismanique contre les artefacts"),
             Map.entry("shroud", "Linceul"),
             Map.entry("indestructible", "Indestructible"),
             Map.entry("protection from white", "Protection contre le blanc"),
@@ -639,7 +655,15 @@ final class CustomCards {
             Map.entry("protection from black", "Protection contre le noir"),
             Map.entry("protection from red", "Protection contre le rouge"),
             Map.entry("protection from green", "Protection contre le vert"),
+            Map.entry("protection from creatures", "Protection contre les créatures"),
+            Map.entry("protection from artifacts", "Protection contre les artefacts"),
+            Map.entry("protection from multicolored", "Protection contre le multicolore"),
+            Map.entry("protection from instants", "Protection contre les éphémères"),
+            Map.entry("protection from everything", "Protection contre tout"),
             Map.entry("ward", "Parade"),
+            Map.entry("ward—pay life", "Parade — payer des points de vie"),
+            Map.entry("ward—discard a card", "Parade — se défausser d'une carte"),
+            Map.entry("phasing", "Déphasage"),
             Map.entry("flash", "Flash"),
             Map.entry("prowess", "Prouesse"),
             Map.entry("cascade", "Cascade"),
@@ -650,20 +674,28 @@ final class CustomCards {
             Map.entry("riot", "Émeute"),
             Map.entry("training", "Entraînement"),
             Map.entry("mentor", "Mentor"),
-            Map.entry("dethrone", "Détrônement"),
+            Map.entry("dethrone", "Détrôner"),
             Map.entry("melee", "Mêlée"),
             Map.entry("battle cry", "Cri de guerre"),
             Map.entry("myriad", "Myriade"),
             Map.entry("evolve", "Évolution"),
             Map.entry("extort", "Extorsion"),
-            Map.entry("provoke", "Provocation"),
             Map.entry("unleash", "Emportement"),
             Map.entry("decayed", "Décomposition"),
-            Map.entry("partner", "Partenariat"),
+            Map.entry("ascend", "Ascension"),
+            Map.entry("devoid", "Carence"),
+            Map.entry("exploit", "Exploitation"),
+            Map.entry("ingest", "Ingestion"),
+            Map.entry("soulbond", "Association d'âmes"),
+            Map.entry("sunburst", "Solarisation"),
+            Map.entry("increment", "Incrémentation"),
+            Map.entry("compleated", "Parachevé"),
+            Map.entry("read ahead", "Lecture rapide"),
+            Map.entry("outlast", "Résilience"),
+            Map.entry("champion", "Appui"),
             Map.entry("annihilator", "Annihilateur"),
             Map.entry("bushido", "Bushido"),
             Map.entry("toxic", "Toxique"),
-            Map.entry("afflict", "Affliction"),
             Map.entry("afterlife", "Au-delà"),
             Map.entry("fabricate", "Fabrication"),
             Map.entry("rampage", "Sauvagerie"),
@@ -673,28 +705,106 @@ final class CustomCards {
             Map.entry("dredge", "Dragage"),
             Map.entry("fading", "Évanescence"),
             Map.entry("vanishing", "Disparition"),
-            Map.entry("cycling", "Recyclage"),
-            Map.entry("flashback", "Flashback"),
-            Map.entry("unearth", "Exhumation"),
+            Map.entry("amplify", "Amplification"),
+            Map.entry("devour", "Dévorement"),
+            Map.entry("graft", "Greffe"),
+            Map.entry("soulshift", "Transmigration"),
+            Map.entry("mobilize", "Mobilisation"),
+            Map.entry("firebending", "Maîtrise du Feu"),
+            Map.entry("equip", "Équipement"),
+            Map.entry("enchant", "Enchanter"),
+            Map.entry("bestow", "Grâce"),
+            Map.entry("crew", "Pilotage"),
+            Map.entry("saddle", "Seller"),
+            Map.entry("living weapon", "Arme vivante"),
+            Map.entry("for mirrodin!", "Pour Mirrodin !"),
+            Map.entry("job select", "Choix de job"),
+            Map.entry("reconfigure", "Reconfiguration"),
+            Map.entry("fortify", "Fortification"),
+            Map.entry("umbra armor", "Armure totémique"),
+            Map.entry("living metal", "Métal vivant"),
+            Map.entry("kicker", "Kick"),
+            Map.entry("multikicker", "Multikick"),
+            Map.entry("buyback", "Rappel"),
             Map.entry("ninjutsu", "Ninjutsu"),
             Map.entry("dash", "Précipitation"),
             Map.entry("blitz", "Blitz"),
             Map.entry("evoke", "Évocation"),
             Map.entry("madness", "Folie"),
+            Map.entry("morph", "Mue"),
+            Map.entry("megamorph", "Mégamue"),
+            Map.entry("disguise", "Déguisement"),
+            Map.entry("echo", "Écho"),
+            Map.entry("cumulative upkeep", "Entretien cumulatif"),
+            Map.entry("entwine", "Union"),
+            Map.entry("escalate", "Intensification"),
+            Map.entry("foretell", "Prédiction"),
+            Map.entry("mutate", "Mutation"),
+            Map.entry("miracle", "Miracle"),
+            Map.entry("prowl", "Incursion"),
+            Map.entry("plot", "Complot"),
+            Map.entry("offspring", "Progéniture"),
+            Map.entry("overload", "Surcharge"),
+            Map.entry("replicate", "Duplication"),
+            Map.entry("spectacle", "Spectacle"),
+            Map.entry("squad", "Escouade"),
+            Map.entry("surge", "Déferlement"),
+            Map.entry("emerge", "Émergence"),
+            Map.entry("freerunning", "Course libre"),
+            Map.entry("strive", "Obstination"),
+            Map.entry("sneak", "Infiltration"),
+            Map.entry("warp", "Warp"),
+            Map.entry("web-slinging", "Lanceur de toile"),
+            Map.entry("transmute", "Transmutation"),
+            Map.entry("transfigure", "Transfiguration"),
+            Map.entry("offering", "Offrande"),
+            Map.entry("suspend", "Suspension"),
+            Map.entry("awaken", "Éveil"),
+            Map.entry("reinforce", "Renfort"),
+            Map.entry("impending", "Imminence"),
+            Map.entry("flashback", "Flashback"),
+            Map.entry("unearth", "Exhumation"),
             Map.entry("embalm", "Embaumement"),
             Map.entry("eternalize", "Éternalisation"),
             Map.entry("encore", "Encore"),
-            Map.entry("morph", "Mue"),
-            Map.entry("disguise", "Déguisement"),
             Map.entry("scavenge", "Récupération"),
-            Map.entry("outlast", "Résilience"),
-            Map.entry("equip", "Équipement"),
+            Map.entry("harmonize", "Harmonisation"),
+            Map.entry("mayhem", "Désordre"),
+            Map.entry("recover", "Recouvrement"),
+            Map.entry("retrace", "Pistage"),
+            Map.entry("jump-start", "Relancez"),
+            Map.entry("escape", "Échappée"),
+            Map.entry("cycling", "Recyclage"),
+            Map.entry("plainscycling", "Recyclage de plaine"),
+            Map.entry("islandcycling", "Recyclage d'île"),
+            Map.entry("swampcycling", "Recyclage de marais"),
+            Map.entry("mountaincycling", "Recyclage de montagne"),
+            Map.entry("forestcycling", "Recyclage de forêt"),
+            Map.entry("basic landcycling", "Recyclage de terrain de base"),
+            Map.entry("affinity", "Affinité"),
             Map.entry("convoke", "Convocation"),
             Map.entry("delve", "Fouille"),
             Map.entry("improvise", "Improvisation"),
             Map.entry("storm", "Déluge"),
+            Map.entry("gravestorm", "Déluge de cimetière"),
             Map.entry("split second", "Fraction de seconde"),
-            Map.entry("rebound", "Rebond"));
+            Map.entry("rebound", "Rebond"),
+            Map.entry("bargain", "Négociation"),
+            Map.entry("cipher", "Cryptage"),
+            Map.entry("conspire", "Conspiration"),
+            Map.entry("demonstrate", "Démonstration"),
+            Map.entry("epic", "Épique"),
+            Map.entry("undaunted", "Témérité"),
+            Map.entry("paradigm", "Paradigme"),
+            Map.entry("casualty", "Victime"),
+            Map.entry("ripple", "Remous"),
+            Map.entry("splice onto arcane", "Imprégnation d'arcane"),
+            Map.entry("partner", "Partenariat"),
+            Map.entry("partner with", "Partenariat avec"),
+            Map.entry("choose a background", "Choisissez un passé"),
+            Map.entry("doctor's companion", "Compagnon du Docteur"),
+            Map.entry("partner—character select", "Partenariat — Sélection du personnage"),
+            Map.entry("assist", "Assistance"));
     /** Mot-clé avec sa valeur, tel que Forge l'écrit (« Annihilator 2 », « Cycling {1}{U} », « Ward {3} »). */
     /** Ligne de mot-clé avec son texte de rappel (« Undying (When this creature dies, …) ») : le rappel en anglais tombe. */
     private static final Pattern REMINDER = Pattern.compile("^(.*?)\\s*\\((?:[^()]|\\([^()]*\\))*\\)$");
@@ -705,6 +815,66 @@ final class CustomCards {
      * Texte d'une carte perso en partie, en français : Forge y ajoute en anglais les mots-clés qu'elle a ou qu'on
      * lui donne (« Haste, flying ») et ses marqueurs (« +1/+1 counters: 2 »).
      */
+    private static final String[] EN_NUMBERS = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"};
+    private static final String[] FR_NUMBERS = {"zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix"};
+    private static final Pattern KW_NCOST = Pattern.compile("^(Suspend|Awaken|Reinforce|Impending) (\\d+|X)\\s*—\\s*(.+)$");
+    private static final Pattern KW_ESCAPE = Pattern.compile("^Escape—(.+?), Exile (\\w+) other cards? from your graveyard\\.?$");
+    private static final Pattern KW_CHAMPION = Pattern.compile("^Champion an? (.+)$");
+    private static final Pattern KW_OFFERING = Pattern.compile("^(.+) offering$");
+    private static final Pattern KW_STRIVE = Pattern.compile("^Strive - .+ costs (.+) more to cast for each target beyond the first\\.?$");
+    private static final Pattern KW_WARD_LIFE = Pattern.compile("^Ward—Pay (\\d+) life\\.?$");
+
+    /** « de créature », « d'elfe » : un type de créature dans un nom de mot-clé (Appui, Offrande). */
+    private static String deType(final String en) {
+        String fr = "creature".equalsIgnoreCase(en) ? "créature" : French.creatureTypeFr(en);
+        if (fr == null) {
+            fr = en;
+        }
+        fr = fr.toLowerCase(Locale.ROOT);
+        return (fr.matches("^[aeiouyhéèêàâîôû].*") ? "d'" : "de ") + fr;
+    }
+
+    /** Les mots-clés que Forge écrit en phrase (« Suspend 3—{1}{U} », « Escape—… ») : leur texte des cartes françaises, ou null. */
+    static String keywordPhrase(final String core) {
+        java.util.regex.Matcher m = KW_NCOST.matcher(core);
+        if (m.matches()) {
+            final String name = Map.of("Suspend", "Suspension", "Awaken", "Éveil", "Reinforce", "Renfort", "Impending", "Imminence").get(m.group(1));
+            return name + " " + m.group(2) + " — " + m.group(3).trim();
+        }
+        m = KW_ESCAPE.matcher(core);
+        if (m.matches()) {
+            int k = java.util.Arrays.asList(EN_NUMBERS).indexOf(m.group(2).toLowerCase(Locale.ROOT));
+            final String n = k >= 0 ? FR_NUMBERS[k] : m.group(2);
+            return "Échappée — " + m.group(1) + ", exilez " + n + " autre" + ("one".equals(m.group(2)) ? "" : "s") + " carte" + ("one".equals(m.group(2)) ? "" : "s") + " de votre cimetière.";
+        }
+        m = KW_CHAMPION.matcher(core);
+        if (m.matches()) {
+            return "Appui " + deType(m.group(1));
+        }
+        m = KW_OFFERING.matcher(core);
+        if (m.matches() && !m.group(1).contains(" ")) {
+            return "Offrande " + deType(m.group(1));
+        }
+        m = KW_STRIVE.matcher(core);
+        if (m.matches()) {
+            return "Obstination — Ce sort coûte " + m.group(1) + " de plus à lancer pour chaque cible au-delà de la première.";
+        }
+        m = KW_WARD_LIFE.matcher(core);
+        if (m.matches()) {
+            return "Parade — Payez " + m.group(1) + " points de vie.";
+        }
+        if (core.matches("^Ward—Discard a card\\.?$")) {
+            return "Parade — Défaussez-vous d'une carte.";
+        }
+        if (core.startsWith("Partner with ")) {
+            return "Partenariat avec " + core.substring("Partner with ".length());
+        }
+        if (core.equals("Partner — Character select")) {
+            return "Partenariat — Sélection du personnage";
+        }
+        return null;
+    }
+
     static String frenchText(final String text) {
         if (text == null || text.isEmpty()) {
             return text;
@@ -729,6 +899,11 @@ final class CustomCards {
             final java.util.regex.Matcher reminder = REMINDER.matcher(core);
             if (reminder.matches() && !reminder.group(1).isEmpty()) {
                 core = reminder.group(1).trim();
+            }
+            final String phrase = keywordPhrase(core);
+            if (phrase != null) {
+                out.append(phrase);
+                continue;
             }
             final String[] parts = core.split(",\\s*");
             final List<String> fr = new ArrayList<>();

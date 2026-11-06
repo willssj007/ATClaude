@@ -79,6 +79,10 @@
 .ate-ab .ate-gen button, .ate-kwv .ate-gen button { width: 30px; height: 30px; }
 
 /* Mots-clés par groupes repliables, puis la valeur de ceux qui en ont une. */
+.ate-kw { display: flex; flex-direction: column; gap: 8px; }
+.ate-kwq { width: 100%; }
+.ate-kwhits { padding: 4px 2px; }
+.ate-costs > summary { font-size: 13px; }
 .ate-kwgs { display: flex; flex-direction: column; gap: 6px; }
 .ate-kwg { border: 1px solid var(--line); border-radius: 12px; background: rgb(255 255 255 / 0.025); }
 .ate-kwg > summary { cursor: pointer; padding: 8px 12px; font-size: 13.5px; font-weight: 600; list-style-position: inside; }

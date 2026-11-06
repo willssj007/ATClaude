@@ -8,8 +8,9 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {AMOUNTS, CARD_TYPES, CONDITIONS, EFFECT_GROUPS, KEYWORDS, PICKS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
-  effectsFor, eminenceOk, keywordValue, modeEffectsFor, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay} from './cardscript.js';
+import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
+  SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+  effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 const NEW_CARD = () => ({
@@ -200,6 +201,8 @@ export class Atelier {
     this.form.kwValues = this.form.kwValues || {};
     this.kwOpen = new Set(['combat', ...KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3])]);
     this.moreOpen = new Set();
+    this.costOpen = new Set();
+    this.kwQuery = '';
     this.mode = entry && !entry.form ? 'script' : 'form';
     this.formUsed = this.mode === 'form'; // carte faite au formulaire (une carte en script n'en a pas)
     this.tab = 'edit';
@@ -241,6 +244,14 @@ export class Atelier {
           this.moreOpen.add(Number(more));
         } else {
           this.moreOpen.delete(Number(more));
+        }
+      }
+      const costs = e.target.dataset && e.target.dataset.costs;
+      if (costs !== undefined) {
+        if (e.target.open) {
+          this.costOpen.add(Number(costs));
+        } else {
+          this.costOpen.delete(Number(costs));
         }
       }
       const g = e.target.dataset && e.target.dataset.kwg;
@@ -450,7 +461,7 @@ export class Atelier {
     const list = this.typeList || (this.data.creatureTypes || []).map(en => ({en, fr: en}));
     const options = [...list.filter(t => t.fr !== t.en).map(t => `<option value="${esc(t.fr)}">${esc(t.en)}</option>`), ...list.map(t => `<option value="${esc(t.en)}">`)];
     left.innerHTML = `<datalist id="ate-subtypes">${options.join('')}</datalist>
-      <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Professeur X" maxlength="60"></label>
+      <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
       ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
         `<button class="ate-pip${f.colors.includes(c) ? ' first' : ''}" data-tcolor="${c}" title="${l}">${symbol(c)}</button>`).join('')}
         <span class="muted small">${f.colors.length ? '' : 'Incolore'}</span></div></div>` : `<div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>`}
@@ -460,7 +471,7 @@ export class Atelier {
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
       <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Humain Sorcier, ou Human Wizard (séparés par des espaces)"></label>
-      ${f.types.includes('Creature') ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
+      ${needsPT(f) ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
         <input type="number" data-k="power" value="${esc(f.power)}" min="0" max="99"> / <input type="number" data-k="toughness" value="${esc(f.toughness)}" min="0" max="99"></div>` : ''}
       ${f.types.includes('Planeswalker') ? `<label class="ate-field"><span>Loyauté de départ</span><input type="number" data-k="loyaltyStart" value="${esc(f.loyaltyStart)}" min="1" max="20"></label>` : ''}
       <div class="ate-field"><span>Mots-clés</span>${this.keywordsHtml(f)}</div>
@@ -472,34 +483,53 @@ export class Atelier {
     this.check();
   }
 
-  /** Mots-clés par groupes repliables, puis la valeur de ceux qui en ont une (Annihilateur 2, Recyclage {2}…). */
+  /** Mots-clés par groupes repliables (ou ceux qui correspondent à la recherche), puis la valeur de ceux qui en ont une. */
   keywordsHtml(f) {
-    const groups = KW_GROUPS.map(([g, label]) => {
-      const list = KW_ALL.filter(k => k[3] === g);
-      const on = list.filter(k => f.keywords.includes(k[0])).length;
-      return `<details class="ate-kwg" data-kwg="${g}"${this.kwOpen.has(g) ? ' open' : ''}>
-        <summary>${esc(label)}${on ? ` <b class="ate-kwn">${on}</b>` : ''}</summary>
-        <div class="ate-chips">${list.map(k => `<button class="chip ${f.keywords.includes(k[0]) ? 'on' : ''}" data-kw="${esc(k[0])}">${esc(k[1])}</button>`).join('')}</div>
-      </details>`;
-    }).join('');
-    const valued = KW_ALL.filter(k => k[4] && f.keywords.includes(k[0]));
-    const values = valued.map((k) => {
+    const values = KW_ALL.filter(k => k[4] && f.keywords.includes(k[0])).map((k) => {
       if (k[4] === 'cost') {
         return `<div class="ate-kwv-row"><span class="muted small">${esc(k[1])}</span>${this.manaHtml('kw:' + k[0])}</div>`;
       }
+      if (k[4] === 'ncost') {
+        return `<div class="ate-kwv-row"><label class="ate-kwv-n"><span class="muted small">${esc(k[1])}</span>
+          <input type="number" data-kwn="${esc(k[0])}" value="${esc(keywordNumber(f, k[0]))}" min="1" max="20"></label>${this.manaHtml('kw:' + k[0])}</div>`;
+      }
       if (k[4] === 'sel') {
         const v = keywordValue(f, k[0]);
-        return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])} pour</span>
+        return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}${k[0] === 'Affinity' ? ' pour' : ''}</span>
           <select data-kwv="${esc(k[0])}">${(KW_OPTIONS[k[0]] || []).map(o => `<option value="${esc(o[0])}"${o[0] === v ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select></label>`;
       }
       if (k[4] === 'text') {
         return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}</span>
           <input type="text" class="ate-kwv-text" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" placeholder="le nom exact de l'autre carte"></label>`;
       }
+      if (k[4] === 'type') {
+        return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}</span>
+          <input type="text" class="ate-kwv-text" data-kwv="${esc(k[0])}" list="ate-subtypes" value="${esc(keywordValue(f, k[0]))}" placeholder="un type de créature : Elfe"></label>`;
+      }
       return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}${k[4] === 'gen' ? ' (coût générique)' : ''}</span>
         <input type="number" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" min="${k[4] === 'gen' ? 0 : 1}" max="20"></label>`;
     }).join('');
-    return `<div class="ate-kwgs">${groups}</div>${values ? `<div class="ate-kwv">${values}</div>` : ''}`;
+    return `<div class="ate-kw"><input type="search" class="ate-kwq" placeholder="Chercher un mot-clé : vol, kick, suspension, enchanter…" value="${esc(this.kwQuery || '')}">
+      <div class="ate-kwbox">${this.keywordChipsHtml(f)}</div></div>${values ? `<div class="ate-kwv">${values}</div>` : ''}`;
+  }
+
+  /** Les mots-clés : par groupes, ou ceux qui correspondent à la recherche (en français ou en anglais, sans accents). */
+  keywordChipsHtml(f) {
+    const plain = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const q = plain(this.kwQuery || '').trim();
+    const chip = (k) => `<button class="chip ${f.keywords.includes(k[0]) ? 'on' : ''}" data-kw="${esc(k[0])}" title="${esc(k[2])}">${esc(k[1])}</button>`;
+    if (q) {
+      const hits = KW_ALL.filter(k => plain(k[1]).includes(q) || plain(k[2]).includes(q));
+      return hits.length ? `<div class="ate-chips ate-kwhits">${hits.map(chip).join('')}</div>` : '<p class="muted small">Aucun mot-clé ne correspond.</p>';
+    }
+    return `<div class="ate-kwgs">${KW_GROUPS.map(([g, label]) => {
+      const list = KW_ALL.filter(k => k[3] === g);
+      const on = list.filter(k => f.keywords.includes(k[0])).length;
+      return `<details class="ate-kwg" data-kwg="${g}"${this.kwOpen.has(g) ? ' open' : ''}>
+        <summary>${esc(label)}${on ? ` <b class="ate-kwn">${on}</b>` : ''}</summary>
+        <div class="ate-chips">${list.map(chip).join('')}</div>
+      </details>`;
+    }).join('')}</div>`;
   }
 
   /** Type proposé dans les capacités toutes prêtes : un type perso de la carte, sinon son dernier sous-type. */
@@ -653,34 +683,122 @@ export class Atelier {
     const w = WHEN.find(x => x.id === a.when) || WHEN[0];
     const effects = effectsFor(a.when);
     const e = effects.find(x => x.id === a.effect) || effects[0];
-    const filter = w.filter || e.filter;
+    const isStatic = a.when === 'static';
+    const sel = (attr, list, value, extra = '') => `<select data-a="${attr}"${extra}>${list.map(([v, l]) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+    const scope = a.scope || 'you';
+    const filterShown = isStatic ? e.scope && ['you', 'opp', 'all', 'tokens'].includes(scope) : (w.filter || e.filter);
+    const otherShown = !isStatic || ['you', 'all'].includes(scope);
+    const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
     return `<div class="ate-ab panel" data-ab="${i}">
       <div class="ate-ab-row"><select data-a="when">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind)
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${eminenceOk(a.when) && this.form.legendary ? `<div class="ate-ab-row"><label class="ate-check" title="Pour un commandant : la capacité marche aussi quand il est dans la zone de commandement">
         <input type="checkbox" data-a="eminence"${a.eminence ? ' checked' : ''}> Éminence <span class="muted small">(marche aussi depuis la zone de commandement)</span></label></div>` : ''}
+      ${a.when === 'chapter' ? `<div class="ate-ab-row"><span class="muted small">Chapitre</span>${sel('chapter', ROMAN.map((r, k) => [String(k + 1), r]), String(a.chapter || 1))}
+        <span class="muted small">la saga avance d'un chapitre à chacun de vos tours</span></div>` : ''}
       ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tapX"${a.tapX ? ' checked' : ''}> engager X</label>
         ${a.tapX ? `<select data-a="tapXWhat">${TAP_WHAT.map(([v, l]) => `<option value="${v}"${v === (a.tapXWhat || 'token') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
           ${a.tapXWhat === 'type' ? `<input type="text" data-a="tapXType" list="ate-subtypes" value="${esc(a.tapXType || '')}" placeholder="un type : Elf" style="width:120px">` : ''}
-          <span class="muted small">dégagés que vous contrôlez (X au choix en jouant)</span>` : ''}</div>` : ''}
+          <span class="muted small">dégagés que vous contrôlez (X au choix en jouant)</span>` : ''}</div>
+        <details class="ate-more ate-costs"${moreCosts || this.costOpen.has(i) ? ' open' : ''} data-costs="${i}"><summary>Autres coûts et restrictions${moreCosts ? ' <b class="ate-kwn">✓</b>' : ''}
+          <span class="muted small">— PV, défausse, sacrifice, {Q}, rituel, cimetière…</span></summary>
+          <div class="ate-ab-row"><span class="muted small">Payer</span><input type="number" data-a="payLife" value="${esc(a.payLife || 0)}" min="0" max="20" style="width:64px">
+            <span class="muted small">points de vie</span><input type="number" data-a="payEnergy" value="${esc(a.payEnergy || 0)}" min="0" max="10" style="width:64px"><span class="muted small">${symbol('E')}</span></div>
+          <div class="ate-ab-row"><span class="muted small">Sacrifier</span>${sel('sacWhat', SAC_WHAT.map(s => [s[0], s[0] ? s[2] : 'rien d\'autre']), a.sacWhat || '')}
+            <label class="ate-check"><input type="checkbox" data-a="discardCost" value="card"${a.discardCost === 'card' ? ' checked' : ''}> se défausser d'une carte</label></div>
+          <div class="ate-ab-row"><span class="muted small">Exiler</span><input type="number" data-a="exileGY" value="${esc(a.exileGY || 0)}" min="0" max="10" style="width:64px">
+            <span class="muted small">cartes de votre cimetière</span></div>
+          <div class="ate-ab-row"><span class="muted small">Retirer</span><input type="number" data-a="removeCounters" value="${esc(a.removeCounters || 0)}" min="0" max="10" style="width:64px">
+            <span class="muted small">marqueurs +1/+1 de cette carte</span></div>
+          <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="untapQ"${a.untapQ ? ' checked' : ''}> ${symbol('Q')} la dégager</label>
+            <label class="ate-check"><input type="checkbox" data-a="sorcery"${a.sorcery ? ' checked' : ''}> seulement comme un rituel</label>
+            <label class="ate-check"><input type="checkbox" data-a="oncePerTurn"${a.oncePerTurn ? ' checked' : ''}> une fois par tour</label>
+            <label class="ate-check"><input type="checkbox" data-a="yourTurnOnly"${a.yourTurnOnly ? ' checked' : ''}> pendant votre tour</label></div>
+          <div class="ate-ab-row"><span class="muted small">S'active</span>${sel('zone', ACT_ZONES.map(z => [z[0], z[2]]), a.zone || '')}
+            ${a.zone === 'Graveyard' ? `<label class="ate-check"><input type="checkbox" data-a="exileSelf"${a.exileSelf ? ' checked' : ''}> en l'exilant de votre cimetière</label>` : ''}
+            ${a.zone === 'Hand' ? '<span class="muted small">en se défaussant de cette carte</span>' : ''}</div>
+        </details>` : ''}
+      ${a.when === 'spell' ? `<div class="ate-ab-row"><span class="muted small">Coût en plus</span>${sel('addCost', SPELL_COSTS.map(c => [c[0], c[0] ? c[2] : 'aucun']), a.addCost || '')}
+        ${a.addCost === 'payLife' ? `<input type="number" data-a="addCostN" value="${esc(a.addCostN || 2)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span>${this.loyaltyHtml(a)}<span class="muted small">− pour retirer des marqueurs, + pour en ajouter</span></div>` : ''}
       <div class="ate-ab-row"><select data-a="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n && !(e.mana && a.mana === 'Symbols') ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+      ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', SCOPES, scope)}</div>` : ''}
       ${e.modal ? this.modesHtml(a) : ''}
-      ${e.token ? `<div class="ate-ab-row">${this.tokenSelectHtml(a, 'a')}</div>` : ''}
-      ${e.mana ? `<div class="ate-ab-row"><select data-a="mana">${MANA_CHOICES.map(([v, l]) => `<option value="${v}"${v === (a.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
-        ${a.mana === 'Symbols' ? `<div class="ate-ab-cost"><span class="muted small">Mana ajouté</span>${this.manaHtml('prod:' + i)}</div>` : ''}` : ''}
-      ${e.keyword ? `<div class="ate-ab-row"><select data-a="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === a.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
-      ${filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
-        <input type="text" data-a="ftype" list="ate-subtypes" value="${esc(a.filter.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
-        <label class="ate-check"><input type="checkbox" data-a="fother"${a.filter.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
-      ${!e.modal && a.when !== 'static' ? this.moreHtml(a, i, e) : ''}
+      ${this.optionRows(a, e, 'a', i)}
+      ${filterShown ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
+        <input type="text" data-a="ftype" list="ate-subtypes" value="${esc((a.filter || {}).type || '')}" placeholder="toutes, ou un type : Elf" style="width:170px">
+        ${otherShown ? `<label class="ate-check"><input type="checkbox" data-a="fother"${(a.filter || {}).other ? ' checked' : ''}> autres que celle-ci</label>` : ''}</div>` : ''}
+      ${isStatic ? this.staticCondHtml(a, e) : ''}
+      ${!e.modal && !isStatic ? this.moreHtml(a, i, e) : ''}
     </div>`;
+  }
+
+  /**
+   * Les réglages propres à un effet (dans une capacité, un mode ou un effet enchaîné) : jeton, mana, mot-clé, type de
+   * permanent, type de carte, marqueur, type de sort, X, emblème. attr : « a » (la capacité) ou « sf » (un mode).
+   */
+  optionRows(h, e, attr, i) {
+    const sel = (k, list, value) => `<select data-${attr}="${k}">${list.map(([v, l]) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+    const row = (label, html) => `<div class="ate-ab-row">${label ? `<span class="muted small">${esc(label)}</span>` : ''}${html}</div>`;
+    let out = '';
+    if (e.token) {
+      out += row('', this.tokenSelectHtml(h, attr));
+    }
+    if (e.mana) {
+      const choices = attr === 'a' ? MANA_CHOICES : MANA_CHOICES.filter(([v]) => v !== 'Symbols');
+      out += row('', sel('mana', choices, h.mana || 'Any'));
+      if (attr === 'a' && h.mana === 'Symbols') {
+        out += `<div class="ate-ab-cost"><span class="muted small">Mana ajouté</span>${this.manaHtml('prod:' + i)}</div>`;
+      }
+    }
+    if (e.keyword) {
+      out += row('', sel('keyword', KEYWORDS, h.keyword || 'Flying'));
+    }
+    if (e.pt) {
+      out += row('Quoi', sel('permType', PERM_TYPES.map(t => [t[0], t[2].replace(/ ciblée?$/, '').replace(/^une? /, '')]), h.permType || 'creature'));
+    }
+    if (e.ct) {
+      out += row('Quelle carte', sel('cardKind', CARD_KINDS.map(t => [t[0], t[2]]), h.cardKind || 'card'));
+    }
+    if (e.counter) {
+      out += row('Marqueurs', sel('counter', COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]), h.counter || 'P1P1'));
+    }
+    if (e.spellType) {
+      out += row('Quels sorts', sel('spellType', SPELL_TYPES.map(t => [t[0], t[2]]), h.spellType || 'all')
+        + (h.spellType === 'type' ? `<input type="text" data-${attr}="spellTypeName" list="ate-subtypes" value="${esc(h.spellTypeName || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
+    }
+    if (e.amountSel) {
+      out += row('X =', sel('amount', AMOUNTS.filter(([v]) => !['fixed', 'tapped', 'xPaid'].includes(v)).map(([v, l]) => [v, l.replace(/^X = /, '')]), h.amount && h.amount !== 'fixed' ? h.amount : 'creatures')
+        + (h.amount === 'typeCount' ? `<input type="text" data-${attr}="amountType" list="ate-subtypes" value="${esc(h.amountType || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
+    }
+    if (e.emblem) {
+      const em = h.emblem || 'anthem';
+      out += row('L\'emblème', sel('emblem', EMBLEMS, em));
+      if (['anthem', 'extraLand', 'reduceCost'].includes(em)) {
+        out += row('N', `<input type="number" data-${attr}="n" value="${esc(h.n ?? 1)}" min="1" max="20" style="width:70px">`);
+      }
+      if (em === 'grantKeyword') {
+        out += row('', sel('keyword', KEYWORDS, h.keyword || 'Flying'));
+      }
+    }
+    return out;
+  }
+
+  /** « Tant que … » d'un effet permanent : la condition, son nombre et son type. */
+  staticCondHtml(a) {
+    const repl = STATIC_REPLACEMENTS.has(a.effect);
+    const list = CONDITIONS.filter(([v]) => !['tappedAtLeast', 'kicked'].includes(v) && !(repl && ['yourTurn', 'notYourTurn'].includes(v)));
+    const cond = a.cond || 'none';
+    return `<div class="ate-ab-row"><span class="muted small">Tant que</span>
+      <select data-a="cond">${list.map(([v, l]) => `<option value="${v}"${v === cond ? ' selected' : ''}>${esc(v === 'none' ? 'Toujours' : l.replace(/^Si /, '').replace(/^S'il /, 'Il '))}</option>`).join('')}</select>
+      ${CONDITIONS_N.includes(cond) ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
+      ${cond === 'control' ? `<input type="text" data-a="condType" list="ate-subtypes" value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
   }
 
   /** Loyauté d'une capacité de planeswalker au doigt (le clavier des téléphones n'a pas toujours le signe moins). */
@@ -755,9 +873,7 @@ export class Atelier {
       <div class="ate-ab-row"><select data-sf="effect">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-      ${e.token ? `<div class="ate-ab-row">${this.tokenSelectHtml(m, 'sf')}</div>` : ''}
-      ${e.mana ? `<div class="ate-ab-row"><select data-sf="mana">${MANA_CHOICES.filter(([v]) => v !== 'Symbols').map(([v, l]) => `<option value="${v}"${v === (m.mana || 'Any') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
-      ${e.keyword ? `<div class="ate-ab-row"><select data-sf="keyword">${KEYWORDS.map(([v, l]) => `<option value="${v}"${v === m.keyword ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+      ${this.optionRows(m, e, 'sf', null)}
       ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-sf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-sf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
@@ -768,7 +884,7 @@ export class Atelier {
   /** Condition propre à un effet enchaîné (paliers : « puis, si au moins trois ont été engagés, … »). */
   thenCondHtml(a, m) {
     const tapped = a.when === 'activated' && a.tapX;
-    const cond = m.cond && m.cond !== 'none';
+    const cond = CONDITIONS_N.includes(m.cond);
     return `<div class="ate-ab-row"><span class="muted small">Seulement</span>
       <select data-sf="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
@@ -801,7 +917,7 @@ export class Atelier {
     const amount = e.n && !e.mana ? `<div class="ate-ab-row"><span class="muted small">Nombre</span>
         <select data-a="amount">${amounts.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" list="ate-subtypes" value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}</div>` : '';
-    const cond = a.cond && a.cond !== 'none';
+    const cond = CONDITIONS_N.includes(a.cond);
     return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
       <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre X, condition, « et puis »</span></summary>
       ${amount}
@@ -899,7 +1015,13 @@ export class Atelier {
       this.renderLeft();
     } else if (b.dataset.kw) {
       const k = b.dataset.kw;
-      f.keywords = f.keywords.includes(k) ? f.keywords.filter(x => x !== k) : [...f.keywords, k];
+      const adding = !f.keywords.includes(k);
+      f.keywords = adding ? [...f.keywords, k] : f.keywords.filter(x => x !== k);
+      // Enchanter fait une aura, Équipement un équipement, Pilotage un véhicule : le type de carte qui va avec.
+      const o = keywordOptions(k);
+      if (adding && o.base && !f.types.includes(o.base)) {
+        f.types = [...f.types.filter(t => !(o.base === 'Enchantment' && t === 'Creature' && k === 'Enchant') && !(o.base === 'Artifact' && t === 'Creature' && k !== 'Reconfigure' && k !== 'Living metal')), o.base];
+      }
       this.renderLeft();
     } else if (b.dataset.template !== undefined) {
       this.pickTemplate();
@@ -970,6 +1092,24 @@ export class Atelier {
       }
       return;
     }
+    if (t.classList.contains('ate-kwq')) {
+      // Seulement en tapant : la fin de saisie (« change », au toucher d'un mot-clé) ne doit pas redessiner la liste
+      // sous le doigt.
+      if (e.type !== 'input' || t.value === (this.kwQuery || '')) {
+        return;
+      }
+      this.kwQuery = t.value;
+      const box = this.root.querySelector('.ate-kwbox');
+      if (box) {
+        box.innerHTML = this.keywordChipsHtml(this.form);
+      }
+      return;
+    }
+    if (t.dataset.kwn !== undefined) {
+      this.form.kwValues = {...this.form.kwValues, [`${t.dataset.kwn}#n`]: t.value};
+      this.check();
+      return;
+    }
     if (t.dataset.kwv !== undefined) {
       this.form.kwValues = {...this.form.kwValues, [t.dataset.kwv]: t.type === 'number' ? t.value : t.value};
       this.repaintMana(t);
@@ -999,7 +1139,7 @@ export class Atelier {
       } else {
         m[k] = t.type === 'number' ? Number(t.value) : t.value;
       }
-      if (e.type === 'change' && (k === 'effect' || k === 'cond')) {
+      if (e.type === 'change' && ['effect', 'cond', 'emblem', 'spellType', 'amount'].includes(k)) {
         this.renderLeft();
         return;
       }
@@ -1021,15 +1161,20 @@ export class Atelier {
     } else if (k === 'fother') {
       a.filter.other = t.checked;
     } else if (t.type === 'checkbox') {
-      a[k] = t.checked;
+      const v = t.getAttribute('value');
+      a[k] = v ? (t.checked ? v : '') : t.checked;
     } else {
       a[k] = t.type === 'number' ? Number(t.value) : t.value;
     }
     this.repaintMana(t);
+    if (e.type === 'change' && k === 'when' && a.when === 'chapter' && !this.form.types.includes('Enchantment')) {
+      // Un chapitre : la carte est une saga (enchantement).
+      this.form.types = [...this.form.types.filter(x => x !== 'Creature'), 'Enchantment'];
+    }
     if (k === 'mana' && a.mana === 'Symbols' && !costParts(a.manaSymbols).length) {
       a.manaSymbols = '{G}{U}';
     }
-    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick', 'mana'].includes(k)) {
+    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when)[0].id;
       }
