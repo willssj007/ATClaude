@@ -169,6 +169,8 @@ final class Catalog {
         final String colors = upper(q, "colors");
         final String colorMode = str(q, "colorMode").isEmpty() ? "any" : str(q, "colorMode");
         final List<String> types = new ArrayList<>();
+        // any : un des types choisis ; all : tous à la fois (Créature et Enchantement) ; exact : ces types de carte et pas d'autre.
+        final String typeMode = str(q, "typeMode").isEmpty() ? "any" : str(q, "typeMode");
         if (q.has("types")) {
             for (final JsonElement t : q.getAsJsonArray("types")) {
                 types.add(t.getAsString().toLowerCase(Locale.ROOT));
@@ -186,7 +188,9 @@ final class Catalog {
         final int limit = q.has("limit") ? q.get("limit").getAsInt() : DEFAULT_LIMIT;
         // Extension : les cartes imprimées dans ce set, montrées avec leur impression de ce set.
         final String setCode = str(q, "set");
-        final java.util.Set<String> inSet = setCode.isEmpty() ? null : namesInSet(setCode);
+        // « @id » : une extension perso (Atelier), ses cartes dans l'ordre de leur numéro.
+        final String customSet = setCode.startsWith("@") ? setCode.substring(1) : null;
+        final java.util.Set<String> inSet = setCode.isEmpty() || customSet != null ? null : namesInSet(setCode);
         // Mode Planeswalker : seulement les cartes de la collection (et les terrains de base) ; ownedInfo : toutes les
         // cartes, avec le nombre d'exemplaires possédés (cartes manquantes, à acheter avec des jetons).
         final boolean onlyOwned = bool(q, "owned");
@@ -195,6 +199,7 @@ final class Catalog {
         final List<Entry> matches = new ArrayList<>();
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
+            if (customSet != null && !customSet.equals(CustomCards.setOf(e.nameEn()))) continue;
             if (onlyOwned && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
             if (owned != null && e.card().getRules().isCustom()) continue; // cartes perso : Sandbox seulement
             if (!text.isEmpty()) {
@@ -209,14 +214,16 @@ final class Catalog {
             if (!creatureType.isEmpty() && !hasCreatureType(e.card(), creatureType)) continue;
             if (cmcMin >= 0 && e.cmc() < cmcMin) continue;
             if (cmcMax >= 0 && e.cmc() > cmcMax) continue;
-            if (!types.isEmpty() && types.stream().noneMatch(t -> e.typeEn().contains(t))) continue;
+            if (!types.isEmpty() && !typesMatch(e.typeEn(), types, typeMode)) continue;
             if (!colors.isEmpty() && !colorsMatch(e.identity(), colors, colorMode)) continue;
             matches.add(e);
         }
         // Ordre « les plus jouées » : les cartes des préconstruits Commander (les staples) d'abord ; avec un texte, les noms
         // qui commencent par lui restent devant.
-        final Map<String, Integer> pop = bool(q, "popular") ? Precons.popularity() : null;
-        if (pop != null) {
+        final Map<String, Integer> pop = bool(q, "popular") && customSet == null ? Precons.popularity() : null;
+        if (customSet != null && text.isEmpty()) {
+            matches.sort(Comparator.comparingInt((Entry e) -> CustomCards.numberOf(e.nameEn())));
+        } else if (pop != null) {
             final Comparator<Entry> byPop = Comparator.comparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0));
             matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text)).thenComparing(byPop));
         } else if (!text.isEmpty()) {
@@ -267,6 +274,41 @@ final class Catalog {
         if (en.startsWith(text) || fr.startsWith(text)) return 1;
         if (e.searchName().contains(text)) return 2;
         return 3;
+    }
+
+    /** Types de carte (pas les supertypes comme « légendaire ») : ceux que « exactement ces types » compare. */
+    private static final java.util.Set<String> CARD_TYPES = java.util.Set.of("creature", "instant", "sorcery", "artifact", "enchantment",
+            "planeswalker", "land", "battle", "kindred", "tribal");
+
+    /**
+     * Les types d'une carte (« legendary enchantment creature - god », en minuscules) comparés aux types choisis.
+     * any : au moins un ; all : tous (une créature-enchantement pour Créature + Enchantement) ; exact : exactement ces
+     * types de carte (un supertype choisi, comme Légendaire, est exigé ; sinon il ne compte pas).
+     */
+    static boolean typesMatch(final String typeLine, final List<String> wanted, final String mode) {
+        final int dash = typeLine.indexOf(" - ");
+        final java.util.Set<String> have = new java.util.HashSet<>(java.util.Arrays.asList((dash < 0 ? typeLine : typeLine.substring(0, dash)).trim().split("\\s+")));
+        switch (mode) {
+            case "all":
+                return have.containsAll(wanted);
+            case "exact":
+                if (!have.containsAll(wanted)) {
+                    return false;
+                }
+                for (final String t : have) {
+                    if (CARD_TYPES.contains(t) && !wanted.contains(t)) {
+                        return false;
+                    }
+                }
+                return true;
+            default:
+                for (final String t : wanted) {
+                    if (have.contains(t)) {
+                        return true;
+                    }
+                }
+                return false;
+        }
     }
 
     /** any : partage une couleur ; identity : tient dans ces couleurs ; exact : exactement ces couleurs. */

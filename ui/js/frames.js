@@ -194,8 +194,45 @@ function planeswalkerRules(text) {
   }).join('');
 }
 
-/** Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou "") ; frameUrl : son cadre importé. */
-export function customFrameHtml(card, art, frameUrl = '') {
+const RARITY_LETTER = {C: 'C', U: 'U', R: 'R', M: 'M', S: 'S'};
+
+/**
+ * Symbole d'extension (à droite du type) : le logo de l'extension perso, teint selon la rareté si elle le demande
+ * (comme les vrais symboles), sinon l'enclume de l'Atelier, de la couleur de la rareté.
+ */
+function setSymbol(card, logoUrl) {
+  const r = RARITY_LETTER[card.crarity] ? ` cf-r${card.crarity}` : '';
+  const set = card.cset;
+  if (set && logoUrl) {
+    const url = `url(&quot;${esc(logoUrl)}&quot;)`;
+    // Teint : la silhouette (masque) colorée, l'ombre autour sur l'enveloppe (le masque l'effacerait).
+    return set.tint ? `<span class="cf-set cf-slogo cf-tint${r || ' cf-rC'}" style="--logo:${url}" title="${esc(set.name)}"><i></i></span>`
+      : `<span class="cf-set cf-slogo${r}" style="background-image:${url}" title="${esc(set.name)}"></span>`;
+  }
+  return `<span class="cf-set${r}">${icon('anvil')}</span>`;
+}
+
+/** Bas de la carte : numéro et rareté, puis code de l'extension, langue et artiste (« 007/120 R · ILO • FR ✎ Ilona »). */
+function footHtml(card) {
+  const set = card.cset;
+  const artist = String(card.artist || '').trim();
+  const r = RARITY_LETTER[card.crarity] || '';
+  if (!set && !artist && !r) {
+    return '<div class="cf-foot">Atelier</div>';
+  }
+  const pad = (n) => String(n).padStart(3, '0');
+  const num = set && set.n ? `${pad(set.n)}/${pad(set.total)}` : '';
+  const top = [num, r].filter(Boolean).join(' ');
+  const code = set ? `${esc(set.code)} • ${card.lang === 'en' ? 'EN' : 'FR'}` : '';
+  const brush = artist ? `<span class="cf-artist">${icon('brush')}${esc(artist)}</span>` : '';
+  return `<div class="cf-foot cf-info">${top ? `<span>${esc(top)}</span>` : ''}<span>${code}${brush}</span></div>`;
+}
+
+/**
+ * Le cadre dessiné d'une carte perso. art : attribut style de son illustration (ou "") ; frameUrl : son cadre importé ;
+ * logoUrl : le logo de son extension perso.
+ */
+export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
   const style = card.frame === IMPORTED && frameUrl ? IMPORTED : FRAMES.some(f => f[0] === card.frame) ? card.frame : 'modern';
   const cols = frameColors(card);
   const l = PALETTE[cols[0]];
@@ -230,13 +267,13 @@ export function customFrameHtml(card, art, frameUrl = '') {
     ${overlay}
     <div class="cf-crown"></div>
     <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span></div>
-    <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span><span class="cf-set">${icon('anvil')}</span></div>
+    <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span>${setSymbol(card, logoUrl)}</div>
     <div class="cf-icon">${typeIcon(typeLine)}</div>
     <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>`
     : `<div class="cf-rules">${rulesHtml(text)}${flavor ? `<div class="cf-flavor">${esc(flavor).replace(/\n/g, '<br>')}</div>` : ''}</div>`}</div>
     ${pt && loyalty ? `<div class="cf-pt cf-loy"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M3 3H37V30L20 43L3 30Z"/></svg><span>${esc(pt)}</span></div>`
     : pt ? `<div class="cf-pt">${esc(pt)}</div>` : ''}
-    <div class="cf-foot">Atelier</div>
+    ${footHtml(card)}
     ${card.fx && card.fx !== 'none' && FX.some(f => f[0] === card.fx) ? `<div class="cf-fx cf-fx-${card.fx}"></div>` : ''}
   </div>`;
 }

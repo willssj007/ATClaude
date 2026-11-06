@@ -2,6 +2,31 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.5 — Extensions perso, recherche par plusieurs types
+
+### Atelier : extensions perso
+- **Mes extensions** : crée tes propres extensions. Chacune a :
+  - un nom ;
+  - un code de 2 à 6 lettres ou chiffres, comme « MH3 ». Il est proposé d'après le nom. Un code officiel ou déjà pris est refusé ;
+  - un **logo**, importé depuis la galerie.
+- **Le logo** s'affiche tel quel, ou en silhouette **de la couleur de la rareté**, comme les vrais symboles : noir, argent, or ou orange. L'aperçu le montre dans chaque rareté.
+- **Ranger une carte** : dans son onglet Apparence, choisis son extension, sa **rareté** (commune, peu commune, rare, mythique ou spéciale) et son **artiste**. Pour plusieurs cartes d'un coup, passe par « Organiser », puis « Mettre dans une extension… ». L'artiste écrit est repris sur les nouvelles cartes.
+- **Sur la carte** :
+  - le logo va à droite du type ;
+  - en bas, il y a le numéro de la carte dans l'extension (« 002/120 ») et sa rareté ;
+  - puis le code de l'extension, la langue et l'artiste, avec un pinceau.
+
+  Les numéros suivent l'ordre des vraies extensions : blanc, bleu, noir, rouge, vert, multicolore, incolore, puis terrains.
+- **Filtre par extension** dans l'Atelier : « Toutes les extensions », chacune avec son nombre de cartes, ou « Sans extension ».
+- **Recherche** : le bouton « Extension » du menu des cartes et du deck builder propose tes extensions en premier, avec leur logo. Leurs cartes s'affichent dans l'ordre de leur numéro.
+- **Les extensions et leurs logos suivent ton compte** sur tes autres appareils. Supprimer une extension garde ses cartes, sans extension.
+
+### Recherche de cartes
+- **Plusieurs types à la fois** : un choix à côté des types, comme pour les couleurs :
+  - « Au moins tous ces types » (par défaut) : Créature + Enchantement donne les créatures-enchantements ;
+  - « Au moins un de ces types » : l'ancien comportement ;
+  - « Exactement ces types » : Créature seule exclut les créatures-artefacts. Légendaire, s'il est choisi, est exigé.
+
 ## 0.6.4 — Mises à jour automatiques, sous-types, ordre et noms des capacités
 
 ### Mises à jour automatiques

@@ -57,14 +57,22 @@ function pickEdition(current) {
       body.innerHTML = '<input type="search" class="ed-q" placeholder="Nom ou code de l\'extension (ex. Bloomburrow, MH3)…" style="width:100%"><div class="ed-list"><p class="muted">Chargement…</p></div>';
       const list = body.querySelector('.ed-list');
       const all = await loadEditions();
+      // Les extensions perso (Atelier) d'abord, avec leur logo ; leur code de recherche est « @id ».
+      const mine = await bridge.request('customSets').catch(() => []);
+      const custom = mine.map(x => ({code: '@' + x.id, name: x.name, setCode: x.code, count: x.count, logo: x.logo}));
       const render = (text) => {
         const t = text.trim().toLowerCase();
+        const own = custom.filter(e => !t || e.name.toLowerCase().includes(t) || e.setCode.toLowerCase().startsWith(t));
+        const ownHtml = own.length ? `<p class="muted small ed-head">Tes extensions</p>${own.map(e => `<button class="ed-item ed-own${current && current.code === e.code ? ' on' : ''}" data-code="${esc(e.code)}">
+          <i class="ed-logo"${e.logo ? ` style="background-image:url(&quot;${esc(bridge.imageUrl(e.logo))}&quot;)"` : ''}></i><b>${esc(e.name)}</b>
+          <span class="muted small">${esc(e.setCode)} · Atelier · ${e.count} carte${e.count > 1 ? 's' : ''}</span></button>`).join('')}
+          ${all.length ? '<p class="muted small ed-head">Extensions officielles</p>' : ''}` : '';
         const hits = all.filter(e => !t || e.name.toLowerCase().includes(t) || e.code.toLowerCase().startsWith(t));
         // Code exact, puis noms qui commencent par le texte, puis le reste (du plus récent au plus ancien).
         const rank = (e) => !t ? 0 : e.code.toLowerCase() === t ? 0 : e.name.toLowerCase().startsWith(t) ? 1 : 2;
         const shown = hits.map((e, i) => [e, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([e]) => e).slice(0, 250);
-        list.innerHTML = shown.map(e => `<button class="ed-item${current && current.code === e.code ? ' on' : ''}" data-code="${esc(e.code)}">
-          <b>${esc(e.name)}</b><span class="muted small">${esc(e.code)} · ${esc(e.year)} · ${esc(SET_TYPES[e.type] || e.type)} · ${e.count} cartes</span></button>`).join('')
+        list.innerHTML = (ownHtml + shown.map(e => `<button class="ed-item${current && current.code === e.code ? ' on' : ''}" data-code="${esc(e.code)}">
+          <b>${esc(e.name)}</b><span class="muted small">${esc(e.code)} · ${esc(e.year)} · ${esc(SET_TYPES[e.type] || e.type)} · ${e.count} cartes</span></button>`).join(''))
           || '<p class="muted">Aucune extension ne correspond.</p>';
       };
       render('');
@@ -75,7 +83,7 @@ function pickEdition(current) {
         const b = e.target.closest('[data-code]');
         if (b) {
           answered = true;
-          resolve(all.find(x => x.code === b.dataset.code));
+          resolve(custom.find(x => x.code === b.dataset.code) || all.find(x => x.code === b.dataset.code));
           close();
         }
       });
@@ -108,7 +116,7 @@ export class SearchPanel {
     this.onRemove = onRemove;
     this.counts = counts || (() => 0);
     this.identityLock = identityLock || (() => null);
-    this.query = {text: '', inText: false, colors: [], colorMode: 'any', types: [], commanderLegal: false, commandersOnly: false, popular: popularFirst};
+    this.query = {text: '', inText: false, colors: [], colorMode: 'any', types: [], typeMode: 'all', commanderLegal: false, commandersOnly: false, popular: popularFirst};
     this.offset = 0;
     this.total = 0;
     this.loading = false;
@@ -135,7 +143,12 @@ export class SearchPanel {
             </select>
             <div class="sh-cmc" title="Valeur de mana (coût converti)"><span>VM</span><input type="number" class="cmin" placeholder="min" min="0" aria-label="Valeur de mana minimale"><i>–</i><input type="number" class="cmax" placeholder="max" min="0" aria-label="Valeur de mana maximale"></div>
           </div>
-          <div class="sh-row chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}</div>
+          <div class="sh-row chips types">${TYPES.map(([k, l]) => `<span class="chip" data-type="${k}">${l}</span>`).join('')}
+            <select class="tmode" title="Comment comparer les types choisis" aria-label="Types choisis">
+              <option value="all">Au moins tous ces types</option>
+              <option value="any">Au moins un de ces types</option>
+              <option value="exact">Exactement ces types</option>
+            </select></div>
           <div class="sh-row">
             <button class="sh-pill set-btn" title="N'afficher que les cartes d'une extension">${icon('book')}<span>Extension : toutes</span></button>
             <label class="tchip" title="Chercher le mot aussi dans le texte des cartes"><input type="checkbox" class="intext"><i></i><span>Dans le texte</span></label>
@@ -182,6 +195,13 @@ export class SearchPanel {
     r.querySelector('.mode').addEventListener('change', (e) => {
       this.query.colorMode = e.target.value;
       run();
+    });
+    // Plusieurs types : tous à la fois (une créature-enchantement), un seul suffit, ou exactement ceux-là.
+    r.querySelector('.tmode').addEventListener('change', (e) => {
+      this.query.typeMode = e.target.value;
+      if (this.query.types.length) {
+        run();
+      }
     });
     r.querySelector('.cmin').addEventListener('input', (e) => {
       this.query.cmcMin = e.target.value === '' ? undefined : Number(e.target.value);

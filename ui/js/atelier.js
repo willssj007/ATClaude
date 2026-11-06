@@ -11,7 +11,7 @@ import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
-  PLAYER_EFFECTS, SUBTYPES, attachOf, attachTemplates, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+  PLAYER_EFFECTS, RARITIES, SUBTYPES, attachOf, attachTemplates, cleanArtist, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 /** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
@@ -33,8 +33,35 @@ function labelSelects(root) {
 
 const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
-  keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none',
+  keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none', set: '', rarity: '', artist: '',
 });
+/** Le dernier artiste écrit : il est repris sur les nouvelles cartes. */
+const ARTIST_KEY = 'at.atelier.artist';
+function lastArtist() {
+  try {
+    return cleanArtist(localStorage.getItem(ARTIST_KEY) || '');
+  } catch (e) {
+    return '';
+  }
+}
+
+/** L'extension perso écrite dans un script (son identifiant), ou "". */
+function setIdOf(script) {
+  return (String(script || '').match(/^SVar:AtelierSet:([a-z0-9]+)\s*$/m) || [])[1] || '';
+}
+
+/** Le logo d'une extension perso (pastille), ou un carré vide. */
+function setLogoHtml(set, cls = '') {
+  const url = set && set.logo ? bridge.imageUrl(set.logo) : '';
+  return `<i class="ate-slogo${cls ? ' ' + cls : ''}${url ? '' : ' none'}"${url ? ` style="background-image:url(&quot;${esc(url)}&quot;)"` : ''}></i>`;
+}
+
+/** Un code d'extension tiré de son nom : les initiales (« Les Marées d'Ilona » : LMI). */
+function codeFromName(name) {
+  const words = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  const code = words.length > 1 ? words.map(w => w[0]).join('') : (words[0] || '');
+  return code.slice(0, words.length > 1 ? 5 : 3);
+}
 /** Nouveau jeton : une créature 1/1 verte sans coût, au cadre de jeton. */
 const NEW_TOKEN = () => ({...NEW_CARD(), token: true, colors: ['G'], power: 1, toughness: 1, frame: 'token'});
 const TOKEN_COLORS = [['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert']];
@@ -154,9 +181,28 @@ export class Atelier {
     return [...n].sort((a, b) => a[0].localeCompare(b[0], 'fr'));
   }
 
+  /** L'extension perso d'une carte (son identifiant, si l'extension existe encore), "" sans extension. */
+  setOf(c) {
+    const id = setIdOf(c.script);
+    return id && (this.data.sets || []).some(x => x.id === id) ? id : '';
+  }
+
   renderList() {
     const d = this.data;
     const groups = this.groups();
+    const sets = d.sets || [];
+    let setFilter = this.setFilter;
+    if (setFilter === undefined) {
+      try {
+        setFilter = JSON.parse(localStorage.getItem('at.atelier.set') || '""');
+      } catch (e) {
+        setFilter = '';
+      }
+    }
+    if (setFilter && setFilter !== '-' && !sets.some(x => x.id === setFilter)) {
+      setFilter = '';
+    }
+    this.setFilter = setFilter;
     let filter = this.groupFilter;
     if (filter === undefined) {
       try {
@@ -170,10 +216,14 @@ export class Atelier {
       filter = '';
     }
     this.groupFilter = filter;
-    const shown = (c) => !filter || (filter === '-' ? !this.groupOf(c) : this.groupOf(c) === filter);
+    const inSet = (c) => !setFilter || (setFilter === '-' ? !this.setOf(c) : this.setOf(c) === setFilter);
+    const shown = (c) => inSet(c) && (!filter || (filter === '-' ? !this.groupOf(c) : this.groupOf(c) === filter));
     const cards = d.cards.filter(c => !c.token && shown(c));
     const tokens = d.cards.filter(c => c.token && shown(c));
     const loose = d.cards.filter(c => !this.groupOf(c)).length;
+    const noSet = d.cards.filter(c => !this.setOf(c)).length;
+    const setChip = (v, label, count, set) => `<button class="chip${setFilter === v ? ' on' : ''}" data-sfilter="${esc(v)}">${set ? setLogoHtml(set) : ''}${esc(label)}
+      <span class="ate-gn">${count}</span></button>`;
     const sel = this.selection;
     const chip = (v, label, count) => `<button class="chip${filter === v ? ' on' : ''}" data-gfilter="${esc(v)}">${esc(label)}
       <span class="ate-gn">${count}</span></button>`;
@@ -185,11 +235,22 @@ export class Atelier {
       ${groups.length || sel ? `<div class="ate-groups chips">${chip('', 'Toutes', d.cards.length)}${groups.map(([g, n]) => chip(g, g, n)).join('')}
         ${groups.length && loose ? chip('-', 'Sans groupe', loose) : ''}
         ${filter && filter !== '-' ? `<button class="btn small" data-grename title="Renommer ce groupe">Renommer</button>` : ''}</div>` : ''}
+      ${sets.length ? `<div class="ate-groups chips ate-setfilter">${setChip('', 'Toutes les extensions', d.cards.length)}${sets.map(x => setChip(x.id, x.name, d.cards.filter(c => this.setOf(c) === x.id).length, x)).join('')}
+        ${noSet ? setChip('-', 'Sans extension', noSet) : ''}</div>` : ''}
       ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
         <button class="btn small gold" data-gput${sel.size ? '' : ' disabled'}>Mettre dans un groupe…</button>
         <button class="btn small" data-gout${sel.size ? '' : ' disabled'}>Retirer du groupe</button>
+        <button class="btn small" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
         <button class="btn small" data-gall>${cards.length + tokens.length && [...cards, ...tokens].every(c => sel.has(c.name)) ? 'Aucune' : 'Toutes'}</button></div>` : ''}
       <div class="ate-cardgroups"></div>
+      <div class="ate-top"><h2>Mes extensions</h2><button class="btn" data-newset>＋ Nouvelle extension</button></div>
+      <p class="muted small">Tes propres extensions : un nom, un code (comme « MH3 ») et un logo. Le logo s'affiche sur tes cartes à
+        droite du type, de la couleur de leur rareté, avec leur numéro dans l'extension et l'artiste en bas. Chaque extension se
+        cherche dans le menu des cartes et le deck builder (bouton « Extension »). Une carte se range dans une extension dans
+        son onglet « Apparence », ou plusieurs à la fois avec « Organiser ».</p>
+      <div class="ate-sets">${sets.length ? sets.map(x => `<button class="ate-set panel" data-editset="${esc(x.id)}">${setLogoHtml(x, 'big')}
+        <span><b>${esc(x.name)}</b><span class="muted small">${esc(x.code)} · ${x.count} carte${x.count > 1 ? 's' : ''}</span></span></button>`).join('')
+        : '<p class="muted">Aucune extension pour l\'instant.</p>'}</div>
       <div class="ate-top"><h2>Mes jetons</h2><button class="btn" data-new-token>＋ Nouveau jeton</button></div>
       <p class="muted small">Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso
         les créent (effet « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.</p>
@@ -234,6 +295,30 @@ export class Atelier {
       }
       const tile = e.target.closest('.ate-tile');
       const gf = e.target.closest('[data-gfilter]');
+      const sf = e.target.closest('[data-sfilter]');
+      if (sf) {
+        this.setFilter = sf.dataset.sfilter;
+        try {
+          localStorage.setItem('at.atelier.set', JSON.stringify(this.setFilter));
+        } catch (err) {
+          // mémoire du navigateur indisponible : le filtre ne sera pas retenu
+        }
+        this.renderList();
+        return;
+      }
+      if (e.target.closest('[data-newset]')) {
+        this.editSet(null, () => this.renderList());
+        return;
+      }
+      const es = e.target.closest('[data-editset]');
+      if (es) {
+        this.editSet((d.sets || []).find(x => x.id === es.dataset.editset), () => this.renderList());
+        return;
+      }
+      if (e.target.closest('[data-sput]')) {
+        this.askSet([...this.selection]);
+        return;
+      }
       if (gf) {
         this.groupFilter = gf.dataset.gfilter;
         try {
@@ -374,6 +459,181 @@ export class Atelier {
     await this.show();
   }
 
+  /**
+   * Crée (set null) ou modifie une extension perso : nom, code, logo (PNG, 256 px au plus) et sa teinte selon la
+   * rareté. onSaved reçoit l'extension enregistrée.
+   */
+  editSet(set, onSaved) {
+    let logo; // undefined : garder ; "" : retirer ; data URL : nouveau logo
+    let logoUrl = set && set.logo ? bridge.imageUrl(set.logo) : '';
+    let codeTouched = !!set;
+    customBox(set ? `Extension « ${set.name} »` : 'Nouvelle extension', (body, footer, close) => {
+      body.innerHTML = `<label class="ate-field"><span>Nom</span><input type="text" class="es-name" maxlength="40" placeholder="Les Marées d'Ilona" value="${esc(set ? set.name : '')}"></label>
+        <label class="ate-field"><span>Code <span class="muted small">(2 à 6 lettres ou chiffres, comme « MH3 »)</span></span>
+          <input type="text" class="es-code" maxlength="6" autocapitalize="characters" placeholder="LMI" value="${esc(set ? set.code : '')}"></label>
+        <div class="ate-field"><span>Logo <span class="muted small">(une image carrée, sur fond transparent de préférence)</span></span>
+          <div class="ate-esp"></div>
+          <div class="ate-look-row"><button class="btn small" data-eslogo>Choisir une image…</button><button class="btn small" data-esnologo>Retirer le logo</button></div>
+          <label class="tchip"><input type="checkbox" class="es-tint"${set && set.tint ? ' checked' : ''}><i></i><span>Couleur de la rareté</span></label>
+          <p class="muted small">« Couleur de la rareté » garde la forme du logo et la colore comme les vrais symboles : noir (commune),
+            argent (peu commune), or (rare), orange (mythique). Sans elle, le logo s'affiche tel quel.</p></div>`;
+      const name = body.querySelector('.es-name');
+      const code = body.querySelector('.es-code');
+      const tint = body.querySelector('.es-tint');
+      const previews = () => {
+        const box = body.querySelector('.ate-esp');
+        const url = logoUrl ? `url(&quot;${esc(logoUrl)}&quot;)` : '';
+        box.innerHTML = !url ? '<span class="muted small">Pas de logo : l\'enclume de l\'Atelier, de la couleur de la rareté.</span>'
+          : ['C', 'U', 'R', 'M'].map(r => tint.checked ? `<span class="cf-set cf-slogo cf-tint cf-r${r}" style="--logo:${url}"><i></i></span>`
+            : `<span class="cf-set cf-slogo" style="background-image:${url}"></span>`).join('');
+        body.querySelector('[data-esnologo]').classList.toggle('hidden', !logoUrl);
+      };
+      previews();
+      name.addEventListener('input', () => {
+        if (!codeTouched) {
+          code.value = codeFromName(name.value);
+        }
+      });
+      code.addEventListener('input', () => {
+        codeTouched = true;
+        code.value = code.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      });
+      tint.addEventListener('change', previews);
+      body.addEventListener('click', (e) => {
+        if (e.target.closest('[data-esnologo]')) {
+          logo = '';
+          logoUrl = '';
+          previews();
+        } else if (e.target.closest('[data-eslogo]')) {
+          const input = el('<input type="file" accept="image/*" style="display:none">');
+          document.body.appendChild(input);
+          input.addEventListener('change', () => {
+            const file = input.files && input.files[0];
+            input.remove();
+            if (!file) {
+              return;
+            }
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+              // 256 px au plus, proportions et transparence gardées.
+              const k = Math.min(1, 256 / Math.max(img.naturalWidth, img.naturalHeight));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.max(1, Math.round(img.naturalWidth * k));
+              canvas.height = Math.max(1, Math.round(img.naturalHeight * k));
+              canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+              URL.revokeObjectURL(url);
+              logo = canvas.toDataURL('image/png');
+              logoUrl = logo;
+              previews();
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(url);
+              toast('Image illisible.', {title: 'Logo', error: true});
+            };
+            img.src = url;
+          });
+          input.click();
+        }
+      });
+      if (set) {
+        const del = el('<button class="btn danger">Supprimer</button>');
+        del.addEventListener('click', async () => {
+          const n = set.count || 0;
+          if (!await confirmBox('Supprimer l\'extension ?', `« ${set.name} » disparaîtra, avec son logo.${n ? ` Ses ${n} carte${n > 1 ? 's' : ''} restent, sans extension.` : ''}`,
+            {yes: 'Supprimer', danger: true})) {
+            return;
+          }
+          try {
+            this.useData(await bridge.request('customSetDelete', {id: set.id}));
+            close();
+            this.onChanged();
+            if (!this.editing) {
+              this.renderList();
+            }
+          } catch (err) {
+            toast(err.message, {error: true});
+          }
+        });
+        footer.appendChild(del);
+      }
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      const ok = el(`<button class="btn gold">${set ? 'Enregistrer' : 'Créer'}</button>`);
+      ok.addEventListener('click', async () => {
+        ok.disabled = true;
+        try {
+          const req = {id: set ? set.id : '', name: name.value, code: code.value, tint: tint.checked};
+          if (logo !== undefined) {
+            req.logo = logo;
+          }
+          const data = await bridge.request('customSetSave', req);
+          this.useData(data);
+          const saved = (data.sets || []).find(x => x.code === code.value.trim().toUpperCase());
+          close();
+          toast(set ? 'Extension enregistrée.' : `Extension « ${saved ? saved.name : name.value} » créée.`, {title: 'Atelier'});
+          this.onChanged();
+          if (saved && onSaved) {
+            onSaved(saved);
+          }
+        } catch (err) {
+          toast(err.message, {title: 'Extension', error: true, duration: 6000});
+          ok.disabled = false;
+        }
+      });
+      footer.append(cancel, ok);
+      setTimeout(() => (set ? null : name.focus()), 50);
+    }, {narrow: true});
+  }
+
+  /** Ranger les cartes choisies dans une extension (ou les en sortir). */
+  askSet(names) {
+    const sets = this.data.sets || [];
+    customBox(`Ranger ${names.length} carte${names.length > 1 ? 's' : ''}`, (body, footer, close) => {
+      body.innerHTML = `<p class="muted small">Dans l'extension :</p>
+        <div class="chips ate-gpick">${sets.map(x => `<button class="chip" data-spick="${esc(x.id)}">${setLogoHtml(x)}${esc(x.name)} <span class="ate-gn">${esc(x.code)}</span></button>`).join('')}
+        <button class="chip" data-spick="">Aucune extension</button><button class="chip ate-newset" data-snew>＋ Nouvelle extension…</button></div>`;
+      body.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-spick]');
+        if (b) {
+          close();
+          await this.putInSet(names, b.dataset.spick);
+        } else if (e.target.closest('[data-snew]')) {
+          close();
+          this.editSet(null, (set) => this.putInSet(names, set.id));
+        }
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel);
+    }, {narrow: true});
+  }
+
+  /** Met les cartes nommées dans une extension ("" : sans extension) : la ligne est écrite dans leur script. */
+  async putInSet(names, id) {
+    let done = 0;
+    for (const name of names) {
+      const c = this.data.cards.find(x => x.name === name);
+      if (!c || this.setOf(c) === id) {
+        continue;
+      }
+      try {
+        await bridge.request('customSave', {script: withDisplay(c.script, {...readDisplay(c.script), set: id}), previous: c.name, art: null,
+          form: c.form ? {...c.form, set: id} : null});
+        done++;
+      } catch (e) {
+        toast(`${name} : ${e.message}`, {error: true, duration: 6000});
+      }
+    }
+    if (done) {
+      const set = (this.data.sets || []).find(x => x.id === id);
+      toast(set ? `${done} carte${done > 1 ? 's' : ''} dans « ${set.name} ».` : `${done} carte${done > 1 ? 's' : ''} sans extension.`, {title: 'Atelier'});
+      this.onChanged();
+    }
+    this.selection = this.selection ? new Set() : null;
+    await this.show();
+  }
+
   async setTypes(types) {
     try {
       this.useData(await bridge.request('customTypes', {types}));
@@ -396,6 +656,9 @@ export class Atelier {
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : token ? NEW_TOKEN() : NEW_CARD();
+    if (!entry) {
+      this.form.artist = lastArtist();
+    }
     // Le groupe est dans le script (il a pu être changé par « Organiser », ou sur un autre appareil).
     if (entry && entry.script) {
       this.form.group = readGroup(entry.script);
@@ -500,7 +763,8 @@ export class Atelier {
 
   /** Présentation de la carte : celle du formulaire, ou celle écrite dans le script. */
   look() {
-    return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang, frameText: this.form.frameText || 'dark', fx: this.form.fx || 'none'}
+    return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang, frameText: this.form.frameText || 'dark', fx: this.form.fx || 'none',
+      set: this.form.set || '', rarity: this.form.rarity || '', artist: this.form.artist || ''}
       : readDisplay(this.script);
   }
 
@@ -518,8 +782,23 @@ export class Atelier {
     this.check();
   }
 
+  /** Extension perso, rareté et artiste (onglet Apparence). */
+  extHtml() {
+    const sets = (this.data && this.data.sets) || [];
+    return `<div class="ate-field ate-look ate-ext"><span>Extension</span>
+      <div class="chips ate-setpick"><button class="chip" data-lset="">Aucune</button>${sets.map(x => `<button class="chip" data-lset="${esc(x.id)}">${setLogoHtml(x)}${esc(x.name)}
+        <span class="ate-gn">${esc(x.code)}</span></button>`).join('')}<button class="chip ate-newset" data-newset>＋ Nouvelle extension…</button></div>
+    </div>
+    <div class="ate-field ate-look"><span>Rareté</span>
+      <div class="chips ate-rarpick">${RARITIES.map(([v, l]) => `<button class="chip" data-lrarity="${v}">${v ? `<i class="ate-rdot r${v}"></i>` : ''}${l}</button>`).join('')}</div>
+    </div>
+    <label class="ate-field ate-look"><span>Artiste <span class="muted small">(en bas de la carte, avec un pinceau)</span></span>
+      <input type="text" data-lartist maxlength="60" placeholder="Qui a fait l'illustration : toi, ou son artiste"></label>
+    <p class="muted small">Le logo de l'extension va à droite du type, de la couleur de la rareté. Le numéro de la carte dans l'extension, le code de l'extension et l'artiste vont en bas. Les extensions se créent ici ou dans « Mes extensions » de l'Atelier, et se cherchent dans le menu des cartes (bouton « Extension »).</p>`;
+  }
+
   lookHtml() {
-    return `<div class="ate-field ate-look"><span>Présentation</span>
+    return `${this.extHtml()}<div class="ate-field ate-look"><span>Présentation</span>
       <div class="ate-look-row">
         <div class="seg ate-lang">${LANGS.map(([v, l]) => `<button data-lang="${v}">${l}</button>`).join('')}</div>
         <label class="ate-fcolor" data-fcolor-box>Couleur du cadre <select data-fcolor>${FRAME_COLORS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
@@ -543,6 +822,14 @@ export class Atelier {
   renderLook() {
     const look = this.look();
     this.root.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === look.lang));
+    const sets = (this.data && this.data.sets) || [];
+    const setNow = sets.some(x => x.id === look.set) ? look.set : '';
+    this.root.querySelectorAll('[data-lset]').forEach(b => b.classList.toggle('on', b.dataset.lset === setNow));
+    this.root.querySelectorAll('[data-lrarity]').forEach(b => b.classList.toggle('on', b.dataset.lrarity === (look.rarity || '')));
+    const artist = this.root.querySelector('[data-lartist]');
+    if (artist && document.activeElement !== artist && artist.value !== (look.artist || '')) {
+      artist.value = look.artist || '';
+    }
     const sel = this.root.querySelector('[data-fcolor]');
     if (sel && sel.value !== look.frameColor) {
       sel.value = look.frameColor;
@@ -1529,6 +1816,15 @@ export class Atelier {
       this.frameImg = '';
       this.frameUrl = '';
       this.setLook(this.look().frame === IMPORTED ? {frame: 'modern'} : {});
+    } else if (b.dataset.lset !== undefined) {
+      this.setLook({set: b.dataset.lset});
+    } else if (b.dataset.lrarity !== undefined) {
+      this.setLook({rarity: b.dataset.lrarity});
+    } else if (b.dataset.newset !== undefined) {
+      this.editSet(null, (set) => {
+        this.renderLeft();
+        this.setLook({set: set.id});
+      });
     } else if (b.dataset.lang) {
       this.setLook({lang: b.dataset.lang});
     } else if (b.dataset.frame) {
@@ -1673,6 +1969,22 @@ export class Atelier {
     if (t.classList.contains('ate-script')) {
       this.script = t.value;
       this.check();
+      return;
+    }
+    if (t.dataset.lartist !== undefined) {
+      // L'artiste : écrit dans la carte sans redessiner les vignettes à chaque lettre (la vérification le fera).
+      if (e.type === 'input') {
+        if (this.mode === 'form') {
+          this.form.artist = t.value;
+        } else {
+          this.script = withDisplay(this.script, {...this.look(), artist: t.value});
+          const area = this.root.querySelector('.ate-script');
+          if (area) {
+            area.value = this.script;
+          }
+        }
+        this.check();
+      }
       return;
     }
     if (t.dataset.fcolor !== undefined || t.dataset.ftext !== undefined) {
@@ -1878,6 +2190,13 @@ export class Atelier {
       }
       await bridge.request('customSave', {script: this.currentScript(), previous: this.previous, art: this.art,
         form: kept ? this.form : null, frameImage: this.frameImg});
+      try {
+        if (cleanArtist(this.look().artist)) {
+          localStorage.setItem(ARTIST_KEY, cleanArtist(this.look().artist));
+        }
+      } catch (err) {
+        // mémoire du navigateur indisponible : l'artiste ne sera pas repris
+      }
       toast(this.form.token ? 'Jeton enregistré : tes cartes perso peuvent le créer, et la triche le propose en partie.'
         : 'Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
       this.onChanged();

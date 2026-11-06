@@ -69,6 +69,10 @@ public final class ImageService {
             final File frame = CustomCards.frameImage(imageKey);
             return frame == null ? null : new Served(frame, "en", false);
         }
+        if (imageKey.startsWith(CustomCards.SET_PREFIX)) {
+            final File logo = CustomCards.setLogoFile(imageKey);
+            return logo == null ? null : new Served(logo, "en", true);
+        }
         if (imageKey.startsWith(CustomCards.ART_PREFIX)) {
             final File art = CustomCards.art(imageKey);
             return art == null ? null : new Served(art, "en", false);

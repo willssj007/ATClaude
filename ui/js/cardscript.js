@@ -2952,7 +2952,25 @@ export function displayLines(d) {
   if (d.fx && d.fx !== 'none') {
     out.push(`SVar:AtelierFx:${d.fx}`);
   }
+  // Extension perso (son identifiant), rareté et artiste : en bas de la carte et à côté du type.
+  if (/^[a-z0-9]{1,20}$/.test(d.set || '')) {
+    out.push(`SVar:AtelierSet:${d.set}`);
+  }
+  if (RARITIES.some(r => r[0] === d.rarity && r[0])) {
+    out.push(`SVar:AtelierRarity:${d.rarity}`);
+  }
+  if (cleanArtist(d.artist)) {
+    out.push(`SVar:AtelierArtist:${cleanArtist(d.artist)}`);
+  }
   return out;
+}
+
+/** Raretés d'une carte perso (la couleur du symbole d'extension et la lettre en bas de la carte). */
+export const RARITIES = [['', 'Aucune'], ['C', 'Commune'], ['U', 'Peu commune'], ['R', 'Rare'], ['M', 'Mythique'], ['S', 'Spéciale']];
+
+/** Le nom d'un artiste pour le script : une ligne, sans « | », 60 caractères au plus. */
+export function cleanArtist(a) {
+  return String(a || '').replace(/[|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
 /** Un nom de groupe utilisable dans un script : une ligne, sans « | » ni « : », 30 caractères au plus. */
@@ -2981,7 +2999,7 @@ export function withGroup(script, group) {
   const g = cleanGroup(group);
   if (g) {
     // Avant les lignes de présentation, pour que le script reste lisible.
-    const i = kept.findIndex(l => /^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx):/.test(l));
+    const i = kept.findIndex(l => /^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx|Set|Rarity|Artist):/.test(l));
     kept.splice(i < 0 ? kept.length : i, 0, `SVar:AtelierGroup:${g}`);
   }
   return kept.join('\n');
@@ -2991,12 +3009,13 @@ export function withGroup(script, group) {
 export function readDisplay(script) {
   const get = (k) => (String(script || '').match(new RegExp(`^SVar:${k}:(\\S+)`, 'm')) || [])[1];
   return {frame: get('AtelierFrame') || 'modern', frameColor: get('AtelierFrameColor') || 'auto', lang: get('AtelierLang') === 'en' ? 'en' : 'fr',
-    frameText: get('AtelierFrameText') === 'light' ? 'light' : 'dark', fx: get('AtelierFx') || 'none'};
+    frameText: get('AtelierFrameText') === 'light' ? 'light' : 'dark', fx: get('AtelierFx') || 'none',
+    set: get('AtelierSet') || '', rarity: get('AtelierRarity') || '', artist: cleanArtist((String(script || '').match(/^SVar:AtelierArtist:(.*)$/m) || [])[1])};
 }
 
 /** Le script avec d'autres réglages d'affichage (pour le mode script). */
 export function withDisplay(script, d) {
-  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx):/.test(l));
+  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx|Set|Rarity|Artist):/.test(l));
   while (kept.length && !kept[kept.length - 1].trim()) {
     kept.pop();
   }

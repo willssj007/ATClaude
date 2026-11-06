@@ -551,6 +551,11 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 .ed-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgb(255 255 255 / 0.03); cursor: pointer; color: var(--text); }
 .ed-item:hover { border-color: var(--line-strong); }
 .ed-item.on { border-color: var(--gold); background: rgb(var(--gold-rgb) / 0.12); }
+/* Extensions perso dans la liste des extensions : leur logo à gauche. */
+.ed-head { margin: 6px 2px 0; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+.ed-item.ed-own { display: grid; grid-template-columns: 32px 1fr; column-gap: 10px; align-items: center; }
+.ed-own .ed-logo { grid-row: span 2; width: 32px; height: 32px; background: center / 80% no-repeat; }
+.ed-own .ed-logo[style] { background-color: rgb(240 234 220 / 0.92); border-radius: 6px; }
 .browser .results, .builder .results { flex: 1; min-height: 0; overflow: auto; padding: 2px; overscroll-behavior: contain; }
 @media (max-width: 520px) { .sh-q .total { display: none; } .filters-btn span, .search-head .missing-toggle span { display: none; } }
 /* Téléphone en paysage : en-tête plus ramassé, pour laisser la place aux cartes. */

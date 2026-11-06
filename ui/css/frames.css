@@ -55,6 +55,23 @@
 .cf-set svg, .cf-icon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .cf-set svg .f, .cf-icon svg .f { fill: currentColor; stroke: none; }
 .cf-icon { display: none; }
+/* Rareté (cartes perso) : la couleur du symbole d'extension, comme sur les cartes imprimées. */
+.cf-set.cf-rC { color: #1d1b19; filter: drop-shadow(0 0 calc(var(--u) * 0.35) rgb(255 255 255 / 0.85)); }
+.cf-set.cf-tint:not(.cf-rC) { filter: drop-shadow(0 0 calc(var(--u) * 0.18) #000) drop-shadow(0 0 calc(var(--u) * 0.18) #000); }
+.cf-set.cf-rU { color: #a9b3bb; filter: drop-shadow(0 0 calc(var(--u) * 0.3) rgb(0 0 0 / 0.9)); }
+.cf-set.cf-rR { color: #d4a63a; filter: drop-shadow(0 0 calc(var(--u) * 0.3) rgb(0 0 0 / 0.9)); }
+.cf-set.cf-rM { color: #e8661f; filter: drop-shadow(0 0 calc(var(--u) * 0.3) rgb(0 0 0 / 0.9)); }
+.cf-set.cf-rS { color: #a46bd6; filter: drop-shadow(0 0 calc(var(--u) * 0.3) rgb(0 0 0 / 0.9)); }
+/* Logo d'une extension perso : l'image telle quelle, ou sa silhouette teinte selon la rareté. */
+.cf-set.cf-slogo { width: calc(var(--u) * 6.6); height: calc(var(--u) * 6.6); background: center / contain no-repeat; }
+.cf-set.cf-tint { background-image: none; }
+.cf-tint > i { display: block; width: 100%; height: 100%;
+  -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
+.cf-tint.cf-rC > i { background: #1d1b19; }
+.cf-tint.cf-rU > i { background: linear-gradient(135deg, #59626a, #e6ebef 50%, #59626a); }
+.cf-tint.cf-rR > i { background: linear-gradient(135deg, #7a5a14, #f6d77f 50%, #7a5a14); }
+.cf-tint.cf-rM > i { background: linear-gradient(135deg, #9e2a0c, #ffb24a 50%, #9e2a0c); }
+.cf-tint.cf-rS > i { background: linear-gradient(135deg, #4e2478, #dcb0ff 50%, #4e2478); }
 
 /* Boîte de texte : parchemin teinté. */
 .cf-box {
@@ -90,6 +107,16 @@
   left: 6.4%; bottom: 1.3%; font: 700 calc(var(--u) * 2.6) / 1 system-ui, sans-serif; letter-spacing: 0.14em;
   text-transform: uppercase; color: rgb(255 255 255 / 0.7);
 }
+/* Numéro, rareté, extension, langue et artiste d'une carte perso (deux petites lignes, à gauche de la force). */
+.cf-foot.cf-info {
+  right: 30%; display: flex; flex-direction: column; gap: calc(var(--u) * 0.6);
+  font: 600 calc(var(--u) * 2.4) / 1 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: none;
+  color: rgb(255 255 255 / 0.82); text-shadow: 0 0 calc(var(--u) * 0.6) rgb(0 0 0 / 0.9);
+}
+.cf-info span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cf-artist { margin-left: 1em; }
+.cf-info span:first-child .cf-artist:first-child, .cf-info span > .cf-artist:only-child { margin-left: 0; }
+.cf-artist svg { width: 1.15em; height: 1.15em; vertical-align: -0.22em; margin-right: 0.25em; fill: none; stroke: currentColor; stroke-width: 2.2; }
 
 /* Couronne d'une carte légendaire : une arche au-dessus du nom. */
 .cf-crown { display: none; }

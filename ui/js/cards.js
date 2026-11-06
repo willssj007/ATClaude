@@ -23,7 +23,8 @@ function artStyle(card) {
 function frameHtml(card) {
   if (card.custom) {
     const frameUrl = card.customFrameUrl || (card.customFrame ? bridge.imageUrl(card.customFrame) : '');
-    return customFrameHtml(card, artStyle(card), frameUrl);
+    const logoUrl = card.csetLogoUrl || (card.cset && card.cset.logo ? bridge.imageUrl(card.cset.logo) : '');
+    return customFrameHtml(card, artStyle(card), frameUrl, logoUrl);
   }
   const pt = ptText(card);
   const name = card.nameFr || card.name || '';

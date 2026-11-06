@@ -44,6 +44,8 @@ final class CustomCards {
     static final String ART_PREFIX = "custom:";
     /** Préfixe des cadres importés (image PNG transparente posée sur l'illustration). */
     static final String FRAME_PREFIX = "customframe:";
+    /** Préfixe des logos d'extension perso (« customset:id:date », la date change l'adresse quand le logo change). */
+    static final String SET_PREFIX = "customset:";
 
     private static final Pattern TYPE_NAME = Pattern.compile("[\\p{L}][\\p{L}\\p{N}'’-]{0,29}");
 
@@ -68,6 +70,7 @@ final class CustomCards {
     private CustomCards() { }
 
     private static void changed() {
+        setIndex = null;
         onChanged.run();
     }
 
@@ -266,6 +269,261 @@ final class CustomCards {
         return state();
     }
 
+    // ------------------------------------------------------------------ extensions
+
+    /** Identifiant d'une extension perso (il ne change pas, même si son code change) : écrit dans le script des cartes. */
+    private static final Pattern SET_ID = Pattern.compile("[a-z0-9]{1,20}");
+    /** Code d'une extension, comme ceux des vraies (« MH3 ») : 2 à 6 lettres ou chiffres. */
+    private static final Pattern SET_CODE = Pattern.compile("[A-Z0-9]{2,6}");
+    /** Extensions perso lues sur le disque (null : à relire). */
+    private static volatile JsonArray sets;
+    /** Pour chaque carte perso : son extension, et son numéro dans l'extension (refait à chaque changement). */
+    private static volatile Map<String, String[]> setIndex;
+
+    private static File setsFile() {
+        return new File(ForgeConstants.USER_CUSTOM_DIR, "sets.json");
+    }
+
+    private static File setLogo(final String id) {
+        return new File(new File(ForgeConstants.USER_CUSTOM_DIR, "sets"), id + ".png");
+    }
+
+    /** Les extensions perso, dans l'ordre de création : {id, code, name, tint}. */
+    static JsonArray readSets() {
+        JsonArray a = sets;
+        if (a == null) {
+            a = new JsonArray();
+            if (setsFile().isFile()) {
+                try {
+                    for (final com.google.gson.JsonElement e : com.google.gson.JsonParser.parseString(read(setsFile())).getAsJsonArray()) {
+                        final JsonObject o = e.getAsJsonObject();
+                        if (SET_ID.matcher(str(o, "id")).matches() && !str(o, "name").isEmpty()) {
+                            a.add(o);
+                        }
+                    }
+                } catch (final RuntimeException e) {
+                    System.err.println("Extensions perso illisibles : " + e.getMessage());
+                }
+            }
+            sets = a;
+        }
+        return a;
+    }
+
+    private static JsonObject findSet(final String id) {
+        for (final com.google.gson.JsonElement e : readSets()) {
+            if (str(e.getAsJsonObject(), "id").equals(id)) {
+                return e.getAsJsonObject();
+            }
+        }
+        return null;
+    }
+
+    private static void writeSets(final JsonArray a) {
+        write(setsFile(), a.toString());
+        sets = a;
+    }
+
+    /** Logo d'une extension perso (clé « customset:id:date »), ou null. */
+    static File setLogoFile(final String key) {
+        final String rest = key.startsWith(SET_PREFIX) ? key.substring(SET_PREFIX.length()) : key;
+        final int colon = rest.indexOf(':');
+        final String id = colon < 0 ? rest : rest.substring(0, colon);
+        if (!SET_ID.matcher(id).matches()) {
+            return null;
+        }
+        final File f = setLogo(id);
+        return f.isFile() ? f : null;
+    }
+
+    private static String logoKey(final String id) {
+        final File f = setLogo(id);
+        return f.isFile() ? SET_PREFIX + id + ":" + f.lastModified() : null;
+    }
+
+    /** Valeur d'une ligne « SVar:Nom:… » d'une carte (vide si elle n'en a pas). */
+    private static String svar(final CardRules rules, final String key) {
+        if (rules != null && rules.getMainPart() != null) {
+            for (final Map.Entry<String, String> v : rules.getMainPart().getVariables()) {
+                if (key.equals(v.getKey())) {
+                    return v.getValue() == null ? "" : v.getValue().trim();
+                }
+            }
+        }
+        return "";
+    }
+
+    /** Ordre des cartes dans une extension, comme les vraies : blanc, bleu, noir, rouge, vert, multicolore, incolore, terrains. */
+    private static int colorRank(final CardRules r) {
+        if (r.getType().isLand()) {
+            return 7;
+        }
+        final forge.card.ColorSet c = r.getColor();
+        if (c.countColors() > 1) {
+            return 5;
+        }
+        if (c.countColors() == 0) {
+            return 6;
+        }
+        return c.hasWhite() ? 0 : c.hasBlue() ? 1 : c.hasBlack() ? 2 : c.hasRed() ? 3 : 4;
+    }
+
+    /** Carte → {extension, numéro, nombre de cartes de l'extension} ; les jetons n'ont pas de numéro. */
+    private static Map<String, String[]> setIndex() {
+        Map<String, String[]> idx = setIndex;
+        if (idx != null) {
+            return idx;
+        }
+        idx = new java.util.HashMap<>();
+        final Map<String, List<CardRules>> bySet = new java.util.HashMap<>();
+        for (final String name : names()) {
+            final CardRules r = rules(name);
+            final String id = svar(r, "AtelierSet");
+            if (id.isEmpty() || findSet(id) == null) {
+                continue;
+            }
+            if (TOKENS.contains(name)) {
+                idx.put(name, new String[] {id, "", ""});
+            } else {
+                bySet.computeIfAbsent(id, k -> new ArrayList<>()).add(r);
+            }
+        }
+        for (final Map.Entry<String, List<CardRules>> e : bySet.entrySet()) {
+            final List<CardRules> list = e.getValue();
+            list.sort(java.util.Comparator.comparingInt(CustomCards::colorRank).thenComparing(CardRules::getName, String.CASE_INSENSITIVE_ORDER));
+            for (int i = 0; i < list.size(); i++) {
+                idx.put(list.get(i).getName(), new String[] {e.getKey(), String.valueOf(i + 1), String.valueOf(list.size())});
+            }
+        }
+        setIndex = idx;
+        return idx;
+    }
+
+    /** L'extension perso d'une carte (son identifiant), ou "". */
+    static String setOf(final String name) {
+        final String[] s = name == null ? null : setIndex().get(name);
+        return s == null ? "" : s[0];
+    }
+
+    /** Numéro d'une carte dans son extension (0 si elle n'en a pas). */
+    static int numberOf(final String name) {
+        final String[] s = name == null ? null : setIndex().get(name);
+        return s == null || s[1].isEmpty() ? 0 : Integer.parseInt(s[1]);
+    }
+
+    /** Les extensions pour l'interface : id, code, nom, logo (clé d'image), teinte selon la rareté, nombre de cartes. */
+    static JsonArray sets() {
+        final Map<String, Integer> counts = new java.util.HashMap<>();
+        for (final String[] s : setIndex().values()) {
+            counts.merge(s[0], 1, Integer::sum);
+        }
+        final JsonArray out = new JsonArray();
+        for (final com.google.gson.JsonElement e : readSets()) {
+            final JsonObject o = e.getAsJsonObject().deepCopy();
+            final String id = str(o, "id");
+            final String logo = logoKey(id);
+            if (logo != null) {
+                o.addProperty("logo", logo);
+            }
+            o.addProperty("count", counts.getOrDefault(id, 0));
+            out.add(o);
+        }
+        return out;
+    }
+
+    /**
+     * Crée ou modifie une extension perso : {id (absent : nouvelle), code, name, tint, logo (PNG en data URL ; "" le
+     * retire ; absent le garde)}. Le code ne doit pas être celui d'une extension officielle ni d'une autre extension perso.
+     */
+    static synchronized JsonObject saveSet(final JsonObject m) {
+        final String name = str(m, "name").replaceAll("[\\r\\n|]+", " ").trim();
+        final String code = str(m, "code").trim().toUpperCase(Locale.ROOT);
+        if (name.isEmpty() || name.length() > 40) {
+            throw new IllegalArgumentException("Donne un nom à l'extension (40 caractères au plus).");
+        }
+        if (!SET_CODE.matcher(code).matches()) {
+            throw new IllegalArgumentException("Le code de l'extension tient en 2 à 6 lettres ou chiffres (ex. « MDR », « ILO1 »).");
+        }
+        if ("USER".equals(code) || FModel.getMagicDb().getEditions().get(code) != null) {
+            throw new IllegalArgumentException("« " + code + " » est déjà le code d'une extension officielle : choisis-en un autre.");
+        }
+        String id = str(m, "id");
+        final JsonArray list = readSets().deepCopy();
+        JsonObject set = null;
+        for (final com.google.gson.JsonElement e : list) {
+            final JsonObject o = e.getAsJsonObject();
+            if (!id.isEmpty() && str(o, "id").equals(id)) {
+                set = o;
+            } else if (str(o, "code").equals(code)) {
+                throw new IllegalArgumentException("Tu as déjà une extension « " + code + " » (" + str(o, "name") + ").");
+            }
+        }
+        if (set == null) {
+            if (!id.isEmpty() && !SET_ID.matcher(id).matches()) {
+                throw new IllegalArgumentException("Extension inconnue.");
+            }
+            if (id.isEmpty()) {
+                id = Long.toString(System.currentTimeMillis(), 36);
+                while (findSet(id) != null) {
+                    id = id + "x";
+                }
+            }
+            set = new JsonObject();
+            set.addProperty("id", id);
+            list.add(set);
+        }
+        set.addProperty("code", code);
+        set.addProperty("name", name);
+        set.addProperty("tint", m.has("tint") && m.get("tint").getAsBoolean());
+        if (m.has("logo") && !m.get("logo").isJsonNull()) {
+            final String logo = m.get("logo").getAsString();
+            if (logo.isEmpty()) {
+                delete(setLogo(id));
+            } else {
+                final byte[] bytes = B64.decode(logo.startsWith("data:") ? logo.substring(logo.indexOf(',') + 1) : logo);
+                if (bytes.length < 8 || (bytes[0] & 0xff) != 0x89 || bytes[1] != 'P' || bytes[2] != 'N' || bytes[3] != 'G') {
+                    throw new IllegalArgumentException("Le logo doit être une image PNG.");
+                }
+                if (bytes.length > 1_000_000) {
+                    throw new IllegalArgumentException("Logo trop lourd.");
+                }
+                try {
+                    setLogo(id).getParentFile().mkdirs();
+                    Files.write(setLogo(id).toPath(), bytes);
+                } catch (final IOException e) {
+                    throw new IllegalStateException("Logo non enregistré : " + e.getMessage());
+                }
+            }
+        }
+        writeSets(list);
+        changed();
+        return state();
+    }
+
+    /** Supprime une extension perso et son logo ; ses cartes restent (sans extension). */
+    static synchronized JsonObject deleteSet(final String id) {
+        final JsonArray list = new JsonArray();
+        for (final com.google.gson.JsonElement e : readSets()) {
+            if (!str(e.getAsJsonObject(), "id").equals(id)) {
+                list.add(e);
+            }
+        }
+        if (SET_ID.matcher(id).matches()) {
+            delete(setLogo(id));
+        }
+        writeSets(list);
+        changed();
+        return state();
+    }
+
+    private static long setsAt() {
+        return setsFile().isFile() ? setsFile().lastModified() : 0;
+    }
+
+    private static String str(final JsonObject o, final String key) {
+        return o != null && o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsString() : "";
+    }
+
     // ------------------------------------------------------------------ cartes
 
     /** Types perso, cartes perso (script, carte telle que la montre le catalogue) et types de créature connus. */
@@ -287,6 +545,7 @@ final class CustomCards {
         final JsonArray known = new JsonArray();
         new java.util.TreeSet<>(CardType.Constant.CREATURE_TYPES).forEach(known::add);
         o.add("creatureTypes", known);
+        o.add("sets", sets());
         return o;
     }
 
@@ -977,6 +1236,7 @@ final class CustomCards {
         String lang = "fr";
         String text = "dark";
         String fx = "none";
+        String setId = "";
         if (rules != null && rules.getMainPart() != null) {
             for (final Map.Entry<String, String> v : rules.getMainPart().getVariables()) {
                 final String value = v.getValue() == null ? "" : v.getValue().trim();
@@ -984,6 +1244,13 @@ final class CustomCards {
                     // Texte d'ambiance (en italique sous les capacités) : « \n » y marque un retour à la ligne.
                     if (!value.isEmpty()) {
                         o.addProperty("flavor", value.replace("\\n", "\n"));
+                    }
+                    continue;
+                }
+                if ("AtelierArtist".equals(v.getKey())) {
+                    // L'artiste, en bas de la carte (« ✎ Ilona »).
+                    if (!value.isEmpty()) {
+                        o.addProperty("artist", value.length() > 60 ? value.substring(0, 60) : value);
                     }
                     continue;
                 }
@@ -996,6 +1263,12 @@ final class CustomCards {
                     case "AtelierLang" -> lang = "en".equals(value) ? "en" : "fr";
                     case "AtelierFrameText" -> text = "light".equals(value) ? "light" : "dark";
                     case "AtelierFx" -> fx = value;
+                    case "AtelierRarity" -> {
+                        if (value.matches("[CURMS]")) {
+                            o.addProperty("crarity", value);
+                        }
+                    }
+                    case "AtelierSet" -> setId = value;
                     default -> { }
                 }
             }
@@ -1005,6 +1278,25 @@ final class CustomCards {
         o.addProperty("lang", lang);
         o.addProperty("frameText", text);
         o.addProperty("fx", fx);
+        // Extension perso : code, nom, logo, et le numéro de la carte (« 007/120 »).
+        final JsonObject set = setId.isEmpty() ? null : findSet(setId);
+        if (set != null) {
+            final JsonObject cs = new JsonObject();
+            cs.addProperty("id", setId);
+            cs.addProperty("code", str(set, "code"));
+            cs.addProperty("name", str(set, "name"));
+            cs.addProperty("tint", set.has("tint") && set.get("tint").getAsBoolean());
+            final String logo = logoKey(setId);
+            if (logo != null) {
+                cs.addProperty("logo", logo);
+            }
+            final String[] n = rules == null ? null : setIndex().get(rules.getName());
+            if (n != null && !n[1].isEmpty()) {
+                cs.addProperty("n", Integer.parseInt(n[1]));
+                cs.addProperty("total", Integer.parseInt(n[2]));
+            }
+            o.add("cset", cs);
+        }
     }
 
     /** La carte perso de ce nom, telle que Forge l'a lue (null si ce n'en est pas une). */
@@ -1210,6 +1502,22 @@ final class CustomCards {
         o.add("types", types);
         o.addProperty("typesAt", typesAt());
         o.add("deleted", tombs());
+        // Les extensions perso, avec leur logo.
+        final JsonArray setList = new JsonArray();
+        for (final com.google.gson.JsonElement e : readSets()) {
+            final JsonObject set = e.getAsJsonObject().deepCopy();
+            final File logo = setLogo(str(set, "id"));
+            if (logo.isFile()) {
+                try {
+                    set.addProperty("logo", B64.encode(Files.readAllBytes(logo.toPath())));
+                } catch (final IOException ex) {
+                    // sans logo
+                }
+            }
+            setList.add(set);
+        }
+        o.add("sets", setList);
+        o.addProperty("setsAt", setsAt());
         final JsonObject cards = new JsonObject();
         for (final Map.Entry<String, File> e : FILES.entrySet()) {
             if (DELETED.contains(e.getKey())) {
@@ -1256,6 +1564,10 @@ final class CustomCards {
         final JsonObject typesFrom = localTypes ? l : r;
         m.add("types", typesFrom.has("types") && typesFrom.get("types").isJsonArray() ? typesFrom.getAsJsonArray("types") : new JsonArray());
         m.addProperty("typesAt", at(typesFrom, "typesAt"));
+        // Extensions perso : la liste la plus récente (avec leurs logos).
+        final JsonObject setsFrom = at(l, "setsAt") >= at(r, "setsAt") ? l : r;
+        m.add("sets", setsFrom.has("sets") && setsFrom.get("sets").isJsonArray() ? setsFrom.getAsJsonArray("sets") : new JsonArray());
+        m.addProperty("setsAt", at(setsFrom, "setsAt"));
 
         final JsonObject tombs = new JsonObject();
         final long cutoff = System.currentTimeMillis() - 90L * 24 * 3600_000;
@@ -1308,6 +1620,46 @@ final class CustomCards {
                 }
             }
             typesFile().setLastModified(at(merged, "typesAt"));
+        }
+        // Les extensions perso (avant les cartes, qui s'y rangent).
+        if (at(merged, "setsAt") > setsAt() && merged.has("sets") && merged.get("sets").isJsonArray()) {
+            final JsonArray list = new JsonArray();
+            final Set<String> kept = new java.util.HashSet<>();
+            for (final com.google.gson.JsonElement e : merged.getAsJsonArray("sets")) {
+                if (!e.isJsonObject()) {
+                    continue;
+                }
+                final JsonObject set = e.getAsJsonObject().deepCopy();
+                final String id = str(set, "id");
+                if (!SET_ID.matcher(id).matches()) {
+                    continue;
+                }
+                kept.add(id);
+                final String logo = str(set, "logo");
+                set.remove("logo");
+                set.remove("count");
+                try {
+                    if (logo.isEmpty()) {
+                        delete(setLogo(id));
+                    } else {
+                        setLogo(id).getParentFile().mkdirs();
+                        Files.write(setLogo(id).toPath(), B64.decode(logo));
+                    }
+                } catch (final IOException | RuntimeException ex) {
+                    System.err.println("Logo d'extension non repris : " + ex.getMessage());
+                }
+                list.add(set);
+            }
+            for (final com.google.gson.JsonElement e : readSets()) {
+                final String id = str(e.getAsJsonObject(), "id");
+                if (!kept.contains(id)) {
+                    delete(setLogo(id));
+                }
+            }
+            writeSets(list);
+            setsFile().setLastModified(at(merged, "setsAt"));
+            setIndex = null;
+            changed++;
         }
         // Suppressions faites ailleurs (après la dernière modification ici).
         final JsonObject theirTombs = obj(merged, "deleted");
