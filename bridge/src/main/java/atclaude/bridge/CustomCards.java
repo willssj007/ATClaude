@@ -980,6 +980,13 @@ final class CustomCards {
         if (rules != null && rules.getMainPart() != null) {
             for (final Map.Entry<String, String> v : rules.getMainPart().getVariables()) {
                 final String value = v.getValue() == null ? "" : v.getValue().trim();
+                if ("AtelierFlavor".equals(v.getKey())) {
+                    // Texte d'ambiance (en italique sous les capacités) : « \n » y marque un retour à la ligne.
+                    if (!value.isEmpty()) {
+                        o.addProperty("flavor", value.replace("\\n", "\n"));
+                    }
+                    continue;
+                }
                 if (!FRAME_VALUE.matcher(value).matches()) {
                     continue;
                 }

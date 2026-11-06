@@ -685,7 +685,9 @@ export class Atelier {
         <div class="ate-add">${attachOf(f) ? `<button class="btn small gold" data-template-attach>＋ Pour ${esc(attachOf(f).fr)}…</button>` : ''}
         <button class="btn small gold" data-template>＋ Capacité toute prête…</button>
         <button class="btn small" data-addab>＋ Capacité vide</button>
-        <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>`;
+        <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>
+      <label class="ate-field"><span>Texte d'ambiance <span class="muted small">(en italique, sous les capacités ; facultatif)</span></span>
+        <textarea data-k="flavor" rows="2" maxlength="240" placeholder="« La marée ne choisit pas : elle emporte tout. »">${esc(f.flavor || '')}</textarea></label>`;
     this.renderLook();
     this.check();
     labelSelects(left);
@@ -1298,6 +1300,8 @@ export class Atelier {
     return `<div class="ate-mode" data-sub="${sub}" data-si="${k}">
       <div class="ate-ab-row ate-mode-head"><b class="small">${esc(title)}</b>
         ${canDelete ? `<button class="ate-x" data-delsub="${k}" title="Retirer">✕</button>` : ''}</div>
+      ${sub === 'modes' ? `<div class="ate-ab-row"><input type="text" class="ate-modename" data-sf="flavor" value="${esc(m.flavor || '')}" maxlength="40"
+        placeholder="Nom du mode (facultatif) : Souffle des marées"></div>` : ''}
       <div class="ate-ab-row"><select data-sf="effect" aria-label="Ce qu'il fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>

@@ -214,11 +214,13 @@ export function customFrameHtml(card, art, frameUrl = '') {
   const box = pw ? {...SPACE[style], w: SPACE[style].w - 14, h: SPACE[style].h + 10} : SPACE[style];
   const costWidth = style === 'token' || !pips ? 0 : pips * 5.96 + (pips - 1) * 0.5 + 2;
   // Taille déjà mesurée sur cet appareil pour cette carte dans ce cadre, sinon une estimation, vérifiée à l'affichage.
-  const key = fitKey(style, name, typeLine, text, card.cost);
+  // Texte d'ambiance (cartes perso) : en italique sous les capacités ; il compte dans la taille du texte.
+  const flavor = String(card.flavor || '').trim();
+  const key = fitKey(style, name, typeLine, flavor ? `${text}\n${flavor}` : text, card.cost);
   const known = FITTED.get(key);
   const sn = known ? known.sn : clampScale(0.93 * (box.t - costWidth) / Math.max(1, textWidth(name, true) * 6.6));
   const st = known ? known.st : clampScale(0.93 * box.y / Math.max(1, textWidth(typeLine, true) * (style === 'retro' ? 5 : 5.4)));
-  const sr = known ? known.sr : rulesScale(text, box);
+  const sr = known ? known.sr : rulesScale(flavor ? `${text}\n${flavor}` : text, box);
   const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}`;
   const overlay = style === IMPORTED ? `<div class="cf-overlay" style="background-image:url(&quot;${esc(frameUrl)}&quot;)"></div>` : '';
   const light = style === IMPORTED && card.frameText === 'light' ? ' cf-light' : '';
@@ -230,7 +232,8 @@ export function customFrameHtml(card, art, frameUrl = '') {
     <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span></div>
     <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span><span class="cf-set">${icon('anvil')}</span></div>
     <div class="cf-icon">${typeIcon(typeLine)}</div>
-    <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>` : `<div class="cf-rules">${rulesHtml(text)}</div>`}</div>
+    <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>`
+    : `<div class="cf-rules">${rulesHtml(text)}${flavor ? `<div class="cf-flavor">${esc(flavor).replace(/\n/g, '<br>')}</div>` : ''}</div>`}</div>
     ${pt && loyalty ? `<div class="cf-pt cf-loy"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M3 3H37V30L20 43L3 30Z"/></svg><span>${esc(pt)}</span></div>`
     : pt ? `<div class="cf-pt">${esc(pt)}</div>` : ''}
     <div class="cf-foot">Atelier</div>

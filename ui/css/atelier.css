@@ -98,6 +98,8 @@
 .ate-costs > summary { font-size: 13px; }
 
 /* Sous-types en pastilles, et le sélecteur de types (français ou anglais). */
+.ate-modename { flex: 1; min-width: 0; font-style: italic; }
+.ate-field textarea[data-k="flavor"] { font-family: inherit; font-size: 14px; font-style: italic; }
 .ate-subbox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .ate-subchip { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; }
 .ate-subchip small { opacity: .65; font-size: 11px; }

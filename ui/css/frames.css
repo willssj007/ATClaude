@@ -64,6 +64,9 @@
   box-shadow: 0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.7), 0 0 0 calc(var(--u) * 0.9) var(--e), inset 0 0 calc(var(--u) * 3) rgb(0 0 0 / 0.14);
 }
 .cf-rules { width: 100%; max-height: 100%; overflow: hidden; white-space: pre-line; font-size: calc(var(--u) * 6 * var(--sr)); line-height: 1.16; }
+/* Texte d'ambiance d'une carte perso : en italique, sous un trait fin, comme sur les cartes imprimées. */
+.cf-flavor { margin-top: .45em; padding-top: .35em; border-top: 1px solid currentColor; border-top-color: rgb(0 0 0 / .28); font-style: italic; white-space: normal; }
+.cf-light .cf-flavor { border-top-color: rgb(255 255 255 / .35); }
 .cf-rules .ms { width: 1.05em; height: 1.05em; font-size: 0.86em; vertical-align: middle; position: relative; top: -0.05em; }
 .cf-rules .ms.ms-hybrid:empty { font-size: 0.86em; }
 

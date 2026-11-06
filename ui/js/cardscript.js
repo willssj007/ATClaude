@@ -2893,7 +2893,9 @@ function modalLines(a, id, w, lang, card) {
     const mid = `${id}M${k + 1}`;
     const e = effect({...newMode(), ...m, attachTo: a.attachTo, attachWhen: a.attachWhen}, mid);
     if (e) {
-      parts.push({mid, e, text: capitalize(en ? e.en : e.fr) + '.'});
+      // Un mode peut avoir un nom, comme sur les cartes récentes (« • Souffle des marées — Piochez une carte. »).
+      const label = cleanModeName(m.flavor);
+      parts.push({mid, e, text: (label ? `${label} — ` : '') + capitalize(en ? e.en : e.fr) + '.'});
     }
   });
   if (parts.length < 2) {
@@ -2956,6 +2958,16 @@ export function displayLines(d) {
 /** Un nom de groupe utilisable dans un script : une ligne, sans « | » ni « : », 30 caractères au plus. */
 export function cleanGroup(g) {
   return String(g || '').replace(/[|:\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30);
+}
+
+/** Un texte d'ambiance pour le script : sur une ligne (« \\n » pour aller à la ligne), sans « | », 240 caractères au plus. */
+export function cleanFlavor(t) {
+  return String(t || '').replace(/\r/g, '').trim().slice(0, 240).replace(/\|/g, '/').replace(/\n/g, '\\n');
+}
+
+/** Le nom d'un mode (« Souffle des marées — … ») : une ligne, sans « | » ni tiret long, 40 caractères au plus. */
+export function cleanModeName(t) {
+  return String(t || '').replace(/[|\r\n—]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
 }
 
 /** Le groupe d'une carte perso, écrit dans son script (« SVar:AtelierGroup:Dragons »), ou "". */
@@ -3259,6 +3271,10 @@ export function buildScript(form) {
     if (lines[i] === 'SVar:X:Count$xPaid' && lines.indexOf(lines[i]) !== i) {
       lines.splice(i, 1);
     }
+  }
+  // Texte d'ambiance, en italique sous les capacités (Forge ne s'en sert pas).
+  if (cleanFlavor(f.flavor)) {
+    lines.push(`SVar:AtelierFlavor:${cleanFlavor(f.flavor)}`);
   }
   // Le groupe où la carte est rangée dans l'Atelier (il suit la carte sur les autres appareils).
   if (cleanGroup(f.group)) {
