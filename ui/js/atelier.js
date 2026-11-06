@@ -11,14 +11,23 @@ import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
-  PLAYER_EFFECTS, RARITIES, SUBTYPES, attachOf, attachTemplates, cleanArtist, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 /** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
 const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scope: 'Qui', keyword: 'Mot-clé', token: 'Jeton', mana: 'Mana',
   cond: 'Condition', amount: 'Nombre X', counter: 'Marqueur', permType: 'Type de permanent', cardKind: 'Type de carte', spellType: 'Type de sort',
   emblem: 'Emblème', level: 'Niveau de la classe', who: 'Joueur', chapter: 'Chapitre', sacWhat: 'Sacrifier', zone: 'D\'où elle s\'active',
-  addCost: 'Coût en plus', tapXWhat: 'Engager X…', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre'};
+  addCost: 'Coût en plus', tapXWhat: 'Engager X…', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre',
+  whenCounter: 'Marqueur', amountCounter: 'Marqueur', condCounter: 'Marqueur', removeCounterType: 'Marqueur'};
+
+/** Les types de marqueurs d'une liste déroulante (« charge », « temps », +1/+1…). */
+const COUNTER_OPTIONS = COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]);
+/** Une liste des types de marqueurs : attr « a » (capacité) ou « sf » (mode, effet enchaîné). */
+function counterSelect(attr, key, value, def = 'P1P1') {
+  const v = COUNTER_OPTIONS.some(c => c[0] === value) ? value : def;
+  return `<select data-${attr}="${key}">${COUNTER_OPTIONS.map(([id, l]) => `<option value="${esc(id)}"${id === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+}
 
 function labelSelects(root) {
   root.querySelectorAll('select:not([aria-label])').forEach((sel) => {
@@ -1503,7 +1512,6 @@ export class Atelier {
     const subs = cardSubtypes(this.form);
     const isClass = subs.includes('Class');
     const isCase = subs.includes('Case');
-    const curse = (attachOf(this.form) || {}).kind === 'player';
     const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
     const count = this.form.abilities.length;
     return `<div class="ate-ab panel" data-ab="${i}">
@@ -1517,6 +1525,8 @@ export class Atelier {
         .sort((p, q) => Number(!!q.attach) - Number(!!p.attach))
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
+      ${w.counterSel ? `<div class="ate-ab-row"><span class="muted small">Marqueur</span>${counterSelect('a', 'whenCounter', a.whenCounter, 'CHARGE')}
+        ${w.nth ? `<span class="muted small">N =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       <div class="ate-ab-row"><input type="text" class="ate-abname" data-a="flavor" value="${esc(a.flavor || '')}" maxlength="40"
         placeholder="Nom de la capacité (facultatif)"></div>
       ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
@@ -1543,7 +1553,7 @@ export class Atelier {
           <div class="ate-ab-row"><span class="muted small">Exiler</span><input type="number" data-a="exileGY" value="${esc(a.exileGY || 0)}" min="0" max="10" style="width:64px">
             <span class="muted small">cartes de votre cimetière</span></div>
           <div class="ate-ab-row"><span class="muted small">Retirer</span><input type="number" data-a="removeCounters" value="${esc(a.removeCounters || 0)}" min="0" max="10" style="width:64px">
-            <span class="muted small">marqueurs +1/+1 de cette carte</span></div>
+            <span class="muted small">marqueurs</span>${counterSelect('a', 'removeCounterType', a.removeCounterType)}<span class="muted small">de cette carte</span></div>
           <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="untapQ"${a.untapQ ? ' checked' : ''}> ${symbol('Q')} la dégager</label>
             <label class="ate-check"><input type="checkbox" data-a="sorcery"${a.sorcery ? ' checked' : ''}> seulement comme un rituel</label>
             <label class="ate-check"><input type="checkbox" data-a="oncePerTurn"${a.oncePerTurn ? ' checked' : ''}> une fois par tour</label>
@@ -1559,10 +1569,8 @@ export class Atelier {
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n && !(e.mana && a.mana === 'Symbols') ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
       ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', scopesFor(this.form, scope), scope)}</div>` : ''}
-      ${curse && PLAYER_EFFECTS.has(e.id) ? `<div class="ate-ab-row"><span class="muted small">Joueur</span>${sel('who', [['enchanted', 'le joueur enchanté (malédiction)'],
-        ['target', 'un joueur ciblé']], a.who === 'target' ? 'target' : 'enchanted')}</div>` : ''}
       ${e.modal ? this.modesHtml(a) : ''}
-      ${this.optionRows(a, e, 'a', i)}
+      ${this.optionRows(a, e, 'a', i, a.when)}
       ${filterShown ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-a="ftype" data-typepick readonly value="${esc((a.filter || {}).type || '')}" placeholder="toutes, ou un type : Elf" style="width:170px">
         ${otherShown ? `<label class="ate-check"><input type="checkbox" data-a="fother"${(a.filter || {}).other ? ' checked' : ''}> autres que celle-ci</label>` : ''}</div>` : ''}
@@ -1575,10 +1583,17 @@ export class Atelier {
    * Les réglages propres à un effet (dans une capacité, un mode ou un effet enchaîné) : jeton, mana, mot-clé, type de
    * permanent, type de carte, marqueur, type de sort, X, emblème. attr : « a » (la capacité) ou « sf » (un mode).
    */
-  optionRows(h, e, attr, i) {
+  optionRows(h, e, attr, i, when) {
     const sel = (k, list, value) => `<select data-${attr}="${k}">${list.map(([v, l]) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
     const row = (label, html) => `<div class="ate-ab-row">${label ? `<span class="muted small">${esc(label)}</span>` : ''}${html}</div>`;
     let out = '';
+    if (PLAYER_WHO.has(e.id)) {
+      // Le joueur touché : ciblé, chaque adversaire, le joueur défenseur (« Quand elle attaque »), ce joueur…
+      const list = whoChoices(e.id, when, this.form);
+      const curse = (attachOf(this.form) || {}).kind === 'player';
+      const def = curse && PLAYER_EFFECTS.has(e.id) && h.who === undefined ? 'enchanted' : 'target';
+      out += row('Joueur', sel('who', list, list.some(x => x[0] === h.who) ? h.who : def));
+    }
     if (e.token) {
       out += row('', this.tokenSelectHtml(h, attr));
     }
@@ -1606,8 +1621,11 @@ export class Atelier {
         + (h.spellType === 'type' ? `<input type="text" data-${attr}="spellTypeName" data-typepick readonly value="${esc(h.spellTypeName || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
     }
     if (e.amountSel) {
-      out += row('X =', sel('amount', AMOUNTS.filter(([v]) => !['fixed', 'tapped', 'xPaid'].includes(v)).map(([v, l]) => [v, l.replace(/^X = /, '')]), h.amount && h.amount !== 'fixed' ? h.amount : 'creatures')
-        + (h.amount === 'typeCount' ? `<input type="text" data-${attr}="amountType" data-typepick readonly value="${esc(h.amountType || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
+      // +X/+X : par défaut, un marqueur sur elle ; la force et l'endurance (définies) : le nombre de créatures.
+      const amount = h.amount && h.amount !== 'fixed' ? h.amount : e.id === 'anthemX' ? 'counters' : 'creatures';
+      out += row('X =', sel('amount', AMOUNTS.filter(([v]) => !['fixed', 'tapped', 'xPaid'].includes(v)).map(([v, l]) => [v, l.replace(/^X = /, '')]), amount)
+        + (amount === 'typeCount' ? `<input type="text" data-${attr}="amountType" data-typepick readonly value="${esc(h.amountType || '')}" placeholder="un type : Elf" style="width:120px">` : '')
+        + (amount === 'counters' ? counterSelect(attr, 'amountCounter', h.amountCounter) : ''));
     }
     if (e.emblem) {
       const em = h.emblem || 'anthem';
@@ -1630,7 +1648,8 @@ export class Atelier {
     return `<div class="ate-ab-row"><span class="muted small">Tant que</span>
       <select data-a="cond">${list.map(([v, l]) => `<option value="${v}"${v === cond ? ' selected' : ''}>${esc(v === 'none' ? 'Toujours' : l.replace(/^Si /, '').replace(/^S'il /, 'Il '))}</option>`).join('')}</select>
       ${CONDITIONS_N.includes(cond) ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
-      ${cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
+      ${cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
+      ${cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>`;
   }
 
   /** Loyauté d'une capacité de planeswalker au doigt (le clavier des téléphones n'a pas toujours le signe moins). */
@@ -1709,7 +1728,7 @@ export class Atelier {
       <div class="ate-ab-row"><select data-sf="effect" aria-label="Ce qu'il fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
-      ${this.optionRows(m, e, 'sf', null)}
+      ${this.optionRows(m, e, 'sf', null, a.when)}
       ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-sf="ftype" data-typepick readonly value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-sf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
@@ -1724,7 +1743,8 @@ export class Atelier {
     return `<div class="ate-ab-row"><span class="muted small">Seulement</span>
       <select data-sf="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
-      ${m.cond === 'control' ? `<input type="text" data-sf="condType" data-typepick readonly value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
+      ${m.cond === 'control' ? `<input type="text" data-sf="condType" data-typepick readonly value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
+      ${m.cond === 'countersAtLeast' ? counterSelect('sf', 'condCounter', m.condCounter, 'CHARGE') : ''}</div>`;
   }
 
   /** Les modes de « Choisissez l'un — » : chacun son effet et ses réglages ; 2 ou 3 modes. */
@@ -1752,7 +1772,8 @@ export class Atelier {
     const amounts = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped);
     const amount = e.n && !e.mana ? `<div class="ate-ab-row"><span class="muted small">Nombre</span>
         <select data-a="amount">${amounts.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-        ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" data-typepick readonly value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}</div>` : '';
+        ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" data-typepick readonly value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}
+        ${a.amount === 'counters' ? counterSelect('a', 'amountCounter', a.amountCounter) : ''}</div>` : '';
     const cond = CONDITIONS_N.includes(a.cond);
     return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
       <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre X, condition, « et puis »</span></summary>
@@ -1760,7 +1781,8 @@ export class Atelier {
       <div class="ate-ab-row"><span class="muted small">Seulement</span>
         <select data-a="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
-        ${a.cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>
+        ${a.cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
+        ${a.cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>
       <div class="ate-modes">${then.map((m, k) => this.subEffectHtml(a, m, k, 'then', 'Et puis', true)).join('')}
         ${then.length < 2 ? '<button class="btn small" data-addsub="then">＋ Et puis… (un autre effet)</button>' : ''}</div>
     </details>`;

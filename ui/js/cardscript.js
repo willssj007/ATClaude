@@ -321,6 +321,9 @@ export const WHEN = [
   {id: 'constellation', kind: 'T', label: 'Quand un enchantement arrive sous votre contrôle (Constellation)'},
   {id: 'artifactEnters', kind: 'T', label: 'Quand un artefact arrive sous votre contrôle'},
   {id: 'counterAdded', kind: 'T', label: 'Quand des marqueurs +1/+1 sont mis sur une de vos créatures'},
+  {id: 'counterPutSelf', kind: 'T', label: 'Quand des marqueurs (d\'un type) sont mis sur elle', counterSel: true},
+  {id: 'counterNth', kind: 'T', label: 'Quand le Nième marqueur (d\'un type) est mis sur elle (« le troisième marqueur « charge »… »)', counterSel: true, nth: true},
+  {id: 'lastCounterRemoved', kind: 'T', label: 'Quand le dernier marqueur (d\'un type) est retiré d\'elle', counterSel: true},
   {id: 'castAny', kind: 'T', label: 'Quand vous lancez un sort'},
   {id: 'castNonCreature', kind: 'T', label: 'Quand vous lancez un sort non-créature'},
   {id: 'castCreature', kind: 'T', label: 'Quand vous lancez un sort de créature'},
@@ -429,7 +432,7 @@ export const EFFECTS = [
   {id: 'fog', group: 'life', label: 'Prévenir toutes les blessures de combat ce tour-ci (brouillard)'},
   {id: 'poison', group: 'life', label: 'Chaque adversaire reçoit des marqueurs poison', n: true},
   {id: 'energy', group: 'life', label: 'Vous obtenez de l\'énergie ({E})', n: true},
-  {id: 'experience', group: 'life', label: 'Vous obtenez un marqueur expérience'},
+  {id: 'experience', group: 'life', label: 'Vous gagnez des marqueurs « expérience »', n: true},
   {id: 'draw', group: 'cards', label: 'Piocher des cartes', n: true},
   {id: 'drawEach', group: 'cards', label: 'Chaque joueur pioche des cartes', n: true},
   {id: 'loot', group: 'cards', label: 'Piocher puis se défausser (autant)', n: true},
@@ -442,7 +445,7 @@ export const EFFECTS = [
   {id: 'surveil', group: 'cards', label: 'Surveiller', n: true},
   {id: 'mill', group: 'cards', label: 'Meuler (vous)', n: true},
   {id: 'millOpponents', group: 'cards', label: 'Chaque adversaire meule', n: true},
-  {id: 'discard', group: 'cards', label: 'Chaque adversaire défausse des cartes', n: true},
+  {id: 'discard', group: 'cards', label: 'Chaque adversaire se défausse de cartes', n: true},
   {id: 'thoughtseize', group: 'cards', label: 'Un joueur ciblé révèle sa main, vous choisissez une carte non-terrain qu\'il défausse'},
   {id: 'tutor', group: 'cards', label: 'Chercher une carte dans la bibliothèque (main)'},
   {id: 'tutorTyped', group: 'cards', label: 'Chercher une carte d\'un type dans la bibliothèque (main)', ct: true},
@@ -456,6 +459,9 @@ export const EFFECTS = [
   {id: 'countersEach', group: 'creatures', label: 'Marqueurs sur chaque créature choisie (chaque Elfe, chaque autre…)', n: true, filter: true, counter: true},
   {id: 'countersTarget', group: 'creatures', label: 'Marqueurs sur une créature ciblée (+1/+1, -1/-1, bouclier…)', n: true, counter: true},
   {id: 'countersAttached', group: 'creatures', label: 'Marqueurs sur la créature équipée ou enchantée (équipement, aura)', n: true, counter: true, attach: 'creature'},
+  {id: 'countersPermTarget', group: 'creatures', label: 'Marqueurs sur un permanent ciblé d\'un type (artefact, terrain…)', n: true, counter: true, pt: true},
+  {id: 'removeCountersSelf', group: 'creatures', label: 'Retirer des marqueurs de cette carte', n: true, counter: true},
+  {id: 'removeCountersTarget', group: 'creatures', label: 'Retirer des marqueurs d\'un permanent ciblé', n: true, counter: true, pt: true},
   {id: 'proliferate', group: 'creatures', label: 'Proliférer'},
   {id: 'pumpSelf', group: 'creatures', label: 'Elle gagne +N/+N jusqu\'à la fin du tour', n: true, self: true},
   {id: 'pumpTarget', group: 'creatures', label: '+N/+N à une créature ciblée jusqu\'à la fin du tour', n: true},
@@ -517,6 +523,7 @@ export const EFFECTS = [
   {id: 'targetDiscard', group: 'players', label: 'Un joueur ciblé se défausse de cartes', n: true},
   {id: 'targetMill', group: 'players', label: 'Un joueur ciblé meule des cartes', n: true},
   {id: 'targetSacrifice', group: 'players', label: 'Un joueur ciblé sacrifie une créature'},
+  {id: 'targetPoison', group: 'players', label: 'Un joueur ciblé reçoit des marqueurs poison', n: true},
   {id: 'extraTurn', group: 'turns', label: 'Jouer un tour supplémentaire après celui-ci'},
   {id: 'extraCombat', group: 'turns', label: 'Une phase de combat supplémentaire après cette phase principale'},
   {id: 'copySpell', group: 'turns', label: 'Copier un sort d\'éphémère ou de rituel ciblé'},
@@ -539,6 +546,7 @@ export const EFFECTS = [
   {id: 'grantKeyword', group: 'stCreature', label: 'Elles ont un mot-clé (« les autres Elfes que vous contrôlez ont la vigilance »)', scope: true, keyword: true, only: ['static']},
   {id: 'anthem', group: 'stCreature', label: 'Elles gagnent +N/+N', n: true, scope: true, only: ['static']},
   {id: 'anthemPower', group: 'stCreature', label: 'Elles gagnent +N/+0', n: true, scope: true, only: ['static']},
+  {id: 'anthemX', group: 'stCreature', label: 'Elles gagnent +X/+X (X : marqueurs sur elle, marqueurs « expérience », créatures…)', scope: true, amountSel: true, only: ['static']},
   {id: 'debuff', group: 'stCreature', label: 'Elles gagnent -N/-N', n: true, scope: true, only: ['static']},
   {id: 'cantBlock', group: 'stCreature', label: 'Elles ne peuvent pas bloquer', scope: true, only: ['static']},
   {id: 'cantAttack', group: 'stCreature', label: 'Elles ne peuvent pas attaquer', scope: true, only: ['static']},
@@ -582,7 +590,7 @@ export const EFFECTS = [
 /** Groupes des effets dans le formulaire. */
 export const EFFECT_GROUPS = [
   ['life', 'Blessures, points de vie, poison, énergie'], ['cards', 'Cartes (pioche, bibliothèque, cimetière)'], ['creatures', 'Créatures et marqueurs'],
-  ['players', 'Cibler un joueur'], ['removal', 'Détruire, exiler, contrer'], ['control', 'Engager, contrôler'], ['mana', 'Mana et terrains'],
+  ['players', 'Un joueur (ciblé, défenseur, ce joueur…)'], ['removal', 'Détruire, exiler, contrer'], ['control', 'Engager, contrôler'], ['mana', 'Mana et terrains'],
   ['turns', 'Tours, combats, copies, emblèmes'], ['mech', 'Mécaniques (explorer, l\'Anneau, monarque…)'], ['modal', 'Au choix'],
   ['stCreature', 'Effet permanent sur des créatures'], ['stSelf', 'Effet permanent de cette carte'], ['stPlayer', 'Effet permanent sur vous et les sorts'],
   ['stRepl', 'Remplacements (doubler les jetons, les blessures…)'],
@@ -631,13 +639,39 @@ export const CARD_KINDS = [
   ['equipment', 'Equipment', 'une carte d\'équipement', 'an Equipment card'], ['aura', 'Aura', 'une carte d\'aura', 'an Aura card'],
 ];
 
-/** Marqueurs : [pour Forge, « un marqueur +1/+1 » (après « marqueur »), en anglais]. */
+/**
+ * Marqueurs sur un permanent : [pour Forge, « un marqueur +1/+1 » (après « marqueur »), en anglais]. Les noms français
+ * sont ceux des cartes imprimées (« pétrole », « sapience », « temps »…). Les marqueurs de mot-clé donnent leur
+ * capacité, « bouclier » et « étourdissement » ont leur règle ; les autres servent aux capacités de la carte (coût
+ * « retirez… », nombre X, condition, déclencheur « quand le troisième marqueur… »).
+ */
 export const COUNTER_TYPES = [
-  ['P1P1', '+1/+1', '+1/+1'], ['M1M1', '-1/-1', '-1/-1'], ['SHIELD', '« bouclier »', 'shield'], ['Indestructible', '« indestructible »', 'indestructible'],
-  ['Flying', '« vol »', 'flying'], ['Deathtouch', '« contact mortel »', 'deathtouch'], ['Lifelink', '« lien de vie »', 'lifelink'], ['Trample', '« piétinement »', 'trample'],
-  ['Vigilance', '« vigilance »', 'vigilance'], ['Menace', '« menace »', 'menace'], ['Reach', '« portée »', 'reach'], ['Hexproof', '« défense talismanique »', 'hexproof'],
-  ['First Strike', '« initiative »', 'first strike'], ['CHARGE', '« charge »', 'charge'], ['STUN', '« étourdissement »', 'stun'], ['OIL', '« huile »', 'oil'],
+  ['P1P1', '+1/+1', '+1/+1'], ['M1M1', '-1/-1', '-1/-1'], ['SHIELD', '« bouclier »', 'shield'], ['STUN', '« étourdissement »', 'stun'],
+  ['Indestructible', '« indestructible »', 'indestructible'], ['Flying', '« vol »', 'flying'], ['Deathtouch', '« contact mortel »', 'deathtouch'],
+  ['Lifelink', '« lien de vie »', 'lifelink'], ['Trample', '« piétinement »', 'trample'], ['Vigilance', '« vigilance »', 'vigilance'],
+  ['Menace', '« menace »', 'menace'], ['Reach', '« portée »', 'reach'], ['Hexproof', '« défense talismanique »', 'hexproof'],
+  ['First Strike', '« initiative »', 'first strike'],
+  ['CHARGE', '« charge »', 'charge'], ['TIME', '« temps »', 'time'], ['LORE', '« sapience »', 'lore'], ['OIL', '« pétrole »', 'oil'],
+  ['QUEST', '« quête »', 'quest'], ['DOOM', '« fatalité »', 'doom'], ['AGE', '« âge »', 'age'], ['LEVEL', '« niveau »', 'level'],
+  ['SPORE', '« spore »', 'spore'], ['DIVINITY', '« divinité »', 'divinity'], ['SOUL', '« âme »', 'soul'], ['STORAGE', '« stock »', 'storage'],
+  ['ICE', '« glace »', 'ice'], ['FLOOD', '« inondation »', 'flood'], ['KI', '« ki »', 'ki'], ['BOUNTY', '« prime »', 'bounty'],
+  ['BLOOD', '« sang »', 'blood'], ['BRICK', '« brique »', 'brick'], ['VERSE', '« verset »', 'verse'], ['FATE', '« destin »', 'fate'],
+  ['STUDY', '« étude »', 'study'], ['OMEN', '« présage »', 'omen'], ['PLAGUE', '« peste »', 'plague'], ['FUSE', '« mèche »', 'fuse'],
+  ['GROWTH', '« croissance »', 'growth'], ['WISH', '« souhait »', 'wish'], ['HOUR', '« heure »', 'hour'], ['PAGE', '« page »', 'page'],
+  ['GOLD', '« or »', 'gold'], ['FEATHER', '« plume »', 'feather'],
 ];
+
+/** Le type de marqueur de cet identifiant (COUNTER_TYPES), sinon « def ». */
+function counterById(id, def = 'P1P1') {
+  return COUNTER_TYPES.find(c => c[0] === id) || COUNTER_TYPES.find(c => c[0] === def);
+}
+
+/** « premier », « troisième » ; « first », « third ». */
+function ordinal(n, lang) {
+  const fr = ['premier', 'deuxième', 'troisième', 'quatrième', 'cinquième', 'sixième', 'septième', 'huitième', 'neuvième', 'dixième'];
+  const en = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+  return (lang === 'en' ? en : fr)[n - 1] || (lang === 'en' ? `${n}th` : `${n}e`);
+}
 
 /** Types de sorts (coûts réduits, flash…) : [id, pour Forge, « les sorts … », « … spells »]. */
 export const SPELL_TYPES = [
@@ -687,7 +721,9 @@ export const AMOUNTS = [
   ['opponents', 'X = le nombre d\'adversaires'],
   ['power', 'X = la force de cette carte'],
   ['toughness', 'X = l\'endurance de cette carte'],
-  ['counters', 'X = le nombre de marqueurs +1/+1 sur cette carte'],
+  ['counters', 'X = le nombre de marqueurs (d\'un type, au choix) sur cette carte'],
+  ['experience', 'X = le nombre de marqueurs « expérience » que vous avez'],
+  ['energy', 'X = la quantité d\'énergie ({E}) que vous avez'],
   ['tapped', 'X = le nombre de permanents engagés pour le coût'],
 ];
 
@@ -730,10 +766,14 @@ export const CONDITIONS = [
   ['lifeGained', 'Si vous avez gagné des points de vie ce tour-ci'],
   ['spells2', 'Si vous avez lancé au moins deux sorts ce tour-ci'],
   ['tappedAtLeast', 'Si vous en avez engagé au moins N (coût « engager X »)'],
+  ['countersAtLeast', 'Si elle a au moins N marqueurs (d\'un type, au choix)'],
+  ['experienceAtLeast', 'Si vous avez au moins N marqueurs « expérience »'],
+  ['energyAtLeast', 'Si vous avez au moins N {E} (énergie)'],
 ];
 
 /** Conditions qui demandent un nombre N. */
-export const CONDITIONS_N = ['control', 'lifeAtLeast', 'lifeAtMost', 'handAtLeast', 'graveyardAtLeast', 'tappedAtLeast'];
+export const CONDITIONS_N = ['control', 'lifeAtLeast', 'lifeAtMost', 'handAtLeast', 'graveyardAtLeast', 'tappedAtLeast', 'countersAtLeast',
+  'experienceAtLeast', 'energyAtLeast'];
 
 /** Types de créature, en français et en anglais (posés par l'Atelier d'après la liste du pont). */
 const typesByName = new Map();
@@ -1179,7 +1219,12 @@ function amountOf(a) {
     case 'opponents': return ['PlayerCountOpponents$Amount', 'le nombre d\'adversaires que vous avez', 'the number of opponents you have'];
     case 'power': return ['Count$CardPower', 'la force de CARDNAME', 'CARDNAME\'s power'];
     case 'toughness': return ['Count$CardToughness', 'l\'endurance de CARDNAME', 'CARDNAME\'s toughness'];
-    case 'counters': return ['Count$CardCounters.P1P1', 'le nombre de marqueurs +1/+1 sur CARDNAME', 'the number of +1/+1 counters on CARDNAME'];
+    case 'counters': {
+      const ct = counterById(a.amountCounter);
+      return [`Count$CardCounters.${ct[0]}`, `le nombre de marqueurs ${ct[1]} sur CARDNAME`, `the number of ${ct[2]} counters on CARDNAME`];
+    }
+    case 'experience': return ['Count$YourCountersExperience', 'le nombre de marqueurs « expérience » que vous avez', 'the number of experience counters you have'];
+    case 'energy': return ['Count$YourCountersEnergy', 'la quantité de {E} que vous avez', 'the amount of {E} you have'];
     case 'tapped': {
       const w = tapWhat(a);
       return ['Count$xPaid', `le nombre de ${w[1]} engagé${w[3]} ainsi`, `the number of ${w[4]} tapped this way`];
@@ -1230,6 +1275,18 @@ function conditionOf(a) {
     case 'kicked': return c('Count$Kicked.1.0', 'GE1', 'si le kick a été payé', 'if it was kicked');
     case 'lifeGained': return c('Count$LifeYouGainedThisTurn', 'GE1', 'si vous avez gagné des points de vie ce tour-ci', 'if you gained life this turn');
     case 'spells2': return c('Count$ThisTurnCast_Card.YouCtrl', 'GE2', 'si vous avez lancé au moins deux sorts ce tour-ci', 'if you\'ve cast two or more spells this turn');
+    case 'countersAtLeast': {
+      const ct = counterById(a.condCounter, 'CHARGE');
+      return c(`Count$CardCounters.${ct[0]}`, `GE${n}`, `si CARDNAME a au moins ${n === 1 ? 'un marqueur' : word(n, 'fr') + ' marqueurs'} ${ct[1]}`,
+        `if CARDNAME has ${word(n, 'en')} or more ${ct[2]} ${n === 1 ? 'counter' : 'counters'} on it`);
+    }
+    case 'experienceAtLeast': return c('Count$YourCountersExperience', `GE${n}`,
+      `si vous avez au moins ${n === 1 ? 'un marqueur' : word(n, 'fr') + ' marqueurs'} « expérience »`,
+      `if you have ${word(n, 'en')} or more experience ${n === 1 ? 'counter' : 'counters'}`);
+    case 'energyAtLeast': {
+      const e = '{E}'.repeat(Math.max(1, Math.min(n, 10)));
+      return c('Count$YourCountersEnergy', `GE${n}`, `si vous avez au moins ${e}`, `if you have ${e} or more`);
+    }
     case 'tappedAtLeast': {
       const w = tapWhat(a);
       const fem = w[3] === 'es';
@@ -1286,7 +1343,7 @@ function chainOf(a, id, lang) {
   const items = [{head: toForge(main.p), extra: (main.extra || []).map(toForge), aux: (main.aux || []).map(toForge), text: toText(en ? main.en : main.fr) + suffix}];
   (a.then || []).slice(0, 2).forEach((m, k) => {
     const name = `${id}T${k + 1}`;
-    const e = effect({...newMode(), ...m, attachTo: a.attachTo, attachWhen: a.attachWhen}, name);
+    const e = effect({...newMode(), ...m, when: a.when, attachTo: a.attachTo, attachWhen: a.attachWhen}, name);
     if (e) {
       // Un effet enchaîné peut avoir sa propre condition (paliers : « puis, si au moins trois ont été engagés, … »).
       const own = conditionOf({...m, tapXWhat: a.tapXWhat, tapXType: a.tapXType});
@@ -1412,6 +1469,8 @@ export function templates(type) {
   const t = type || '';
   const others = t ? `les autres ${t}` : 'les autres créatures';
   const base = {n: 1, filter: {type: t, other: true}, token: 'w_1_1_spirit_flying', keyword: 'Vigilance', cost: '{2}', tap: true, sac: false, loyalty: 1};
+  // Une capacité sur elle seule (pas de filtre de créatures).
+  const one = {...base, filter: {type: '', other: false}};
   return [
     {label: `${capitalize(others)} que vous contrôlez ont la vigilance`, a: {...base, when: 'static', effect: 'grantKeyword'}},
     {label: `${capitalize(others)} que vous contrôlez gagnent +1/+1`, a: {...base, when: 'static', effect: 'anthem'}},
@@ -1489,6 +1548,50 @@ export function templates(type) {
     {label: 'Sort : en tant que coût supplémentaire, sacrifiez une créature. Détruisez une créature ciblée',
       a: {...base, when: 'spell', effect: 'destroy', addCost: 'sacCreature', filter: {type: '', other: false}}},
     {label: 'Sort : jouez un tour supplémentaire après celui-ci', a: {...base, when: 'spell', effect: 'extraTurn', filter: {type: '', other: false}}},
+    // Un joueur précis : le joueur défenseur, ce joueur (blessures de combat, sort d'un adversaire…), un adversaire ciblé.
+    {label: 'Quand elle attaque, elle inflige 1 blessure au joueur défenseur', a: {...one, when: 'attacks', effect: 'damageOpponent', who: 'that'}},
+    {label: 'Quand elle attaque, le joueur défenseur perd 1 point de vie et vous gagnez 1 point de vie',
+      a: {...one, when: 'attacks', effect: 'drainTarget', who: 'that'}},
+    {label: 'Quand elle attaque, le joueur défenseur sacrifie une créature', a: {...one, when: 'attacks', effect: 'targetSacrifice', who: 'that'}},
+    {label: 'À chaque fois qu\'elle inflige des blessures de combat à un joueur, ce joueur se défausse d\'une carte',
+      a: {...one, when: 'combatDamage', effect: 'targetDiscard', who: 'that'}},
+    {label: 'À chaque fois qu\'elle inflige des blessures de combat à un joueur, ce joueur meule deux cartes',
+      a: {...one, n: 2, when: 'combatDamage', effect: 'targetMill', who: 'that'}},
+    {label: 'À chaque fois qu\'un adversaire lance un sort, ce joueur perd 1 point de vie', a: {...one, when: 'oppCasts', effect: 'targetLoseLife', who: 'that'}},
+    {label: 'Au début de l\'entretien de chaque adversaire, elle inflige 1 blessure à ce joueur', a: {...one, when: 'oppUpkeep', effect: 'damageOpponent', who: 'that'}},
+    {label: 'À chaque fois qu\'un adversaire se défausse d\'une carte, elle inflige 2 blessures à ce joueur',
+      a: {...one, n: 2, when: 'oppDiscards', effect: 'damageOpponent', who: 'that'}},
+    {label: 'Quand elle arrive, un adversaire ciblé perd 3 points de vie', a: {...one, n: 3, when: 'etb', effect: 'targetLoseLife', who: 'opponent'}},
+    {label: 'Quand elle arrive, un adversaire ciblé reçoit deux marqueurs « poison »', a: {...one, n: 2, when: 'etb', effect: 'targetPoison', who: 'opponent'}},
+    // Marqueurs : les poser, les retirer en coût, compter, réagir au troisième ou au dernier.
+    {label: 'Au début de votre entretien, mettez un marqueur « charge » sur elle', a: {...one, when: 'upkeep', effect: 'countersSelf', counter: 'CHARGE'}},
+    {label: '{T} : mettez un marqueur « charge » sur elle', a: {...one, when: 'activated', effect: 'countersSelf', counter: 'CHARGE', cost: '', tap: true}},
+    {label: '{T}, retirez trois marqueurs « charge » de cette carte : piochez trois cartes',
+      a: {...one, n: 3, when: 'activated', effect: 'draw', cost: '', tap: true, removeCounters: 3, removeCounterType: 'CHARGE'}},
+    {label: '{1}, retirez un marqueur « charge » de cette carte : elle inflige 2 blessures à n\'importe quelle cible',
+      a: {...one, n: 2, when: 'activated', effect: 'damageAny', cost: '{1}', tap: false, removeCounters: 1, removeCounterType: 'CHARGE'}},
+    {label: 'Elle gagne +1/+1 pour chaque marqueur « charge » sur elle',
+      a: {...one, when: 'static', effect: 'anthemX', scope: 'self', amount: 'counters', amountCounter: 'CHARGE'}},
+    {label: 'Tant qu\'elle a au moins trois marqueurs « charge », elle a le vol',
+      a: {...one, when: 'static', effect: 'grantKeyword', keyword: 'Flying', scope: 'self', cond: 'countersAtLeast', condN: 3, condCounter: 'CHARGE'}},
+    {label: 'Quand le troisième marqueur « charge » est mis sur elle, sacrifiez-la, puis piochez trois cartes',
+      a: {...one, when: 'counterNth', whenCounter: 'CHARGE', whenN: 3, effect: 'sacrificeSelf', then: [{...newMode('draw'), n: 3}]}},
+    {label: 'Elle arrive sur le champ de bataille avec trois marqueurs « temps »', a: {...one, n: 3, when: 'static', effect: 'etbCounters', counter: 'TIME'}},
+    {label: 'Au début de votre entretien, retirez un marqueur « temps » de cette carte', a: {...one, when: 'upkeep', effect: 'removeCountersSelf', counter: 'TIME'}},
+    {label: 'Quand le dernier marqueur « temps » est retiré d\'elle, elle inflige 5 blessures à chaque adversaire',
+      a: {...one, n: 5, when: 'lastCounterRemoved', whenCounter: 'TIME', effect: 'damageOpponents'}},
+    {label: 'Quand elle arrive, retirez deux marqueurs +1/+1 d\'une créature ciblée',
+      a: {...one, n: 2, when: 'etb', effect: 'removeCountersTarget', counter: 'P1P1', permType: 'creature'}},
+    {label: '{T} : mettez un marqueur « charge » sur un artefact ciblé', a: {...one, when: 'activated', effect: 'countersPermTarget', counter: 'CHARGE', permType: 'artifact', cost: '', tap: true}},
+    {label: 'Quand elle attaque, vous gagnez un marqueur « expérience »', a: {...one, when: 'attacks', effect: 'experience'}},
+    {label: `${capitalize(others)} que vous contrôlez gagnent +1/+1 pour chaque marqueur « expérience » que vous avez`,
+      a: {...base, when: 'static', effect: 'anthemX', scope: 'you', amount: 'experience'}},
+    {label: 'Quand elle attaque, elle gagne +X/+X jusqu\'à la fin du tour, X étant le nombre de marqueurs « expérience » que vous avez',
+      a: {...one, when: 'attacks', effect: 'pumpSelf', amount: 'experience'}},
+    {label: 'Quand elle arrive, vous gagnez {E}{E}', a: {...one, n: 2, when: 'etb', effect: 'energy'}},
+    {label: 'Payez {E}{E} : elle gagne +2/+2 jusqu\'à la fin du tour', a: {...one, n: 2, when: 'activated', effect: 'pumpSelf', cost: '', tap: false, payEnergy: 2}},
+    {label: 'Au début de votre étape de fin, si vous avez au moins cinq marqueurs « expérience », piochez une carte',
+      a: {...one, when: 'end', effect: 'draw', cond: 'experienceAtLeast', condN: 5}},
   ];
 }
 
@@ -1711,7 +1814,7 @@ function allEn(f) {
 
 /** Le type de marqueur d'un effet : [pour Forge, nom français, nom anglais] (+1/+1 par défaut). */
 function counterType(a) {
-  return COUNTER_TYPES.find(c => c[0] === a.counter) || COUNTER_TYPES[0];
+  return counterById(a.counter);
 }
 
 /** « un marqueur +1/+1 », « deux marqueurs « bouclier » », « a shield counter ». */
@@ -1758,23 +1861,113 @@ function hasKw(kw, pl) {
 /** Paramètres de Forge et texte (français et anglais) d'un effet. id : préfixe des SVar de cette capacité. */
 /** Effets qui visent un joueur : sur une malédiction, ils peuvent toucher le joueur enchanté au lieu d'un joueur ciblé. */
 export const PLAYER_EFFECTS = new Set(['damagePlayer', 'damageOpponent', 'targetLoseLife', 'drainTarget', 'targetGainLife', 'targetDraw',
-  'targetDiscard', 'targetMill', 'targetSacrifice']);
+  'targetDiscard', 'targetMill', 'targetSacrifice', 'targetPoison']);
 
 /**
- * Un effet : ses paramètres de Forge (p), ses lignes en plus, son texte. who « enchanted » : l'effet touche le joueur
- * enchanté (malédiction) ; « ce joueur » quand le déclencheur vient de lui (« Au début de l'entretien du joueur enchanté »).
+ * Le joueur que chaque effet de joueur touche d'origine : any (un joueur ou un planeswalker ciblé), player (un joueur
+ * ciblé), opponent (un adversaire ciblé), eachOpp (chaque adversaire). Le choix « Joueur » le change.
+ */
+const WHO_BASE = {damagePlayer: 'any', damageOpponent: 'opponent', targetLoseLife: 'player', drainTarget: 'player', targetGainLife: 'player',
+  targetDraw: 'player', targetDiscard: 'player', targetMill: 'player', targetSacrifice: 'player', targetPoison: 'player', thoughtseize: 'player',
+  exileGraveyard: 'player', damageOpponents: 'eachOpp', drain: 'eachOpp', poison: 'eachOpp', discard: 'eachOpp', millOpponents: 'eachOpp', edict: 'eachOpp'};
+/** Effets dont le joueur peut changer (« Joueur : le joueur défenseur »). */
+export const PLAYER_WHO = new Set(Object.keys(WHO_BASE));
+/** Effets qui ne visent qu'un joueur à la fois (pas « chaque adversaire »). */
+const WHO_ONE = new Set(['thoughtseize', 'exileGraveyard']);
+
+/**
+ * Le joueur dont parle un déclencheur : [pour Forge, en français, en anglais, libellé du choix]. « Quand elle attaque » :
+ * le joueur défenseur ; « Quand elle inflige des blessures de combat à un joueur » : ce joueur ; « Quand un adversaire
+ * lance un sort » : ce joueur…
+ */
+const THAT_PLAYER = (() => {
+  const defending = ['TriggeredDefendingPlayer', 'le joueur défenseur', 'defending player', 'Le joueur défenseur (celui qu\'elle attaque)'];
+  const damaged = ['TriggeredTarget', 'ce joueur', 'that player', 'Ce joueur (celui qui a subi les blessures)'];
+  return {
+    attacks: defending, attacksAlly: [...defending.slice(0, 3), 'Le joueur défenseur (celui que la créature attaque)'],
+    attachedAttacks: [...defending.slice(0, 3), 'Le joueur défenseur (celui que la créature attaque)'],
+    combatDamage: damaged, combatDamageAlly: damaged, attachedCombatDamage: damaged,
+    oppCasts: ['TriggeredActivator', 'ce joueur', 'that player', 'Ce joueur (celui qui a lancé le sort)'],
+    oppDiscards: ['TriggeredCardController', 'ce joueur', 'that player', 'Ce joueur (celui qui s\'est défaussé)'],
+    oppLosesLife: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui qui a perdu des points de vie)'],
+    oppUpkeep: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui dont c\'est l\'entretien)'],
+    eachUpkeep: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui dont c\'est l\'entretien)'],
+    eachEnd: ['TriggeredPlayer', 'ce joueur', 'that player', 'Ce joueur (celui dont c\'est le tour)'],
+    oppCreatureEnters: ['TriggeredCardController', 'ce joueur', 'that player', 'Ce joueur (celui qui contrôle la créature)'],
+    oppCreatureDies: ['TriggeredCardController', 'ce joueur', 'that player', 'Ce joueur (celui qui contrôlait la créature)'],
+    anyDies: ['TriggeredCardController', 'le contrôleur de cette créature', 'its controller', 'Le contrôleur de la créature morte'],
+  };
+})();
+
+const WHO_LABELS = {any: 'un joueur ou un planeswalker ciblé', player: 'un joueur ciblé', opponent: 'un adversaire ciblé', eachOpp: 'chaque adversaire',
+  each: 'chaque joueur'};
+
+/**
+ * Les joueurs proposés pour un effet de joueur, selon le déclencheur et la carte : [valeur, libellé]. « target » : le
+ * joueur de l'effet tel qu'il est (le premier choix).
+ */
+export function whoChoices(effectId, when, card = null) {
+  const base = WHO_BASE[effectId];
+  if (!base) {
+    return [];
+  }
+  const list = [['target', WHO_LABELS[base]]];
+  for (const v of ['player', 'opponent', 'eachOpp', 'each']) {
+    if (v !== base && !(WHO_ONE.has(effectId) && v.startsWith('each'))) {
+      list.push([v, WHO_LABELS[v]]);
+    }
+  }
+  const that = THAT_PLAYER[when];
+  if (that) {
+    list.push(['that', that[3]]);
+  }
+  if ((attachOf(card) || {}).kind === 'player') {
+    list.push(['enchanted', 'le joueur enchanté (malédiction)']);
+  }
+  return list;
+}
+
+/** Ce que le choix « Joueur » met à la place du joueur de l'effet : {p (pour Forge), fr, en}, ou null (rien ne change). */
+function whoTarget(a) {
+  switch (a.who) {
+    case 'player': return {p: 'ValidTgts$ Player | TgtPrompt$ Choisissez un joueur ciblé', fr: 'un joueur ciblé', en: 'target player'};
+    case 'opponent': return {p: 'ValidTgts$ Opponent | TgtPrompt$ Choisissez un adversaire ciblé', fr: 'un adversaire ciblé', en: 'target opponent'};
+    case 'eachOpp': return WHO_ONE.has(a.effect) ? null : {p: 'Defined$ Player.Opponent', fr: 'chaque adversaire', en: 'each opponent'};
+    case 'each': return WHO_ONE.has(a.effect) ? null : {p: 'Defined$ Player', fr: 'chaque joueur', en: 'each player'};
+    case 'that': {
+      const t = THAT_PLAYER[a.when];
+      return t ? {p: `Defined$ ${t[0]}`, fr: t[1], en: t[2]} : null;
+    }
+    case 'enchanted': {
+      // « ce joueur » quand le déclencheur vient de lui (« Au début de l'entretien du joueur enchanté »).
+      const that = (WHEN.find(x => x.id === a.when) || {}).attach === 'player';
+      return {p: 'Defined$ EnchantedPlayer', fr: that ? 'ce joueur' : 'le joueur enchanté', en: that ? 'that player' : 'enchanted player'};
+    }
+    default: return null;
+  }
+}
+
+/** Le joueur d'un effet dans ses paramètres de Forge et dans son texte (français, anglais). */
+const WHO_SPEC = /ValidTgts\$ [^|]+\| TgtPrompt\$ [^|]*?(?=\s*\||\s*$)|Defined\$ Player(?:\.Opponent)?(?=\s*\||\s*$)/;
+const WHO_FR = /(d')?(un joueur ou un planeswalker ciblé|un adversaire ciblé|un joueur ciblé|chaque adversaire)/;
+const WHO_EN = /target player or planeswalker|target opponent|target player|each opponent/;
+
+/**
+ * Un effet : ses paramètres de Forge (p), ses lignes en plus, son texte. who : le joueur touché par un effet de joueur
+ * (« le joueur défenseur », « ce joueur », « chaque adversaire », « le joueur enchanté » d'une malédiction…).
  */
 function effect(a, id) {
   const r = effectBase(a, id);
-  if (!r || a.who !== 'enchanted' || !PLAYER_EFFECTS.has(a.effect)) {
+  if (!r || !PLAYER_WHO.has(a.effect)) {
     return r;
   }
-  const that = (WHEN.find(x => x.id === a.when) || {}).attach === 'player';
-  const fr = that ? 'ce joueur' : 'le joueur enchanté';
-  const en = that ? 'that player' : 'enchanted player';
-  return {...r, p: r.p.replace(/ValidTgts\$ [^|]+\| TgtPrompt\$ [^|]+/, 'Defined$ EnchantedPlayer '),
-    fr: r.fr.replace(/un joueur ou un planeswalker ciblé|un adversaire ciblé|un joueur ciblé/, fr).replace(/\bà le joueur\b/, 'au joueur'),
-    en: r.en.replace(/target player or planeswalker|target opponent|target player/, en)};
+  const to = whoTarget(a);
+  if (!to) {
+    return r;
+  }
+  const fr = r.fr.replace(WHO_FR, (m, d) => (d ? 'de ' : '') + to.fr)
+    .replace(/(^|\s)à le /g, '$1au ').replace(/\bde le /g, 'du ').replace(/\bde un /g, 'd\'un ');
+  return {...r, p: r.p.replace(WHO_SPEC, to.p), fr, en: r.en.replace(WHO_EN, to.en)};
 }
 
 function effectBase(a, id) {
@@ -1861,7 +2054,7 @@ function effectBase(a, id) {
       return {p: `Scry | ScryNum$ ${n1}`, fr: `regard ${n1}`, en: `scry ${n1}`};
     case 'discard':
       return {p: `Discard | Defined$ Player.Opponent | NumCards$ ${n1} | Mode$ TgtChoose`,
-        fr: `chaque adversaire défausse ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`,
+        fr: `chaque adversaire se défausse ${n1 === 1 ? 'd\'une carte' : 'de ' + word(n1, 'fr') + ' cartes'}`,
         en: `each opponent discards ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
     case 'loot':
       return {p: `Draw | Defined$ You | NumCards$ ${n1} | SubAbility$ ${id}Loot`,
@@ -1972,6 +2165,10 @@ function effectBase(a, id) {
     case 'targetSacrifice':
       return {p: `Sacrifice | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | SacValid$ Creature`,
         fr: 'un joueur ciblé sacrifie une créature', en: 'target player sacrifices a creature'};
+    case 'targetPoison':
+      return {p: `Poison | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})} | Num$ ${n1}`,
+        fr: `un joueur ciblé gagne ${n1 === 1 ? 'un marqueur' : word(n1, 'fr') + ' marqueurs'} « poison »`,
+        en: `target player gets ${n1 === 1 ? 'a poison counter' : word(n1, 'en') + ' poison counters'}`};
     case 'discover':
       return {p: `Discover | Num$ ${n1}`, fr: `découvrez ${n1}`, en: `discover ${n1}`};
     case 'explore':
@@ -2016,8 +2213,22 @@ function effectBase(a, id) {
       return {p: `PutCounter | Defined$ You | CounterType$ ENERGY | CounterNum$ ${n1}`, fr: `vous gagnez ${e}`, en: `you get ${e}`};
     }
     case 'experience':
-      return {p: 'PutCounter | Defined$ You | CounterType$ EXPERIENCE | CounterNum$ 1', fr: 'vous gagnez un marqueur « expérience »',
-        en: 'you get an experience counter'};
+      return {p: `PutCounter | Defined$ You | CounterType$ EXPERIENCE | CounterNum$ ${n1}`,
+        fr: `vous gagnez ${n1 === 1 ? 'un marqueur' : word(n1, 'fr') + ' marqueurs'} « expérience »`,
+        en: n1 === 1 ? 'you get an experience counter' : `you get ${word(n1, 'en')} experience counters`};
+    case 'countersPermTarget': {
+      const pt = permType(a);
+      return {p: `PutCounter | ${target({v: pt[1], prompt: 'Choisissez ' + pt[2]})} | CounterType$ ${ct[0]} | CounterNum$ ${n1}${ct[0] === 'M1M1' ? ' | IsCurse$ True' : ''}`,
+        fr: `mettez ${countersFr(n1)} sur ${pt[2]}`, en: `put ${countersEn(n1)} on ${pt[3]}`};
+    }
+    case 'removeCountersSelf':
+      return {p: `RemoveCounter | Defined$ Self | CounterType$ ${ct[0]} | CounterNum$ ${n1}`, fr: `retirez ${countersFr(n1)} de CARDNAME`,
+        en: `remove ${countersEn(n1)} from CARDNAME`};
+    case 'removeCountersTarget': {
+      const pt = permType(a);
+      return {p: `RemoveCounter | ${target({v: pt[1], prompt: 'Choisissez ' + pt[2]})} | CounterType$ ${ct[0]} | CounterNum$ ${n1}`,
+        fr: `retirez ${countersFr(n1)} ${deWord(pt[2])}`, en: `remove ${countersEn(n1)} from ${pt[3]}`};
+    }
     case 'drawEach':
       return {p: `Draw | Defined$ Player | NumCards$ ${n1}`, fr: `chaque joueur pioche ${n1 === 1 ? 'une carte' : word(n1, 'fr') + ' cartes'}`,
         en: `each player draws ${n1 === 1 ? 'a card' : word(n1, 'en') + ' cards'}`};
@@ -2270,7 +2481,8 @@ function aWord(w) {
 
 /** Une phrase terminée par un point, sauf si elle finit déjà par un point ou des guillemets (« … »). */
 function endDot(t) {
-  return /[.»"]$/.test(t) ? t : t + '.';
+  // « … marqueur « poison ». » : le point après le guillemet ; « avec « Les créatures… +2/+2. » » : déjà dedans.
+  return /[."]$/.test(t) || /\.\s*»$/.test(t) ? t : t + '.';
 }
 
 /** « de la créature enchantée », « des créatures que… », « de CARDNAME ». */
@@ -2356,6 +2568,21 @@ function staticCore(a, id, lang, card) {
       return {s: `Mode$ Continuous | Affected$ ${sc.v} | AddPower$ ${n} | AddToughness$ ${n}`, text: en ? `${S} ${v3('gets', 'get')} +${n}/+${n}` : `${S} ${v3('gagne', 'gagnent')} +${n}/+${n}`};
     case 'anthemPower':
       return {s: `Mode$ Continuous | Affected$ ${sc.v} | AddPower$ ${n}`, text: en ? `${S} ${v3('gets', 'get')} +${n}/+0` : `${S} ${v3('gagne', 'gagnent')} +${n}/+0`};
+    case 'anthemX': {
+      // +X/+X : « pour chaque marqueur « charge » sur elle », « pour chaque marqueur « expérience » que vous avez », ou « X étant… ».
+      const x = amountOf({...a, amount: a.amount && !['fixed', 'tapped', 'xPaid'].includes(a.amount) ? a.amount : 'counters'});
+      const s = `Mode$ Continuous | Affected$ ${sc.v} | AddPower$ ${id}X | AddToughness$ ${id}X`;
+      const svars = [`SVar:${id}X:${x[0]}`];
+      const each = a.amount === 'experience' ? ['pour chaque marqueur « expérience » que vous avez', 'for each experience counter you have']
+        : (!a.amount || a.amount === 'counters') ? (() => {
+          const ct = counterById(a.amountCounter);
+          return [`pour chaque marqueur ${ct[1]} sur CARDNAME`, `for each ${ct[2]} counter on CARDNAME`];
+        })() : null;
+      if (each) {
+        return {s, svars, text: en ? `${S} ${v3('gets', 'get')} +1/+1 ${each[1]}` : `${S} ${v3('gagne', 'gagnent')} +1/+1 ${each[0]}`};
+      }
+      return {s, svars, text: en ? `${S} ${v3('gets', 'get')} +X/+X, where X is ${x[2]}` : `${S} ${v3('gagne', 'gagnent')} +X/+X, X étant ${x[1]}`};
+    }
     case 'debuff':
       return {s: `Mode$ Continuous | Affected$ ${sc.v} | AddPower$ -${n} | AddToughness$ -${n}`,
         text: en ? `${S} ${v3('gets', 'get')} -${n}/-${n}` : `${S} ${v3('gagne', 'gagnent')} -${n}/-${n}`};
@@ -2624,9 +2851,10 @@ function activationCost(a, lang) {
   }
   const ctr = Math.max(0, Math.round(Number(a.removeCounters) || 0));
   if (ctr) {
-    forge.push(`SubCounter<${ctr}/P1P1>`);
-    text.push(en ? `remove ${ctr === 1 ? 'a +1/+1 counter' : word(ctr, 'en') + ' +1/+1 counters'} from CARDNAME`
-      : `retirez ${ctr === 1 ? 'un marqueur' : word(ctr, 'fr') + ' marqueurs'} +1/+1 de CARDNAME`);
+    // « Retirez trois marqueurs « charge » de CARDNAME » (+1/+1 par défaut).
+    const ct = counterById(a.removeCounterType);
+    forge.push(`SubCounter<${ctr}/${ct[0]}>`);
+    text.push(en ? `remove ${counterWords(ct, ctr, 'en')} from CARDNAME` : `retirez ${counterWords(ct, ctr, 'fr')} de CARDNAME`);
   }
   const energy = Math.max(0, Math.round(Number(a.payEnergy) || 0));
   if (energy) {
@@ -2734,14 +2962,15 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
       // Le coût est écrit par CostDesc$ (dans la langue de la carte) : Forge ne le répète pas en anglais devant l'effet.
       const head = en ? `${k > 0 ? '+' : k < 0 ? '−' : ''}${Math.abs(k)}:` : `[${k > 0 ? '+' : ''}${k}] :`;
       const text = `${head} ${endDot(withWord(e.aw, capitalize(body)))}`;
-      return {lines: [`A:AB$ ${e.p} | Cost$ ${cost} | Planeswalker$ True | CostDesc$ ${head} | SpellDescription$ ${endDot(withWord(e.aw, capitalize(body)))}`, ...extra], text};
+      // Sur la pile et dans le journal : le texte de la carte (sinon Forge écrit le sien, en anglais).
+      return {lines: [`A:AB$ ${e.p} | Cost$ ${cost} | Planeswalker$ True | CostDesc$ ${head} | SpellDescription$ ${endDot(withWord(e.aw, capitalize(body)))} | StackDescription$ SpellDescription`, ...extra], text};
     }
     const c = activationCost(a, lang);
     const lim = activationLimits(a, lang);
     const head = en ? `${c.text}:` : `${c.text} :`;
     const desc = `${endDot(capitalize(body))}${lim.text}`;
     const text = withWord(e.aw, `${head} ${desc}`);
-    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc}`, ...extra, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])], text};
+    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc} | StackDescription$ SpellDescription`, ...extra, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])], text};
   }
   const head = triggerHead(a, card);
   const text = withWord(e.aw, endDot(`${head[en ? 2 : 1]}, ${body}`));
@@ -2792,6 +3021,9 @@ function triggerTable(a, card = null) {
   const enters = (v) => `Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ ${v} | TriggerZones$ Battlefield`;
   const dies = (v) => `Mode$ ChangesZone | Origin$ Battlefield | Destination$ Graveyard | ValidCard$ ${v} | TriggerZones$ Battlefield`;
   const phase = (p, who) => `Mode$ Phase | Phase$ ${p}${who ? ` | ValidPlayer$ ${who}` : ''} | TriggerZones$ Battlefield`;
+  // Déclencheurs de marqueurs : le type (« charge » par défaut) et, pour « le Nième marqueur », N.
+  const wc = counterById(a.whenCounter, 'CHARGE');
+  const wn = Math.max(1, Math.min(20, Math.round(Number(a.whenN) || 3)));
   return {
     etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille', 'When CARDNAME enters'],
     ally: [enters(valid(f)), `Quand ${oneFr(f)} arrive sur le champ de bataille sous votre contrôle`, `Whenever ${oneEn(f)} you control enters`],
@@ -2827,6 +3059,12 @@ function triggerTable(a, card = null) {
       'Whenever an artifact you control enters'],
     counterAdded: ['Mode$ CounterAddedOnce | ValidCard$ Creature.YouCtrl | CounterType$ P1P1 | TriggerZones$ Battlefield',
       'À chaque fois qu\'au moins un marqueur +1/+1 est mis sur une créature que vous contrôlez', 'Whenever one or more +1/+1 counters are put on a creature you control'],
+    counterPutSelf: [`Mode$ CounterAddedOnce | ValidCard$ Card.Self | CounterType$ ${wc[0]} | TriggerZones$ Battlefield`,
+      `À chaque fois qu'au moins un marqueur ${wc[1]} est mis sur CARDNAME`, `Whenever one or more ${wc[2]} counters are put on CARDNAME`],
+    counterNth: [`Mode$ CounterAdded | ValidCard$ Card.Self | CounterType$ ${wc[0]} | CounterAmount$ EQ${wn} | TriggerZones$ Battlefield`,
+      `Quand le ${ordinal(wn, 'fr')} marqueur ${wc[1]} est mis sur CARDNAME`, `When the ${ordinal(wn, 'en')} ${wc[2]} counter is put on CARDNAME`],
+    lastCounterRemoved: [`Mode$ CounterRemoved | ValidCard$ Card.Self | CounterType$ ${wc[0]} | NewCounterAmount$ 0 | TriggerZones$ Battlefield`,
+      `Quand le dernier marqueur ${wc[1]} est retiré de CARDNAME`, `When the last ${wc[2]} counter is removed from CARDNAME`],
     castAny: ['Mode$ SpellCast | ValidCard$ Card | ValidActivatingPlayer$ You | TriggerZones$ Battlefield', 'À chaque fois que vous lancez un sort', 'Whenever you cast a spell'],
     castNonCreature: ['Mode$ SpellCast | ValidCard$ Card.nonCreature | ValidActivatingPlayer$ You | TriggerZones$ Battlefield',
       'À chaque fois que vous lancez un sort non-créature', 'Whenever you cast a noncreature spell'],
@@ -2891,7 +3129,7 @@ function modalLines(a, id, w, lang, card) {
   const parts = [];
   (a.modes || []).slice(0, 3).forEach((m, k) => {
     const mid = `${id}M${k + 1}`;
-    const e = effect({...newMode(), ...m, attachTo: a.attachTo, attachWhen: a.attachWhen}, mid);
+    const e = effect({...newMode(), ...m, when: a.when, attachTo: a.attachTo, attachWhen: a.attachWhen}, mid);
     if (e) {
       // Un mode peut avoir un nom, comme sur les cartes récentes (« • Souffle des marées — Piochez une carte. »).
       const label = cleanModeName(m.flavor);
@@ -3061,7 +3299,7 @@ function auraLogic(f) {
 /** Le nom de la carte dans son texte : « de Ilona » devient « d'Ilona », « que Ilona » « qu'Ilona ». */
 function named(text, name) {
   const vowel = /^[aeiouyhàâéèêîôûAEIOUYHÀÂÉÈÊÎÔÛ]/.test(name);
-  return String(text).replace(/\b(de|que) CARDNAME/g, (m, w) => (vowel ? `${w[0]}'${name}` : `${w} ${name}`)).replace(/CARDNAME/g, name);
+  return String(text).replace(/\b(de|que) CARDNAME/g, (m, w) => (vowel ? `${w === 'que' ? 'qu' : 'd'}'${name}` : `${w} ${name}`)).replace(/CARDNAME/g, name);
 }
 
 /** Mots-clés écrits après les capacités, comme sur les cartes imprimées (Équipement, Pilotage…). */

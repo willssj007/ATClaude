@@ -14,7 +14,15 @@ import {boardFx} from './themes.js';
 import {icon} from './icons.js';
 import {esc, el, manaHtml, avatarHtml, ownPhotoUrl, cutoutRects, PHASES, prefs, rulesHtml, toast, debounce, translatePrompt} from './util.js';
 
-const COUNTER_LABELS = {P1P1: '+1/+1', M1M1: '−1/−1', LOYALTY: 'Loyauté', CHARGE: 'Charge', LORE: 'Histoire', DEFENSE: 'Défense', SHIELD: 'Bouclier', STUN: 'Étourdi', OIL: 'Huile', TIME: 'Temps'};
+// Les noms des cartes françaises (« pétrole », « sapience »…).
+const COUNTER_LABELS = {P1P1: '+1/+1', M1M1: '−1/−1', LOYALTY: 'Loyauté', CHARGE: 'Charge', LORE: 'Sapience', DEFENSE: 'Défense', SHIELD: 'Bouclier',
+  STUN: 'Étourdissement', OIL: 'Pétrole', TIME: 'Temps', QUEST: 'Quête', DOOM: 'Fatalité', AGE: 'Âge', LEVEL: 'Niveau', SPORE: 'Spore',
+  DIVINITY: 'Divinité', SOUL: 'Âme', STORAGE: 'Stock', STORG: 'Stock', ICE: 'Glace', FLOOD: 'Inondation', KI: 'Ki', BOUNTY: 'Prime', BLOOD: 'Sang',
+  BRICK: 'Brique', VERSE: 'Verset', FATE: 'Destin', STUDY: 'Étude', OMEN: 'Présage', PLAGUE: 'Peste', FUSE: 'Mèche', GROWTH: 'Croissance',
+  WISH: 'Souhait', HOUR: 'Heure', PAGE: 'Page', GOLD: 'Or', FEATHER: 'Plume', FADE: 'Disparition', EXPERIENCE: 'Expérience', ENERGY: 'Énergie',
+  POISON: 'Poison', RAD: 'Radiation', FLYING: 'Vol', DEATHTOUCH: 'Contact mortel', LIFELINK: 'Lien de vie', TRAMPLE: 'Piétinement',
+  VIGILANCE: 'Vigilance', MENACE: 'Menace', REACH: 'Portée', HEXPROOF: 'Défense talismanique', INDESTRUCTIBLE: 'Indestructible',
+  'FIRST STRIKE': 'Initiative', FIRST_STRIKE: 'Initiative'};
 const MANA_ORDER = ['W', 'U', 'B', 'R', 'G', 'C'];
 // Marqueurs que peut avoir un joueur (noms de Forge) : icône, libellé, seuil de défaite éventuel.
 const PLAYER_COUNTERS = {

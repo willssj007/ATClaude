@@ -2,6 +2,46 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.6 — Le joueur visé, des marqueurs qui servent
+
+### Atelier : quel joueur l'effet touche
+- **Un choix « Joueur »** sous chaque effet qui touche un joueur : blessures, perte ou gain de points de vie, pioche, défausse, meule, sacrifice, poison, cimetière exilé… On choisit :
+  - un joueur ciblé, un adversaire ciblé, chaque adversaire ou chaque joueur ;
+  - ou le joueur dont parle le déclencheur.
+- **Le joueur du déclencheur** :
+  - « Quand elle attaque » : **le joueur défenseur**, celui qu'elle attaque ;
+  - « Quand elle inflige des blessures de combat à un joueur » : **ce joueur** ;
+  - « Quand un adversaire lance un sort, se défausse ou perd des points de vie » : ce joueur ;
+  - « Au début de l'entretien de chaque adversaire » : ce joueur ;
+  - « Quand une créature d'un adversaire arrive ou meurt » : ce joueur ;
+  - « Quand une créature meurt » : son contrôleur ;
+  - une malédiction : le joueur enchanté.
+
+- **Exemples** : « Quand elle attaque, elle inflige 1 blessure au joueur défenseur. » ; « À chaque fois qu'elle inflige des blessures de combat à un joueur, ce joueur se défausse d'une carte. »
+- **Nouvel effet** : un joueur ciblé gagne des marqueurs « poison ».
+- **Capacités toutes prêtes** pour un joueur précis (le joueur défenseur, ce joueur, un adversaire ciblé).
+- **Sur la pile et dans le journal**, les capacités activées des cartes perso s'écrivent avec le texte de la carte, en français.
+
+### Atelier : des marqueurs qui servent
+- **44 types de marqueurs**, avec les noms des cartes françaises : « charge », « temps », « sapience », « pétrole », « quête », « fatalité », « âge », « niveau », « spore », « divinité »… On peut les poser, les retirer, les compter et réagir à leur arrivée :
+  - **Coût** : retirez N marqueurs d'un type de cette carte (« {T}, retirez trois marqueurs « charge » de cette carte : piochez trois cartes »).
+  - **Nombre X** : les marqueurs d'un type sur cette carte, vos marqueurs « expérience », votre énergie.
+  - **Conditions** : si elle a au moins N marqueurs d'un type, si vous avez au moins N marqueurs « expérience » ou au moins N {E}.
+  - **Déclencheurs** : quand des marqueurs sont mis sur elle, quand le **Nième** est mis sur elle (« Quand le troisième marqueur « charge » est mis sur… »), quand le **dernier** est retiré d'elle.
+  - **Effets** : retirer des marqueurs de cette carte ou d'un permanent ciblé, mettre des marqueurs sur un permanent ciblé (un artefact, un terrain…), gagner plusieurs marqueurs « expérience ».
+  - **Effet permanent** : +1/+1 pour chaque marqueur d'un type sur elle, ou pour chaque marqueur « expérience » que vous avez. Ce +X/+X peut aussi compter autre chose, au choix.
+- **Capacités toutes prêtes**, à chercher par « charge », « temps », « expérience » ou « énergie » :
+  - une batterie de charges ;
+  - un compte à rebours de temps ;
+  - l'expérience qui renforce vos créatures ;
+  - l'énergie à dépenser.
+- **En partie**, les marqueurs portent leur nom français : Pétrole, Sapience, Quête, Fatalité…
+
+### Corrections
+- « Chaque adversaire se défausse d'une carte », au lieu de « défausse une carte ».
+- « Qu'Essai… » devant un nom qui commence par une voyelle, au lieu de « q'Essai… ».
+- Un point à la fin des phrases qui finissent par un marqueur (« … deux marqueurs « poison ». »).
+
 ## 0.6.5 — Extensions perso, recherche par plusieurs types
 
 ### Atelier : extensions perso
