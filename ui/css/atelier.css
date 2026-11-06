@@ -97,6 +97,29 @@
 .ate-kwhits { padding: 4px 2px; }
 .ate-costs > summary { font-size: 13px; }
 
+/* Sous-types en pastilles, et le sélecteur de types (français ou anglais). */
+.ate-subbox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ate-subchip { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; }
+.ate-subchip small { opacity: .65; font-size: 11px; }
+.ate-subchip button { width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .25); font-size: 12px; cursor: pointer; }
+.ate-subadd { border-style: dashed; }
+.ate-subkb { margin-top: 6px; }
+.ate-subkb input { width: 100%; margin-top: 6px; }
+input[data-typepick] { cursor: pointer; caret-color: transparent; }
+.ate-tp-head { position: sticky; top: -6px; z-index: 2; background: var(--panel-solid); padding: 2px 0 8px; border-bottom: 1px solid var(--line); }
+.ate-tp-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.ate-tpq { flex: 1 1 220px; min-width: 0; }
+.ate-tp-chosen { margin: 10px 0 2px; }
+.ate-tp-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.ate-tp-item { display: flex; align-items: baseline; gap: 8px; width: 100%; min-height: 42px; padding: 9px 12px; border: 0; border-radius: 9px;
+  background: transparent; text-align: left; cursor: pointer; font-size: 14.5px; }
+.ate-tp-item:hover { background: rgba(255, 255, 255, .06); }
+.ate-tp-item span { flex: 0 1 auto; }
+.ate-tp-item small { flex: 1; color: var(--muted); font-size: 12px; }
+.ate-tp-item small.warn { flex: none; color: #ffd27a; }
+.ate-tp-item b { color: var(--gold); }
+.ate-tp-item.on { background: rgb(var(--gold-rgb) / 0.14); color: var(--gold-2); }
+
 /* Sous-types : ce qu'ils font dans le jeu (capacité de la nourriture, mana de la forêt, niveaux de la classe…). */
 .ate-subs { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 10px; padding: 8px 10px; border: 1px solid var(--line);
   border-radius: 12px; background: rgb(255 255 255 / 0.025); font-size: 13.5px; }

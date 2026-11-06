@@ -2,6 +2,23 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.4 — Sélecteur de sous-types
+
+### Atelier
+- **Les sous-types en pastilles** : on en retire un en touchant ✕. Retirer « Équipement » retire aussi le mot-clé qui le donnait.
+- **Un sélecteur pour les ajouter**, avec une recherche sans accents en français comme en anglais (« elfe », « elf », « equipement »). Les choix sont rangés par groupe :
+  - ceux qui vont avec la carte ;
+  - les types perso ;
+  - tous les types de créature, dans l'ordre alphabétique ;
+  - les autres sous-types.
+
+  On en choisit plusieurs d'un coup. Un type inconnu peut s'écrire tel quel.
+- **Noms en français ou en anglais**, au choix : « Elfe Druide » ou « Elf Druid ». Les deux noms s'affichent côte à côte. La saisie au clavier reste possible.
+- **Les champs « un type : Elfe »** (filtres « chaque Elfe… », Appui, conditions, nombre X…) ouvrent le même sélecteur, avec « Toutes » quand on veut toutes les créatures. Ils remplacent la liste de suggestions du téléphone, qui sautait et devenait transparente.
+
+### Menus déroulants
+- **Avec une recherche, le panneau reste en haut de l'écran** : il ne bouge plus quand le clavier s'ouvre. Il ne se replace qu'une fois par image, et son fond est opaque.
+
 ## 0.6.3 — Menus et groupes de l'Atelier
 
 ### Menus déroulants

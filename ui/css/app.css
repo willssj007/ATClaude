@@ -149,7 +149,7 @@ select.csel-native { position: absolute; width: 1px; height: 1px; min-height: 0;
 .csel-backdrop { position: fixed; inset: 0; z-index: 119; background: rgba(0, 0, 0, .5); animation: csel-fade .14s ease-out; }
 .csel-backdrop.closing { background: transparent; transition: background .15s; }
 @keyframes csel-fade { from { opacity: 0; } }
-.csel-panel.sheet { border-radius: 16px; animation: csel-up .18s ease-out; }
+.csel-panel.sheet { border-radius: 16px; animation: csel-up .18s ease-out; background: var(--panel-solid); }
 @keyframes csel-up { from { opacity: 0; transform: translateY(14px); } }
 .csel-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 10px 6px 16px; }
 .csel-title { flex: 1; min-width: 0; font: 600 15px/1.25 var(--title-font); color: var(--gold-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

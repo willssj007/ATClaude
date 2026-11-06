@@ -11,7 +11,7 @@ import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
-  PLAYER_EFFECTS, SUBTYPES, attachOf, attachTemplates, cleanGroup, readGroup, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+  PLAYER_EFFECTS, SUBTYPES, attachOf, attachTemplates, cleanGroup, forgeSubtypes, readGroup, typeLabel, withGroup, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED} from './frames.js';
 
 /** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
@@ -662,16 +662,7 @@ export class Atelier {
       return;
     }
     const f = this.form;
-    // Suggestions : les types en français (le type de Forge à côté) puis en anglais.
-    const list = this.typeList || (this.data.creatureTypes || []).map(en => ({en, fr: en}));
-    // Les sous-types qui vont avec les types de la carte (équipement, nourriture, forêt…) d'abord, avec ce qu'ils font.
-    const fit = (st) => st[2].some(t => f.types.includes(t));
-    const subOption = (st) => `<option value="${esc(st[1])}">${esc(st[0])}${st[3].no ? ' (sans sa mécanique)' : ''}</option>`;
-    const others = SUBTYPES.filter(st => st[0] !== 'Mount');
-    const options = [...others.filter(fit).map(subOption),
-      ...list.filter(t => t.fr !== t.en).map(t => `<option value="${esc(t.fr)}">${esc(t.en)}</option>`), ...list.map(t => `<option value="${esc(t.en)}">`),
-      ...others.filter(st => !fit(st)).map(subOption)];
-    left.innerHTML = `<datalist id="ate-subtypes">${options.join('')}</datalist>
+    left.innerHTML = `
       <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
       <label class="ate-field"><span>Groupe <span class="muted small">(pour ranger tes cartes dans l'Atelier)</span></span>
         <input type="text" data-k="group" list="ate-groups" value="${esc(f.group || '')}" placeholder="Aucun : Dragons, Deck d'Ilona, À finir…" maxlength="30">
@@ -684,7 +675,7 @@ export class Atelier {
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
-      <label class="ate-field"><span>Sous-types</span><input type="text" data-k="subtypes" list="ate-subtypes" value="${esc(f.subtypes)}" placeholder="Humain Sorcier, Équipement, Nourriture, Forêt… (séparés par des espaces)"></label>
+      <div class="ate-field"><span>Sous-types</span>${this.subtypesHtml(f)}</div>
       ${this.subtypeHtml(f)}
       ${needsPT(f) ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
         <input type="number" data-k="power" value="${esc(f.power)}" min="0" max="99"> / <input type="number" data-k="toughness" value="${esc(f.toughness)}" min="0" max="99"></div>` : ''}
@@ -698,6 +689,138 @@ export class Atelier {
     this.renderLook();
     this.check();
     labelSelects(left);
+  }
+
+  /** La langue des noms de sous-types de la carte : celle choisie dans le sélecteur, sinon celle du texte de la carte. */
+  subLang(f = this.form) {
+    return f.subLang === 'en' || f.subLang === 'fr' ? f.subLang : f.lang === 'en' ? 'en' : 'fr';
+  }
+
+  /** Les sous-types en pastilles (toucher ✕ en retire un), le bouton qui ouvre le sélecteur, et la saisie au clavier. */
+  subtypesHtml(f) {
+    const lang = this.subLang(f);
+    const list = forgeSubtypes(f.subtypes);
+    return `<div class="ate-subbox">${list.map(en => `<span class="chip on ate-subchip">${esc(typeLabel(en, lang))}${typeLabel(en, lang) !== en && lang === 'fr'
+      ? `<small>${esc(en)}</small>` : ''}<button data-subdel="${esc(en)}" title="Retirer">✕</button></span>`).join('')}
+      <button class="chip ate-subadd" data-subpick>＋ ${list.length ? 'Ajouter' : 'Choisir les sous-types'}</button></div>
+      <details class="ate-subkb"><summary class="muted small">Saisie au clavier</summary>
+        <input type="text" data-k="subtypes" value="${esc(f.subtypes)}" placeholder="Humain Sorcier, ou Human Wizard (séparés par des espaces)"></details>`;
+  }
+
+  /**
+   * Sélecteur de types, avec recherche (sans accents, en français comme en anglais) et noms en français ou en anglais :
+   * multi (les sous-types de la carte) ou un seul type (un filtre « chaque Elfe… », « toutes » permis). onDone(types en
+   * anglais, langue choisie).
+   */
+  pickTypes({multi = false, current = [], title = 'Sous-types', allowAll = false, onDone}) {
+    const f = this.form;
+    let lang = this.subLang(f);
+    const chosen = new Set(current);
+    const creature = (this.typeList || (this.data.creatureTypes || []).map(en => ({en, fr: en})));
+    const custom = (this.data && this.data.types) || [];
+    const fits = (st) => st[2].some(t => f.types.includes(t));
+    // Les groupes : ceux qui vont avec la carte, les types perso, les types de créature, les autres sous-types.
+    const groups = multi ? [
+      ['Pour cette carte', SUBTYPES.filter(st => st[0] !== 'Mount' && fits(st)).map(st => ({en: st[0], fr: st[1], no: !!st[3].no}))],
+      ['Types perso', custom.map(t => ({en: t, fr: t}))],
+      ['Types de créature', creature.map(t => ({en: t.en, fr: t.fr || t.en}))],
+      ['Autres sous-types', SUBTYPES.filter(st => st[0] !== 'Mount' && !fits(st)).map(st => ({en: st[0], fr: st[1], no: !!st[3].no}))],
+    ] : [['Types perso', custom.map(t => ({en: t, fr: t}))], ['Types de créature', creature.map(t => ({en: t.en, fr: t.fr || t.en}))]];
+    const plain = (x) => String(x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    customBox(title, (body, footer, close) => {
+      body.innerHTML = `<div class="ate-tp-head"><div class="ate-tp-top">
+          <input type="search" class="ate-tpq" placeholder="Chercher : elfe, dragon, équipement, forêt…" enterkeyhint="search">
+          <div class="seg ate-tp-lang"><button data-tplang="fr">Français</button><button data-tplang="en">English</button></div>
+        </div>
+        ${multi ? '<div class="ate-tp-chosen chips"></div>' : ''}</div>
+        <div class="ate-tp-list"></div>`;
+      const input = body.querySelector('.ate-tpq');
+      const listBox = body.querySelector('.ate-tp-list');
+      const chosenBox = body.querySelector('.ate-tp-chosen');
+      const name = (t) => (lang === 'en' ? t.en : t.fr);
+      const other = (t) => (lang === 'en' ? t.fr : t.en);
+      const paint = () => {
+        body.querySelectorAll('[data-tplang]').forEach(b => b.classList.toggle('on', b.dataset.tplang === lang));
+        if (chosenBox) {
+          chosenBox.innerHTML = chosen.size ? [...chosen].map(en => `<button class="chip on" data-tpdel="${esc(en)}">${esc(typeLabel(en, lang))} ✕</button>`).join('')
+            : '<span class="muted small">Aucun sous-type pour l\'instant : touche ceux de la carte.</span>';
+        }
+        const q = plain(input.value.trim());
+        let html = allowAll && !q ? `<button class="ate-tp-item${!chosen.size ? ' on' : ''}" data-tpall>Toutes (aucun type)</button>` : '';
+        let exact = false;
+        for (const [label, items] of groups) {
+          // Par ordre alphabétique des noms affichés (« Ange », « Antilope »… en français ; « Angel »… en anglais).
+          const hits = items.filter(t => !q || plain(t.en).includes(q) || plain(t.fr).includes(q))
+            .sort((x, y) => plain(name(x)).localeCompare(plain(name(y)), lang));
+          if (!hits.length) {
+            continue;
+          }
+          exact = exact || hits.some(t => plain(t.en) === q || plain(t.fr) === q);
+          html += `<div class="ate-tplgroup">${esc(label)} <span class="ate-gn">${hits.length}</span></div>`
+            + hits.slice(0, q ? 400 : 1000).map(t => `<button class="ate-tp-item${chosen.has(t.en) ? ' on' : ''}" data-tp="${esc(t.en)}">
+              <span>${esc(name(t))}</span>${other(t) !== name(t) ? `<small>${esc(other(t))}</small>` : ''}${t.no ? '<small class="warn">sans sa mécanique</small>' : ''}
+              ${chosen.has(t.en) ? '<b>✓</b>' : ''}</button>`).join('');
+        }
+        // Un type qui n'est dans aucune liste (un type inventé) : on peut l'écrire tel quel.
+        if (q && !exact && /^[\p{L}][\p{L}'-]*$/u.test(input.value.trim())) {
+          html += `<button class="ate-tp-item" data-tpfree="${esc(input.value.trim())}"><span>Utiliser « ${esc(input.value.trim())} » tel quel</span>
+            <small>un type que Forge ne connaît pas : déclare-le dans « Types de créature perso »</small></button>`;
+        }
+        listBox.innerHTML = html || '<p class="muted small">Rien ne correspond.</p>';
+      };
+      paint();
+      input.addEventListener('input', paint);
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-tp],[data-tpdel],[data-tplang],[data-tpall],[data-tpfree]');
+        if (!b) {
+          return;
+        }
+        if (b.dataset.tplang) {
+          lang = b.dataset.tplang;
+        } else if (b.dataset.tpall !== undefined) {
+          close();
+          onDone([], lang);
+          return;
+        } else if (b.dataset.tpdel) {
+          chosen.delete(b.dataset.tpdel);
+        } else {
+          const en = b.dataset.tp || b.dataset.tpfree;
+          if (!multi) {
+            close();
+            onDone([en], lang);
+            return;
+          }
+          if (chosen.has(en)) {
+            chosen.delete(en);
+          } else {
+            chosen.add(en);
+          }
+          if (b.dataset.tpfree) {
+            input.value = '';
+          }
+        }
+        paint();
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel);
+      if (multi) {
+        const ok = el('<button class="btn gold">OK</button>');
+        ok.addEventListener('click', () => {
+          close();
+          onDone([...chosen], lang);
+        });
+        footer.append(ok);
+      }
+    }, {narrow: true});
+  }
+
+  /** Sous-types choisis (types de Forge) : écrits dans la langue choisie, puis reliés à leur mécanique. */
+  setSubtypes(list, lang) {
+    this.form.subLang = lang;
+    this.form.subtypes = list.map(en => typeLabel(en, lang)).join(' ');
+    this.subNotes = linkSubtypes(this.form);
+    this.renderLeft();
   }
 
   /**
@@ -743,7 +866,7 @@ export class Atelier {
     const c = f.caseCond || '';
     return `<select data-case="caseCond"><option value="">— choisir —</option>${list.map(([id, l]) => `<option value="${id}"${id === c ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${CONDITIONS_N.includes(c) ? `<input type="number" data-case="caseN" value="${esc(f.caseN ?? 3)}" min="0" max="99" style="width:64px" title="N">` : ''}
-      ${c === 'control' ? `<input type="text" data-case="caseType" list="ate-subtypes" value="${esc(f.caseType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}`;
+      ${c === 'control' ? `<input type="text" data-case="caseType" data-typepick readonly value="${esc(f.caseType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}`;
   }
 
   /** Mots-clés par groupes repliables (ou ceux qui correspondent à la recherche), puis la valeur de ceux qui en ont une. */
@@ -767,7 +890,7 @@ export class Atelier {
       }
       if (k[4] === 'type') {
         return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}</span>
-          <input type="text" class="ate-kwv-text" data-kwv="${esc(k[0])}" list="ate-subtypes" value="${esc(keywordValue(f, k[0]))}" placeholder="un type de créature : Elfe"></label>`;
+          <input type="text" class="ate-kwv-text" data-kwv="${esc(k[0])}" data-typepick readonly value="${esc(keywordValue(f, k[0]))}" placeholder="un type de créature : Elfe"></label>`;
       }
       return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}${k[4] === 'gen' ? ' (coût générique)' : ''}</span>
         <input type="number" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" min="${k[4] === 'gen' ? 0 : 1}" max="20"></label>`;
@@ -1005,7 +1128,7 @@ export class Atelier {
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tapX"${a.tapX ? ' checked' : ''}> engager X</label>
         ${a.tapX ? `<select data-a="tapXWhat">${TAP_WHAT.map(([v, l]) => `<option value="${v}"${v === (a.tapXWhat || 'token') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-          ${a.tapXWhat === 'type' ? `<input type="text" data-a="tapXType" list="ate-subtypes" value="${esc(a.tapXType || '')}" placeholder="un type : Elf" style="width:120px">` : ''}
+          ${a.tapXWhat === 'type' ? `<input type="text" data-a="tapXType" data-typepick readonly value="${esc(a.tapXType || '')}" placeholder="un type : Elf" style="width:120px">` : ''}
           <span class="muted small">dégagés que vous contrôlez (X au choix en jouant)</span>` : ''}</div>
         <details class="ate-more ate-costs"${moreCosts || this.costOpen.has(i) ? ' open' : ''} data-costs="${i}"><summary>Autres coûts et restrictions${moreCosts ? ' <b class="ate-kwn">✓</b>' : ''}
           <span class="muted small">— PV, défausse, sacrifice, {Q}, rituel, cimetière…</span></summary>
@@ -1037,7 +1160,7 @@ export class Atelier {
       ${e.modal ? this.modesHtml(a) : ''}
       ${this.optionRows(a, e, 'a', i)}
       ${filterShown ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
-        <input type="text" data-a="ftype" list="ate-subtypes" value="${esc((a.filter || {}).type || '')}" placeholder="toutes, ou un type : Elf" style="width:170px">
+        <input type="text" data-a="ftype" data-typepick readonly value="${esc((a.filter || {}).type || '')}" placeholder="toutes, ou un type : Elf" style="width:170px">
         ${otherShown ? `<label class="ate-check"><input type="checkbox" data-a="fother"${(a.filter || {}).other ? ' checked' : ''}> autres que celle-ci</label>` : ''}</div>` : ''}
       ${isStatic ? this.staticCondHtml(a, e) : ''}
       ${!e.modal && !isStatic ? this.moreHtml(a, i, e) : ''}
@@ -1076,11 +1199,11 @@ export class Atelier {
     }
     if (e.spellType) {
       out += row('Quels sorts', sel('spellType', SPELL_TYPES.map(t => [t[0], t[2]]), h.spellType || 'all')
-        + (h.spellType === 'type' ? `<input type="text" data-${attr}="spellTypeName" list="ate-subtypes" value="${esc(h.spellTypeName || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
+        + (h.spellType === 'type' ? `<input type="text" data-${attr}="spellTypeName" data-typepick readonly value="${esc(h.spellTypeName || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
     }
     if (e.amountSel) {
       out += row('X =', sel('amount', AMOUNTS.filter(([v]) => !['fixed', 'tapped', 'xPaid'].includes(v)).map(([v, l]) => [v, l.replace(/^X = /, '')]), h.amount && h.amount !== 'fixed' ? h.amount : 'creatures')
-        + (h.amount === 'typeCount' ? `<input type="text" data-${attr}="amountType" list="ate-subtypes" value="${esc(h.amountType || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
+        + (h.amount === 'typeCount' ? `<input type="text" data-${attr}="amountType" data-typepick readonly value="${esc(h.amountType || '')}" placeholder="un type : Elf" style="width:120px">` : ''));
     }
     if (e.emblem) {
       const em = h.emblem || 'anthem';
@@ -1103,7 +1226,7 @@ export class Atelier {
     return `<div class="ate-ab-row"><span class="muted small">Tant que</span>
       <select data-a="cond">${list.map(([v, l]) => `<option value="${v}"${v === cond ? ' selected' : ''}>${esc(v === 'none' ? 'Toujours' : l.replace(/^Si /, '').replace(/^S'il /, 'Il '))}</option>`).join('')}</select>
       ${CONDITIONS_N.includes(cond) ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
-      ${cond === 'control' ? `<input type="text" data-a="condType" list="ate-subtypes" value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
+      ${cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
   }
 
   /** Loyauté d'une capacité de planeswalker au doigt (le clavier des téléphones n'a pas toujours le signe moins). */
@@ -1180,7 +1303,7 @@ export class Atelier {
         ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
       ${this.optionRows(m, e, 'sf', null)}
       ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
-        <input type="text" data-sf="ftype" list="ate-subtypes" value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
+        <input type="text" data-sf="ftype" data-typepick readonly value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
         <label class="ate-check"><input type="checkbox" data-sf="fother"${f.other ? ' checked' : ''}> autres que celle-ci</label></div>` : ''}
       ${sub === 'then' ? this.thenCondHtml(a, m) : ''}
     </div>`;
@@ -1193,7 +1316,7 @@ export class Atelier {
     return `<div class="ate-ab-row"><span class="muted small">Seulement</span>
       <select data-sf="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
-      ${m.cond === 'control' ? `<input type="text" data-sf="condType" list="ate-subtypes" value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
+      ${m.cond === 'control' ? `<input type="text" data-sf="condType" data-typepick readonly value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>`;
   }
 
   /** Les modes de « Choisissez l'un — » : chacun son effet et ses réglages ; 2 ou 3 modes. */
@@ -1221,7 +1344,7 @@ export class Atelier {
     const amounts = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped);
     const amount = e.n && !e.mana ? `<div class="ate-ab-row"><span class="muted small">Nombre</span>
         <select data-a="amount">${amounts.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-        ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" list="ate-subtypes" value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}</div>` : '';
+        ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" data-typepick readonly value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}</div>` : '';
     const cond = CONDITIONS_N.includes(a.cond);
     return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
       <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre X, condition, « et puis »</span></summary>
@@ -1229,7 +1352,7 @@ export class Atelier {
       <div class="ate-ab-row"><span class="muted small">Seulement</span>
         <select data-a="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
-        ${a.cond === 'control' ? `<input type="text" data-a="condType" list="ate-subtypes" value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>
+        ${a.cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}</div>
       <div class="ate-modes">${then.map((m, k) => this.subEffectHtml(a, m, k, 'then', 'Et puis', true)).join('')}
         ${then.length < 2 ? '<button class="btn small" data-addsub="then">＋ Et puis… (un autre effet)</button>' : ''}</div>
     </details>`;
@@ -1239,11 +1362,34 @@ export class Atelier {
     if (this.pressed()) {
       return;
     }
+    // Un champ « un type : Elfe » : le sélecteur de types (au lieu de la liste du téléphone, qui sautait).
+    const tp = e.target.closest('input[data-typepick]');
+    if (tp) {
+      e.preventDefault();
+      this.pickTypes({title: tp.dataset.kwv !== undefined ? 'Type de créature' : 'Créatures d\'un type', current: tp.value ? forgeSubtypes(tp.value) : [],
+        allowAll: tp.dataset.kwv === undefined, onDone: (list, lang) => {
+          tp.value = list.length ? typeLabel(list[0], lang) : '';
+          tp.dispatchEvent(new Event('input', {bubbles: true}));
+          tp.dispatchEvent(new Event('change', {bubbles: true}));
+        }});
+      return;
+    }
     const b = e.target.closest('button');
     if (!b) {
       return;
     }
     const f = this.form;
+    if (b.dataset.subpick !== undefined) {
+      this.pickTypes({multi: true, current: forgeSubtypes(f.subtypes), onDone: (list, lang) => this.setSubtypes(list, lang)});
+      return;
+    }
+    if (b.dataset.subdel) {
+      // Retirer « Équipement » retire aussi le mot-clé qui le donnait (sinon la carte resterait un équipement).
+      const gone = b.dataset.subdel;
+      f.keywords = f.keywords.filter(k => keywordOptions(k).sub !== gone);
+      this.setSubtypes(forgeSubtypes(f.subtypes).filter(t => t !== gone), this.subLang());
+      return;
+    }
     const mana = b.closest('[data-mana]');
     if (mana) {
       this.manaClick(mana, b);

@@ -239,7 +239,24 @@ function openList(select, button) {
   place(panel, button);
   if (sheet && window.visualViewport) {
     // Le clavier qui s'ouvre (la recherche) rétrécit l'écran : le panneau suit, il ne se ferme pas.
-    panel._onViewport = () => place(panel, button);
+    // Une seule mise en place par image, et seulement si la partie visible a vraiment changé (pas de tremblement).
+    let last = '';
+    let queued = false;
+    panel._onViewport = () => {
+      if (queued) {
+        return;
+      }
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const v = window.visualViewport;
+        const key = `${Math.round(v.width)}x${Math.round(v.height)}@${Math.round(v.offsetTop)},${Math.round(v.offsetLeft)}`;
+        if (key !== last && openPanel === panel) {
+          last = key;
+          place(panel, button);
+        }
+      });
+    };
     window.visualViewport.addEventListener('resize', panel._onViewport);
     window.visualViewport.addEventListener('scroll', panel._onViewport);
   }
@@ -284,13 +301,15 @@ function place(panel, button) {
     panel.classList.toggle('compact', vh < 420);
     const width = Math.min(landscape ? 620 : 560, vw - 16);
     const maxH = Math.max(160, Math.min(vh - 16, landscape ? vh - 16 : vh * 0.86));
+    const search = !!panel.querySelector('.csel-search');
     panel.style.width = width + 'px';
     panel.style.maxHeight = maxH + 'px';
-    // Avec une recherche, le panneau garde sa hauteur pendant qu'on tape (il ne saute pas à chaque lettre).
-    panel.style.height = panel.querySelector('.csel-search') ? maxH + 'px' : '';
-    panel.style.left = (left0 + (vw - width) / 2) + 'px';
+    // Avec une recherche, le panneau garde sa hauteur pendant qu'on tape (il ne saute pas à chaque lettre), et il reste
+    // calé en haut : le clavier qui s'ouvre en bas ne le pousse pas.
+    panel.style.height = search ? maxH + 'px' : '';
+    panel.style.left = Math.round(left0 + (vw - width) / 2) + 'px';
     const h = Math.min(maxH, panel.scrollHeight);
-    panel.style.top = (top0 + (landscape ? Math.max(8, (vh - h) / 2) : vh - h - 8)) + 'px';
+    panel.style.top = Math.round(top0 + (search ? 8 : Math.max(8, (vh - h) / 2))) + 'px';
     return;
   }
   const r = button.getBoundingClientRect();

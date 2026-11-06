@@ -824,6 +824,11 @@ function registerSubtypes() {
 }
 registerSubtypes();
 
+/** Le nom d'un type dans une langue : « Elf » → « Elfe » en français ; un type sans traduction reste tel quel. */
+export function typeLabel(en, lang = 'fr') {
+  return lang === 'en' ? en : typeFr.get(en) || en;
+}
+
 /** Un sous-type de la table (« Food ») : [type, nom français, types de carte, mécanique], ou null. */
 export function subtypeInfo(en) {
   return SUB_BY.get(en) || null;
