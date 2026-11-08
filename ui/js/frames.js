@@ -123,7 +123,7 @@ function rulesScale(text, box) {
   }
   for (let s = 1; s > 0.45; s -= 0.03) {
     const size = 6 * s;
-    if (lineCount(paras, size, box.w) * size * 1.16 <= box.h) {
+    if (lineCount(paras, size, box.w) * size * 1.08 <= box.h) {
       return Math.round(s * 100) / 100;
     }
   }
@@ -272,12 +272,8 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
   // Texte long : la zone de texte (et le bandeau du type) remonte sur l'illustration, jusqu'à 18 % de la hauteur de la
   // carte, pour garder un texte lisible plutôt que de le réduire (une carte fait 140 unités de haut).
   const full = flavor ? `${text}\n${flavor}` : text;
-  let grow = 0;
-  if (rulesScale(full, box) < 0.85) {
-    for (grow = 4; grow < 18 && rulesScale(full, {...box, h: box.h + grow * 1.4}) < 0.85; grow += 2) {
-      // agrandir encore
-    }
-  }
+  // Proportions d'une vraie carte : la boîte de texte garde sa place, le texte se resserre pour tenir.
+  const grow = 0;
   const sr = known ? known.sr : rulesScale(full, grow ? {...box, h: box.h + grow * 1.4} : box);
   const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}${grow ? `;--grow:${grow}%` : ''}`;
   const overlay = style === IMPORTED ? `<div class="cf-overlay" style="background-image:url(&quot;${esc(frameUrl)}&quot;)"></div>` : '';

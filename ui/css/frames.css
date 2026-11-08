@@ -75,12 +75,12 @@
 
 /* Boîte de texte : parchemin teinté. */
 .cf-box {
-  top: 62.6%; bottom: 8.4%; left: 7.4%; right: 7.4%; display: flex; align-items: center; padding: 2.6% 3.6%;
+  top: 62.6%; bottom: 8.4%; left: 7.4%; right: 7.4%; display: flex; align-items: center; padding: 1.8% 2.8%;
   background: linear-gradient(180deg, rgb(255 255 255 / 0.35), rgb(255 255 255 / 0) 30%), var(--paper), var(--split-x);
   background-size: auto, calc(var(--u) * 50), auto;
   box-shadow: 0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.7), 0 0 0 calc(var(--u) * 0.9) var(--e), inset 0 0 calc(var(--u) * 3) rgb(0 0 0 / 0.14);
 }
-.cf-rules { width: 100%; max-height: 100%; overflow: hidden; white-space: pre-line; font-size: calc(var(--u) * 6 * var(--sr)); line-height: 1.16; }
+.cf-rules { width: 100%; max-height: 100%; overflow: hidden; white-space: pre-line; font-size: calc(var(--u) * 6 * var(--sr)); line-height: 1.08; }
 /* Texte long : la boîte de texte s'agrandit vers le haut (marge négative : son bas ne bouge pas) et le bandeau du type
    remonte avec elle, par-dessus le bas de l'illustration (--grow : en % de la hauteur de la carte, posé par frames.js). */
 .frame.cf.cf-grow .cf-box { margin-top: calc(var(--grow) * -1.4); }
@@ -95,7 +95,7 @@
 .frame.cf.cf-notext.cf-future.cf-fullart .cf-icon { display: none; }
 .frame.cf.cf-grow .cf-type, .frame.cf.cf-grow .cf-icon { margin-top: calc(var(--grow) * -1.4); }
 /* Texte d'ambiance d'une carte perso : en italique, sous un trait fin, comme sur les cartes imprimées. */
-.cf-flavor { margin-top: .45em; padding-top: .35em; border-top: 1px solid currentColor; border-top-color: rgb(0 0 0 / .28); font-style: italic; white-space: normal; }
+.cf-flavor { margin-top: .3em; padding-top: .25em; border-top: 1px solid currentColor; border-top-color: rgb(0 0 0 / .28); font-style: italic; white-space: normal; }
 .cf-light .cf-flavor { border-top-color: rgb(255 255 255 / .35); }
 .cf-rules .ms { width: 1.05em; height: 1.05em; font-size: 0.86em; vertical-align: middle; position: relative; top: -0.05em; }
 .cf-rules .ms.ms-hybrid:empty { font-size: 0.86em; }

@@ -2,6 +2,11 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.9 — Proportions des cartes perso
+
+### Corrections
+- **Cartes perso à long texte** : la boîte de texte ne monte plus sur l'illustration, la carte garde les proportions d'une vraie carte Magic. Le texte reste lisible grâce à un interligne et des marges plus serrés.
+
 ## 0.6.8 — Autres illustrations des cartes perso, terrains full art, sorts en X
 
 ### Atelier
