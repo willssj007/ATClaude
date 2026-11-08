@@ -442,6 +442,49 @@ export const ANIM_KINDS = [
   ['noncreature', 'Permanents non-créatures', 'Permanent.nonCreature', 'les permanents non-créatures', 'noncreature permanents'],
 ];
 
+/** « Explorer », « comploter », « endurer » : qui le fait. */
+export const MECH_WHO = [['self', 'Elle (cette carte)'], ['target', 'Une créature ciblée que vous contrôlez'], ['two', 'Jusqu\'à deux créatures ciblées que vous contrôlez'],
+  ['each', 'Chaque créature que vous contrôlez']];
+
+/** Ce qui gagne « {T} : Ajoutez un mana de la couleur de votre choix » : [id, libellé, type pour Forge, « Les … », anglais]. */
+export const MANA_KINDS = [['lands', 'Terrains', 'Land', 'Les terrains', 'Lands'], ['creatures', 'Créatures', 'Creature', 'Les créatures', 'Creatures'],
+  ['artifacts', 'Artefacts', 'Artifact', 'Les artefacts', 'Artifacts'], ['nonland', 'Permanents non-terrain', 'Permanent.nonLand', 'Les permanents non-terrain', 'Nonland permanents']];
+
+/** Pluriel ciblé et « chaque … » de chaque type de PERM_TYPES : [fr ciblés, en, chaque (fr), each (en)]. */
+const PERM_PLURAL = {
+  creature: ['créatures ciblées', 'target creatures', 'chaque créature', 'each creature'],
+  oppCreature: ['créatures ciblées que vos adversaires contrôlent', 'target creatures your opponents control', 'chaque créature qu\'un adversaire contrôle',
+    'each creature an opponent controls'],
+  artifact: ['artefacts ciblés', 'target artifacts', 'chaque artefact', 'each artifact'],
+  enchantment: ['enchantements ciblés', 'target enchantments', 'chaque enchantement', 'each enchantment'],
+  artEnch: ['artefacts et enchantements ciblés', 'target artifacts and/or enchantments', 'chaque artefact et chaque enchantement', 'each artifact and each enchantment'],
+  land: ['terrains ciblés', 'target lands', 'chaque terrain', 'each land'],
+  nonbasicLand: ['terrains non-base ciblés', 'target nonbasic lands', 'chaque terrain non-base', 'each nonbasic land'],
+  planeswalker: ['planeswalkers ciblés', 'target planeswalkers', 'chaque planeswalker', 'each planeswalker'],
+  creaturePw: ['créatures et planeswalkers ciblés', 'target creatures and/or planeswalkers', 'chaque créature et chaque planeswalker', 'each creature and each planeswalker'],
+  nonland: ['permanents non-terrain ciblés', 'target nonland permanents', 'chaque permanent non-terrain', 'each nonland permanent'],
+  oppNonland: ['permanents non-terrain ciblés que vos adversaires contrôlent', 'target nonland permanents your opponents control',
+    'chaque permanent non-terrain qu\'un adversaire contrôle', 'each nonland permanent an opponent controls'],
+  permanent: ['permanents ciblés', 'target permanents', 'chaque permanent', 'each permanent'],
+};
+
+/** Un type de Forge (« Artifact,Enchantment ») avec une propriété en plus (« cmcLE3 ») sur chacune de ses parties. */
+function withProp(valid, prop) {
+  return valid.split(',').map(v => `${v}${v.includes('.') ? '+' : '.'}${prop}`).join(',');
+}
+
+/** Qui explore, complote ou endure : [paramètres de Forge, sujet fr, sujet en, pluriel]. */
+function mechWhoOf(a) {
+  const who = MECH_WHO.some(w => w[0] === a.mechWho) ? a.mechWho : a.when === 'spell' ? 'target' : 'self';
+  const tgt = 'ValidTgts$ Creature.YouCtrl | TgtPrompt$ Choisissez une créature ciblée que vous contrôlez';
+  switch (who) {
+    case 'target': return [tgt, 'une créature ciblée que vous contrôlez', 'target creature you control', false];
+    case 'two': return [`${tgt} | TargetMin$ 0 | TargetMax$ 2`, 'jusqu\'à deux créatures ciblées que vous contrôlez', 'up to two target creatures you control', true];
+    case 'each': return ['Defined$ Valid Creature.YouCtrl', 'chaque créature que vous contrôlez', 'each creature you control', false];
+    default: return ['Defined$ Self', 'CARDNAME', 'CARDNAME', false];
+  }
+}
+
 /** « Maîtriser l'Air » : sur quoi. */
 export const AIR_KINDS = [['creature', 'Créatures', 'Creature', 'créature ciblée', 'créatures ciblées', 'creature'],
   ['nonland', 'Permanents non-terrains', 'Permanent.nonLand', 'permanent non-terrain ciblé', 'permanents non-terrains ciblés', 'nonland permanent']];
@@ -576,7 +619,7 @@ export const EFFECTS = [
   {id: 'regenerateTarget', group: 'creatures', label: 'Régénérer une créature ciblée'},
   {id: 'mustBlock', group: 'creatures', label: 'Une créature ciblée bloque cette créature ce tour-ci si elle le peut'},
   {id: 'removeFromCombat', group: 'creatures', label: 'Retirer du combat une créature attaquante ou bloqueuse ciblée'},
-  {id: 'endure', group: 'creatures', label: 'Elle endure N (marqueurs +1/+1 ou un jeton Esprit N/N)', n: true, self: true},
+  {id: 'endure', group: 'creatures', label: 'Endurer N : elle, une ou deux créatures ciblées, ou chaque créature (marqueurs +1/+1 ou un jeton Esprit N/N)', n: true, mechWho: true},
   {id: 'sacrificeEndStep', group: 'creatures', label: 'La sacrifier au début de la prochaine étape de fin', self: true},
   {id: 'exileEndStep', group: 'creatures', label: 'L\'exiler au début de la prochaine étape de fin', self: true},
   {id: 'flicker', group: 'creatures', label: 'Exiler une créature ciblée que vous contrôlez, puis la renvoyer sur le champ de bataille'},
@@ -607,11 +650,15 @@ export const EFFECTS = [
   {id: 'destroyTyped', group: 'removal', label: 'Détruire un permanent ciblé d\'un type (artefact, terrain, planeswalker…)', pt: true},
   {id: 'wrath', group: 'removal', label: 'Détruire toutes les créatures'},
   {id: 'destroyAllTyped', group: 'removal', label: 'Détruire tous les permanents d\'un type (au choix)', pt: true},
+  {id: 'destroyN', group: 'removal', label: 'Détruire N (ou X) permanents ciblés d\'un type', n: true, pt: true},
+  {id: 'destroyMv', group: 'removal', label: 'Détruire chaque permanent d\'un type de valeur de mana N (ou X) ou moins', n: true, pt: true},
   {id: 'edict', group: 'removal', label: 'Chaque adversaire sacrifie une créature'},
   {id: 'sacrificeEach', group: 'removal', label: 'Chaque joueur sacrifie une créature'},
   {id: 'exile', group: 'removal', label: 'Exiler une créature ciblée'},
   {id: 'exileTyped', group: 'removal', label: 'Exiler un permanent ciblé d\'un type (au choix)', pt: true},
   {id: 'exileAllTyped', group: 'removal', label: 'Exiler tous les permanents d\'un type (au choix)', pt: true},
+  {id: 'exileN', group: 'removal', label: 'Exiler N (ou X) permanents ciblés d\'un type', n: true, pt: true},
+  {id: 'exileMv', group: 'removal', label: 'Exiler chaque permanent d\'un type de valeur de mana N (ou X) ou moins', n: true, pt: true},
   {id: 'bounce', group: 'removal', label: 'Renvoyer une créature ciblée dans la main'},
   {id: 'bounceTyped', group: 'removal', label: 'Renvoyer un permanent ciblé d\'un type dans la main', pt: true},
   {id: 'bounceAllTyped', group: 'removal', label: 'Renvoyer tous les permanents d\'un type dans la main', pt: true},
@@ -676,10 +723,10 @@ export const EFFECTS = [
   {id: 'emblem', group: 'turns', label: 'Obtenir un emblème (effet permanent pour toute la partie)', emblem: true},
   {id: 'winGame', group: 'turns', label: 'Gagner la partie'},
   {id: 'discover', group: 'mech', label: 'Découvrir N', n: true},
-  {id: 'explore', group: 'mech', label: 'Explorer', self: true},
+  {id: 'explore', group: 'mech', label: 'Explorer : elle, une ou deux créatures ciblées, ou chaque créature', mechWho: true},
   {id: 'earthbend', group: 'mech', label: 'Maîtriser la Terre N (un terrain que vous contrôlez devient une créature 0/0 avec la célérité et N marqueurs +1/+1)', n: true},
   {id: 'airbend', group: 'mech', label: 'Maîtriser l\'Air sur une créature (ou un permanent) ciblée : exilée, son propriétaire peut la relancer pour {2}', n: true, airKind: true},
-  {id: 'connive', group: 'mech', label: 'Comploter', self: true},
+  {id: 'connive', group: 'mech', label: 'Comploter : elle, une ou deux créatures ciblées, ou chaque créature', mechWho: true},
   {id: 'investigate', group: 'mech', label: 'Enquêter (jetons Indice)', n: true},
   {id: 'incubate', group: 'mech', label: 'Incuber N', n: true},
   {id: 'manifest', group: 'mech', label: 'Manifester la carte du dessus de votre bibliothèque'},
@@ -750,6 +797,7 @@ export const EFFECTS = [
   {id: 'playersCantGainLife', group: 'stPlayer', label: 'Les joueurs ne peuvent pas gagner de points de vie', only: ['static']},
   {id: 'cantPreventDamage', group: 'stPlayer', label: 'Les blessures ne peuvent pas être prévenues', only: ['static']},
   {id: 'playLandsGraveyard', group: 'stPlayer', label: 'Vous pouvez jouer des terrains depuis votre cimetière', only: ['static']},
+  {id: 'grantManaAny', group: 'stPlayer', label: 'Vos terrains (ou créatures, artefacts…) ont « {T} : Ajoutez un mana de la couleur de votre choix »', manaKind: true, only: ['static']},
   {id: 'animateStatic', group: 'stPlayer', label: 'Vos terrains, artefacts, enchantements… sont des créatures N/N (d\'un type, au choix) en plus de leurs autres types', n: true, anim: 'static', only: ['static']},
   {id: 'doubleTokens', group: 'stRepl', label: 'Vos effets créent deux fois plus de jetons', only: ['static']},
   {id: 'doubleCounters', group: 'stRepl', label: 'Deux fois plus de marqueurs +1/+1 sur vos créatures', only: ['static']},
@@ -1534,7 +1582,10 @@ function chainOf(a, id, lang) {
     return null;
   }
   const xName = `${id}X`;
-  const toForge = (l) => (x ? l.replace(/\b7777\b/g, xName) : l);
+  // Dans un type de Forge (« Creature.cmcLE… »), DestroyAll remplace chaque « X » par la valeur de la variable X : le
+  // compte y porte un nom sans X (« Atelier1V »).
+  const vName = `${id}V`;
+  const toForge = (l) => (x ? l.replace(/cmc(LE|GE|EQ|LT|GT)7777(?!\d)/g, `cmc$1${vName}`).replace(/(?<!\d)7777(?!\d)/g, xName) : l);
   const toText = (l) => (x ? l.replace(/\b7777\b/g, 'X') : l);
   const suffix = x && x[1] ? (en ? `, where X is ${x[2]}` : `, X étant ${x[1]}`) : '';
   const items = [{head: toForge(main.p), extra: (main.extra || []).map(toForge), aux: (main.aux || []).map(toForge), text: toText(en ? main.en : main.fr) + suffix}];
@@ -1575,6 +1626,9 @@ function chainOf(a, id, lang) {
   const svars = [...items[0].extra, ...items[0].aux];
   if (x) {
     svars.push(`SVar:${xName}:${x[0]}`);
+    if ([items[0].head, ...items[0].extra].some(l => l.includes(vName))) {
+      svars.push(`SVar:${vName}:${x[0]}`);
+    }
   }
   if (cond && cond.count) {
     svars.push(`SVar:${id}C:${cond.count}`);
@@ -2493,8 +2547,10 @@ function effectBase(a, id) {
     case 'removeFromCombat':
       return {p: `RemoveFromCombat | ${target({v: 'Creature.attacking,Creature.blocking', prompt: 'Choisissez une créature attaquante ou bloqueuse ciblée'})}`,
         fr: 'retirez du combat une créature attaquante ou bloqueuse ciblée', en: 'remove target attacking or blocking creature from combat'};
-    case 'endure':
-      return {p: `Endure | Num$ ${n1}`, fr: `CARDNAME endure ${n1}`, en: `CARDNAME endures ${n1}`};
+    case 'endure': {
+      const w = mechWhoOf(a);
+      return {p: `Endure | ${w[0]} | Num$ ${n1}`, fr: `${w[1]} ${w[3] ? 'endurent' : 'endure'} ${n1}`, en: w[3] ? `${w[2]} each endure ${n1}` : `${w[2]} endures ${n1}`};
+    }
     case 'sacrificeEndStep':
       return {p: `DelayedTrigger | Mode$ Phase | Phase$ End of Turn | Execute$ ${id}Sac | TriggerDescription$ Sacrifiez CARDNAME.`,
         aux: [`SVar:${id}Sac:DB$ Sacrifice | SacValid$ Self`], fr: 'sacrifiez CARDNAME au début de la prochaine étape de fin',
@@ -2638,10 +2694,14 @@ function effectBase(a, id) {
         en: `target player gets ${n1 === 1 ? 'a poison counter' : word(n1, 'en') + ' poison counters'}`};
     case 'discover':
       return {p: `Discover | Num$ ${n1}`, fr: `découvrez ${n1}`, en: `discover ${n1}`};
-    case 'explore':
-      return {p: 'Explore', fr: 'CARDNAME explore', en: 'CARDNAME explores'};
-    case 'connive':
-      return {p: 'Connive | Defined$ Self', fr: 'CARDNAME complote', en: 'CARDNAME connives'};
+    case 'explore': {
+      const w = mechWhoOf(a);
+      return {p: `Explore | ${w[0]}`, fr: `${w[1]} ${w[3] ? 'explorent' : 'explore'}`, en: w[3] ? `${w[2]} each explore` : `${w[2]} explores`};
+    }
+    case 'connive': {
+      const w = mechWhoOf(a);
+      return {p: `Connive | ${w[0]}`, fr: `${w[1]} ${w[3] ? 'complotent' : 'complote'}`, en: w[3] ? `${w[2]} each connive` : `${w[2]} connives`};
+    }
     case 'investigate':
       return {p: `Investigate | Num$ ${n1}`, fr: n1 === 1 ? 'enquêtez' : `enquêtez ${n1 === 2 ? 'deux fois' : word(n1, 'fr') + ' fois'}`,
         en: n1 === 1 ? 'investigate' : `investigate ${n1 === 2 ? 'twice' : word(n1, 'en') + ' times'}`};
@@ -2805,6 +2865,29 @@ function effectBase(a, id) {
     case 'exileTyped': {
       const t = permType(a);
       return {p: `ChangeZone | ${target({v: t[1], prompt: `Choisissez ${t[2]}`})} | Origin$ Battlefield | Destination$ Exile`, fr: `exilez ${t[2]}`, en: `exile ${t[3]}`};
+    }
+    case 'destroyN':
+    case 'exileN': {
+      // « Détruisez deux créatures ciblées », « Exilez X artefacts ciblés » (X payé en lançant le sort).
+      const t = permType(a);
+      const pl = PERM_PLURAL[t[0]] || PERM_PLURAL.permanent;
+      const k = n1;
+      const verb = a.effect === 'destroyN' ? ['Destroy', 'détruisez', 'destroy'] : ['ChangeZone | Origin$ Battlefield | Destination$ Exile', 'exilez', 'exile'];
+      const num = (lang) => (k < 20 ? word(k, lang) : String(k));
+      return {p: `${verb[0]} | ValidTgts$ ${t[1]} | TgtPrompt$ Choisissez les ${pl[0]} | TargetMin$ ${k} | TargetMax$ ${k}`,
+        fr: k === 1 ? `${verb[1]} ${t[2]}` : `${verb[1]} ${num('fr')} ${pl[0]}`,
+        en: k === 1 ? `${verb[2]} ${t[3]}` : `${verb[2]} ${num('en')} ${pl[1]}`};
+    }
+    case 'destroyMv':
+    case 'exileMv': {
+      // « Détruisez chaque artefact dont la valeur de mana est inférieure ou égale à X. »
+      const t = permType(a);
+      const pl = PERM_PLURAL[t[0]] || PERM_PLURAL.permanent;
+      const valid = withProp(t[1], `cmcLE${n}`);
+      const destroy = a.effect === 'destroyMv';
+      return {p: destroy ? `DestroyAll | ValidCards$ ${valid}` : `ChangeZoneAll | ChangeType$ ${valid} | Origin$ Battlefield | Destination$ Exile`,
+        fr: `${destroy ? 'détruisez' : 'exilez'} ${pl[2]} dont la valeur de mana est inférieure ou égale à ${n}`,
+        en: `${destroy ? 'destroy' : 'exile'} ${pl[3]} with mana value ${n} or less`};
     }
     case 'exileAllTyped': {
       const t = permType(a);
@@ -3123,6 +3206,14 @@ function staticCore(a, id, lang, card) {
       return {s: 'Mode$ CantGainLife | ValidPlayer$ Player', text: en ? 'Players can\'t gain life' : 'Les joueurs ne peuvent pas gagner de points de vie'};
     case 'cantPreventDamage':
       return {s: 'Mode$ CantPreventDamage', text: en ? 'Damage can\'t be prevented' : 'Les blessures ne peuvent pas être prévenues'};
+    case 'grantManaAny': {
+      // Comme la Lanterne chromatique : « Les terrains que vous contrôlez ont « {T} : Ajoutez un mana de la couleur de votre choix. » »
+      const k = MANA_KINDS.find(x => x[0] === a.manaKind) || MANA_KINDS[0];
+      const ab = en ? 'Add one mana of any color.' : 'Ajoutez un mana de la couleur de votre choix.';
+      return {s: `Mode$ Continuous | Affected$ ${k[2]}${k[2].includes('.') ? '+' : '.'}YouCtrl | AddAbility$ ${id}Mana`,
+        svars: [`SVar:${id}Mana:AB$ Mana | Cost$ T | Produced$ Any | SpellDescription$ ${ab}`],
+        text: en ? `${k[4]} you control have "{T}: ${ab}"` : `${k[3]} que vous contrôlez ont « {T} : ${ab} »`};
+    }
     case 'animateStatic': {
       const m = animParts(a);
       return {s: `Mode$ Continuous | Affected$ ${m.v} | AddType$ Creature${m.t ? ' & ' + m.t : ''} | SetPower$ ${n} | SetToughness$ ${n}`,
@@ -3317,7 +3408,7 @@ function staticLines(a, id, lang, card) {
   if (cond && cond.aw) {
     words.push(cond.aw[en ? 1 : 0]);
   }
-  text = (words.length ? words.join(' — ') + ' — ' : '') + text + '.';
+  text = endDot((words.length ? words.join(' — ') + ' — ' : '') + text);
   const svars = [...(core.svars || [])];
   if (cond && cond.count) {
     svars.push(`SVar:${id}C:${cond.count}`);
@@ -3557,7 +3648,8 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
   if (w.kind === 'SP') {
     const c = spellCost(a, lang, card);
     const text = c.text + withWord(e.aw, endDot(capitalize(body)));
-    return {lines: [`A:SP$ ${e.p}${c.forge} | SpellDescription$ ${withWord(e.aw, endDot(capitalize(body)))}`, ...extra], text};
+    // Sur la pile et dans le journal : le texte de la carte (sinon Forge écrit le sien, en anglais : « Grizzlis explores »).
+    return {lines: [`A:SP$ ${e.p}${c.forge} | SpellDescription$ ${withWord(e.aw, endDot(capitalize(body)))} | StackDescription$ SpellDescription`, ...extra], text};
   }
   if (w.kind === 'A') {
     if (a.when === 'loyalty') {
@@ -4199,6 +4291,11 @@ export function buildScript(form) {
     const [k] = lines.splice(over, 1);
     const lastSp = lines.reduce((m, l, i) => (l.startsWith('A:SP$') ? i : m), -1);
     lines.splice(lastSp >= 0 ? lastSp + 1 : lines.length, 0, k);
+  }
+  // Un sort avec {X} dans son coût, dont un effet vaut X (« Détruisez X créatures ciblées ») : Forge lit le X payé dans la
+  // variable X de la carte ; sans elle, il paie X = 0 quel que soit le X annoncé.
+  if (/\bX\b/.test(forgeCost(f.cost) || '') && lines.some(l => /Count\$xPaid/.test(l)) && !lines.some(l => l.startsWith('SVar:X:'))) {
+    lines.push('SVar:X:Count$xPaid');
   }
   // Plusieurs capacités « engager X » : une seule définition de X.
   for (let i = lines.length - 1; i >= 0; i--) {

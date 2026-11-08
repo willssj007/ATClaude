@@ -432,14 +432,16 @@ final class Catalog {
             if (frame != null) {
                 o.addProperty("customFrame", frame);
             }
-        } else if (Reprints.EDITION.equals(pc.getEdition())) {
-            // Réimpression de l'Atelier : le cadre dessiné avec son illustration (la clé de l'impression sert au choix
-            // de l'illustration dans le deck builder). Supprimée entre-temps : l'image de l'impression par défaut.
+        }
+        if (Reprints.EDITION.equals(pc.getEdition())) {
+            // Réimpression de l'Atelier (carte officielle ou carte perso) : le cadre dessiné avec son illustration (la clé
+            // de l'impression sert au choix de l'illustration dans le deck builder). Supprimée entre-temps : l'image de
+            // l'impression par défaut.
             o.addProperty("printImage", pc.getImageKey(false));
             final JsonObject rp = Reprints.of(pc);
             if (rp != null) {
                 Reprints.addDisplay(o, rp);
-            } else {
+            } else if (!o.has("custom")) {
                 final PaperCard def = FModel.getMagicDb().getCommonCards().getCard(nameEn);
                 o.addProperty("image", def == null ? "" : def.getImageKey(false));
             }
@@ -1111,6 +1113,11 @@ final class Catalog {
             final JsonObject o = paperJson(p);
             final forge.card.CardEdition ed = editions.get(p.getEdition());
             o.addProperty("setName", ed == null ? p.getEdition() : ed.getName());
+            if ("USER".equals(p.getEdition())) {
+                // La carte perso elle-même (à côté de ses réimpressions).
+                o.addProperty("setName", "Carte perso (Atelier)");
+                o.addProperty("setLabel", "Atelier");
+            }
             if (o.has("reprint")) {
                 // Réimpression : son extension perso (ou l'Atelier), son code.
                 final JsonObject cs = o.has("cset") ? o.getAsJsonObject("cset") : null;

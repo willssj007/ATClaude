@@ -895,6 +895,10 @@ final class CustomCards {
             db.loadCard(name, null, rules);
             db.addCard(new PaperCard(rules, "USER", CardRarity.Special));
         }
+        if (previous != null && !previous.equals(name)) {
+            // Carte renommée : ses réimpressions suivent le nouveau nom.
+            Reprints.renamed(previous, name);
+        }
         changed();
         return entry(name, file);
     }

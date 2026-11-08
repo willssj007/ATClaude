@@ -1423,6 +1423,7 @@ final class MatchSession {
             throw new IllegalStateException("Attends d'avoir la main (priorité ou choix) pour tricher.");
         }
         final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        final Object before = c.getInputQueue().getInput();
         cheating = true;
         game.getAction().invoke(() -> {
             try {
@@ -1442,8 +1443,16 @@ final class MatchSession {
             }
             gui.markDirty();
         });
+        // On attend la fin de la triche, sauf si elle demande un choix au joueur (la cible du déclencheur d'une carte
+        // ajoutée) : sa réponse arrive par ce même fil de messages, qui ne doit pas rester bloqué ici.
         try {
-            done.await(10, TimeUnit.SECONDS);
+            final long end = System.currentTimeMillis() + 10_000;
+            while (!done.await(50, TimeUnit.MILLISECONDS) && System.currentTimeMillis() < end) {
+                final Object now = c.getInputQueue().getInput();
+                if (now != null && now != before && !(now instanceof forge.gamemodes.match.input.InputPassPriority)) {
+                    break;
+                }
+            }
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
         }

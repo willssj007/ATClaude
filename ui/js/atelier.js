@@ -9,7 +9,7 @@ import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
-  SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, allTokens, buildScript, costParts,
+  SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './frames.js';
@@ -18,7 +18,7 @@ import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './fra
 const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scope: 'Qui', keyword: 'Mot-clé', token: 'Jeton', mana: 'Mana',
   cond: 'Condition', amount: 'Nombre X', counter: 'Marqueur', permType: 'Type de permanent', cardKind: 'Type de carte', spellType: 'Type de sort',
   emblem: 'Emblème', level: 'Niveau de la classe', who: 'Joueur', chapter: 'Chapitre', sacWhat: 'Sacrifier', zone: 'D\'où elle s\'active',
-  addCost: 'Coût en plus', tapXWhat: 'Engager quoi', tapXN: 'Combien en engager', whenKind: 'Quel type', animKind: 'Lesquels', animDur: 'Combien de temps', airKind: 'Sur quoi', dcWho: 'Sur quelles créatures', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre',
+  addCost: 'Coût en plus', tapXWhat: 'Engager quoi', tapXN: 'Combien en engager', whenKind: 'Quel type', animKind: 'Lesquels', animDur: 'Combien de temps', airKind: 'Sur quoi', mechWho: 'Qui', manaKind: 'Lesquels', dcWho: 'Sur quelles créatures', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre',
   whenCounter: 'Marqueur', amountCounter: 'Marqueur', condCounter: 'Marqueur', removeCounterType: 'Marqueur', sacKind: 'Sacrifie'};
 
 /** Les types de marqueurs d'une liste déroulante (« charge », « temps », +1/+1…). */
@@ -148,6 +148,10 @@ export class Atelier {
       this.useData(await bridge.request('customCards'));
     } catch (e) {
       this.root.innerHTML = `<div class="page"><h1>Atelier</h1><p class="muted">${esc(e.message)}</p></div>`;
+      return;
+    }
+    // Un éditeur ouvert entre-temps (« Autre illustration… » ferme la carte puis ouvre sa réimpression) : il reste.
+    if (this.editing) {
       return;
     }
     this.renderList();
@@ -602,9 +606,9 @@ export class Atelier {
   /** Édite une carte perso (entry) ou en crée une (null). */
   /** Réimprimer une carte officielle : la chercher (en français ou en anglais), puis l'ouvrir dans l'éditeur. */
   pickReprint() {
-    customBox('Réimprimer une carte officielle', (body, footer, close) => {
-      body.innerHTML = `<p class="muted small">La carte garde ses règles (Forge la joue comme l'officielle) ; tu choisis son illustration,
-        son extension, sa rareté, son artiste et son cadre.</p>
+    customBox('Réimprimer une carte', (body, footer, close) => {
+      body.innerHTML = `<p class="muted small">Une carte officielle ou une de tes cartes perso, avec une autre illustration : elle garde son
+        nom et ses règles ; tu choisis son illustration, son extension, sa rareté, son artiste et son cadre.</p>
         <input type="search" class="ate-rpq" placeholder="Anneau solaire, Sol Ring, Foudre…" autocomplete="off">
         <div class="card-grid ate-rpgrid"></div>`;
       const input = body.querySelector('.ate-rpq');
@@ -623,9 +627,10 @@ export class Atelier {
             return;
           }
           grid.innerHTML = '';
-          const list = (r.cards || []).filter(c => !c.custom);
+          // Cartes officielles et cartes perso (une autre illustration sans doublon renommé) ; pas les réimpressions.
+          const list = (r.cards || []).filter(c => !c.reprint);
           if (!list.length) {
-            grid.appendChild(el('<p class="muted">Aucune carte officielle.</p>'));
+            grid.appendChild(el('<p class="muted">Aucune carte.</p>'));
           }
           for (const c of list) {
             const cell = el('<div class="cell ate-rpcell"></div>');
@@ -664,7 +669,7 @@ export class Atelier {
     const rarityOf = {COMMON: 'C', UNCOMMON: 'U', RARE: 'R', MYTHIC_RARE: 'M', MythicRare: 'M', Common: 'C', Uncommon: 'U', Rare: 'R'};
     this.form = {...NEW_CARD(), frame: (rec && rec.frame) || 'modern', frameColor: (rec && rec.frameColor) || 'auto', frameText: (rec && rec.frameText) || 'dark',
       fx: (rec && rec.fx) || 'none', lang: 'fr', set: rec ? rec.set || '' : (this.setFilter && this.setFilter !== '-' ? this.setFilter : ''),
-      rarity: rec ? rec.rarity || '' : rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : lastArtist()};
+      rarity: rec ? rec.rarity || '' : base.crarity || rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : base.artist || lastArtist()};
     this.mode = 'form';
     this.formUsed = false;
     this.tab = 'look';
@@ -703,7 +708,8 @@ export class Atelier {
     const look = this.look();
     const set = ((this.data && this.data.sets) || []).find(x => x.id === look.set);
     const base = this.reprint.base;
-    const keepNumber = base.cset && set && base.cset.id === set.id;
+    // Le numéro dans l'extension : celui de la réimpression enregistrée (pas celui de la carte perso qu'elle réimprime).
+    const keepNumber = this.reprint.id && base.cset && set && base.cset.id === set.id;
     const card = {...base, custom: true, reprint: true, image: '', frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, lang: 'fr',
       crarity: look.rarity || undefined, artist: cleanArtist(look.artist) || undefined,
       cset: set ? {id: set.id, code: set.code, name: set.name, tint: !!set.tint, logo: set.logo, ...(keepNumber ? {n: base.cset.n, total: base.cset.total} : {})} : undefined};
@@ -719,7 +725,7 @@ export class Atelier {
     const msg = this.root.querySelector('.ate-msg');
     if (msg) {
       msg.className = 'ate-msg small ok';
-      msg.textContent = `Les règles de « ${this.reprint.nameFr} » restent celles de la carte officielle.`;
+      msg.textContent = `« ${this.reprint.nameFr} » garde son nom et ses règles : seule l'apparence change.`;
     }
   }
 
@@ -808,6 +814,7 @@ export class Atelier {
           <div class="ate-preview"></div>
           <div class="ate-msg muted small">Vérification par Forge…</div>
           <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button></div>
+          ${entry && !this.form.token && entry.card ? '<button class="btn small" data-alt-art title="Une réimpression : la même carte avec une autre illustration, sans la renommer">↻ Autre illustration…</button>' : ''}
           <div class="ate-actions">
             <button class="btn gold" data-save>Enregistrer</button>
             ${entry ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
@@ -1738,6 +1745,12 @@ export class Atelier {
         + `<input type="text" data-${attr}="animType" data-typepick readonly value="${esc(h.animType || '')}" placeholder="type de créature (facultatif)" style="width:170px">`
         + (e.anim === 'static' ? '' : sel('animDur', [['eot', 'jusqu\'à la fin du tour'], ['perm', 'pour toujours']], h.animDur || 'eot')));
     }
+    if (e.mechWho) {
+      out += row('Qui', sel('mechWho', MECH_WHO, MECH_WHO.some(w => w[0] === h.mechWho) ? h.mechWho : when === 'spell' ? 'target' : 'self'));
+    }
+    if (e.manaKind) {
+      out += row('Lesquels', sel('manaKind', MANA_KINDS.map(k => [k[0], k[1]]), h.manaKind || 'lands'));
+    }
     if (e.airKind) {
       out += row('Sur', sel('airKind', AIR_KINDS.map(k => [k[0], k[1]]), h.airKind || 'creature'));
     }
@@ -2104,6 +2117,13 @@ export class Atelier {
       this.art = '';
       this.artUrl = '';
       this.check();
+    } else if (b.dataset.altArt !== undefined) {
+      // Une autre illustration de cette carte perso : une réimpression (la carte enregistrée, sans les changements en cours).
+      const entry = (this.data.cards || []).find(c => c.name === this.previous);
+      if (entry && entry.card) {
+        this.close();
+        this.editReprint(null, entry.card);
+      }
     } else if (b.dataset.save !== undefined) {
       if (this.reprint) {
         this.saveReprint(b);

@@ -149,10 +149,36 @@ final class Reprints {
         };
     }
 
-    /** Les règles officielles d'une carte (null pour une carte perso, un jeton ou un nom inconnu). */
+    /**
+     * Les règles d'une carte qu'on peut réimprimer : une carte officielle, ou une carte perso de l'Atelier (une autre
+     * illustration sans doublon renommé). Null pour un jeton ou un nom inconnu. Une carte perso modifiée garde le même
+     * objet de règles (Forge le met à jour sur place) : ses réimpressions suivent.
+     */
     private static CardRules official(final String name) {
-        final CardRules r = name == null || name.isEmpty() ? null : FModel.getMagicDb().getCommonCards().getRules(name, false);
-        return r == null || r.isCustom() || CustomCards.isCustom(name) ? null : r;
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        if (CustomCards.isCustom(name)) {
+            return CustomCards.isToken(name) ? null : CustomCards.rules(name);
+        }
+        final CardRules r = FModel.getMagicDb().getCommonCards().getRules(name, false);
+        return r == null || r.isCustom() ? null : r;
+    }
+
+    /** Une carte perso renommée : ses réimpressions la suivent. */
+    static synchronized void renamed(final String before, final String after) {
+        final List<JsonObject> list = all();
+        boolean changed = false;
+        for (final JsonObject r : list) {
+            if (str(r, "name").equals(before)) {
+                r.addProperty("name", after);
+                changed = true;
+            }
+        }
+        if (changed) {
+            write(list);
+            list.forEach(Reprints::register);
+        }
     }
 
     private static void register(final JsonObject r) {
@@ -262,28 +288,35 @@ final class Reprints {
      * extension perso, rareté, artiste. Le nom, le type et le texte restent ceux de la carte officielle, en français.
      */
     static void addDisplay(final JsonObject o, final JsonObject r) {
-        o.addProperty("custom", true);
+        if (!o.has("custom")) {
+            // Carte officielle : le cadre dessiné de l'Atelier, texte en français. Une carte perso a déjà le sien.
+            o.addProperty("custom", true);
+            o.addProperty("image", "");
+            o.addProperty("lang", "fr");
+        }
         o.addProperty("reprint", true);
         o.addProperty("reprintId", str(r, "id"));
-        o.addProperty("image", "");
         o.addProperty("frame", value(r, "frame", "modern"));
         o.addProperty("frameColor", value(r, "frameColor", "auto"));
         o.addProperty("frameText", "light".equals(str(r, "frameText")) ? "light" : "dark");
         o.addProperty("fx", value(r, "fx", "none"));
-        o.addProperty("lang", "fr");
         final String rarity = str(r, "rarity");
+        o.remove("crarity");
         if (rarity.matches("[CURMS]")) {
             o.addProperty("crarity", rarity);
         }
         final String artist = str(r, "artist");
+        o.remove("artist");
         if (!artist.isEmpty()) {
             o.addProperty("artist", artist);
         }
         final JsonObject cs = CustomCards.csetJson(str(r, "set"), indexKey(r));
+        o.remove("cset");
         if (cs != null) {
             o.add("cset", cs);
         }
         final String art = artKey(r);
+        o.remove("customArt");
         if (art != null) {
             o.addProperty("customArt", art);
         }
@@ -325,7 +358,7 @@ final class Reprints {
         final String name = old != null ? str(old, "name") : str(m, "name").trim();
         final CardRules rules = official(name);
         if (rules == null) {
-            throw new IllegalArgumentException("« " + name + " » n'est pas une carte officielle : une carte perso se change directement dans l'Atelier.");
+            throw new IllegalArgumentException("« " + name + " » ne peut pas être réimprimée (carte inconnue ou jeton).");
         }
         final List<JsonObject> list = all();
         final JsonObject r = old != null ? old.deepCopy() : new JsonObject();

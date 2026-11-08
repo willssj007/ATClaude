@@ -2,6 +2,25 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.8 — Autres illustrations des cartes perso, sorts en X
+
+### Atelier
+- **Une autre illustration pour une carte perso**, sans doublon renommé (« NomDeCarte 2 ») :
+  - bouton « ↻ Autre illustration… » dans l'éditeur de la carte, ou « ＋ Réimpression », qui propose maintenant aussi les cartes perso ;
+  - même nom, mêmes règles : la carte ne change pas, sa réimpression a son illustration, son extension, sa rareté, son artiste et son cadre ;
+  - elle se choisit dans le deck builder (pinceau d'une ligne du deck), à côté de la carte d'origine ;
+  - si la carte est modifiée ou renommée, ses réimpressions suivent.
+- **Détruire ou exiler N (ou X) permanents ciblés** d'un type : « Détruisez X créatures ciblées », « Exilez deux artefacts ciblés ».
+- **Détruire ou exiler chaque permanent d'un type de valeur de mana N (ou X) ou moins** : « Détruisez chaque créature dont la valeur de mana est inférieure ou égale à X ».
+- **Explorer, comploter, endurer** : la carte elle-même, une créature ciblée que vous contrôlez, jusqu'à deux, ou chaque créature que vous contrôlez. Aussi dans un éphémère ou un rituel.
+- **« Vos terrains (ou créatures, artefacts…) ont « {T} : Ajoutez un mana de la couleur de votre choix. » »**, en effet permanent.
+
+### Corrections
+- **Sorts avec {X} dans le coût** (« Piochez X cartes », « Détruisez X créatures ciblées ») : le X annoncé était payé comme 0. Il est maintenant payé et compte vraiment.
+- **Triche « Ajouter une carte »** : une carte dont l'arrivée cible une de vos créatures attendait une dizaine de secondes avant de prendre en compte la cible. Elle la prend tout de suite.
+- **Sur la pile et dans le journal**, un sort perso s'écrit avec son texte français (« Une créature ciblée que vous contrôlez explore. »), plus en anglais.
+- **Deck builder** : la carte perso d'origine s'appelle « Carte perso (Atelier) » parmi ses impressions.
+
 ## 0.6.7 — Réimpressions, maîtrise des éléments
 
 ### Atelier : réimpressions
