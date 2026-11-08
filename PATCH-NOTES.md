@@ -2,6 +2,43 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.6.7 — Réimpressions, maîtrise des éléments
+
+### Atelier : réimpressions
+- **« ＋ Réimpression »** : une carte officielle (Anneau solaire, Foudre…) avec ton illustration, comme si elle sortait dans une de tes extensions.
+  - Tu choisis la carte (recherche en français ou en anglais), puis son illustration, son extension, sa rareté, son artiste, son cadre et son effet visuel.
+  - Elle garde ses règles : Forge la joue comme la carte officielle, avec son texte français.
+- **Dans l'Atelier**, elle se range dans le bloc de son extension, marquée ↻, avec un numéro (« 003/120 ») comme les cartes perso.
+- **Dans le deck builder**, elle apparaît en tête des impressions de la carte (pinceau d'une ligne du deck) ; une fois choisie, elle se joue en partie avec ton illustration.
+- **La recherche par extension** montre aussi ses réimpressions.
+- L'impression habituelle de la carte ne change pas : ta réimpression ne sert que là où tu la choisis.
+- Les réimpressions et leurs illustrations suivent le compte sur les autres appareils.
+
+### Atelier : nouveaux effets et déclencheurs
+- **Maîtrise des éléments** (avec les termes des cartes françaises) :
+  - **Maîtrise du Feu N**, mot-clé : en attaquant, ajoutez N {R}, qui dure jusqu'à la fin du combat ;
+  - **maîtrisez la Terre N** : un terrain que vous contrôlez devient une créature 0/0 avec la célérité et N marqueurs +1/+1 ;
+  - **maîtrisez l'Air** sur une créature ou un permanent non-terrain ciblé (jusqu'à N) : il est exilé, et son propriétaire peut le relancer pour {2} ;
+  - **Maîtrisez l'Eau {N}**, en coût d'une capacité ou en coût supplémentaire d'un sort : on peut engager ses artefacts et ses créatures pour payer ;
+  - déclencheur « **Quand vous maîtrisez** l'Eau, la Terre, le Feu ou l'Air » (ou un seul élément).
+- **Vos terrains, artefacts, enchantements… deviennent des créatures N/N**, d'un type au choix (« les artefacts non-créatures que vous contrôlez deviennent des créatures 4/4 Élémental ») :
+  - jusqu'à la fin du tour ou pour toujours ;
+  - ou en effet permanent (« … sont des créatures 4/4 en plus de leurs autres types »).
+- **Doubler les marqueurs sur chaque créature** (de chaque type ou d'un type), les vôtres ou toutes.
+- **Nouveaux déclencheurs** :
+  - quand vous lancez un **sort historique** ;
+  - quand vous lancez un sort d'un type (artefact, enchantement, légendaire, multicolore, incolore, éphémère ou rituel, planeswalker, de clan) ;
+  - quand vous lancez un sort de **valeur de mana N ou plus** ;
+  - quand une **créature de force N ou plus** arrive sous votre contrôle ;
+  - quand une créature, un artefact, un enchantement, un planeswalker ou un permanent non-terrain de **valeur de mana N ou plus** arrive sous votre contrôle.
+- **Engager des permanents en coût** : « Engagez deux créatures… » avec un nombre fixe (une à dix), ou X au choix en jouant, qui vaut maintenant **au moins 1**. Avec X = 0, une capacité de mana ou de pioche devenait gratuite, donc infinie.
+- **« Organiser » → « Rareté… »** : la rareté de plusieurs cartes d'un coup.
+
+### Corrections
+- PC : une liste déroulante ouverte (par exemple « Quand elle agit ») ne cache plus son premier choix sous le titre de son groupe.
+- En partie, la cible d'un déclencheur s'écrit « (cible : Grizzlis) », sans crochets en trop.
+- « Maîtrise du Feu » en français sur la pile et dans le journal.
+
 ## 0.6.6 — Le joueur visé, des marqueurs qui servent
 
 ### Atelier : quel joueur l'effet touche

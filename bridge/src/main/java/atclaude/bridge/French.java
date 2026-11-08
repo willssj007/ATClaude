@@ -39,7 +39,8 @@ final class French {
     private static final Pattern ENGLISH = Pattern.compile("\\b(the|you|your|target|creature|creatures|this|card|cards|draws?|each|damage|until|"
             + "end of turn|gains?|gets?|may|with|enters|whenever|when|dies|opponent|life|control|player|spell|counter|adds?|tap|"
             + "destroy|return|put|deals|sacrifices?|discards?|searches|shuffles)\\b"); // pas « mana » ni « exile » : aussi français
-    private static final Pattern TARGETING = Pattern.compile("\\s*\\(Targeting: \\[*(.*?)\\]*\\)");
+    // « (Targeting: [[Grizzlis (123)]]) » : la cible peut contenir des parenthèses (identifiant de la carte).
+    private static final Pattern TARGETING = Pattern.compile("\\s*\\(Targeting: ((?:[^()]|\\([^()]*\\))*)\\)");
     private static final Pattern NULL_IMPORTANT = Pattern.compile("\\s*\\[[^\\[\\]:]+: null\\]");
     private static final Pattern ZONE_CHANGE = Pattern.compile("^(.*) was put into (\\w+) from (\\w+)\\.$");
     /** Même ligne avec le modèle français (« {0} : {2} → {1}. ») : Forge y met les noms anglais des zones. */
@@ -371,15 +372,26 @@ final class French {
      * perso) : « Partner with X (When this creature enters, target player may put X into their hand…) ».
      */
     private static String keywordTrigger(final SpellAbility sa, final String forge) {
-        if (sa == null || !sa.isTrigger() || sa.getHostCard() == null || !looksEnglish(forge)) {
+        // Le texte anglais de Forge commence par le mot-clé (« Firebending 2 (…) », « Partner with X (…) ») ; une carte
+        // traduite a déjà son texte français.
+        if (sa == null || !sa.isTrigger() || sa.getHostCard() == null || !forge.matches("(?s)\\s*(Firebending|Partner with)\\b.*")) {
             return null;
         }
         final Trigger trig = sa.getTrigger();
-        if (trig == null || !trig.isKeyword(Keyword.PARTNER_WITH) || trig.getKeyword() == null) {
+        if (trig == null || trig.getKeyword() == null) {
             return null;
         }
         final String[] k = trig.getKeyword().getOriginal().split(":");
         if (k.length < 2) {
+            return null;
+        }
+        if (trig.isKeyword(Keyword.FIREBENDING)) {
+            // « Maîtrise du Feu 2 » : ajoutez {R}{R} en attaquant ; ce mana dure jusqu'à la fin du combat.
+            final String host = GameSerializer.translatedName(sa.getHostCard().getView().getCurrentState());
+            final String red = k[1].matches("\\d{1,2}") ? "{R}".repeat(Integer.parseInt(k[1])) : "X {R}";
+            return host + " — Maîtrise du Feu " + k[1] + " : ajoutez " + red + ". Ce mana dure jusqu'à la fin du combat.";
+        }
+        if (!trig.isKeyword(Keyword.PARTNER_WITH)) {
             return null;
         }
         final String partner = cardName(k[1]);
@@ -414,8 +426,22 @@ final class French {
         return rest.isEmpty() ? fr : Character.toUpperCase(rest.charAt(0)) + rest.substring(1);
     }
 
+    private static final Pattern FIREBENDING_TEXT = Pattern.compile(
+        "Firebending (\\S+) \\(Whenever this creature attacks, add ([^.]*)\\. This mana lasts until end of combat\\.\\)");
+
+    /** Rappels de mots-clés que Forge écrit en anglais pour une carte sans traduction (cartes perso). */
+    private static String keywordReminders(final String s) {
+        return FIREBENDING_TEXT.matcher(s).replaceAll("Maîtrise du Feu $1 : ajoutez $2. Ce mana dure jusqu'à la fin du combat.");
+    }
+
     private static String cleanTrigger(final String s) {
-        String out = TARGETING.matcher(s).replaceAll(" (cible : $1)");
+        final Matcher m = TARGETING.matcher(s);
+        final StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            m.appendReplacement(sb, Matcher.quoteReplacement(" (cible : " + m.group(1).replaceAll("[\\[\\]]", "").trim() + ")"));
+        }
+        m.appendTail(sb);
+        String out = keywordReminders(sb.toString());
         out = NULL_IMPORTANT.matcher(out).replaceAll("");
         return out.replace("(OPTIONAL) ", "");
     }
@@ -478,7 +504,7 @@ final class French {
         if (resolved != null) {
             return resolved;
         }
-        String out = text;
+        String out = keywordReminders(text);
         final Matcher z = ZONE_CHANGE.matcher(out);
         final Matcher zf = ZONE_CHANGE_FR.matcher(out);
         if (z.matches()) {

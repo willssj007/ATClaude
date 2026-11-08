@@ -73,6 +73,10 @@ public final class ImageService {
             final File logo = CustomCards.setLogoFile(imageKey);
             return logo == null ? null : new Served(logo, "en", true);
         }
+        if (imageKey.startsWith(Reprints.ART_PREFIX)) {
+            final File art = Reprints.art(imageKey);
+            return art == null ? null : new Served(art, "en", true);
+        }
         if (imageKey.startsWith(CustomCards.ART_PREFIX)) {
             final File art = CustomCards.art(imageKey);
             return art == null ? null : new Served(art, "en", false);

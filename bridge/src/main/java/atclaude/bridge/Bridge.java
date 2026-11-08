@@ -246,7 +246,7 @@ public final class Bridge {
             "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster", "openBoosters",
             "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic",
             "careerSwapChallenge", "creatureTypes", "customCards", "customValidate", "customSave", "customDelete", "customTypes",
-            "customSets", "customSetSave", "customSetDelete");
+            "customSets", "customSetSave", "customSetDelete", "reprintSave", "reprintDelete");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -412,6 +412,10 @@ public final class Bridge {
                 return CustomCards.sets();
             case "customSetSave":
                 return CustomCards.saveSet(m);
+            case "reprintSave":
+                return Reprints.save(m);
+            case "reprintDelete":
+                return Reprints.delete(m.get("id").getAsString());
             case "customSetDelete":
                 return CustomCards.deleteSet(m.get("id").getAsString());
             case "cardInfo":

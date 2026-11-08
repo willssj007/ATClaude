@@ -326,6 +326,13 @@ final class GameSerializer {
                 o.addProperty("customArt", art);
             }
         }
+        if (!o.has("custom")) {
+            // Réimpression de l'Atelier (impression « ATRP ») : son illustration et son extension perso.
+            final JsonObject rp = Reprints.ofImageKey(s.getName(), s.getImageKey());
+            if (rp != null) {
+                Reprints.addDisplay(o, rp);
+            }
+        }
         flag(o, "scheme", scheme);
         flag(o, "ongoing", ongoing);
         if (scheme) {

@@ -92,6 +92,8 @@ public final class ForgeRuntime {
         new File(user, "custom" + File.separator + "cards").mkdirs();
         // Les jetons perso de l'Atelier : Forge les lit au démarrage dans sa base des jetons.
         new File(user, "custom" + File.separator + "tokens").mkdirs();
+        // L'édition des réimpressions de l'Atelier (cartes officielles avec une illustration perso).
+        Reprints.prepareEdition(new File(user, "custom" + File.separator + "editions"));
         FModel.initialize(progress, prefs -> {
             prefs.setPref(FPref.UI_LANGUAGE, "fr-FR");
             if (prefs.getPref(FPref.PLAYER_NAME).trim().isEmpty()) {
@@ -128,6 +130,7 @@ public final class ForgeRuntime {
         });
         final long forgeDone = System.nanoTime();
         CustomCards.init();
+        Reprints.init();
         French.prebuildVariantMappings();
         System.out.println("Démarrage : Forge " + (forgeDone - started) / 1_000_000 + " ms, traductions "
                 + (System.nanoTime() - forgeDone) / 1_000_000 + " ms");

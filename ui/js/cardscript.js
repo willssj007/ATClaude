@@ -110,6 +110,7 @@ export const KW_ALL = [
   ['Bushido', 'Bushido', 'Bushido', 'number', 'n', null, 1],
   ['Hideaway', 'Cachette', 'Hideaway', 'number', 'n', null, 4],
   ['Toxic', 'Toxique', 'Toxic', 'number', 'n', null, 1],
+  ['Firebending', 'Maîtrise du Feu', 'Firebending', 'number', 'n', null, 1],
   ['Afterlife', 'Au-delà', 'Afterlife', 'number', 'n', null, 1],
   ['Fabricate', 'Fabrication', 'Fabricate', 'number', 'n', null, 1],
   ['Rampage', 'Sauvagerie', 'Rampage', 'number', 'n', null, 1],
@@ -333,6 +334,8 @@ export const WHEN = [
   {id: 'landfall', kind: 'T', label: 'Quand un terrain arrive sous votre contrôle (Toucheterre)'},
   {id: 'constellation', kind: 'T', label: 'Quand un enchantement arrive sous votre contrôle (Constellation)'},
   {id: 'artifactEnters', kind: 'T', label: 'Quand un artefact arrive sous votre contrôle'},
+  {id: 'entersPower', kind: 'T', label: 'Quand une créature de force N ou plus arrive sous votre contrôle', nLabel: 'Force au moins'},
+  {id: 'entersMv', kind: 'T', label: 'Quand une créature, un artefact… de valeur de mana N ou plus arrive sous votre contrôle', kinds: 'perm', nLabel: 'Valeur de mana au moins'},
   {id: 'counterAdded', kind: 'T', label: 'Quand des marqueurs +1/+1 sont mis sur une de vos créatures'},
   {id: 'counterPutSelf', kind: 'T', label: 'Quand des marqueurs (d\'un type) sont mis sur elle', counterSel: true},
   {id: 'counterNth', kind: 'T', label: 'Quand le Nième marqueur (d\'un type) est mis sur elle (« le troisième marqueur « charge »… »)', counterSel: true, nth: true},
@@ -340,6 +343,10 @@ export const WHEN = [
   {id: 'castAny', kind: 'T', label: 'Quand vous lancez un sort'},
   {id: 'castNonCreature', kind: 'T', label: 'Quand vous lancez un sort non-créature'},
   {id: 'castCreature', kind: 'T', label: 'Quand vous lancez un sort de créature'},
+  {id: 'castHistoric', kind: 'T', label: 'Quand vous lancez un sort historique (artefact, légendaire ou saga)'},
+  {id: 'castKind', kind: 'T', label: 'Quand vous lancez un sort d\'un type (artefact, enchantement, légendaire, multicolore…)', kinds: 'cast'},
+  {id: 'castMv', kind: 'T', label: 'Quand vous lancez un sort de valeur de mana N ou plus', nLabel: 'Valeur de mana au moins'},
+  {id: 'youBend', kind: 'T', label: 'Quand vous maîtrisez l\'Eau, la Terre, le Feu ou l\'Air (ou un seul élément)', kinds: 'bend'},
   {id: 'magecraft', kind: 'T', label: 'Quand vous lancez ou copiez un éphémère ou un rituel (Sorcellerie)'},
   {id: 'secondSpell', kind: 'T', label: 'Quand vous lancez votre deuxième sort de chaque tour'},
   {id: 'oppCasts', kind: 'T', label: 'Quand un adversaire lance un sort'},
@@ -393,6 +400,65 @@ export const WHEN = [
   {id: 'chapter', kind: 'CH', label: 'Chapitre de saga (I, II, III…)'},
   {id: 'static', kind: 'S', label: 'Effet permanent (« les créatures que vous contrôlez ont… », « vous n\'avez pas de taille maximale de main »…)', filter: true},
 ];
+
+/**
+ * Types pour « quand vous lancez un sort d'un type » ('cast') et « quand un permanent de valeur de mana N ou plus arrive »
+ * ('perm') : [id, libellé, type pour Forge, « un sort … » / « un … », en anglais].
+ */
+export const WHEN_KINDS = {
+  cast: [
+    ['artifact', 'Artefact', 'Artifact', 'un sort d\'artefact', 'an artifact spell'],
+    ['enchantment', 'Enchantement', 'Enchantment', 'un sort d\'enchantement', 'an enchantment spell'],
+    ['legendary', 'Légendaire', 'Card.Legendary', 'un sort légendaire', 'a legendary spell'],
+    ['multicolor', 'Multicolore', 'Card.MultiColor', 'un sort multicolore', 'a multicolored spell'],
+    ['colorless', 'Incolore', 'Card.Colorless', 'un sort incolore', 'a colorless spell'],
+    ['instantSorcery', 'Éphémère ou rituel', 'Instant,Sorcery', 'un sort d\'éphémère ou de rituel', 'an instant or sorcery spell'],
+    ['planeswalker', 'Planeswalker', 'Planeswalker', 'un sort de planeswalker', 'a planeswalker spell'],
+    ['kindred', 'Tribal (de clan)', 'Kindred', 'un sort de clan', 'a kindred spell'],
+  ],
+  perm: [
+    ['creature', 'Créature', 'Creature', 'une créature', 'a creature'],
+    ['artifact', 'Artefact', 'Artifact', 'un artefact', 'an artifact'],
+    ['enchantment', 'Enchantement', 'Enchantment', 'un enchantement', 'an enchantment'],
+    ['planeswalker', 'Planeswalker', 'Planeswalker', 'un planeswalker', 'a planeswalker'],
+    ['nonland', 'Permanent non-terrain', 'Permanent.nonLand', 'un permanent non-terrain', 'a nonland permanent'],
+  ],
+};
+
+WHEN_KINDS.bend = [
+  ['any', 'L\'Eau, la Terre, le Feu ou l\'Air', 'ElementalBend', 'l\'Eau, la Terre, le Feu ou l\'Air', 'waterbend, earthbend, firebend, or airbend'],
+  ['water', 'L\'Eau', 'Waterbend', 'l\'Eau', 'waterbend'], ['earth', 'La Terre', 'Earthbend', 'la Terre', 'earthbend'],
+  ['fire', 'Le Feu', 'Firebend', 'le Feu', 'firebend'], ['air', 'L\'Air', 'Airbend', 'l\'Air', 'airbend'],
+];
+
+/**
+ * Ce que « deviennent des créatures N/N » touche : [id, libellé, type pour Forge, « les … » (pluriel), en anglais].
+ * Artefacts et enchantements : seulement ceux qui ne sont pas déjà des créatures.
+ */
+export const ANIM_KINDS = [
+  ['lands', 'Terrains', 'Land', 'les terrains', 'lands'],
+  ['artifacts', 'Artefacts non-créatures', 'Artifact.nonCreature', 'les artefacts non-créatures', 'noncreature artifacts'],
+  ['enchantments', 'Enchantements non-créatures', 'Enchantment.nonCreature', 'les enchantements non-créatures', 'noncreature enchantments'],
+  ['noncreature', 'Permanents non-créatures', 'Permanent.nonCreature', 'les permanents non-créatures', 'noncreature permanents'],
+];
+
+/** « Maîtriser l'Air » : sur quoi. */
+export const AIR_KINDS = [['creature', 'Créatures', 'Creature', 'créature ciblée', 'créatures ciblées', 'creature'],
+  ['nonland', 'Permanents non-terrains', 'Permanent.nonLand', 'permanent non-terrain ciblé', 'permanents non-terrains ciblés', 'nonland permanent']];
+
+/** Partie commune de « deviennent / sont des créatures N/N » : [Affected$ pour Forge, Types, sujet fr, sujet en, « Élémental », Elemental]. */
+function animParts(a) {
+  const k = ANIM_KINDS.find(x => x[0] === a.animKind) || ANIM_KINDS[0];
+  const t = typeName(a.animType);
+  const v = `${k[2]}${k[2].includes('.') ? '+' : '.'}YouCtrl`;
+  return {v, t, fr: `${k[3]} que vous contrôlez`, en: `${k[4]} you control`, tFr: t ? ` ${frType(a.animType)}` : '', tEn: t ? ` ${t}` : ''};
+}
+
+/** Le type choisi pour un déclencheur à type (le premier par défaut). */
+export function whenKindOf(w, id) {
+  const list = WHEN_KINDS[w && w.kinds] || [];
+  return list.find(k => k[0] === id) || list[0];
+}
 
 /** Groupes du choix « quand » dans le formulaire. */
 export const WHEN_GROUPS = [['T', 'Déclenchée (quand…)'], ['A', 'Activée'], ['SP', 'Sort'], ['CH', 'Saga'], ['S', 'Permanente']];
@@ -502,6 +568,8 @@ export const EFFECTS = [
   {id: 'animateSelf', group: 'creatures', label: 'Elle devient une créature N/N jusqu\'à la fin du tour (terrain, artefact…)', n: true},
   {id: 'animateTarget', group: 'creatures', label: 'Une créature ciblée a une force et une endurance de base N/N jusqu\'à la fin du tour', n: true},
   {id: 'animateLands', group: 'creatures', label: 'Les terrains que vous contrôlez deviennent des créatures N/N jusqu\'à la fin du tour', n: true},
+  {id: 'animateAll', group: 'creatures', label: 'Vos terrains, artefacts, enchantements… deviennent des créatures N/N (d\'un type, au choix), jusqu\'à la fin du tour ou pour toujours', n: true, anim: true},
+  {id: 'doubleCountersAll', group: 'creatures', label: 'Doubler les marqueurs (de chaque type, ou d\'un type) sur chaque créature', counterEach: true},
   {id: 'protectionTarget', group: 'creatures', label: 'Une créature ciblée que vous contrôlez acquiert la protection contre la couleur de votre choix'},
   {id: 'protectionAll', group: 'creatures', label: 'Les créatures que vous contrôlez acquièrent la protection contre la couleur de votre choix'},
   {id: 'debuffTarget', group: 'creatures', label: 'Une créature ciblée perd un mot-clé jusqu\'à la fin du tour (le vol…)', keyword: true},
@@ -609,6 +677,8 @@ export const EFFECTS = [
   {id: 'winGame', group: 'turns', label: 'Gagner la partie'},
   {id: 'discover', group: 'mech', label: 'Découvrir N', n: true},
   {id: 'explore', group: 'mech', label: 'Explorer', self: true},
+  {id: 'earthbend', group: 'mech', label: 'Maîtriser la Terre N (un terrain que vous contrôlez devient une créature 0/0 avec la célérité et N marqueurs +1/+1)', n: true},
+  {id: 'airbend', group: 'mech', label: 'Maîtriser l\'Air sur une créature (ou un permanent) ciblée : exilée, son propriétaire peut la relancer pour {2}', n: true, airKind: true},
   {id: 'connive', group: 'mech', label: 'Comploter', self: true},
   {id: 'investigate', group: 'mech', label: 'Enquêter (jetons Indice)', n: true},
   {id: 'incubate', group: 'mech', label: 'Incuber N', n: true},
@@ -680,6 +750,7 @@ export const EFFECTS = [
   {id: 'playersCantGainLife', group: 'stPlayer', label: 'Les joueurs ne peuvent pas gagner de points de vie', only: ['static']},
   {id: 'cantPreventDamage', group: 'stPlayer', label: 'Les blessures ne peuvent pas être prévenues', only: ['static']},
   {id: 'playLandsGraveyard', group: 'stPlayer', label: 'Vous pouvez jouer des terrains depuis votre cimetière', only: ['static']},
+  {id: 'animateStatic', group: 'stPlayer', label: 'Vos terrains, artefacts, enchantements… sont des créatures N/N (d\'un type, au choix) en plus de leurs autres types', n: true, anim: 'static', only: ['static']},
   {id: 'doubleTokens', group: 'stRepl', label: 'Vos effets créent deux fois plus de jetons', only: ['static']},
   {id: 'doubleCounters', group: 'stRepl', label: 'Deux fois plus de marqueurs +1/+1 sur vos créatures', only: ['static']},
   {id: 'plusOneCounter', group: 'stRepl', label: 'Un marqueur +1/+1 de plus sur vos créatures', only: ['static']},
@@ -846,6 +917,15 @@ export const AMOUNTS = [
 
 /** Coût « engager X … dégagés que vous contrôlez » : ce qu'on engage. */
 export const TAP_WHAT = [['token', 'jetons'], ['creature', 'créatures'], ['artifact', 'artefacts'], ['type', 'créatures d\'un type']];
+
+/** Combien le coût « engager … » en demande : [valeur, libellé]. X au choix en jouant (au moins un), ou un nombre fixe. */
+export const TAP_COUNTS = [['X', 'X (au choix, au moins 1)'], ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => [String(n), String(n)])];
+
+/** Le nombre fixe du coût « engager … » (« Engagez deux créatures… »), ou null pour X au choix. */
+export function tapCount(a) {
+  const n = Math.round(Number(a && a.tapXN));
+  return a && a.tapX && a.tapXN && a.tapXN !== 'X' && n >= 1 ? Math.min(n, 10) : null;
+}
 
 /** Ce qu'engage le coût : [type pour Forge, pluriel, singulier, accord (« dégagés »/« dégagées »), en anglais]. */
 function tapWhat(a) {
@@ -2368,6 +2448,29 @@ function effectBase(a, id) {
       return {p: `AnimateAll | ValidCards$ Land.YouCtrl | Power$ ${n} | Toughness$ ${n} | Types$ Creature`,
         fr: `jusqu'à la fin du tour, les terrains que vous contrôlez deviennent des créatures ${n}/${n} qui sont toujours des terrains`,
         en: `until end of turn, lands you control become ${n}/${n} creatures that are still lands`};
+    case 'animateAll': {
+      const m = animParts(a);
+      const perm = a.animDur === 'perm';
+      return {p: `AnimateAll | ValidCards$ ${m.v} | Power$ ${n} | Toughness$ ${n} | Types$ Creature${m.t ? ',' + m.t : ''}${perm ? ' | Duration$ Permanent' : ''}`,
+        fr: `${perm ? '' : 'jusqu\'à la fin du tour, '}${m.fr} deviennent des créatures ${n}/${n}${m.tFr} en plus de leurs autres types`,
+        en: `${perm ? '' : 'until end of turn, '}${m.en} become ${n}/${n}${m.tEn} creatures in addition to their other types`};
+    }
+    case 'doubleCountersAll': {
+      const each = !a.counter || a.counter === 'ALL';
+      const all = a.dcWho === 'all';
+      return {p: `MultiplyCounter | Defined$ Valid Creature${all ? '' : '.YouCtrl'}${each ? '' : ` | CounterType$ ${ct[0]}`}`,
+        fr: `doublez le nombre ${each ? 'de chaque type de marqueur' : `de marqueurs ${ct[1]}`} sur chaque créature${all ? '' : ' que vous contrôlez'}`,
+        en: `double the number of ${each ? 'each kind of counter' : `${ct[2]} counters`} on each creature${all ? '' : ' you control'}`};
+    }
+    case 'earthbend':
+      return {p: `Earthbend | Num$ ${n1}`, fr: `maîtrisez la Terre ${n1}`, en: `earthbend ${n1}`};
+    case 'airbend': {
+      const k = AIR_KINDS.find(x => x[0] === a.airKind) || AIR_KINDS[0];
+      const fem = k[0] === 'creature';
+      return {p: `Airbend | ValidTgts$ ${k[2]} | TgtPrompt$ Choisissez ${fem ? 'une' : 'un'} ${k[3]}${n1 > 1 ? ` | TargetMin$ 0 | TargetMax$ ${n1}` : ''}`,
+        fr: n1 > 1 ? `maîtrisez l'Air sur jusqu'à ${word(n1, 'fr')} ${k[4]}` : `maîtrisez l'Air sur ${fem ? 'une' : 'un'} ${k[3]}`,
+        en: n1 > 1 ? `airbend up to ${word(n1, 'en')} target ${k[5]}s` : `airbend target ${k[5]}`};
+    }
     case 'protectionTarget':
       return {p: `Protection | ${target({v: 'Creature.YouCtrl', prompt: 'Choisissez une créature ciblée que vous contrôlez'})} | Gains$ Choice | Choices$ AnyColor`,
         fr: 'une créature ciblée que vous contrôlez acquiert la protection contre la couleur de votre choix jusqu\'à la fin du tour',
@@ -3020,6 +3123,12 @@ function staticCore(a, id, lang, card) {
       return {s: 'Mode$ CantGainLife | ValidPlayer$ Player', text: en ? 'Players can\'t gain life' : 'Les joueurs ne peuvent pas gagner de points de vie'};
     case 'cantPreventDamage':
       return {s: 'Mode$ CantPreventDamage', text: en ? 'Damage can\'t be prevented' : 'Les blessures ne peuvent pas être prévenues'};
+    case 'animateStatic': {
+      const m = animParts(a);
+      return {s: `Mode$ Continuous | Affected$ ${m.v} | AddType$ Creature${m.t ? ' & ' + m.t : ''} | SetPower$ ${n} | SetToughness$ ${n}`,
+        text: en ? `${capitalize(m.en)} are ${n}/${n}${m.tEn} creatures in addition to their other types`
+          : `${capitalize(m.fr)} sont des créatures ${n}/${n}${m.tFr} en plus de leurs autres types`};
+    }
     case 'playLandsGraveyard':
       return {s: 'Mode$ Continuous | Affected$ Land.YouOwn | MayPlay$ True | AffectedZone$ Graveyard',
         text: en ? 'You may play lands from your graveyard' : 'Vous pouvez jouer des terrains depuis votre cimetière'};
@@ -3252,6 +3361,7 @@ export const SPELL_COSTS = [
   ['discard', 'Discard<1/Card>', 'défaussez-vous d\'une carte', 'discard a card'], ['payLife', 'PayLife<N>', 'payez N points de vie', 'pay N life'],
   ['exileGY', 'ExileFromGrave<1/Card>', 'exilez une carte de votre cimetière', 'exile a card from your graveyard'],
   ['tapCreature', 'tapXType<1/Creature>', 'engagez une créature dégagée que vous contrôlez', 'tap an untapped creature you control'],
+  ['waterbend', 'Waterbend<N>', 'maîtrisez l\'Eau {N}', 'waterbend {N}'],
 ];
 
 /** Coût d'une capacité activée : mana, {T}, {Q}, sacrifices, PV, défausse, exil, marqueurs, énergie. Renvoie le coût pour Forge et son texte. */
@@ -3311,16 +3421,29 @@ function activationCost(a, lang) {
     forge.push(`SubCounter<${ctr}/${ct[0]}>`);
     text.push(en ? `remove ${counterWords(ct, ctr, 'en')} from CARDNAME` : `retirez ${counterWords(ct, ctr, 'fr')} de CARDNAME`);
   }
+  const water = Math.max(0, Math.round(Number(a.waterbend) || 0));
+  if (water) {
+    // « Maîtrisez l'Eau {3} » : on peut engager ses artefacts et ses créatures pour payer, chacun paie {1}.
+    forge.push(`Waterbend<${water}>`);
+    text.push(en ? `waterbend {${water}}` : `maîtrisez l'Eau {${water}}`);
+  }
   const energy = Math.max(0, Math.round(Number(a.payEnergy) || 0));
   if (energy) {
     forge.push(`PayEnergy<${energy}>`);
     text.push(en ? `pay ${'{E}'.repeat(Math.min(energy, 10))}` : `payez ${'{E}'.repeat(Math.min(energy, 10))}`);
   }
   if (a.tapX) {
-    // « Engagez X jetons dégagés que vous contrôlez » : le joueur choisit X en payant (le nombre engagé est lu ensuite).
+    // « Engagez X jetons dégagés que vous contrôlez » : le joueur choisit X en payant, au moins un (XMin$ 1 sur la
+    // capacité : avec X = 0, une capacité de mana ou de pioche serait gratuite, donc infinie), et le nombre engagé est lu
+    // ensuite. Ou un nombre fixe : « Engagez deux créatures dégagées que vous contrôlez ».
     const w = tapWhat(a);
-    forge.push(`tapXType<X/${w[0]}/${w[4]}>`);
-    text.push(en ? `tap X untapped ${w[4]} you control` : `engagez X ${w[1]} dégagé${w[3]} que vous contrôlez`);
+    const n = tapCount(a);
+    forge.push(`tapXType<${n || 'X'}/${w[0]}/${w[4]}>`);
+    const fem = w[3] === 'es';
+    const one = (w[4].endsWith('s') ? w[4].slice(0, -1) : w[4]);
+    text.push(!n ? (en ? `tap X untapped ${w[4]} you control` : `engagez X ${w[1]} dégagé${w[3]} que vous contrôlez`)
+      : n === 1 ? (en ? `tap an untapped ${one} you control` : `engagez ${fem ? 'une' : 'un'} ${w[2]} dégagé${fem ? 'e' : ''} que vous contrôlez`)
+        : (en ? `tap ${word(n, 'en')} untapped ${w[4]} you control` : `engagez ${word(n, 'fr')} ${w[1]} dégagé${w[3]} que vous contrôlez`));
   }
   return {forge: forge.join(' ') || '0', text: capitalize(text.join(', ')) || '{0}'};
 }
@@ -3340,6 +3463,9 @@ function activationLimits(a, lang) {
   if (a.yourTurnOnly && !a.sorcery) {
     forge.push('PlayerTurn$ True');
     text.push(en ? 'Activate only during your turn.' : 'N\'activez que pendant votre tour.');
+  }
+  if (a.tapX && !tapCount(a)) {
+    forge.push('XMin$ 1');
   }
   if (a.oncePerTurn) {
     forge.push('ActivationLimit$ 1');
@@ -3375,6 +3501,29 @@ function withWord(aw, text) {
 export function abilityLines(a, i, lang = 'fr', card = null) {
   const en = lang === 'en';
   const id = `Atelier${i + 1}`;
+  // « Engagez deux créatures… » (nombre fixe) : « X = le nombre engagé » vaut ce nombre, et « si au moins N ont été
+  // engagées » est toujours vrai (N au plus ce nombre) ou jamais.
+  const fixedTap = tapCount(a);
+  if (fixedTap) {
+    const fix = (m) => {
+      const out = {...m};
+      if (out.amount === 'tapped') {
+        out.amount = 'fixed';
+        out.n = fixedTap;
+      }
+      if (out.cond === 'tappedAtLeast' && Math.round(Number(out.condN ?? 3) || 0) <= fixedTap) {
+        out.cond = 'none';
+      }
+      return out;
+    };
+    a = fix(a);
+    if (Array.isArray(a.then)) {
+      a.then = a.then.map(fix);
+    }
+    if (Array.isArray(a.modes)) {
+      a.modes = a.modes.map(fix);
+    }
+  }
   // Sur une malédiction, un effet qui vise un joueur touche le joueur enchanté, sauf si la capacité dit « ciblé ».
   if (a.who === undefined && PLAYER_EFFECTS.has(a.effect) && (attachOf(card) || {}).kind === 'player') {
     a = {...a, who: 'enchanted'};
@@ -3425,7 +3574,7 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
     const head = en ? `${c.text}:` : `${c.text} :`;
     const desc = `${endDot(capitalize(body))}${lim.text}`;
     const text = withWord(e.aw, `${head} ${desc}`);
-    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc} | StackDescription$ SpellDescription`, ...extra, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])], text};
+    return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc} | StackDescription$ SpellDescription`, ...extra, ...(a.tapX && !tapCount(a) ? ['SVar:X:Count$xPaid'] : [])], text};
   }
   const head = triggerHead(a, card);
   const text = withWord(e.aw, endDot(`${head[en ? 2 : 1]}, ${body}`));
@@ -3479,6 +3628,10 @@ function triggerTable(a, card = null) {
   // Déclencheurs de marqueurs : le type (« charge » par défaut) et, pour « le Nième marqueur », N.
   const wc = counterById(a.whenCounter, 'CHARGE');
   const wn = Math.max(1, Math.min(20, Math.round(Number(a.whenN) || 3)));
+  // « Un sort d'artefact », « un artefact dont la valeur de mana… » : le type choisi (le premier par défaut).
+  const ck = whenKindOf({kinds: 'cast'}, a.whenKind);
+  const pk = whenKindOf({kinds: 'perm'}, a.whenKind);
+  const bk = whenKindOf({kinds: 'bend'}, a.whenKind);
   return {
     etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille', 'When CARDNAME enters'],
     ally: [enters(valid(f)), `Quand ${oneFr(f)} arrive sur le champ de bataille sous votre contrôle`, `Whenever ${oneEn(f)} you control enters`],
@@ -3562,6 +3715,19 @@ function triggerTable(a, card = null) {
     lastCounterRemoved: [`Mode$ CounterRemoved | ValidCard$ Card.Self | CounterType$ ${wc[0]} | NewCounterAmount$ 0 | TriggerZones$ Battlefield`,
       `Quand le dernier marqueur ${wc[1]} est retiré de CARDNAME`, `When the last ${wc[2]} counter is removed from CARDNAME`],
     castAny: ['Mode$ SpellCast | ValidCard$ Card | ValidActivatingPlayer$ You | TriggerZones$ Battlefield', 'À chaque fois que vous lancez un sort', 'Whenever you cast a spell'],
+    youBend: [`Mode$ ${bk[2]} | ValidPlayer$ You | TriggerZones$ Battlefield`, `À chaque fois que vous maîtrisez ${bk[3]}`, `Whenever you ${bk[4]}`],
+    castHistoric: ['Mode$ SpellCast | ValidCard$ Card.Historic | ValidActivatingPlayer$ You | TriggerZones$ Battlefield',
+      'À chaque fois que vous lancez un sort historique', 'Whenever you cast a historic spell'],
+    castKind: [`Mode$ SpellCast | ValidCard$ ${ck[2]} | ValidActivatingPlayer$ You | TriggerZones$ Battlefield`,
+      `À chaque fois que vous lancez ${ck[3]}`, `Whenever you cast ${ck[4]}`],
+    castMv: [`Mode$ SpellCast | ValidCard$ Card.cmcGE${wn} | ValidActivatingPlayer$ You | TriggerZones$ Battlefield`,
+      `À chaque fois que vous lancez un sort dont la valeur de mana est supérieure ou égale à ${wn}`, `Whenever you cast a spell with mana value ${wn} or greater`],
+    entersPower: [enters(`Creature.YouCtrl+powerGE${wn}`),
+      `À chaque fois qu'une créature avec une force supérieure ou égale à ${wn} arrive sur le champ de bataille sous votre contrôle`,
+      `Whenever a creature you control with power ${wn} or greater enters`],
+    entersMv: [enters(`${pk[2].includes('.') ? pk[2] + '+' : pk[2] + '.'}YouCtrl+cmcGE${wn}`),
+      `À chaque fois ${que(pk[3])} dont la valeur de mana est supérieure ou égale à ${wn} arrive sur le champ de bataille sous votre contrôle`,
+      `Whenever ${pk[4]} you control with mana value ${wn} or greater enters`],
     castNonCreature: ['Mode$ SpellCast | ValidCard$ Card.nonCreature | ValidActivatingPlayer$ You | TriggerZones$ Battlefield',
       'À chaque fois que vous lancez un sort non-créature', 'Whenever you cast a noncreature spell'],
     castCreature: ['Mode$ SpellCast | ValidCard$ Creature | ValidActivatingPlayer$ You | TriggerZones$ Battlefield',
@@ -3660,7 +3826,7 @@ function modalLines(a, id, w, lang, card) {
     }
     const c = activationCost(a, lang);
     const lim = activationLimits(a, lang);
-    return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${c.text}${en ? ':' : ' :'}`, ...modes, ...(a.tapX ? ['SVar:X:Count$xPaid'] : [])],
+    return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${c.text}${en ? ':' : ' :'}`, ...modes, ...(a.tapX && !tapCount(a) ? ['SVar:X:Count$xPaid'] : [])],
       text: `${c.text}${en ? ':' : ' :'} ${capitalize(choose)}${bullets}${lim.text}`};
   }
   const head = triggerHead(a, card);

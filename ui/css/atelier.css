@@ -270,3 +270,11 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
 .ate-esp { display: flex; align-items: center; gap: 14px; min-height: 52px; margin: 4px 0 8px; padding: 6px 12px;
   border-radius: 10px; background: linear-gradient(180deg, #f2ecdd, #d9d0bb); color: #3b352a; }
 .ate-esp .cf-set.cf-slogo { --u: 6px; display: block; width: 44px; height: 44px; }
+
+/* Réimpressions : une carte officielle avec une illustration perso (badge ↻ dans la liste, éditeur réduit à l'apparence). */
+.ate-rpbadge { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: rgb(var(--gold-rgb) / 0.18); color: var(--gold-2); font-size: 12px; }
+.ate-reprint .ate-lang, .ate-reprint .ate-import { display: none; }
+.ate-rpq { width: 100%; margin: 8px 0 12px; }
+.ate-rpgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.ate-rpcell { cursor: pointer; text-align: center; }
+.ate-rpcell .small { margin-top: 4px; }

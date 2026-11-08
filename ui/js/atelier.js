@@ -9,7 +9,7 @@ import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
 import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
-  SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_WHAT, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, allTokens, buildScript, costParts,
+  SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './frames.js';
@@ -18,7 +18,7 @@ import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './fra
 const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scope: 'Qui', keyword: 'Mot-clé', token: 'Jeton', mana: 'Mana',
   cond: 'Condition', amount: 'Nombre X', counter: 'Marqueur', permType: 'Type de permanent', cardKind: 'Type de carte', spellType: 'Type de sort',
   emblem: 'Emblème', level: 'Niveau de la classe', who: 'Joueur', chapter: 'Chapitre', sacWhat: 'Sacrifier', zone: 'D\'où elle s\'active',
-  addCost: 'Coût en plus', tapXWhat: 'Engager X…', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre',
+  addCost: 'Coût en plus', tapXWhat: 'Engager quoi', tapXN: 'Combien en engager', whenKind: 'Quel type', animKind: 'Lesquels', animDur: 'Combien de temps', airKind: 'Sur quoi', dcWho: 'Sur quelles créatures', pick: 'Combien de modes', caseCond: 'À résoudre', amountSel: 'Nombre',
   whenCounter: 'Marqueur', amountCounter: 'Marqueur', condCounter: 'Marqueur', removeCounterType: 'Marqueur', sacKind: 'Sacrifie'};
 
 /** Les types de marqueurs d'une liste déroulante (« charge », « temps », +1/+1…). */
@@ -175,6 +175,9 @@ export class Atelier {
 
   /** L'extension perso d'une carte (son identifiant, si l'extension existe encore), "" sans extension. */
   setOf(c) {
+    if (c.reprint) {
+      return c.set;
+    }
     const id = setIdOf(c.script);
     return id && (this.data.sets || []).some(x => x.id === id) ? id : '';
   }
@@ -195,21 +198,27 @@ export class Atelier {
     }
     this.setFilter = setFilter;
     const inSet = (c) => !setFilter || (setFilter === '-' ? !this.setOf(c) : this.setOf(c) === setFilter);
-    const cards = d.cards.filter(c => !c.token && inSet(c));
+    // Réimpressions (cartes officielles avec une illustration perso) : rangées avec les cartes de leur extension.
+    const reprints = (d.reprints || []).map(r => ({name: r.nameFr || r.name, card: r.card, reprint: r, set: sets.some(x => x.id === r.set) ? r.set : ''}));
+    const cards = [...d.cards.filter(c => !c.token && inSet(c)), ...reprints.filter(inSet)];
     const tokens = d.cards.filter(c => c.token && inSet(c));
-    const noSet = d.cards.filter(c => !this.setOf(c)).length;
+    const noSet = d.cards.filter(c => !this.setOf(c)).length + reprints.filter(r => !r.set).length;
     const setChip = (v, label, count, set) => `<button class="chip${setFilter === v ? ' on' : ''}" data-sfilter="${esc(v)}">${set ? setLogoHtml(set) : ''}${esc(label)}
       <span class="ate-gn">${count}</span></button>`;
     const sel = this.selection;
     this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
       <div class="ate-top"><h1>Atelier</h1>${d.cards.length ? `<button class="btn" data-organize>${sel ? 'Terminé' : 'Organiser'}</button>` : ''}
+        <button class="btn" data-reprint-new title="Une carte officielle (Sol Ring…) avec ton illustration, dans ton extension">＋ Réimpression</button>
         <button class="btn gold" data-new>＋ Nouvelle carte</button></div>
       <p class="muted small">Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles
-        se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker).</p>
-      ${sets.length ? `<div class="ate-groups chips ate-setfilter">${setChip('', 'Toutes les extensions', d.cards.length)}${sets.map(x => setChip(x.id, x.name, d.cards.filter(c => this.setOf(c) === x.id).length, x)).join('')}
+        se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker). Une <b>réimpression</b> est
+        une carte officielle (Sol Ring…) avec ton illustration, ta rareté et ton artiste, dans ton extension : elle garde ses
+        règles, et se choisit dans le deck builder comme une autre impression (pinceau d'une ligne du deck).</p>
+      ${sets.length ? `<div class="ate-groups chips ate-setfilter">${setChip('', 'Toutes les extensions', d.cards.length + reprints.length)}${sets.map(x => setChip(x.id, x.name, d.cards.filter(c => this.setOf(c) === x.id).length + reprints.filter(r => r.set === x.id).length, x)).join('')}
         ${noSet ? setChip('-', 'Sans extension', noSet) : ''}</div>` : ''}
       ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
         <button class="btn small gold" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
+        <button class="btn small" data-rput${sel.size ? '' : ' disabled'}>Rareté…</button>
         <button class="btn small" data-gall>${cards.length + tokens.length && [...cards, ...tokens].every(c => sel.has(c.name)) ? 'Aucune' : 'Toutes'}</button></div>` : ''}
       <div class="ate-cardgroups"></div>
       <div class="ate-top"><h2>Mes extensions</h2><button class="btn" data-newset>＋ Nouvelle extension</button></div>
@@ -232,6 +241,12 @@ export class Atelier {
       </div>
     </div>`;
     const tileOf = (c) => {
+      if (c.reprint) {
+        const tile = el(`<div class="ate-tile ate-rptile" data-reprint="${esc(c.reprint.id)}"></div>`);
+        tile.appendChild(cardElement(c.card));
+        tile.appendChild(el(`<div class="ate-name">${esc(c.name)} <span class="ate-rpbadge" title="Réimpression d'une carte officielle">↻</span></div>`));
+        return tile;
+      }
       const tile = el(`<div class="ate-tile${sel && sel.has(c.name) ? ' picked' : ''}" data-name="${esc(c.name)}"></div>`);
       tile.appendChild(c.card ? cardElement(c.card) : el(`<div class="mcard"><div class="face"></div></div>`));
       tile.appendChild(el(`<div class="ate-name">${esc(c.name)}</div>`));
@@ -242,9 +257,11 @@ export class Atelier {
     };
     // Toutes les extensions : un bloc par extension (puis les cartes sans extension) ; une extension choisie : ses cartes.
     const holder = this.root.querySelector('.ate-cardgroups');
+    // Dans une extension : l'ordre de leurs numéros (« 007/120 »).
+    const numbered = (list) => list.slice().sort((a, b) => ((a.card && a.card.cset && a.card.cset.n) || 9999) - ((b.card && b.card.cset && b.card.cset.n) || 9999));
     const blocks = !setFilter && sets.some(x => cards.some(c => this.setOf(c) === x.id))
-      ? [...sets.map(x => [x, cards.filter(c => this.setOf(c) === x.id)]), ['-', cards.filter(c => !this.setOf(c))]].filter(b => b[1].length)
-      : [[null, cards]];
+      ? [...sets.map(x => [x, numbered(cards.filter(c => this.setOf(c) === x.id))]), ['-', cards.filter(c => !this.setOf(c))]].filter(b => b[1].length)
+      : [[null, setFilter && setFilter !== '-' ? numbered(cards) : cards]];
     for (const [set, list] of blocks) {
       if (set) {
         holder.appendChild(el(`<h3 class="ate-gtitle">${set === '-' ? 'Sans extension' : `${setLogoHtml(set)}${esc(set.name)} <span class="muted small">${esc(set.code)}</span>`}
@@ -261,6 +278,20 @@ export class Atelier {
     tokens.forEach(c => tgrid.appendChild(tileOf(c)));
     this.root.onclick = async (e) => {
       if (this.pressed()) {
+        return;
+      }
+      const rpt = e.target.closest('[data-reprint]');
+      if (rpt) {
+        if (!this.selection) {
+          const r = (d.reprints || []).find(x => x.id === rpt.dataset.reprint);
+          if (r) {
+            this.editReprint(r, r.card);
+          }
+        }
+        return;
+      }
+      if (e.target.closest('[data-reprint-new]')) {
+        this.pickReprint();
         return;
       }
       const tile = e.target.closest('.ate-tile');
@@ -284,6 +315,10 @@ export class Atelier {
         this.editSet((d.sets || []).find(x => x.id === es.dataset.editset), () => this.renderList());
         return;
       }
+      if (e.target.closest('[data-rput]')) {
+        this.askRarity([...this.selection]);
+        return;
+      }
       if (e.target.closest('[data-sput]')) {
         this.askSet([...this.selection]);
         return;
@@ -301,7 +336,7 @@ export class Atelier {
         }
         this.renderList();
       } else if (e.target.closest('[data-gall]')) {
-        const visible = [...this.root.querySelectorAll('.ate-tile')].map(t => t.dataset.name);
+        const visible = [...this.root.querySelectorAll('.ate-tile[data-name]')].map(t => t.dataset.name);
         const all = visible.every(n => this.selection.has(n));
         visible.forEach(n => (all ? this.selection.delete(n) : this.selection.add(n)));
         this.renderList();
@@ -344,7 +379,8 @@ export class Atelier {
           <div class="ate-look-row"><button class="btn small" data-eslogo>Choisir une image…</button><button class="btn small" data-esnologo>Retirer le logo</button></div>
           <label class="tchip"><input type="checkbox" class="es-tint"${set && set.tint ? ' checked' : ''}><i></i><span>Couleur de la rareté</span></label>
           <p class="muted small">« Couleur de la rareté » garde la forme du logo et la colore comme les vrais symboles : noir (commune),
-            argent (peu commune), or (rare), orange (mythique). Sans elle, le logo s'affiche tel quel.</p></div>`;
+            argent (peu commune), or (rare), orange (mythique). Sans elle, le logo s'affiche tel quel. La rareté de chaque carte se
+            choisit dans son onglet « Apparence », ou pour plusieurs cartes à la fois avec « Organiser » puis « Rareté… ».</p></div>`;
       const name = body.querySelector('.es-name');
       const code = body.querySelector('.es-code');
       const tint = body.querySelector('.es-tint');
@@ -477,6 +513,50 @@ export class Atelier {
     }, {narrow: true});
   }
 
+  /** Donner une rareté aux cartes choisies (« Organiser »). */
+  askRarity(names) {
+    customBox(`Rareté de ${names.length} carte${names.length > 1 ? 's' : ''}`, (body, footer, close) => {
+      body.innerHTML = `<div class="chips ate-gpick">${RARITIES.map(([v, l]) => `<button class="chip" data-rpick="${v}">${v ? `<i class="ate-rdot r${v}"></i>` : ''}${l}</button>`).join('')}</div>
+        <p class="muted small">La rareté colore le logo de l'extension et s'écrit en bas de la carte. Elle se change aussi carte par carte, dans
+          l'onglet « Apparence ».</p>`;
+      body.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-rpick]');
+        if (b) {
+          close();
+          await this.putRarity(names, b.dataset.rpick);
+        }
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel);
+    }, {narrow: true});
+  }
+
+  /** Donne une rareté ("" : aucune) aux cartes nommées : la ligne est écrite dans leur script. */
+  async putRarity(names, rarity) {
+    let done = 0;
+    for (const name of names) {
+      const c = this.data.cards.find(x => x.name === name);
+      if (!c || (readDisplay(c.script).rarity || '') === rarity) {
+        continue;
+      }
+      try {
+        await bridge.request('customSave', {script: withDisplay(c.script, {...readDisplay(c.script), rarity}), previous: c.name, art: null,
+          form: c.form ? {...c.form, rarity} : null});
+        done++;
+      } catch (e) {
+        toast(`${name} : ${e.message}`, {error: true, duration: 6000});
+      }
+    }
+    if (done) {
+      const label = (RARITIES.find(r => r[0] === rarity) || ['', ''])[1].toLowerCase();
+      toast(`${done} carte${done > 1 ? 's' : ''} : ${rarity ? label : 'sans rareté'}.`, {title: 'Atelier'});
+      this.onChanged();
+    }
+    this.selection = this.selection ? new Set() : null;
+    await this.show();
+  }
+
   /** Met les cartes nommées dans une extension ("" : sans extension) : la ligne est écrite dans leur script. */
   async putInSet(names, id) {
     let done = 0;
@@ -520,7 +600,171 @@ export class Atelier {
   // ------------------------------------------------------------------ édition
 
   /** Édite une carte perso (entry) ou en crée une (null). */
+  /** Réimprimer une carte officielle : la chercher (en français ou en anglais), puis l'ouvrir dans l'éditeur. */
+  pickReprint() {
+    customBox('Réimprimer une carte officielle', (body, footer, close) => {
+      body.innerHTML = `<p class="muted small">La carte garde ses règles (Forge la joue comme l'officielle) ; tu choisis son illustration,
+        son extension, sa rareté, son artiste et son cadre.</p>
+        <input type="search" class="ate-rpq" placeholder="Anneau solaire, Sol Ring, Foudre…" autocomplete="off">
+        <div class="card-grid ate-rpgrid"></div>`;
+      const input = body.querySelector('.ate-rpq');
+      const grid = body.querySelector('.ate-rpgrid');
+      let token = 0;
+      const run = debounce(async () => {
+        const text = input.value.trim();
+        const mine = ++token;
+        if (text.length < 2) {
+          grid.innerHTML = '';
+          return;
+        }
+        try {
+          const r = await bridge.request('searchCards', {query: {text, limit: 24}});
+          if (mine !== token) {
+            return;
+          }
+          grid.innerHTML = '';
+          const list = (r.cards || []).filter(c => !c.custom);
+          if (!list.length) {
+            grid.appendChild(el('<p class="muted">Aucune carte officielle.</p>'));
+          }
+          for (const c of list) {
+            const cell = el('<div class="cell ate-rpcell"></div>');
+            cell.appendChild(cardElement(c));
+            cell.appendChild(el(`<div class="small">${esc(c.nameFr || c.name)}</div>`));
+            cell.addEventListener('click', () => {
+              close();
+              this.editReprint(null, c);
+            });
+            grid.appendChild(cell);
+          }
+        } catch (err) {
+          grid.innerHTML = `<p class="muted">${esc(err.message)}</p>`;
+        }
+      }, 250);
+      input.addEventListener('input', run);
+      setTimeout(() => input.focus(), 50);
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.append(cancel);
+    }, {full: true});
+  }
+
+  /**
+   * Éditeur d'une réimpression (rec : null pour une nouvelle ; base : la carte officielle telle que le catalogue la
+   * donne) : son illustration et l'onglet Apparence (extension, rareté, artiste, cadre, effet visuel).
+   */
+  editReprint(rec, base) {
+    this.editing = true;
+    this.reprint = {id: rec ? rec.id : '', name: rec ? rec.name : base.name, base, nameFr: (rec && rec.nameFr) || base.nameFr || base.name};
+    this.previous = null;
+    this.art = null;
+    this.artUrl = rec && base.customArt ? bridge.imageUrl(base.customArt) : '';
+    this.frameImg = null;
+    this.frameUrl = '';
+    const rarityOf = {COMMON: 'C', UNCOMMON: 'U', RARE: 'R', MYTHIC_RARE: 'M', MythicRare: 'M', Common: 'C', Uncommon: 'U', Rare: 'R'};
+    this.form = {...NEW_CARD(), frame: (rec && rec.frame) || 'modern', frameColor: (rec && rec.frameColor) || 'auto', frameText: (rec && rec.frameText) || 'dark',
+      fx: (rec && rec.fx) || 'none', lang: 'fr', set: rec ? rec.set || '' : (this.setFilter && this.setFilter !== '-' ? this.setFilter : ''),
+      rarity: rec ? rec.rarity || '' : rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : lastArtist()};
+    this.mode = 'form';
+    this.formUsed = false;
+    this.tab = 'look';
+    this.script = '';
+    this.lastCard = null;
+    this.root.onclick = null;
+    this.root.innerHTML = `<div class="page atelier-edit ate-reprint">
+      <div class="ate-top">
+        <button class="btn small" data-back>← Retour</button>
+        <h1>Réimpression — ${esc(this.reprint.nameFr)}</h1>
+      </div>
+      <div class="ate-body">
+        <div class="ate-left"></div>
+        <div class="ate-side panel">
+          <div class="ate-preview"></div>
+          <div class="ate-msg muted small"></div>
+          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button></div>
+          <div class="ate-actions">
+            <button class="btn gold" data-save>Enregistrer</button>
+            ${rec ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+    this.check = debounce(() => this.validate(), 150);
+    this.root.addEventListener('click', this.onEditClick = (e) => this.editClick(e));
+    this.root.addEventListener('pointerdown', this.onEditDrag = () => {});
+    this.root.addEventListener('input', this.onEditInput = (e) => this.editInput(e));
+    this.root.addEventListener('change', this.onEditInput);
+    this.root.addEventListener('toggle', this.onEditToggle = () => {}, true);
+    this.renderLeft();
+  }
+
+  /** Aperçu d'une réimpression : la carte officielle (nom, coût, type et texte en français) dans le cadre choisi. */
+  previewReprint() {
+    const look = this.look();
+    const set = ((this.data && this.data.sets) || []).find(x => x.id === look.set);
+    const base = this.reprint.base;
+    const keepNumber = base.cset && set && base.cset.id === set.id;
+    const card = {...base, custom: true, reprint: true, image: '', frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, lang: 'fr',
+      crarity: look.rarity || undefined, artist: cleanArtist(look.artist) || undefined,
+      cset: set ? {id: set.id, code: set.code, name: set.name, tint: !!set.tint, logo: set.logo, ...(keepNumber ? {n: base.cset.n, total: base.cset.total} : {})} : undefined};
+    this.lastCard = card;
+    this.renderLook();
+    const preview = this.root.querySelector('.ate-preview');
+    if (preview) {
+      preview.innerHTML = '';
+      const node = cardElement(this.shown(card));
+      node.addEventListener('click', () => this.pressed() || showZoom(this.shown(card)));
+      preview.appendChild(node);
+    }
+    const msg = this.root.querySelector('.ate-msg');
+    if (msg) {
+      msg.className = 'ate-msg small ok';
+      msg.textContent = `Les règles de « ${this.reprint.nameFr} » restent celles de la carte officielle.`;
+    }
+  }
+
+  async saveReprint(button) {
+    button.disabled = true;
+    const look = this.look();
+    const req = {id: this.reprint.id, name: this.reprint.name, set: look.set || '', rarity: look.rarity || '', artist: cleanArtist(look.artist),
+      frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx};
+    if (this.art !== null) {
+      req.art = this.art;
+    }
+    try {
+      this.useData(await bridge.request('reprintSave', req));
+      try {
+        if (cleanArtist(look.artist)) {
+          localStorage.setItem(ARTIST_KEY, cleanArtist(look.artist));
+        }
+      } catch (err) {
+        // mémoire du navigateur indisponible : l'artiste ne sera pas repris
+      }
+      toast('Réimpression enregistrée : choisis-la dans le deck builder (pinceau d\'une ligne du deck), elle se joue avec ton illustration.', {title: 'Atelier', duration: 6000});
+      this.onChanged();
+      this.close();
+    } catch (e) {
+      toast(e.message, {title: 'Réimpression refusée', error: true, duration: 7000});
+      button.disabled = false;
+    }
+  }
+
+  async removeReprint() {
+    if (!await confirmBox('Supprimer la réimpression ?', `Cette impression de « ${this.reprint.nameFr} » disparaîtra. Les decks qui l'utilisent reprennent
+      l'impression officielle.`, {yes: 'Supprimer', danger: true})) {
+      return;
+    }
+    try {
+      this.useData(await bridge.request('reprintDelete', {id: this.reprint.id}));
+      this.onChanged();
+      this.close();
+    } catch (e) {
+      toast(e.message, {error: true});
+    }
+  }
+
   edit(entry, {token = false} = {}) {
+    this.reprint = null;
     this.editing = true;
     this.previous = entry ? entry.name : null;
     this.art = null;
@@ -612,6 +856,7 @@ export class Atelier {
   }
 
   close() {
+    this.reprint = null;
     this.root.removeEventListener('click', this.onEditClick);
     this.root.removeEventListener('pointerdown', this.onEditDrag);
     this.root.removeEventListener('input', this.onEditInput);
@@ -1371,7 +1616,7 @@ export class Atelier {
     const subs = cardSubtypes(this.form);
     const isClass = subs.includes('Class');
     const isCase = subs.includes('Case');
-    const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
+    const moreCosts = w.cost && (a.payLife || a.discardCost || a.sacWhat || a.exileGY || a.removeCounters || a.untapQ || a.payEnergy || a.waterbend || a.sorcery || a.oncePerTurn || a.yourTurnOnly || a.zone);
     const count = this.form.abilities.length;
     return `<div class="ate-ab panel" data-ab="${i}">
       ${count > 1 ? `<div class="ate-ab-order"><span class="ate-drag" data-drag="${i}" title="Glisser vers le haut ou le bas pour changer l'ordre sur la carte">⠿</span>
@@ -1386,6 +1631,8 @@ export class Atelier {
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${w.counterSel ? `<div class="ate-ab-row"><span class="muted small">Marqueur</span>${counterSelect('a', 'whenCounter', a.whenCounter, 'CHARGE')}
         ${w.nth ? `<span class="muted small">N =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
+      ${w.kinds || w.nLabel ? `<div class="ate-ab-row">${w.kinds ? `${sel('whenKind', WHEN_KINDS[w.kinds].map(k => [k[0], k[1]]), whenKindOf(w, a.whenKind)[0])}` : ''}
+        ${w.nLabel ? `<span class="muted small">${esc(w.nLabel)}</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       <div class="ate-ab-row"><input type="text" class="ate-abname" data-a="flavor" value="${esc(a.flavor || '')}" maxlength="40"
         placeholder="Nom de la capacité (facultatif)"></div>
       ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
@@ -1399,14 +1646,17 @@ export class Atelier {
       ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>
-        <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tapX"${a.tapX ? ' checked' : ''}> engager X</label>
-        ${a.tapX ? `<select data-a="tapXWhat">${TAP_WHAT.map(([v, l]) => `<option value="${v}"${v === (a.tapXWhat || 'token') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tapX"${a.tapX ? ' checked' : ''}> engager</label>
+        ${a.tapX ? `<select data-a="tapXN" aria-label="Combien">${TAP_COUNTS.map(([v, l]) => `<option value="${v}"${v === String(a.tapXN || 'X') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+          <select data-a="tapXWhat">${TAP_WHAT.map(([v, l]) => `<option value="${v}"${v === (a.tapXWhat || 'token') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
           ${a.tapXWhat === 'type' ? `<input type="text" data-a="tapXType" data-typepick readonly value="${esc(a.tapXType || '')}" placeholder="un type : Elf" style="width:120px">` : ''}
-          <span class="muted small">dégagés que vous contrôlez (X au choix en jouant)</span>` : ''}</div>
+          <span class="muted small">dégagés que vous contrôlez${tapCount(a) ? '' : ' (X au choix en jouant, au moins 1)'}</span>` : ''}</div>
         <details class="ate-more ate-costs"${moreCosts || this.costOpen.has(i) ? ' open' : ''} data-costs="${i}"><summary>Autres coûts et restrictions${moreCosts ? ' <b class="ate-kwn">✓</b>' : ''}
           <span class="muted small">— PV, défausse, sacrifice, {Q}, rituel, cimetière…</span></summary>
           <div class="ate-ab-row"><span class="muted small">Payer</span><input type="number" data-a="payLife" value="${esc(a.payLife || 0)}" min="0" max="20" style="width:64px">
             <span class="muted small">points de vie</span><input type="number" data-a="payEnergy" value="${esc(a.payEnergy || 0)}" min="0" max="10" style="width:64px"><span class="muted small">${symbol('E')}</span></div>
+          <div class="ate-ab-row"><span class="muted small">Maîtriser l'Eau {N}</span><input type="number" data-a="waterbend" value="${esc(a.waterbend || 0)}" min="0" max="12" style="width:64px">
+            <span class="muted small">(engager ses artefacts et créatures aide à payer, {1} chacun)</span></div>
           <div class="ate-ab-row"><span class="muted small">Sacrifier</span>${sel('sacWhat', SAC_WHAT.map(s => [s[0], s[0] ? s[2] : 'rien d\'autre']), a.sacWhat || '')}
             <label class="ate-check"><input type="checkbox" data-a="discardCost" value="card"${a.discardCost === 'card' ? ' checked' : ''}> se défausser d'une carte</label></div>
           <div class="ate-ab-row"><span class="muted small">Exiler</span><input type="number" data-a="exileGY" value="${esc(a.exileGY || 0)}" min="0" max="10" style="width:64px">
@@ -1422,7 +1672,7 @@ export class Atelier {
             ${a.zone === 'Hand' ? '<span class="muted small">en se défaussant de cette carte</span>' : ''}</div>
         </details>` : ''}
       ${a.when === 'spell' ? `<div class="ate-ab-row"><span class="muted small">Coût en plus</span>${sel('addCost', SPELL_COSTS.map(c => [c[0], c[0] ? c[2] : 'aucun']), a.addCost || '')}
-        ${a.addCost === 'payLife' ? `<input type="number" data-a="addCostN" value="${esc(a.addCostN || 2)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
+        ${a.addCost === 'payLife' || a.addCost === 'waterbend' ? `<input type="number" data-a="addCostN" value="${esc(a.addCostN || 2)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span>${this.loyaltyHtml(a)}<span class="muted small">− pour retirer des marqueurs, + pour en ajouter</span></div>` : ''}
       <div class="ate-ab-row"><select data-a="effect" aria-label="Ce qu'elle fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
@@ -1477,6 +1727,19 @@ export class Atelier {
     }
     if (e.counter) {
       out += row('Marqueurs', sel('counter', COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]), h.counter || 'P1P1'));
+    }
+    if (e.counterEach) {
+      const list = [['ALL', 'de chaque type'], ...COUNTER_OPTIONS];
+      out += row('Marqueurs', sel('counter', list, list.some(c => c[0] === h.counter) ? h.counter : 'ALL')
+        + sel('dcWho', [['you', 'sur vos créatures'], ['all', 'sur toutes les créatures']], h.dcWho || 'you'));
+    }
+    if (e.anim) {
+      out += row('Lesquels', sel('animKind', ANIM_KINDS.map(k => [k[0], k[1]]), h.animKind || 'lands')
+        + `<input type="text" data-${attr}="animType" data-typepick readonly value="${esc(h.animType || '')}" placeholder="type de créature (facultatif)" style="width:170px">`
+        + (e.anim === 'static' ? '' : sel('animDur', [['eot', 'jusqu\'à la fin du tour'], ['perm', 'pour toujours']], h.animDur || 'eot')));
+    }
+    if (e.airKind) {
+      out += row('Sur', sel('airKind', AIR_KINDS.map(k => [k[0], k[1]]), h.airKind || 'creature'));
     }
     if (e.spellType) {
       out += row('Quels sorts', sel('spellType', SPELL_TYPES.map(t => [t[0], t[2]]), h.spellType || 'all')
@@ -1842,9 +2105,17 @@ export class Atelier {
       this.artUrl = '';
       this.check();
     } else if (b.dataset.save !== undefined) {
-      this.save(b);
+      if (this.reprint) {
+        this.saveReprint(b);
+      } else {
+        this.save(b);
+      }
     } else if (b.dataset.delete !== undefined) {
-      this.remove();
+      if (this.reprint) {
+        this.removeReprint();
+      } else {
+        this.remove();
+      }
     }
   }
 
@@ -1999,7 +2270,7 @@ export class Atelier {
     if (k === 'mana' && a.mana === 'Symbols' && !costParts(a.manaSymbols).length) {
       a.manaSymbols = '{G}{U}';
     }
-    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
+    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXN', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when, this.form).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when, this.form)[0].id;
       }
@@ -2030,6 +2301,10 @@ export class Atelier {
   }
 
   async validate() {
+    if (this.reprint) {
+      this.previewReprint();
+      return;
+    }
     const token = (this.vToken || 0) + 1;
     this.vToken = token;
     const msg = this.root.querySelector('.ate-msg');

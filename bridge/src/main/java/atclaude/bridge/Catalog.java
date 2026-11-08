@@ -199,7 +199,7 @@ final class Catalog {
         final List<Entry> matches = new ArrayList<>();
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
-            if (customSet != null && !customSet.equals(CustomCards.setOf(e.nameEn()))) continue;
+            if (customSet != null && !customSet.equals(CustomCards.setOf(e.nameEn())) && Reprints.inSet(customSet, e.nameEn()) == null) continue;
             if (onlyOwned && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
             if (owned != null && e.card().getRules().isCustom()) continue; // cartes perso : Sandbox seulement
             if (!text.isEmpty()) {
@@ -222,7 +222,7 @@ final class Catalog {
         // qui commencent par lui restent devant.
         final Map<String, Integer> pop = bool(q, "popular") && customSet == null ? Precons.popularity() : null;
         if (customSet != null && text.isEmpty()) {
-            matches.sort(Comparator.comparingInt((Entry e) -> CustomCards.numberOf(e.nameEn())));
+            matches.sort(Comparator.comparingInt((Entry e) -> CustomCards.numberIn(customSet, e.nameEn())));
         } else if (pop != null) {
             final Comparator<Entry> byPop = Comparator.comparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0));
             matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text)).thenComparing(byPop));
@@ -237,6 +237,10 @@ final class Catalog {
             PaperCard pc = matches.get(i).card();
             if (inSet != null) {
                 final PaperCard print = FModel.getMagicDb().getCommonCards().getCard(pc.getName(), setCode);
+                pc = print != null ? print : pc;
+            } else if (customSet != null && !customSet.equals(CustomCards.setOf(pc.getName()))) {
+                // Extension perso : une carte officielle y est sa réimpression.
+                final PaperCard print = Reprints.inSet(customSet, pc.getName());
                 pc = print != null ? print : pc;
             }
             final JsonObject card = paperJson(pc);
@@ -427,6 +431,17 @@ final class Catalog {
             final String frame = CustomCards.frameKey(nameEn);
             if (frame != null) {
                 o.addProperty("customFrame", frame);
+            }
+        } else if (Reprints.EDITION.equals(pc.getEdition())) {
+            // Réimpression de l'Atelier : le cadre dessiné avec son illustration (la clé de l'impression sert au choix
+            // de l'illustration dans le deck builder). Supprimée entre-temps : l'image de l'impression par défaut.
+            o.addProperty("printImage", pc.getImageKey(false));
+            final JsonObject rp = Reprints.of(pc);
+            if (rp != null) {
+                Reprints.addDisplay(o, rp);
+            } else {
+                final PaperCard def = FModel.getMagicDb().getCommonCards().getCard(nameEn);
+                o.addProperty("image", def == null ? "" : def.getImageKey(false));
             }
         }
         return o;
@@ -1086,13 +1101,22 @@ final class Catalog {
             final forge.card.CardEdition ed = editions.get(p.getEdition());
             dates.put(p.getEdition(), ed == null || ed.getDate() == null ? new java.util.Date(0) : ed.getDate());
         }
-        all.sort(Comparator.comparing((PaperCard p) -> dates.get(p.getEdition())).reversed()
+        // Les réimpressions de l'Atelier d'abord, puis les plus récentes.
+        all.removeIf(p -> Reprints.EDITION.equals(p.getEdition()) && Reprints.of(p) == null);
+        all.sort(Comparator.comparing((PaperCard p) -> !Reprints.EDITION.equals(p.getEdition()))
+                .thenComparing(Comparator.comparing((PaperCard p) -> dates.get(p.getEdition())).reversed())
                 .thenComparing(PaperCard::getArtIndex));
         final JsonArray list = new JsonArray();
         for (final PaperCard p : all) {
             final JsonObject o = paperJson(p);
             final forge.card.CardEdition ed = editions.get(p.getEdition());
             o.addProperty("setName", ed == null ? p.getEdition() : ed.getName());
+            if (o.has("reprint")) {
+                // Réimpression : son extension perso (ou l'Atelier), son code.
+                final JsonObject cs = o.has("cset") ? o.getAsJsonObject("cset") : null;
+                o.addProperty("setName", cs != null ? cs.get("name").getAsString() + " (Atelier)" : "Réimpression de l'Atelier");
+                o.addProperty("setLabel", cs != null ? cs.get("code").getAsString() : "Atelier");
+            }
             o.addProperty("year", ed == null || ed.getDate() == null ? "" : String.valueOf(1900 + ed.getDate().getYear()));
             list.add(o);
         }

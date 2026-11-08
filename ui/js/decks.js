@@ -841,7 +841,7 @@ export class Decks {
         const cell = el(`<div class="cell art-cell${p.set === current.set && p.art === current.art ? ' on' : ''}" title="${esc(p.setName)}"></div>`);
         cell.appendChild(cardElement({...print, image: ''}));
         cell.querySelector('.mcard').dataset.exact = '1';
-        cell.appendChild(el(`<div class="art-meta small"><b>${esc(p.setName)}</b><span class="muted">${esc(p.set)} · ${esc(p.number || '')}${p.year ? ' · ' + esc(p.year) : ''}</span></div>`));
+        cell.appendChild(el(`<div class="art-meta small"><b>${esc(p.setName)}</b><span class="muted">${esc(p.setLabel || p.set)}${p.reprint ? '' : ` · ${esc(p.number || '')}${p.year ? ' · ' + esc(p.year) : ''}`}</span></div>`));
         cell._print = print;
         grid.appendChild(cell);
         seen.observe(cell);
@@ -853,7 +853,8 @@ export class Decks {
         }
         const print = cell._print;
         try {
-          await bridge.request('chooseArt', {image: print.image});
+          // Réimpression de l'Atelier : pas d'image (cadre dessiné), la clé de son impression.
+          await bridge.request('chooseArt', {image: print.printImage || print.image});
         } catch (err) {
           toast(err.message, {error: true});
           return;

@@ -262,7 +262,7 @@ function openList(select, button) {
   }
   const current = list.querySelector('.csel-item.on');
   if (current) {
-    current.scrollIntoView({block: 'center'});
+    showChoice(list, current);
   }
   if (input && !sheet && matchMedia('(pointer: fine)').matches) {
     input.focus();
@@ -282,6 +282,49 @@ function openList(select, button) {
       };
       document.addEventListener('pointerdown', away, true);
     });
+  }
+}
+
+/**
+ * Fait voir le choix en cours sans qu'un titre de groupe (collé en haut de la liste) cache à moitié une ligne : la liste
+ * s'ouvre sur le titre du groupe du choix s'il tient avec lui, sinon le choix au milieu, la première ligne visible entière
+ * juste sous le titre collé.
+ */
+function showChoice(list, current) {
+  // Positions de mise en page (l'animation d'ouverture déforme les rectangles) ; un titre collé est lu par la ligne qui
+  // le suit, sa propre position changeant quand il est collé.
+  const pos = (el) => {
+    if (el.classList.contains('csel-group') && el.nextElementSibling) {
+      return pos(el.nextElementSibling) - el.offsetHeight;
+    }
+    return el.offsetTop - list.offsetTop;
+  };
+  const pad = parseFloat(getComputedStyle(list).paddingTop) || 0;
+  let head = current.previousElementSibling;
+  while (head && !head.classList.contains('csel-group')) {
+    head = head.previousElementSibling;
+  }
+  if (head && pos(current) + current.offsetHeight - pos(head) <= list.clientHeight - pad) {
+    list.scrollTop = pos(head) - pad;
+    return;
+  }
+  list.scrollTop = pos(current) - (list.clientHeight - current.offsetHeight) / 2;
+  if (list.scrollTop <= 0) {
+    return;
+  }
+  // La ligne qui passe sous le titre collé (ou un titre) : on recale pour qu'elle commence juste en dessous.
+  const sticky = head ? head.offsetHeight : 0;
+  const top = list.scrollTop;
+  for (const el of list.children) {
+    const y = pos(el);
+    if (el.classList.contains('csel-group') && y >= top) {
+      list.scrollTop = y - pad;
+      return;
+    }
+    if (el.classList.contains('csel-item') && y >= top + sticky - pad) {
+      list.scrollTop = y - sticky + pad;
+      return;
+    }
   }
 }
 

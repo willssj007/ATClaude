@@ -69,7 +69,7 @@ final class CustomCards {
 
     private CustomCards() { }
 
-    private static void changed() {
+    static void changed() {
         setIndex = null;
         onChanged.run();
     }
@@ -375,7 +375,8 @@ final class CustomCards {
             return idx;
         }
         idx = new java.util.HashMap<>();
-        final Map<String, List<CardRules>> bySet = new java.util.HashMap<>();
+        // Les cartes perso (clé : leur nom) et les réimpressions (clé : « reprint:id ») de chaque extension.
+        final Map<String, List<Map.Entry<String, CardRules>>> bySet = new java.util.HashMap<>();
         for (final String name : names()) {
             final CardRules r = rules(name);
             final String id = svar(r, "AtelierSet");
@@ -385,14 +386,22 @@ final class CustomCards {
             if (TOKENS.contains(name)) {
                 idx.put(name, new String[] {id, "", ""});
             } else {
-                bySet.computeIfAbsent(id, k -> new ArrayList<>()).add(r);
+                bySet.computeIfAbsent(id, k -> new ArrayList<>()).add(Map.entry(name, r));
             }
         }
-        for (final Map.Entry<String, List<CardRules>> e : bySet.entrySet()) {
-            final List<CardRules> list = e.getValue();
-            list.sort(java.util.Comparator.comparingInt(CustomCards::colorRank).thenComparing(CardRules::getName, String.CASE_INSENSITIVE_ORDER));
+        for (final JsonObject rp : Reprints.all()) {
+            final String id = Reprints.str(rp, "set");
+            final PaperCard pc = id.isEmpty() || findSet(id) == null ? null : Reprints.paper(rp);
+            if (pc != null) {
+                bySet.computeIfAbsent(id, k -> new ArrayList<>()).add(Map.entry(Reprints.indexKey(rp), pc.getRules()));
+            }
+        }
+        for (final Map.Entry<String, List<Map.Entry<String, CardRules>>> e : bySet.entrySet()) {
+            final List<Map.Entry<String, CardRules>> list = e.getValue();
+            list.sort(java.util.Comparator.comparingInt((Map.Entry<String, CardRules> x) -> colorRank(x.getValue()))
+                .thenComparing(x -> x.getValue().getName(), String.CASE_INSENSITIVE_ORDER));
             for (int i = 0; i < list.size(); i++) {
-                idx.put(list.get(i).getName(), new String[] {e.getKey(), String.valueOf(i + 1), String.valueOf(list.size())});
+                idx.put(list.get(i).getKey(), new String[] {e.getKey(), String.valueOf(i + 1), String.valueOf(list.size())});
             }
         }
         setIndex = idx;
@@ -403,6 +412,48 @@ final class CustomCards {
     static String setOf(final String name) {
         final String[] s = name == null ? null : setIndex().get(name);
         return s == null ? "" : s[0];
+    }
+
+    /** Numéro d'une carte perso, ou de sa réimpression, dans cette extension (pour l'ordre de la recherche). */
+    static int numberIn(final String setId, final String name) {
+        if (setId.equals(setOf(name))) {
+            return numberOf(name);
+        }
+        for (final JsonObject rp : Reprints.all()) {
+            if (setId.equals(Reprints.str(rp, "set")) && Reprints.str(rp, "name").equalsIgnoreCase(name)) {
+                final String[] s = setIndex().get(Reprints.indexKey(rp));
+                if (s != null && !s[1].isEmpty()) {
+                    return Integer.parseInt(s[1]);
+                }
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * L'extension perso pour l'affichage d'une carte : code, nom, logo, teinte, et le numéro de la carte (« 007/120 »)
+     * d'après sa clé d'index (nom d'une carte perso, « reprint:id » d'une réimpression). Null sans extension.
+     */
+    static JsonObject csetJson(final String setId, final String key) {
+        final JsonObject set = setId == null || setId.isEmpty() ? null : findSet(setId);
+        if (set == null) {
+            return null;
+        }
+        final JsonObject cs = new JsonObject();
+        cs.addProperty("id", setId);
+        cs.addProperty("code", str(set, "code"));
+        cs.addProperty("name", str(set, "name"));
+        cs.addProperty("tint", set.has("tint") && set.get("tint").getAsBoolean());
+        final String logo = logoKey(setId);
+        if (logo != null) {
+            cs.addProperty("logo", logo);
+        }
+        final String[] n = key == null ? null : setIndex().get(key);
+        if (n != null && !n[1].isEmpty()) {
+            cs.addProperty("n", Integer.parseInt(n[1]));
+            cs.addProperty("total", Integer.parseInt(n[2]));
+        }
+        return cs;
     }
 
     /** Numéro d'une carte dans son extension (0 si elle n'en a pas). */
@@ -546,6 +597,7 @@ final class CustomCards {
         new java.util.TreeSet<>(CardType.Constant.CREATURE_TYPES).forEach(known::add);
         o.add("creatureTypes", known);
         o.add("sets", sets());
+        o.add("reprints", Reprints.json());
         return o;
     }
 
@@ -1308,22 +1360,8 @@ final class CustomCards {
         o.addProperty("frameText", text);
         o.addProperty("fx", fx);
         // Extension perso : code, nom, logo, et le numéro de la carte (« 007/120 »).
-        final JsonObject set = setId.isEmpty() ? null : findSet(setId);
-        if (set != null) {
-            final JsonObject cs = new JsonObject();
-            cs.addProperty("id", setId);
-            cs.addProperty("code", str(set, "code"));
-            cs.addProperty("name", str(set, "name"));
-            cs.addProperty("tint", set.has("tint") && set.get("tint").getAsBoolean());
-            final String logo = logoKey(setId);
-            if (logo != null) {
-                cs.addProperty("logo", logo);
-            }
-            final String[] n = rules == null ? null : setIndex().get(rules.getName());
-            if (n != null && !n[1].isEmpty()) {
-                cs.addProperty("n", Integer.parseInt(n[1]));
-                cs.addProperty("total", Integer.parseInt(n[2]));
-            }
+        final JsonObject cs = csetJson(setId, rules == null ? null : rules.getName());
+        if (cs != null) {
             o.add("cset", cs);
         }
     }
@@ -1547,6 +1585,9 @@ final class CustomCards {
         }
         o.add("sets", setList);
         o.addProperty("setsAt", setsAt());
+        // Les réimpressions (cartes officielles avec une illustration perso), avec leurs illustrations.
+        o.add("reprints", Reprints.export());
+        o.addProperty("reprintsAt", Reprints.at());
         final JsonObject cards = new JsonObject();
         for (final Map.Entry<String, File> e : FILES.entrySet()) {
             if (DELETED.contains(e.getKey())) {
@@ -1597,6 +1638,9 @@ final class CustomCards {
         final JsonObject setsFrom = at(l, "setsAt") >= at(r, "setsAt") ? l : r;
         m.add("sets", setsFrom.has("sets") && setsFrom.get("sets").isJsonArray() ? setsFrom.getAsJsonArray("sets") : new JsonArray());
         m.addProperty("setsAt", at(setsFrom, "setsAt"));
+        final JsonObject reprintsFrom = at(l, "reprintsAt") >= at(r, "reprintsAt") ? l : r;
+        m.add("reprints", reprintsFrom.has("reprints") && reprintsFrom.get("reprints").isJsonArray() ? reprintsFrom.getAsJsonArray("reprints") : new JsonArray());
+        m.addProperty("reprintsAt", at(reprintsFrom, "reprintsAt"));
 
         final JsonObject tombs = new JsonObject();
         final long cutoff = System.currentTimeMillis() - 90L * 24 * 3600_000;
@@ -1689,6 +1733,15 @@ final class CustomCards {
             setsFile().setLastModified(at(merged, "setsAt"));
             setIndex = null;
             changed++;
+        }
+        // Les réimpressions (après les extensions, où elles se rangent).
+        if (at(merged, "reprintsAt") > Reprints.at() && merged.has("reprints") && merged.get("reprints").isJsonArray()) {
+            try {
+                Reprints.apply(merged.getAsJsonArray("reprints"), at(merged, "reprintsAt"));
+                changed++;
+            } catch (final RuntimeException ex) {
+                System.err.println("Réimpressions non reprises : " + ex.getMessage());
+            }
         }
         // Suppressions faites ailleurs (après la dernière modification ici).
         final JsonObject theirTombs = obj(merged, "deleted");
