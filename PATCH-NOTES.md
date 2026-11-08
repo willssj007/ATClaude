@@ -2,7 +2,7 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.6.8 — Autres illustrations des cartes perso, sorts en X
+## 0.6.8 — Autres illustrations des cartes perso, terrains full art, sorts en X
 
 ### Atelier
 - **Une autre illustration pour une carte perso**, sans doublon renommé (« NomDeCarte 2 ») :
@@ -14,12 +14,19 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 - **Détruire ou exiler chaque permanent d'un type de valeur de mana N (ou X) ou moins** : « Détruisez chaque créature dont la valeur de mana est inférieure ou égale à X ».
 - **Explorer, comploter, endurer** : la carte elle-même, une créature ciblée que vous contrôlez, jusqu'à deux, ou chaque créature que vous contrôlez. Aussi dans un éphémère ou un rituel.
 - **« Vos terrains (ou créatures, artefacts…) ont « {T} : Ajoutez un mana de la couleur de votre choix. » »**, en effet permanent.
+- **Terrains de base réimprimés** (Plaine, Île, Marais, Montagne, Forêt, Lande et leurs versions enneigées), section « Texte du terrain » de l'onglet Apparence :
+  - « Rappel » : « ({T} : Ajoutez {W}.) », en français (avant : « ({T}: Add {W}.) » en anglais) ;
+  - « Grand symbole de mana » : un seul grand symbole au milieu de la boîte de texte ;
+  - « Pas de texte » : avec le cadre « Illustration pleine » ou « Sans bord », plus de boîte de texte et le type descend en bas de la carte : l'illustration occupe toute la carte (full art).
+- **Texte d'ambiance sur une réimpression** (champ dans l'onglet Apparence), par exemple sous le grand symbole d'un terrain.
+- **Cartes perso avec beaucoup de texte** : la boîte de texte s'agrandit vers le haut, par-dessus le bas de l'illustration, au lieu de réduire le texte jusqu'à le rendre illisible. Le texte reste à une taille lisible (environ 12 px sur une carte de 300 px de large au lieu de 8).
 
 ### Corrections
 - **Sorts avec {X} dans le coût** (« Piochez X cartes », « Détruisez X créatures ciblées ») : le X annoncé était payé comme 0. Il est maintenant payé et compte vraiment.
 - **Triche « Ajouter une carte »** : une carte dont l'arrivée cible une de vos créatures attendait une dizaine de secondes avant de prendre en compte la cible. Elle la prend tout de suite.
 - **Sur la pile et dans le journal**, un sort perso s'écrit avec son texte français (« Une créature ciblée que vous contrôlez explore. »), plus en anglais.
 - **Deck builder** : la carte perso d'origine s'appelle « Carte perso (Atelier) » parmi ses impressions.
+- **PC : listes déroulantes qui sortaient de l'écran.** Une liste ouverte vers le bas prenait la hauteur de la place disponible au-dessus du bouton et passait sous la barre des tâches. Elle s'arrête maintenant au bas de la partie visible de la fenêtre, ou s'ouvre vers le haut.
 
 ## 0.6.7 — Réimpressions, maîtrise des éléments
 

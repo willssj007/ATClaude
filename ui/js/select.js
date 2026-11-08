@@ -329,13 +329,35 @@ function showChoice(list, current) {
 }
 
 /**
+ * Hauteur de la fenêtre réellement visible à l'écran. Sur PC, une fenêtre plein écran (ou plus haute que l'écran) peut
+ * avoir son bas caché par la barre des tâches : la liste s'arrête au-dessus.
+ */
+function visibleHeight(vh) {
+  try {
+    const sc = window.screen;
+    if (sc && sc.availHeight && window.outerHeight && matchMedia('(pointer: fine)').matches) {
+      const chrome = Math.max(0, window.outerHeight - window.innerHeight);
+      const top = (window.screenY || 0) + chrome;
+      const bottom = (sc.availTop || 0) + sc.availHeight;
+      const visible = Math.floor(bottom - top);
+      if (visible > 240 && visible < vh) {
+        return visible;
+      }
+    }
+  } catch (e) {
+    // pas d'information sur l'écran : toute la fenêtre
+  }
+  return vh;
+}
+
+/**
  * Panneau (écran tactile) : en bas de l'écran en portrait, au milieu en paysage, à la hauteur de la partie visible (au-dessus du
  * clavier). Liste sous le bouton (souris) : en dessous s'il y a la place, sinon au-dessus ; jamais hors de l'écran.
  */
 function place(panel, button) {
   const vv = window.visualViewport;
   const vw = vv ? vv.width : window.innerWidth;
-  const vh = vv ? vv.height : window.innerHeight;
+  const vh = visibleHeight(vv ? vv.height : window.innerHeight);
   const top0 = vv ? vv.offsetTop : 0;
   const left0 = vv ? vv.offsetLeft : 0;
   if (panel.classList.contains('sheet')) {
@@ -361,12 +383,16 @@ function place(panel, button) {
   panel.style.left = Math.max(8, Math.min(r.left, vw - width - 8)) + 'px';
   const below = vh - r.bottom - 10;
   const above = r.top - 10;
-  const maxH = Math.min(420, Math.max(below, above));
+  panel.style.maxHeight = '';
+  const natural = panel.scrollHeight;
+  // La hauteur suit la place du côté choisi : une liste ouverte vers le bas ne dépasse jamais le bas de l'écran.
+  const down = below >= Math.min(260, natural) || below >= above;
+  const maxH = Math.max(80, Math.min(420, down ? below : above));
   panel.style.maxHeight = maxH + 'px';
-  if (below >= Math.min(260, panel.scrollHeight) || below >= above) {
+  if (down) {
     panel.style.top = (r.bottom + 4) + 'px';
   } else {
-    panel.style.top = Math.max(8, r.top - 4 - Math.min(maxH, panel.scrollHeight)) + 'px';
+    panel.style.top = Math.max(8, r.top - 4 - Math.min(maxH, natural)) + 'px';
   }
 }
 

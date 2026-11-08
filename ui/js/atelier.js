@@ -669,7 +669,8 @@ export class Atelier {
     const rarityOf = {COMMON: 'C', UNCOMMON: 'U', RARE: 'R', MYTHIC_RARE: 'M', MythicRare: 'M', Common: 'C', Uncommon: 'U', Rare: 'R'};
     this.form = {...NEW_CARD(), frame: (rec && rec.frame) || 'modern', frameColor: (rec && rec.frameColor) || 'auto', frameText: (rec && rec.frameText) || 'dark',
       fx: (rec && rec.fx) || 'none', lang: 'fr', set: rec ? rec.set || '' : (this.setFilter && this.setFilter !== '-' ? this.setFilter : ''),
-      rarity: rec ? rec.rarity || '' : base.crarity || rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : base.artist || lastArtist()};
+      rarity: rec ? rec.rarity || '' : base.crarity || rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : base.artist || lastArtist(),
+      landText: rec ? rec.landText || '' : '', flavor: rec ? rec.flavor || '' : ''};
     this.mode = 'form';
     this.formUsed = false;
     this.tab = 'look';
@@ -703,6 +704,18 @@ export class Atelier {
     this.renderLeft();
   }
 
+  /** Réimpression : le texte d'un terrain de base (rappel, grand symbole, rien) et un texte d'ambiance. */
+  reprintTextHtml() {
+    const basic = /^\(\{T\}\s?: (?:Add|Ajoutez) (?:\{[WUBRGCS]\})+(?: à votre réserve)?\.\)$/.test(String(this.reprint.base.text || '').trim());
+    const lt = this.form.landText || '';
+    return `${basic ? `<div class="ate-field"><span>Texte du terrain</span>
+      <div class="chips ate-landtext">${[['', 'Rappel « {T} : Ajoutez… »'], ['symbol', 'Grand symbole de mana'], ['none', 'Pas de texte']].map(([v, l]) =>
+        `<button class="chip${v === lt ? ' on' : ''}" data-rland="${v}">${esc(l)}</button>`).join('')}</div>
+      <p class="muted small">Sans texte et avec le cadre « Illustration pleine » ou « Sans bord », l'illustration occupe toute la carte (full art).</p></div>` : ''}
+      <label class="ate-field"><span>Texte d'ambiance <span class="muted small">(facultatif, en italique sous le texte)</span></span>
+        <textarea data-rflavor rows="2" maxlength="240" placeholder="« Les plaines s'étendaient à perte de vue. »">${esc(this.form.flavor || '')}</textarea></label>`;
+  }
+
   /** Aperçu d'une réimpression : la carte officielle (nom, coût, type et texte en français) dans le cadre choisi. */
   previewReprint() {
     const look = this.look();
@@ -710,7 +723,11 @@ export class Atelier {
     const base = this.reprint.base;
     // Le numéro dans l'extension : celui de la réimpression enregistrée (pas celui de la carte perso qu'elle réimprime).
     const keepNumber = this.reprint.id && base.cset && set && base.cset.id === set.id;
-    const card = {...base, custom: true, reprint: true, image: '', frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, lang: 'fr',
+    // Terrain de base : rappel de mana en français, grand symbole ou rien (comme le pont le fera en partie).
+    const basicText = String(base.text || '').trim().match(/^\(\{T\}\s?: (?:Add|Ajoutez) ((?:\{[WUBRGCS]\})+)(?: à votre réserve)?\.\)$/);
+    const land = basicText ? (this.form.landText === 'symbol' ? {text: '', landSymbol: basicText[1]} : this.form.landText === 'none' ? {text: ''}
+      : {text: `({T} : Ajoutez ${basicText[1]}.)`}) : {};
+    const card = {...base, ...land, flavor: this.form.flavor ? this.form.flavor : base.flavor, custom: true, reprint: true, image: '', frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, lang: 'fr',
       crarity: look.rarity || undefined, artist: cleanArtist(look.artist) || undefined,
       cset: set ? {id: set.id, code: set.code, name: set.name, tint: !!set.tint, logo: set.logo, ...(keepNumber ? {n: base.cset.n, total: base.cset.total} : {})} : undefined};
     this.lastCard = card;
@@ -733,7 +750,7 @@ export class Atelier {
     button.disabled = true;
     const look = this.look();
     const req = {id: this.reprint.id, name: this.reprint.name, set: look.set || '', rarity: look.rarity || '', artist: cleanArtist(look.artist),
-      frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx};
+      frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, landText: this.form.landText || '', flavor: (this.form.flavor || '').trim()};
     if (this.art !== null) {
       req.art = this.art;
     }
@@ -1064,7 +1081,7 @@ export class Atelier {
     const left = this.root.querySelector('.ate-left');
     this.hyb = null;
     if (this.tab === 'look') {
-      left.innerHTML = this.lookHtml();
+      left.innerHTML = (this.reprint ? this.reprintTextHtml() : '') + this.lookHtml();
       this.renderLook();
       this.check();
       return;
@@ -2117,6 +2134,10 @@ export class Atelier {
       this.art = '';
       this.artUrl = '';
       this.check();
+    } else if (b.dataset.rland !== undefined) {
+      this.form.landText = b.dataset.rland;
+      this.root.querySelectorAll('[data-rland]').forEach(x => x.classList.toggle('on', x === b));
+      this.check();
     } else if (b.dataset.altArt !== undefined) {
       // Une autre illustration de cette carte perso : une réimpression (la carte enregistrée, sans les changements en cours).
       const entry = (this.data.cards || []).find(c => c.name === this.previous);
@@ -2140,6 +2161,11 @@ export class Atelier {
   }
 
   editInput(e) {
+    if (e.target && e.target.dataset && e.target.dataset.rflavor !== undefined) {
+      this.form.flavor = e.target.value;
+      this.check();
+      return;
+    }
     const t = e.target;
     if (t.classList.contains('ate-script')) {
       this.script = t.value;

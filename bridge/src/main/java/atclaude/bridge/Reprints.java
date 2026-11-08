@@ -35,6 +35,21 @@ final class Reprints {
     private static final Pattern ID = Pattern.compile("[a-z0-9]{1,20}");
     private static final Pattern FRAME_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,20}");
     private static final Pattern IMAGE_KEY = Pattern.compile("\\|" + EDITION + "\\|(\\d+)");
+    /** Le rappel de mana d'un terrain de base (« ({T}: Add {W}.) », ou déjà en français). */
+    static final Pattern BASIC_REMINDER = Pattern.compile("^\\(\\{T\\}\\s?: (?:Add|Ajoutez) ((?:\\{[WUBRGCS]\\})+)(?: à votre réserve)?\\.\\)$");
+
+    /** Mana d'un terrain de base d'après son nom (« Plains », « Snow-Covered Forest »…), ou null. */
+    static String basicMana(final String name) {
+        return switch (name.replaceFirst("^Snow-Covered ", "")) {
+            case "Plains" -> "{W}";
+            case "Island" -> "{U}";
+            case "Swamp" -> "{B}";
+            case "Mountain" -> "{R}";
+            case "Forest" -> "{G}";
+            case "Wastes" -> "{C}";
+            default -> null;
+        };
+    }
 
     private static volatile List<JsonObject> cache;
 
@@ -310,6 +325,26 @@ final class Reprints {
         if (!artist.isEmpty()) {
             o.addProperty("artist", artist);
         }
+        // Texte d'ambiance de la réimpression (sinon celui de la carte perso qu'elle réimprime, s'il y en a un).
+        final String flavor = str(r, "flavor");
+        if (!flavor.isEmpty()) {
+            o.addProperty("flavor", flavor);
+        }
+        // Terrain de base : le rappel de mana en français, un grand symbole de mana, ou rien. En partie, Forge ne donne pas
+        // de texte aux terrains de base : leur mana vient alors de leur nom.
+        final String text = o.has("text") && !o.get("text").isJsonNull() ? o.get("text").getAsString().trim() : "";
+        final Matcher m = BASIC_REMINDER.matcher(text);
+        final String mana = m.matches() ? m.group(1) : text.isEmpty() ? basicMana(str(r, "name")) : null;
+        if (mana != null) {
+            switch (str(r, "landText")) {
+                case "symbol" -> {
+                    o.addProperty("text", "");
+                    o.addProperty("landSymbol", mana);
+                }
+                case "none" -> o.addProperty("text", "");
+                default -> o.addProperty("text", "({T} : Ajoutez " + mana + ".)");
+            }
+        }
         final JsonObject cs = CustomCards.csetJson(str(r, "set"), indexKey(r));
         o.remove("cset");
         if (cs != null) {
@@ -390,6 +425,10 @@ final class Reprints {
             final String v = str(m, k);
             r.addProperty(k, FRAME_VALUE.matcher(v).matches() ? v : "");
         }
+        // Terrain de base : rappel de mana (par défaut), grand symbole ou rien ; texte d'ambiance (240 caractères au plus).
+        r.addProperty("landText", str(m, "landText").matches("symbol|none") ? str(m, "landText") : "");
+        final String flavor = str(m, "flavor").replace("\r", "").replace("|", "/").trim();
+        r.addProperty("flavor", flavor.length() > 240 ? flavor.substring(0, 240) : flavor);
         r.addProperty("at", System.currentTimeMillis());
         if (m.has("art") && !m.get("art").isJsonNull()) {
             final String data = m.get("art").getAsString();

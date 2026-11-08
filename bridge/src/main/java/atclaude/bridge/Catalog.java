@@ -390,7 +390,9 @@ final class Catalog {
                 text += "\n\n" + halfText(other, true);
                 textEn += "\n\n" + halfText(other, false);
             }
-            o.addProperty("text", text);
+            // Terrain de base : son rappel de mana en français (« ({T} : Ajoutez {W}.) »).
+            final java.util.regex.Matcher basic = Reprints.BASIC_REMINDER.matcher(text.trim());
+            o.addProperty("text", basic.matches() ? "({T} : Ajoutez " + basic.group(1) + ".)" : text);
             o.addProperty("textEn", textEn);
         }
         if (main != null && rules.getType().isCreature()) {

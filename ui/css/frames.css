@@ -81,6 +81,19 @@
   box-shadow: 0 0 0 calc(var(--u) * 0.5) rgb(0 0 0 / 0.7), 0 0 0 calc(var(--u) * 0.9) var(--e), inset 0 0 calc(var(--u) * 3) rgb(0 0 0 / 0.14);
 }
 .cf-rules { width: 100%; max-height: 100%; overflow: hidden; white-space: pre-line; font-size: calc(var(--u) * 6 * var(--sr)); line-height: 1.16; }
+/* Texte long : la boîte de texte s'agrandit vers le haut (marge négative : son bas ne bouge pas) et le bandeau du type
+   remonte avec elle, par-dessus le bas de l'illustration (--grow : en % de la hauteur de la carte, posé par frames.js). */
+.frame.cf.cf-grow .cf-box { margin-top: calc(var(--grow) * -1.4); }
+/* Terrain de base réimprimé : grand symbole de mana ; sans texte, pas de boîte en « Illustration pleine » ni en « Sans bord ». */
+.cf-bigmana { display: flex; justify-content: center; padding: 0.3em 0; }
+.cf-rules .cf-bigmana .ms { width: calc(var(--u) * 17); height: calc(var(--u) * 17); font-size: calc(var(--u) * 9); top: 0;
+  box-shadow: 0 calc(var(--u) * 0.6) 0 rgb(0 0 0 / 0.55); }
+.cf-bigmana ~ .cf-flavor { text-align: center; }
+.frame.cf.cf-notext.cf-fullart .cf-box, .frame.cf.cf-notext.cf-borderless .cf-box { display: none; }
+/* Full art sans texte : le bandeau du type descend en bas de la carte, l'illustration reste entière. */
+.frame.cf.cf-notext.cf-fullart .cf-type, .frame.cf.cf-notext.cf-borderless .cf-type { top: auto; bottom: 8.4%; }
+.frame.cf.cf-notext.cf-future.cf-fullart .cf-icon { display: none; }
+.frame.cf.cf-grow .cf-type, .frame.cf.cf-grow .cf-icon { margin-top: calc(var(--grow) * -1.4); }
 /* Texte d'ambiance d'une carte perso : en italique, sous un trait fin, comme sur les cartes imprimées. */
 .cf-flavor { margin-top: .45em; padding-top: .35em; border-top: 1px solid currentColor; border-top-color: rgb(0 0 0 / .28); font-style: italic; white-space: normal; }
 .cf-light .cf-flavor { border-top-color: rgb(255 255 255 / .35); }

@@ -269,11 +269,24 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
   const known = FITTED.get(key);
   const sn = known ? known.sn : clampScale(0.93 * (box.t - costWidth) / Math.max(1, textWidth(name, true) * 6.6));
   const st = known ? known.st : clampScale(0.93 * box.y / Math.max(1, textWidth(typeLine, true) * (style === 'retro' ? 5 : 5.4)));
-  const sr = known ? known.sr : rulesScale(flavor ? `${text}\n${flavor}` : text, box);
-  const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}`;
+  // Texte long : la zone de texte (et le bandeau du type) remonte sur l'illustration, jusqu'à 18 % de la hauteur de la
+  // carte, pour garder un texte lisible plutôt que de le réduire (une carte fait 140 unités de haut).
+  const full = flavor ? `${text}\n${flavor}` : text;
+  let grow = 0;
+  if (rulesScale(full, box) < 0.85) {
+    for (grow = 4; grow < 18 && rulesScale(full, {...box, h: box.h + grow * 1.4}) < 0.85; grow += 2) {
+      // agrandir encore
+    }
+  }
+  const sr = known ? known.sr : rulesScale(full, grow ? {...box, h: box.h + grow * 1.4} : box);
+  const vars = `--fL:${l.f};--fR:${r.f};--bL:${l.b};--bR:${r.b};--xL:${l.x};--xR:${r.x};--e:${l.e};--ink:${l.ink};--ish:${l.ink === '#ffffff' ? 'rgb(0 0 0 / 0.9)' : 'rgb(255 255 255 / 0.7)'};--sn:${sn};--st:${st};--sr:${sr}${grow ? `;--grow:${grow}%` : ''}`;
   const overlay = style === IMPORTED ? `<div class="cf-overlay" style="background-image:url(&quot;${esc(frameUrl)}&quot;)"></div>` : '';
   const light = style === IMPORTED && card.frameText === 'light' ? ' cf-light' : '';
-  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${pw ? ' cf-pw' : ''}${art ? '' : ' cf-noart'}${light}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
+  // Terrain de base réimprimé : un grand symbole de mana dans la boîte de texte (comme les vrais), ou pas de texte du tout
+  // (avec « Illustration pleine », l'illustration occupe alors toute la carte).
+  const bigMana = card.landSymbol ? `<div class="cf-bigmana">${manaHtml(card.landSymbol)}</div>` : '';
+  const empty = !bigMana && !text && !flavor;
+  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${pw ? ' cf-pw' : ''}${art ? '' : ' cf-noart'}${light}${grow ? ' cf-grow' : ''}${empty ? ' cf-notext' : ''}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
     <div class="cf-bg"></div>
     <div class="cf-art"${art}></div>
     ${overlay}
@@ -282,7 +295,7 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
     <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span>${setSymbol(card, logoUrl)}</div>
     <div class="cf-icon">${typeIcon(typeLine)}</div>
     <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>`
-    : `<div class="cf-rules">${rulesHtml(text)}${flavor ? `<div class="cf-flavor">${esc(flavor).replace(/\n/g, '<br>')}</div>` : ''}</div>`}</div>
+    : `<div class="cf-rules">${bigMana}${rulesHtml(text)}${flavor ? `<div class="cf-flavor">${esc(flavor).replace(/\n/g, '<br>')}</div>` : ''}</div>`}</div>
     ${pt && loyalty ? `<div class="cf-pt cf-loy"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M3 3H37V30L20 43L3 30Z"/></svg><span>${esc(pt)}</span></div>`
     : pt ? `<div class="cf-pt">${esc(pt)}</div>` : ''}
     ${footHtml(card)}
