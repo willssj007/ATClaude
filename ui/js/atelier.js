@@ -8,7 +8,7 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
+import {DFC_MODES, facePart, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
@@ -44,6 +44,9 @@ const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
   keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none', set: '', rarity: '', artist: '',
 });
+/** La présentation d'une carte (le verso d'une carte à deux faces garde celle du recto). */
+const lookOf = (f) => ({frame: f.frame, frameColor: f.frameColor, lang: f.lang, frameText: f.frameText, fx: f.fx, hideText: f.hideText,
+  set: f.set, rarity: f.rarity, artist: f.artist});
 /** Le dernier artiste écrit : il est repris sur les nouvelles cartes. */
 const ARTIST_KEY = 'at.atelier.artist';
 function lastArtist() {
@@ -796,6 +799,11 @@ export class Atelier {
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
     this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : token ? NEW_TOKEN() : NEW_CARD();
+    // Carte à deux faces : on modifie le recto ou le verso (this.front garde le recto pendant qu'on modifie le verso).
+    this.face = 'front';
+    this.front = null;
+    this.backArt = null;
+    this.backArtUrl = entry && entry.card && entry.card.back && entry.card.back.customArt ? bridge.imageUrl(entry.card.back.customArt) : '';
     if (!entry) {
       this.form.artist = lastArtist();
     }
@@ -894,17 +902,93 @@ export class Atelier {
   formKept() {
     // Les lignes de présentation (cadre, couleur, langue) peuvent changer en mode script sans perdre le formulaire.
     const bare = (script) => withDisplay(script, {}).trim();
-    return this.mode === 'form' || (this.formUsed && bare(this.script) === bare(buildScript(this.form)));
+    return this.mode === 'form' || (this.formUsed && bare(this.script) === bare(buildScript(this.full())));
+  }
+
+  /** La carte entière : le recto, avec son verso (même pendant qu'on modifie le verso). */
+  full() {
+    if (this.face !== 'back' || !this.front) {
+      return this.form;
+    }
+    return {...this.front, ...lookOf(this.form), back: facePart(this.form)};
+  }
+
+  /** Passe au recto ou au verso d'une carte à deux faces (le formulaire montre la face choisie). */
+  switchFace(face) {
+    if (face === this.face || this.mode !== 'form') {
+      return;
+    }
+    if (face === 'back') {
+      const front = this.form;
+      this.front = front;
+      this.form = Object.assign(NEW_CARD(), {types: ['Creature'], abilities: []}, front.back || {}, lookOf(front), {token: false});
+      this.form.kwValues = this.form.kwValues || {};
+      this.form.colors = this.form.colors || [];
+      this.face = 'back';
+    } else {
+      const back = this.form;
+      Object.assign(this.front, lookOf(back), {back: facePart(back)});
+      this.form = this.front;
+      this.front = null;
+      this.face = 'front';
+    }
+    this.kwOpen = new Set(['combat', ...KW_ALL.filter(k => (this.form.keywords || []).includes(k[0])).map(k => k[3])]);
+    this.moreOpen = new Set();
+    this.costOpen = new Set();
+    this.renderLeft();
+  }
+
+  /** Une seule face, ou deux (recto verso, jour et nuit, modale, aventure, préparée, bataille). */
+  setDfc(value) {
+    if (this.face === 'back') {
+      this.switchFace('front');
+    }
+    const f = this.form;
+    f.dfc = value;
+    if (value && !f.back) {
+      const spell = value === 'adventure' || value === 'prepare';
+      f.back = {name: '', cost: spell || value === 'modal' ? '' : undefined, types: spell ? ['Sorcery'] : ['Creature'], power: 2, toughness: 2,
+        keywords: [], kwValues: {}, abilities: [], colors: []};
+    }
+    if (value === 'adventure' || value === 'prepare') {
+      const types = (f.back.types || []).filter(t => t === 'Instant' || t === 'Sorcery');
+      f.back.types = types.length ? types : ['Sorcery'];
+    }
+    this.renderLeft();
+  }
+
+  /** Le verso d'une carte qui se transforme : pas de coût, des couleurs. */
+  backNoCost() {
+    const mode = DFC_MODES.find(m => m[0] && m[0] === (this.front || {}).dfc);
+    return this.face === 'back' && !!mode && !mode[3];
+  }
+
+  /** Le choix des faces, en haut du formulaire. */
+  facesHtml() {
+    const front = this.face === 'back' ? this.front : this.form;
+    if (!front || front.token) {
+      return '';
+    }
+    const mode = DFC_MODES.find(m => m[0] === (front.dfc || '')) || DFC_MODES[0];
+    const backName = this.face === 'back' ? this.form.name : (front.back && front.back.name);
+    return `<div class="ate-field ate-faces"><span>Faces</span>
+      <div class="ate-ab-row"><select data-dfc>${DFC_MODES.map(([v, l]) => `<option value="${v}"${v === mode[0] ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+      ${mode[0] ? `<div class="seg ate-faceseg"><button data-face="front" class="${this.face !== 'back' ? 'on' : ''}">Recto${front.name ? ' : ' + esc(front.name) : ''}</button>
+        <button data-face="back" class="${this.face === 'back' ? 'on' : ''}">Verso${backName ? ' : ' + esc(backName) : ''}</button></div>
+        <p class="muted small">${esc(mode[4])} Le formulaire montre la face choisie ; l'illustration aussi.</p>` : ''}
+      ${mode[0] === 'battle' && this.face !== 'back' ? `<label class="ate-field"><span>Défense de la bataille</span>
+        <input type="number" data-k="defense" value="${esc(front.defense ?? 5)}" min="1" max="20" style="width:90px"></label>` : ''}
+    </div>`;
   }
 
   currentScript() {
-    return this.mode === 'form' ? buildScript(this.form) : this.script;
+    return this.mode === 'form' ? buildScript(this.full()) : this.script;
   }
 
   /** Présentation de la carte : celle du formulaire, ou celle écrite dans le script. */
   look() {
     return this.mode === 'form' ? {frame: this.form.frame, frameColor: this.form.frameColor, lang: this.form.lang, frameText: this.form.frameText || 'dark', fx: this.form.fx || 'none',
-      set: this.form.set || '', rarity: this.form.rarity || '', artist: this.form.artist || ''}
+      hideText: !!this.form.hideText, set: this.form.set || '', rarity: this.form.rarity || '', artist: this.form.artist || ''}
       : readDisplay(this.script);
   }
 
@@ -945,6 +1029,8 @@ export class Atelier {
         <label class="ate-fcolor" data-ftext-box>Texte <select data-ftext>${FRAME_TEXT.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
       </div>
       <div class="ate-frames"></div>
+      <div class="ate-look-row"><label class="ate-check" title="Les capacités restent dans le jeu (Forge, aperçu en partie), seule la carte imprimée les cache">
+        <input type="checkbox" data-hidetext> Sur la carte, seulement le texte d'ambiance (cacher le texte des capacités)</label></div>
       <div class="ate-look-row ate-import">
         <button class="btn small" data-import-frame>Importer un cadre…</button>
         <button class="btn small" data-noframe>Retirer le cadre importé</button>
@@ -966,6 +1052,10 @@ export class Atelier {
     const setNow = sets.some(x => x.id === look.set) ? look.set : '';
     this.root.querySelectorAll('[data-lset]').forEach(b => b.classList.toggle('on', b.dataset.lset === setNow));
     this.root.querySelectorAll('[data-lrarity]').forEach(b => b.classList.toggle('on', b.dataset.lrarity === (look.rarity || '')));
+    const hide = this.root.querySelector('[data-hidetext]');
+    if (hide) {
+      hide.checked = !!look.hideText;
+    }
     const artist = this.root.querySelector('[data-lartist]');
     if (artist && document.activeElement !== artist && artist.value !== (look.artist || '')) {
       artist.value = look.artist || '';
@@ -1012,7 +1102,8 @@ export class Atelier {
 
   /** La carte telle qu'elle sera : l'illustration et le cadre importé choisis ici, pas encore enregistrés. */
   shown(card) {
-    return {...card, customArt: null, customArtUrl: this.artUrl, customFrame: null, customFrameUrl: this.frameUrl};
+    const art = this.face === 'back' ? this.backArtUrl || this.artUrl : this.artUrl;
+    return {...card, customArt: null, customArtUrl: art, customFrame: null, customFrameUrl: this.frameUrl};
   }
 
   /** Cadre importé : une image PNG ramenée au format de la carte (504 × 704), transparence gardée. */
@@ -1096,13 +1187,14 @@ export class Atelier {
       return;
     }
     const f = this.form;
-    left.innerHTML = `
-      <label class="ate-field"><span>Nom</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
-      ${f.token ? `<div class="ate-field"><span>Couleurs du jeton</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
+    const colorsOnly = f.token || this.backNoCost();
+    left.innerHTML = `${this.facesHtml()}
+      <label class="ate-field"><span>Nom${this.face === 'back' ? ' du verso' : ''}</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
+      ${colorsOnly ? `<div class="ate-field"><span>${f.token ? 'Couleurs du jeton' : 'Couleurs du verso (il n\'a pas de coût)'}</span><div class="ate-mana-pad ate-tcolors">${TOKEN_COLORS.map(([c, l]) =>
         `<button class="ate-pip${f.colors.includes(c) ? ' first' : ''}" data-tcolor="${c}" title="${l}">${symbol(c)}</button>`).join('')}
         <span class="muted small">${f.colors.length ? '' : 'Incolore'}</span></div></div>` : `<div class="ate-field"><span>Coût de mana</span>${this.manaHtml('form')}</div>`}
       <div class="ate-field"><span>Types</span><div class="ate-chips">
-        <button class="chip ${f.token ? 'on' : ''}" data-tokenflag title="Un jeton : pas de coût, créé par les capacités">Jeton</button>
+        ${this.face === 'back' || f.dfc ? '' : `<button class="chip ${f.token ? 'on' : ''}" data-tokenflag title="Un jeton : pas de coût, créé par les capacités">Jeton</button>`}
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
       </div></div>
@@ -1562,13 +1654,16 @@ export class Atelier {
     }
     const {generic} = costModel(value);
     const hyb = this.hyb && this.hyb.target === target ? this.hyb : null;
+    const phy = this.phy === target;
     return PIPS.map(([p, label]) => {
-      const off = hyb && !'WUBRG'.includes(p);
+      const off = (hyb || phy) && !'WUBRG'.includes(p);
       return `<button class="ate-pip${hyb && hyb.first === p ? ' first' : ''}" data-pip="${p}" title="${label}"${off ? ' disabled' : ''}>${symbol(p)}</button>`;
     }).join('')
       + `<span class="ate-gen" title="Mana générique"><button data-gen="-1" title="Un de moins"${generic ? '' : ' disabled'}>−</button>${symbol(String(generic))}`
       + `<button data-gen="1" title="Un de plus"${generic < GENERIC_MAX ? '' : ' disabled'}>+</button></span>`
       + `<button class="chip ate-hyb${hyb ? ' on' : ''}" data-hybrid title="Symbole à deux couleurs">Hybride</button>`
+      + `<button class="chip ate-hyb${phy ? ' on' : ''}" data-phyrexian title="Mana phyrexian : payable avec 2 points de vie">Phyrexian ϕ</button>`
+      + (phy ? '<span class="muted small ate-hyb-hint">Touche une couleur.</span>' : '')
       + (hyb ? `<span class="muted small ate-hyb-hint">${hyb.first ? 'Et la seconde couleur ?' : 'Touche deux couleurs.'}</span>` : '');
   }
 
@@ -1581,6 +1676,13 @@ export class Atelier {
     let next = value;
     if (b.dataset.hybrid !== undefined) {
       this.hyb = hyb ? null : {target, first: ''};
+      this.phy = null;
+    } else if (b.dataset.phyrexian !== undefined) {
+      this.phy = this.phy === target ? null : target;
+      this.hyb = null;
+    } else if (b.dataset.pip && this.phy === target && 'WUBRG'.includes(b.dataset.pip)) {
+      m.pips.push(`${b.dataset.pip}/P`);
+      next = costText(m);
     } else if (b.dataset.pip) {
       const p = b.dataset.pip;
       if (hyb && !hyb.first) {
@@ -1666,7 +1768,9 @@ export class Atelier {
       ${eminenceOk(a.when) && this.form.legendary ? `<div class="ate-ab-row"><label class="ate-check" title="Pour un commandant : la capacité marche aussi quand il est dans la zone de commandement">
         <input type="checkbox" data-a="eminence"${a.eminence ? ' checked' : ''}> Éminence <span class="muted small">(marche aussi depuis la zone de commandement)</span></label></div>` : ''}
       ${a.when === 'chapter' ? `<div class="ate-ab-row"><span class="muted small">Chapitre</span>${sel('chapter', ROMAN.map((r, k) => [String(k + 1), r]), String(a.chapter || 1))}
-        <span class="muted small">la saga avance d'un chapitre à chacun de vos tours</span></div>` : ''}
+        ${sel('chapterTo', [['', 'ce chapitre seulement'], ...ROMAN.map((r, k) => [String(k + 1), `jusqu'au chapitre ${r}`]).filter(([v]) => Number(v) > Number(a.chapter || 1))],
+          Number(a.chapterTo) > Number(a.chapter || 1) ? String(a.chapterTo) : '')}
+        <span class="muted small">la saga avance d'un chapitre à chacun de vos tours ; plusieurs capacités sur un chapitre se suivent</span></div>` : ''}
       ${w.cost ? `<div class="ate-ab-cost"><span class="muted small">Coût</span>${this.manaHtml('ab:' + i)}</div>
         <div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="tap"${a.tap ? ' checked' : ''}> ${symbol('T')} l'engager</label>
         <label class="ate-check"><input type="checkbox" data-a="sac"${a.sac ? ' checked' : ''}> la sacrifier</label></div>
@@ -1700,7 +1804,9 @@ export class Atelier {
       ${w.loyalty ? `<div class="ate-ab-row"><span class="muted small">Loyauté</span>${this.loyaltyHtml(a)}<span class="muted small">− pour retirer des marqueurs, + pour en ajouter</span></div>` : ''}
       <div class="ate-ab-row"><select data-a="effect" aria-label="Ce qu'elle fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
-        ${e.n && !(e.mana && a.mana === 'Symbols') ? `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+        ${e.n && !(e.mana && a.mana === 'Symbols') ? (!isStatic && !e.modal && !e.mana && a.amount && a.amount !== 'fixed' ? '<b class="ate-xbadge" title="Nombre calculé">X</b>'
+          : `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">`) : ''}</div>
+      ${e.n && !e.mana && !e.modal && !isStatic ? this.amountRow(a, 'a', a) : ''}
       ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', scopesFor(this.form, scope), scope)}</div>` : ''}
       ${e.modal ? this.modesHtml(a) : ''}
       ${this.optionRows(a, e, 'a', i, a.when)}
@@ -1882,7 +1988,9 @@ export class Atelier {
         placeholder="Nom du mode (facultatif)"></div>` : ''}
       <div class="ate-ab-row"><select data-sf="effect" aria-label="Ce qu'il fait">${EFFECT_GROUPS.filter(([g]) => effects.some(x => x.group === g)).map(([g, label]) => `<optgroup label="${esc(label)}">${effects
         .filter(x => x.group === g).map(x => `<option value="${x.id}"${x.id === e.id ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select>
-        ${e.n ? `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">` : ''}</div>
+        ${e.n ? (sub === 'then' && !e.mana && m.amount && m.amount !== 'fixed' ? '<b class="ate-xbadge" title="Nombre calculé">X</b>'
+          : `<input type="number" data-sf="n" value="${esc(m.n)}" min="0" max="99" style="width:70px" title="Nombre">`) : ''}</div>
+      ${sub === 'then' && e.n && !e.mana ? this.amountRow(m, 'sf', a, true) : ''}
       ${this.optionRows(m, e, 'sf', null, a.when)}
       ${e.filter ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
         <input type="text" data-sf="ftype" data-typepick readonly value="${esc(f.type)}" placeholder="toutes, ou un type : Elf" style="width:170px">
@@ -1916,23 +2024,34 @@ export class Atelier {
   }
 
   /**
+   * Le nombre d'un effet : celui indiqué (N), ou X (payé avec {X} dans le coût, ou calculé pendant la partie : créatures,
+   * points de vie perdus…). Un effet enchaîné peut aussi reprendre le même X, ou le nombre de permanents touchés juste avant.
+   */
+  amountRow(m, key, parent, chained = false) {
+    const tapped = parent.when === 'activated' && parent.tapX;
+    const list = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped).map(([v, l]) => [v, v === 'fixed' ? 'N : le nombre indiqué' : l]);
+    if (chained) {
+      list.splice(1, 0, ['same', 'X = le même X que l\'effet principal'], ['prev', 'X = le nombre de permanents détruits, exilés ou sacrifiés juste avant']);
+    }
+    const v = m.amount || 'fixed';
+    return `<div class="ate-ab-row"><span class="muted small">Nombre</span>
+      <select data-${key}="amount">${list.map(([o, l]) => `<option value="${o}"${o === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      ${v === 'typeCount' ? `<input type="text" data-${key}="amountType" data-typepick readonly value="${esc(m.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}
+      ${v === 'counters' ? counterSelect(key, 'amountCounter', m.amountCounter) : ''}</div>`;
+  }
+
+  /**
    * « Plus d'options » d'une capacité, sans écrire de script : un nombre X calculé pendant la partie, une condition
    * (« seulement si … ») et jusqu'à deux effets enchaînés (« …, puis … »).
    */
   moreHtml(a, i, e) {
     const then = a.then || [];
-    const used = (a.amount && a.amount !== 'fixed') || (a.cond && a.cond !== 'none') || then.length > 0;
+    const used = (a.cond && a.cond !== 'none') || then.length > 0;
     const open = this.moreOpen.has(i) || used;
     const tapped = a.when === 'activated' && a.tapX;
-    const amounts = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped);
-    const amount = e.n && !e.mana ? `<div class="ate-ab-row"><span class="muted small">Nombre</span>
-        <select data-a="amount">${amounts.map(([v, l]) => `<option value="${v}"${v === (a.amount || 'fixed') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-        ${a.amount === 'typeCount' ? `<input type="text" data-a="amountType" data-typepick readonly value="${esc(a.amountType || '')}" placeholder="un type : Elf" style="width:130px">` : ''}
-        ${a.amount === 'counters' ? counterSelect('a', 'amountCounter', a.amountCounter) : ''}</div>` : '';
     const cond = CONDITIONS_N.includes(a.cond);
     return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
-      <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— nombre X, condition, « et puis »</span></summary>
-      ${amount}
+      <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— condition, « et puis »</span></summary>
       <div class="ate-ab-row"><span class="muted small">Seulement</span>
         <select data-a="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
@@ -2023,7 +2142,10 @@ export class Atelier {
         return;
       }
       if (b.dataset.mode === 'script') {
-        this.script = buildScript(f);
+        if (this.face === 'back') {
+          this.switchFace('front');
+        }
+        this.script = buildScript(this.form);
         this.mode = 'script';
         this.renderLeft();
       } else if (this.formKept()) {
@@ -2124,16 +2246,27 @@ export class Atelier {
       }
     } else if (b.dataset.art !== undefined) {
       pickPhoto({w: ART.w, h: ART.h, round: false, title: 'Recadrer l\'illustration', use: 'Utiliser cette illustration'}).then((data) => {
-        if (data) {
+        if (data && this.face === 'back') {
+          this.backArt = data;
+          this.backArtUrl = data;
+          this.check();
+        } else if (data) {
           this.art = data;
           this.artUrl = data;
           this.check();
         }
       });
     } else if (b.dataset.noart !== undefined) {
-      this.art = '';
-      this.artUrl = '';
+      if (this.face === 'back') {
+        this.backArt = '';
+        this.backArtUrl = '';
+      } else {
+        this.art = '';
+        this.artUrl = '';
+      }
       this.check();
+    } else if (b.dataset.face) {
+      this.switchFace(b.dataset.face);
     } else if (b.dataset.rland !== undefined) {
       this.form.landText = b.dataset.rland;
       this.root.querySelectorAll('[data-rland]').forEach(x => x.classList.toggle('on', x === b));
@@ -2170,6 +2303,18 @@ export class Atelier {
     if (t.classList.contains('ate-script')) {
       this.script = t.value;
       this.check();
+      return;
+    }
+    if (t.dataset.dfc !== undefined) {
+      if (e.type === 'change') {
+        this.setDfc(t.value);
+      }
+      return;
+    }
+    if (t.dataset.hidetext !== undefined) {
+      if (e.type === 'change') {
+        this.setLook({hideText: t.checked});
+      }
       return;
     }
     if (t.dataset.lartist !== undefined) {
@@ -2316,7 +2461,7 @@ export class Atelier {
     if (k === 'mana' && a.mana === 'Symbols' && !costParts(a.manaSymbols).length) {
       a.manaSymbols = '{G}{U}';
     }
-    if (e.type === 'change' && ['when', 'effect', 'amount', 'cond', 'tapX', 'tapXN', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
+    if (e.type === 'change' && ['when', 'chapter', 'effect', 'amount', 'cond', 'tapX', 'tapXN', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
       if (k === 'when' && !effectsFor(a.when, this.form).some(x => x.id === a.effect)) {
         a.effect = effectsFor(a.when, this.form)[0].id;
       }
@@ -2364,10 +2509,12 @@ export class Atelier {
         return;
       }
       preview.innerHTML = '';
-      this.lastCard = r.card;
+      // En modifiant le verso : l'aperçu montre le verso (une aventure, une carte préparée : la carte entière).
+      const card = this.face === 'back' && r.card.back ? {...r.card.back} : r.card;
+      this.lastCard = card;
       this.renderLook();
-      const node = cardElement(this.shown(r.card));
-      node.addEventListener('click', () => this.pressed() || showZoom(this.shown(r.card)));
+      const node = cardElement(this.shown(card));
+      node.addEventListener('click', () => this.pressed() || showZoom(this.shown(card)));
       preview.appendChild(node);
       preview.classList.remove('stale');
       // Ce que le jeu dirait des sous-types (une leçon sur une créature, une saga sans chapitre…), puis Forge.
@@ -2394,7 +2541,7 @@ export class Atelier {
         Object.assign(this.form, readDisplay(this.script));
       }
       await bridge.request('customSave', {script: this.currentScript(), previous: this.previous, art: this.art,
-        form: kept ? this.form : null, frameImage: this.frameImg});
+        form: kept ? this.full() : null, frameImage: this.frameImg, backArt: this.backArt});
       try {
         if (cleanArtist(this.look().artist)) {
           localStorage.setItem(ARTIST_KEY, cleanArtist(this.look().artist));

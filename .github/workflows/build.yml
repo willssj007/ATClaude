@@ -24,12 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Version 0.6.x : le build 43 est la 0.6.0, chaque build suivant ajoute 1 au dernier chiffre.
-      # (0.4.x : builds 39 à 42 ; 0.3.x : builds 30 à 38.)
+      # Version 0.7.x : le build 53 est la 0.7.0, chaque build suivant ajoute 1 au dernier chiffre.
+      # (0.6.x : builds 43 à 52 ; 0.4.x : builds 39 à 42 ; 0.3.x : builds 30 à 38.)
       - name: Version
         id: version
         run: |
-          VERSION="0.6.$(( ${{ github.run_number }} - 43 ))"
+          VERSION="0.7.$(( ${{ github.run_number }} - 53 ))"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version $VERSION"

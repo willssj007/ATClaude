@@ -194,6 +194,35 @@ function planeswalkerRules(text) {
   }).join('');
 }
 
+/** Chapitre de saga (« I, II — … ») et niveau de classe (« {1}{G} : Niveau 2 »). */
+const CHAPTER_LINE = /^((?:[IVX]+,\s*)*[IVX]+)\s+—\s+(.+)$/;
+const LEVEL_LINE = /^((?:\{[^}]+\})+)\s*:\s*(Niveau|Level)\s+(\d+)\s*$/;
+/** Seuil d'un vaisseau spatial (« STATION 6+ — C'est une créature-artefact. »). */
+const STATION_LINE = /^STATION\s+(\d+\+)\s*(?:—\s*)?(.*)$/;
+
+/**
+ * Texte d'une saga ou d'une classe : chaque chapitre avec ses numéros dans des insignes, chaque niveau de classe dans
+ * un bandeau (son coût et « Niveau 2 ») ; les autres lignes telles quelles.
+ */
+function chapteredRules(text) {
+  return text.replace(/\\n/g, '\n').split('\n').filter(l => l.trim()).map((line) => {
+    const st = line.match(STATION_LINE);
+    if (st) {
+      return `<div class="cf-lvl cf-station"><b>STATION ${esc(st[1])}</b></div>${st[2] ? `<div class="cf-pwt">${rulesHtml(st[2])}</div>` : ''}`;
+    }
+    const lv = line.match(LEVEL_LINE);
+    if (lv) {
+      return `<div class="cf-lvl"><span class="cf-lvc">${manaHtml(lv[1])}</span><b>${esc(lv[2])} ${esc(lv[3])}</b></div>`;
+    }
+    const ch = line.match(CHAPTER_LINE);
+    if (ch) {
+      const nums = ch[1].split(/,\s*/).map(n => `<b>${esc(n)}</b>`).join('');
+      return `<div class="cf-ch"><span class="cf-chn">${nums}</span><span class="cf-cht">${rulesHtml(ch[2])}</span></div>`;
+    }
+    return `<div class="cf-pwt">${rulesHtml(line)}</div>`;
+  }).join('');
+}
+
 const RARITY_LETTER = {C: 'C', U: 'U', R: 'R', M: 'M', S: 'S'};
 
 /**
@@ -252,9 +281,14 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
   const name = card.nameFr || card.name || '';
   const typeLine = card.typeLine || '';
   // En partie, Forge sépare les mots-clés du reste par une ligne vide (et des \r) : une ligne suffit sur la carte.
-  const text = String(card.text || '').replace(/\r/g, '').replace(/\n{2,}/g, '\n').trim();
+  // « Seulement le texte d'ambiance » : les capacités restent dans le jeu, la carte ne les montre pas.
+  // Les classes officielles ont des repères « //Level_2// » dans leur texte : ils n'ont rien à faire sur la carte.
+  const text = card.hideText ? '' : String(card.text || '').replace(/\r/g, '').replace(/(^|\n|\\n)\/\/Level_\d+\/\//g, '').replace(/\n{2,}/g, '\n').trim();
   const loyalty = card.power === undefined && card.loyalty !== undefined && card.loyalty !== null && card.loyalty !== '';
-  const pt = card.power !== undefined && card.toughness !== undefined ? `${card.power}/${card.toughness}` : loyalty ? String(card.loyalty) : '';
+  // Bataille : sa défense, dans un écusson en bas à droite (comme la loyauté d'un planeswalker).
+  const defense = card.power === undefined && !loyalty && card.defense !== undefined && card.defense !== null && card.defense !== '';
+  const pt = card.power !== undefined && card.toughness !== undefined ? `${card.power}/${card.toughness}` : loyalty ? String(card.loyalty)
+    : defense ? String(card.defense) : '';
   const pips = card.cost ? (String(card.cost).match(/\{[^}]+\}/g) || String(card.cost).trim().split(/\s+/)).length : 0;
   const legendary = /légendaire|Legendary/.test(typeLine);
   const pw = /Planeswalker/.test(typeLine) && style !== 'token';
@@ -282,6 +316,9 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
   // (avec « Illustration pleine », l'illustration occupe alors toute la carte).
   const bigMana = card.landSymbol ? `<div class="cf-bigmana">${manaHtml(card.landSymbol)}</div>` : '';
   const empty = !bigMana && !text && !flavor;
+  const textLines = text.split(/\n|\\n/);
+  const chaptered = !pw && ((/saga/i.test(typeLine) && textLines.some(l => CHAPTER_LINE.test(l))) || (/class/i.test(typeLine) && textLines.some(l => LEVEL_LINE.test(l)))
+    || textLines.some(l => STATION_LINE.test(l)));
   return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${pw ? ' cf-pw' : ''}${art ? '' : ' cf-noart'}${light}${grow ? ' cf-grow' : ''}${empty ? ' cf-notext' : ''}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
     <div class="cf-bg"></div>
     <div class="cf-art"${art}></div>
@@ -291,8 +328,10 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
     <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span>${setSymbol(card, logoUrl)}</div>
     <div class="cf-icon">${typeIcon(typeLine)}</div>
     <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>`
+    : chaptered ? `<div class="cf-rules cf-chrules">${chapteredRules(text)}${flavor ? `<div class="cf-flavor">${esc(flavor).replace(/\n/g, '<br>')}</div>` : ''}</div>`
     : `<div class="cf-rules">${bigMana}${rulesHtml(text)}${flavor ? `<div class="cf-flavor">${esc(flavor).replace(/\n/g, '<br>')}</div>` : ''}</div>`}</div>
-    ${pt && loyalty ? `<div class="cf-pt cf-loy"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M3 3H37V30L20 43L3 30Z"/></svg><span>${esc(pt)}</span></div>`
+    ${pt && defense ? `<div class="cf-pt cf-loy cf-def"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M20 2L37 11V35L20 44L3 35V11Z"/></svg><span>${esc(pt)}</span></div>`
+    : pt && loyalty ? `<div class="cf-pt cf-loy"><svg viewBox="0 0 40 46" aria-hidden="true"><path d="M3 3H37V30L20 43L3 30Z"/></svg><span>${esc(pt)}</span></div>`
     : pt ? `<div class="cf-pt">${esc(pt)}</div>` : ''}
     ${footHtml(card)}
     ${card.fx && card.fx !== 'none' && FX.some(f => f[0] === card.fx) ? `<div class="cf-fx cf-fx-${card.fx}"></div>` : ''}

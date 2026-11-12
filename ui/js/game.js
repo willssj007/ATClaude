@@ -587,8 +587,9 @@ export class Game {
       if (e.pointerType !== 'mouse') {
         return;
       }
+      // Une carte du plateau, de la pile, ou d'une fenêtre de zone (cimetière, exil, main : la carte est sur son emplacement).
       const slot = e.target.closest('.slot');
-      const card = slot && this.cards.get(slot.dataset.key);
+      const card = slot && (this.cards.get(slot.dataset.key) || slot._card);
       if (!card || card.hidden) {
         preview.classList.remove('show');
         return;

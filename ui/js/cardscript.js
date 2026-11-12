@@ -122,6 +122,12 @@ export const KW_ALL = [
   ['Vanishing', 'Disparition', 'Vanishing', 'number', 'n', null, 3],
   ['Amplify', 'Amplification', 'Amplify', 'number', 'n', null, 1],
   ['Devour', 'Dévorement', 'Devour', 'number', 'n', null, 1],
+  ['Devour Food', 'Dévorement de nourriture', 'Devour Food', 'number', 'n', null, 1,
+    {line: 'K:Devour:{n}:Food', fr: 'Dévorement de nourriture {n}', en: 'Devour Food {n}'}],
+  ['Devour Artifact', 'Dévorement d\'artefacts', 'Devour artifact', 'number', 'n', null, 1,
+    {line: 'K:Devour:{n}:Artifact', fr: 'Dévorement d\'artefacts {n}', en: 'Devour artifact {n}'}],
+  ['Devour Land', 'Dévorement de terrains', 'Devour land', 'number', 'n', null, 1,
+    {line: 'K:Devour:{n}:Land', fr: 'Dévorement de terrains {n}', en: 'Devour land {n}'}],
   ['Graft', 'Greffe', 'Graft', 'number', 'n', null, 2],
   ['Soulshift', 'Transmigration', 'Soulshift', 'number', 'n', null, 3],
   ['Mobilize', 'Mobilisation', 'Mobilize', 'number', 'n', null, 1],
@@ -304,6 +310,7 @@ export const WHEN = [
   {id: 'blocks', kind: 'T', label: 'Quand elle bloque'},
   {id: 'blocked', kind: 'T', label: 'Quand elle devient bloquée'},
   {id: 'unblocked', kind: 'T', label: 'Quand elle attaque et n\'est pas bloquée'},
+  {id: 'allyBlocked', kind: 'T', label: 'Quand une de vos créatures devient bloquée'},
   {id: 'blocksCreature', kind: 'T', label: 'Quand elle devient bloquée par une créature (une fois par bloqueur)'},
   {id: 'becomesTarget', kind: 'T', label: 'Quand elle devient la cible d\'un sort ou d\'une capacité'},
   {id: 'becomesTargetOpp', kind: 'T', label: 'Quand elle devient la cible d\'un sort ou d\'une capacité qu\'un adversaire contrôle'},
@@ -506,6 +513,13 @@ export function whenKindOf(w, id) {
 /** Groupes du choix « quand » dans le formulaire. */
 export const WHEN_GROUPS = [['T', 'Déclenchée (quand…)'], ['A', 'Activée'], ['SP', 'Sort'], ['CH', 'Saga'], ['S', 'Permanente']];
 
+/** Les chapitres d'une capacité de saga : du chapitre « chapter » jusqu'à « chapterTo » (« I, II — »). */
+export function chaptersOf(a) {
+  const k = Math.max(1, Math.min(6, Math.round(Number(a.chapter) || 1)));
+  const to = Math.max(k, Math.min(6, Math.round(Number(a.chapterTo) || k)));
+  return Array.from({length: to - k + 1}, (_, i) => k + i);
+}
+
 /** Chapitres d'une saga : I à VI. */
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
@@ -559,6 +573,8 @@ const COLOR_WORDS = {W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green'};
 export const EFFECTS = [
   {id: 'damageAny', group: 'life', label: 'Blessures à n\'importe quelle cible', n: true},
   {id: 'damageCreature', group: 'life', label: 'Blessures à une créature ciblée', n: true},
+  {id: 'damageBlocker', group: 'life', label: 'Blessures à la créature qui la bloque ou qu\'elle bloque', n: true,
+    only: ['blocksCreature', 'blocked', 'blocks', 'allyBlocked']},
   {id: 'damageOpponents', group: 'life', label: 'Blessures à chaque adversaire', n: true},
   {id: 'damageEachCreature', group: 'life', label: 'Blessures à chaque créature', n: true},
   {id: 'damageEachOppCreature', group: 'life', label: 'Blessures à chaque créature que vos adversaires contrôlent', n: true},
@@ -590,6 +606,8 @@ export const EFFECTS = [
   {id: 'tutorBattlefield', group: 'cards', label: 'Chercher une carte d\'un type et la mettre sur le champ de bataille', ct: true},
   {id: 'regrowth', group: 'cards', label: 'Renvoyer une créature du cimetière en main'},
   {id: 'regrowthTyped', group: 'cards', label: 'Renvoyer une carte d\'un type du cimetière en main', ct: true},
+  {id: 'putFromHand', group: 'cards', label: 'Mettre une carte d\'un type de votre main sur le champ de bataille (sans payer son coût)', ct: true},
+  {id: 'castFree', group: 'cards', label: 'Lancer un sort de votre main de valeur de mana N (ou X) ou moins sans payer son coût de mana', n: true},
   {id: 'reanimateTyped', group: 'cards', label: 'Renvoyer une carte d\'un type de votre cimetière sur le champ de bataille', ct: true},
   {id: 'playHideaway', group: 'cards', label: 'Jouer la carte exilée par Cachette sans payer son coût de mana'},
   {id: 'castFromGraveyard', group: 'cards', label: 'Lancer un éphémère ou un rituel ciblé de votre cimetière sans payer son coût'},
@@ -669,6 +687,7 @@ export const EFFECTS = [
   {id: 'phaseOut', group: 'removal', label: 'Une créature ciblée passe hors phase'},
   {id: 'detain', group: 'removal', label: 'Détenir un permanent non-terrain ciblé qu\'un adversaire contrôle'},
   {id: 'fight', group: 'removal', label: 'Se battre contre une créature adverse ciblée', self: true},
+  {id: 'fightTargets', group: 'removal', label: 'Une créature ciblée que vous contrôlez se bat contre une créature ciblée que vous ne contrôlez pas'},
   {id: 'counterSpell', group: 'removal', label: 'Contrecarrer un sort ciblé'},
   {id: 'counterCreature', group: 'removal', label: 'Contrecarrer un sort de créature ciblé'},
   {id: 'counterNonCreature', group: 'removal', label: 'Contrecarrer un sort non-créature ciblé'},
@@ -730,6 +749,11 @@ export const EFFECTS = [
   {id: 'investigate', group: 'mech', label: 'Enquêter (jetons Indice)', n: true},
   {id: 'incubate', group: 'mech', label: 'Incuber N', n: true},
   {id: 'manifest', group: 'mech', label: 'Manifester la carte du dessus de votre bibliothèque'},
+  {id: 'transform', group: 'mech', label: 'La transformer (carte recto verso : elle passe sur son autre face)', self: true},
+  {id: 'prepareSelf', group: 'mech', label: 'La préparer (carte préparée : on peut lancer une copie de son sort)', self: true},
+  {id: 'suspectSelf', group: 'mech', label: 'La suspecter (elle a la menace et ne peut pas bloquer)', self: true},
+  {id: 'suspectTarget', group: 'mech', label: 'Suspecter une créature ciblée (menace, ne peut pas bloquer)'},
+  {id: 'cloak', group: 'mech', label: 'Voiler la carte du dessus de votre bibliothèque (2/2 face cachée avec la défense talismanique)'},
   {id: 'manifestDread', group: 'mech', label: 'Manifester l\'effroi'},
   {id: 'amass', group: 'mech', label: 'Amasser des Orques', n: true},
   {id: 'ringTempts', group: 'mech', label: 'L\'Anneau vous tente'},
@@ -954,6 +978,7 @@ export const AMOUNTS = [
   ['spellsTurn', 'X = le nombre de sorts que vous avez lancés ce tour-ci'],
   ['lifeGainedTurn', 'X = les points de vie que vous avez gagnés ce tour-ci'],
   ['lifeLostOpp', 'X = les points de vie perdus par vos adversaires ce tour-ci'],
+  ['lifeLostYou', 'X = les points de vie que vous avez perdus ce tour-ci'],
   ['opponents', 'X = le nombre d\'adversaires'],
   ['power', 'X = la force de cette carte'],
   ['toughness', 'X = l\'endurance de cette carte'],
@@ -964,7 +989,8 @@ export const AMOUNTS = [
 ];
 
 /** Coût « engager X … dégagés que vous contrôlez » : ce qu'on engage. */
-export const TAP_WHAT = [['token', 'jetons'], ['creature', 'créatures'], ['artifact', 'artefacts'], ['type', 'créatures d\'un type']];
+export const TAP_WHAT = [['token', 'jetons'], ['creature', 'créatures'], ['artifact', 'artefacts'], ['type', 'créatures d\'un type'],
+  ['permanent', 'permanents'], ['land', 'terrains'], ['enchantment', 'enchantements']];
 
 /** Combien le coût « engager … » en demande : [valeur, libellé]. X au choix en jouant (au moins un), ou un nombre fixe. */
 export const TAP_COUNTS = [['X', 'X (au choix, au moins 1)'], ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => [String(n), String(n)])];
@@ -981,6 +1007,9 @@ function tapWhat(a) {
   switch (a.tapXWhat) {
     case 'creature': return ['Creature', 'créatures', 'créature', 'es', 'creatures'];
     case 'artifact': return ['Artifact', 'artefacts', 'artefact', 's', 'artifacts'];
+    case 'permanent': return ['Permanent', 'permanents', 'permanent', 's', 'permanents'];
+    case 'land': return ['Land', 'terrains', 'terrain', 's', 'lands'];
+    case 'enchantment': return ['Enchantment', 'enchantements', 'enchantement', 's', 'enchantments'];
     case 'type': return t ? [`Creature.${t}`, `créatures de type ${frType(a.tapXType)}`, `créature de type ${frType(a.tapXType)}`, 'es', `${t} creatures`] : ['Creature', 'créatures', 'créature', 'es', 'creatures'];
     default: return ['Card.token', 'jetons', 'jeton', 's', 'tokens'];
   }
@@ -1009,6 +1038,9 @@ export const CONDITIONS = [
   ['monarch', 'Si vous êtes le monarque'],
   ['kicked', 'Si le kick a été payé (mot-clé Kick)'],
   ['lifeGained', 'Si vous avez gagné des points de vie ce tour-ci'],
+  ['oppLostLife', 'Si un adversaire a perdu des points de vie ce tour-ci'],
+  ['oppLostLifeN', 'Si vos adversaires ont perdu au moins N points de vie ce tour-ci'],
+  ['youLostLife', 'Si vous avez perdu des points de vie ce tour-ci'],
   ['spells2', 'Si vous avez lancé au moins deux sorts ce tour-ci'],
   ['tappedAtLeast', 'Si vous en avez engagé au moins N (coût « engager X »)'],
   ['countersAtLeast', 'Si elle a au moins N marqueurs (d\'un type, au choix)'],
@@ -1017,7 +1049,7 @@ export const CONDITIONS = [
 ];
 
 /** Conditions qui demandent un nombre N. */
-export const CONDITIONS_N = ['control', 'lifeAtLeast', 'lifeAtMost', 'handAtLeast', 'graveyardAtLeast', 'tappedAtLeast', 'countersAtLeast',
+export const CONDITIONS_N = ['control', 'oppLostLifeN', 'lifeAtLeast', 'lifeAtMost', 'handAtLeast', 'graveyardAtLeast', 'tappedAtLeast', 'countersAtLeast',
   'experienceAtLeast', 'energyAtLeast'];
 
 /** Types de créature, en français et en anglais (posés par l'Atelier d'après la liste du pont). */
@@ -1461,6 +1493,7 @@ function amountOf(a) {
     case 'lifeGainedTurn': return ['Count$LifeYouGainedThisTurn', 'le nombre de points de vie que vous avez gagnés ce tour-ci', 'the amount of life you gained this turn'];
     case 'lifeLostOpp': return ['Count$LifeOppsLostThisTurn', 'le nombre total de points de vie que vos adversaires ont perdus ce tour-ci',
       'the total amount of life your opponents lost this turn'];
+    case 'lifeLostYou': return ['Count$LifeYouLostThisTurn', 'le nombre de points de vie que vous avez perdus ce tour-ci', 'the amount of life you lost this turn'];
     case 'opponents': return ['PlayerCountOpponents$Amount', 'le nombre d\'adversaires que vous avez', 'the number of opponents you have'];
     case 'power': return ['Count$CardPower', 'la force de CARDNAME', 'CARDNAME\'s power'];
     case 'toughness': return ['Count$CardToughness', 'l\'endurance de CARDNAME', 'CARDNAME\'s toughness'];
@@ -1472,7 +1505,7 @@ function amountOf(a) {
     case 'energy': return ['Count$YourCountersEnergy', 'la quantité de {E} que vous avez', 'the amount of {E} you have'];
     case 'tapped': {
       const w = tapWhat(a);
-      return ['Count$xPaid', `le nombre de ${w[1]} engagé${w[3]} ainsi`, `the number of ${w[4]} tapped this way`];
+      return ['Count$xPaid', `le nombre ${/^[aeiouéèh]/i.test(w[1]) ? 'd\'' : 'de '}${w[1]} engagé${w[3]} ainsi`, `the number of ${w[4]} tapped this way`];
     }
     default: return null;
   }
@@ -1519,6 +1552,11 @@ function conditionOf(a) {
     case 'monarch': return c('Count$Monarch.1.0', 'GE1', 'si vous êtes le monarque', 'if you\'re the monarch');
     case 'kicked': return c('Count$Kicked.1.0', 'GE1', 'si le kick a été payé', 'if it was kicked');
     case 'lifeGained': return c('Count$LifeYouGainedThisTurn', 'GE1', 'si vous avez gagné des points de vie ce tour-ci', 'if you gained life this turn');
+    case 'oppLostLife': return c('Count$LifeOppsLostThisTurn', 'GE1', 'si un adversaire a perdu des points de vie ce tour-ci',
+      'if an opponent lost life this turn');
+    case 'oppLostLifeN': return c('Count$LifeOppsLostThisTurn', `GE${n}`, `si vos adversaires ont perdu au moins ${n} ${plural(n, 'point', 'points')} de vie ce tour-ci`,
+      `if your opponents lost ${n} or more life this turn`);
+    case 'youLostLife': return c('Count$LifeYouLostThisTurn', 'GE1', 'si vous avez perdu des points de vie ce tour-ci', 'if you lost life this turn');
     case 'spells2': return c('Count$ThisTurnCast_Card.YouCtrl', 'GE2', 'si vous avez lancé au moins deux sorts ce tour-ci', 'if you\'ve cast two or more spells this turn');
     case 'countersAtLeast': {
       const ct = counterById(a.condCounter, 'CHARGE');
@@ -1589,15 +1627,63 @@ function chainOf(a, id, lang) {
   const toText = (l) => (x ? l.replace(/\b7777\b/g, 'X') : l);
   const suffix = x && x[1] ? (en ? `, where X is ${x[2]}` : `, X étant ${x[1]}`) : '';
   const items = [{head: toForge(main.p), extra: (main.extra || []).map(toForge), aux: (main.aux || []).map(toForge), text: toText(en ? main.en : main.fr) + suffix}];
+  let remember = false;
   (a.then || []).slice(0, 2).forEach((m, k) => {
     const name = `${id}T${k + 1}`;
-    const e = effect({...newMode(), ...m, when: a.when, attachTo: a.attachTo, attachWhen: a.attachWhen}, name);
+    // Un effet enchaîné a son propre nombre : fixe, le même X que l'effet principal, le nombre de permanents touchés
+    // juste avant (« détruisez X créatures ciblées, puis créez autant de jetons »), ou un autre X calculé.
+    const mdef = EFFECTS.find(z => z.id === m.effect);
+    let mx = null;
+    if (mdef && mdef.n && !mdef.mana && m.amount && m.amount !== 'fixed') {
+      if (m.amount === 'same') {
+        mx = a.amount && a.amount !== 'fixed' ? amountOf({...a}) : null;
+      } else if (m.amount === 'prev') {
+        const prev = k === 0 ? a.effect : (a.then[k - 1] || {}).effect || '';
+        const done = /exile/i.test(prev) ? ['exilés', 'exiled'] : /sacrific|edict/i.test(prev) ? ['sacrifiés', 'sacrificed']
+          : /bounce|tuck/i.test(prev) ? ['renvoyés', 'returned'] : /destroy|wrath/i.test(prev) ? ['détruits', 'destroyed'] : ['touchés', 'affected'];
+        mx = ['Count$RememberedSize', `le nombre de permanents ${done[0]} ainsi`, `the number of permanents ${done[1]} this way`];
+        items[items.length - 1].remember = true;
+        remember = true;
+      } else {
+        mx = amountOf({...m, tapXWhat: a.tapXWhat, tapXType: a.tapXType});
+      }
+    }
+    const e = effect({...newMode(), ...m, ...(mx ? {n: X_MARK} : {}), when: a.when, attachTo: a.attachTo, attachWhen: a.attachWhen}, name);
     if (e) {
+      const mxName = `${name}X`;
+      const mvName = `${name}V`;
+      const fx = (l) => (mx ? l.replace(/cmc(LE|GE|EQ|LT|GT)7777(?!\d)/g, `cmc$1${mvName}`).replace(/(?<!\d)7777(?!\d)/g, mxName) : l);
+      const head = fx(e.p);
+      const extra = (e.extra || []).map(fx);
+      const aux = (e.aux || []).map(fx);
+      if (mx) {
+        aux.push(`SVar:${mxName}:${mx[0]}`);
+        if ([head, ...extra].some(l => l.includes(mvName))) {
+          aux.push(`SVar:${mvName}:${mx[0]}`);
+        }
+      }
+      let text = en ? e.en : e.fr;
+      if (mx) {
+        text = text.replace(/\b7777\b/g, 'X');
+        // « X étant … » une seule fois quand c'est le même X que l'effet principal.
+        if (mx[1] && !(m.amount === 'same' && suffix)) {
+          text += en ? `, where X is ${mx[2]}` : `, X étant ${mx[1]}`;
+        }
+      }
       // Un effet enchaîné peut avoir sa propre condition (paliers : « puis, si au moins trois ont été engagés, … »).
       const own = conditionOf({...m, tapXWhat: a.tapXWhat, tapXType: a.tapXType});
-      items.push({name, head: e.p, extra: e.extra || [], aux: e.aux || [], text: en ? e.en : e.fr, own});
+      items.push({name, head, extra, aux, text, own});
     }
   });
+  // Le compte des permanents touchés : retenus par l'effet d'avant, oubliés à la fin.
+  items.forEach((it) => {
+    if (it.remember) {
+      it.head += ' | RememberDestroyed$ True | RememberChanged$ True | RememberSacrificed$ True';
+    }
+  });
+  if (remember) {
+    items.push({name: `${id}CL`, head: 'Cleanup | ClearRemembered$ True', extra: [], aux: [], text: '', silent: true});
+  }
   const cond = conditionOf(a);
   const isDb = (l) => /^SVar:[^:]+:DB\$ /.test(l);
   items.forEach((it, k) => {
@@ -1648,7 +1734,7 @@ function chainOf(a, id, lang) {
       body += `. ${en ? 'If you lose the flip,' : 'Si vous perdez,'} ${items[2].text}`;
     }
   }
-  for (const it of coin ? [] : items.slice(1)) {
+  for (const it of coin ? [] : items.slice(1).filter(z => !z.silent)) {
     body += (en ? ', then' : ', puis') + (it.own ? `, ${en ? it.own.en : it.own.fr}, ` : ' ') + it.text;
   }
   if (cond) {
@@ -2415,6 +2501,37 @@ function effectBase(a, id) {
     case 'edict':
       return {p: 'Sacrifice | Defined$ Player.Opponent | SacValid$ Creature', fr: 'chaque adversaire sacrifie une créature',
         en: 'each opponent sacrifices a creature'};
+    case 'fightTargets':
+      return {p: `Pump | ${target({v: 'Creature.YouCtrl', prompt: 'Choisissez une créature ciblée que vous contrôlez'})} | StackDescription$ None | SubAbility$ ${id}Fight`,
+        extra: [`SVar:${id}Fight:DB$ Fight | Defined$ ParentTarget | ${target({v: 'Creature.YouDontCtrl', prompt: 'Choisissez une créature ciblée que vous ne contrôlez pas'})}`],
+        fr: 'une créature ciblée que vous contrôlez se bat contre une créature ciblée que vous ne contrôlez pas',
+        en: 'target creature you control fights target creature you don\'t control'};
+    case 'damageBlocker': {
+      const wounds = `${n} ${plural(n, 'blessure', 'blessures')}`;
+      switch (a.when) {
+        case 'blocks':
+          return {p: `DealDamage | Defined$ TriggeredAttackers | NumDmg$ ${n}`, fr: `CARDNAME inflige ${wounds} à la créature qu'elle bloque`,
+            en: `CARDNAME deals ${n} damage to the creature it blocks`};
+        case 'blocked':
+          return {p: `DealDamage | Defined$ TriggeredBlockers | NumDmg$ ${n}`, fr: `CARDNAME inflige ${wounds} à chaque créature qui la bloque`,
+            en: `CARDNAME deals ${n} damage to each creature blocking it`};
+        case 'allyBlocked':
+          return {p: `DealDamage | Defined$ TriggeredBlockers | DamageSource$ TriggeredAttacker | NumDmg$ ${n}`,
+            fr: `cette créature inflige ${wounds} à chaque créature qui la bloque`, en: `that creature deals ${n} damage to each creature blocking it`};
+        default:
+          return {p: `DealDamage | Defined$ TriggeredBlockerLKICopy | NumDmg$ ${n}`, fr: `CARDNAME inflige ${wounds} à cette créature`,
+            en: `CARDNAME deals ${n} damage to that creature`};
+      }
+    }
+    case 'putFromHand': {
+      const k = cardKind(a);
+      return {p: `ChangeZone | Origin$ Hand | Destination$ Battlefield | ChangeType$ ${owned(k[1])} | ChangeNum$ 1`,
+        fr: `vous pouvez mettre sur le champ de bataille ${k[2]} de votre main`, en: `you may put ${k[3]} from your hand onto the battlefield`};
+    }
+    case 'castFree':
+      return {p: `Play | Valid$ Card.nonLand+YouOwn+cmcLE${n} | ValidZone$ Hand | WithoutManaCost$ True | Optional$ True | Amount$ 1 | Controller$ You`,
+        fr: `vous pouvez lancer un sort de valeur de mana inférieure ou égale à ${n} depuis votre main sans payer son coût de mana`,
+        en: `you may cast a spell with mana value ${n} or less from your hand without paying its mana cost`};
     case 'fight':
       return {p: `Fight | Defined$ Self | ${target({v: 'Creature.OppCtrl', prompt: 'Choisissez une créature ciblée qu\'un adversaire contrôle'})}`,
         fr: 'CARDNAME se bat contre une créature ciblée qu\'un adversaire contrôle', en: 'CARDNAME fights target creature an opponent controls'};
@@ -2967,6 +3084,16 @@ function effectBase(a, id) {
       return {p: `Incubate | Amount$ ${n1}`, fr: `incubez ${n1}`, en: `incubate ${n1}`};
     case 'manifest':
       return {p: 'Manifest', fr: 'manifestez la carte du dessus de votre bibliothèque', en: 'manifest the top card of your library'};
+    case 'transform':
+      return {p: 'SetState | Defined$ Self | Mode$ Transform', fr: 'transformez CARDNAME', en: 'transform CARDNAME'};
+    case 'prepareSelf':
+      return {p: 'AlterAttribute | Defined$ Self | Attributes$ Prepared', fr: 'CARDNAME devient préparée', en: 'CARDNAME becomes prepared'};
+    case 'suspectSelf':
+      return {p: 'AlterAttribute | Defined$ Self | Attributes$ Suspected', fr: 'suspectez CARDNAME', en: 'suspect CARDNAME'};
+    case 'suspectTarget':
+      return {p: `AlterAttribute | ${target(creature)} | Attributes$ Suspected`, fr: 'suspectez une créature ciblée', en: 'suspect target creature'};
+    case 'cloak':
+      return {p: 'Cloak | Amount$ 1 | Defined$ TopOfLibrary', fr: 'voilez la carte du dessus de votre bibliothèque', en: 'cloak the top card of your library'};
     case 'manifestDread':
       return {p: 'ManifestDread', fr: 'manifestez l\'effroi', en: 'manifest dread'};
     default:
@@ -3641,9 +3768,10 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
   const body = e.body;
   const extra = e.extra;
   if (w.kind === 'CH') {
-    const k = Math.max(1, Math.min(6, Math.round(Number(a.chapter) || 1)));
+    const ks = chaptersOf(a);
     const text = withWord(e.aw, endDot(capitalize(body)));
-    return {chapter: k, lines: [`SVar:${id}:DB$ ${e.p} | SpellDescription$ ${text}`, ...extra], text: `${ROMAN[k - 1]} — ${text}`};
+    return {chapter: ks[0], chapters: ks, body: text, lines: [`SVar:${id}:DB$ ${e.p} | SpellDescription$ ${text}`, ...extra],
+      text: `${ks.map(k => ROMAN[k - 1]).join(', ')} — ${text}`};
   }
   if (w.kind === 'SP') {
     const c = spellCost(a, lang, card);
@@ -3760,6 +3888,8 @@ function triggerTable(a, card = null) {
     counterAdded: ['Mode$ CounterAddedOnce | ValidCard$ Creature.YouCtrl | CounterType$ P1P1 | TriggerZones$ Battlefield',
       'À chaque fois qu\'au moins un marqueur +1/+1 est mis sur une créature que vous contrôlez', 'Whenever one or more +1/+1 counters are put on a creature you control'],
     unblocked: ['Mode$ AttackerUnblocked | ValidCard$ Card.Self', 'À chaque fois que CARDNAME attaque et n\'est pas bloquée', 'Whenever CARDNAME attacks and isn\'t blocked'],
+    allyBlocked: ['Mode$ AttackerBlocked | ValidCard$ Creature.YouCtrl | TriggerZones$ Battlefield', 'À chaque fois qu\'une créature que vous contrôlez devient bloquée',
+      'Whenever a creature you control becomes blocked'],
     blocksCreature: ['Mode$ AttackerBlockedByCreature | ValidCard$ Card.Self', 'À chaque fois que CARDNAME devient bloquée par une créature',
       'Whenever CARDNAME becomes blocked by a creature'],
     becomesTarget: ['Mode$ BecomesTarget | ValidTarget$ Card.Self | TriggerZones$ Battlefield', 'À chaque fois que CARDNAME devient la cible d\'un sort ou d\'une capacité',
@@ -3906,8 +4036,9 @@ function modalLines(a, id, w, lang, card) {
     return {lines: [`A:SP$ ${charm}${c.forge}`, ...modes], text: c.text + capitalize(choose) + bullets};
   }
   if (w.kind === 'CH') {
-    const k = Math.max(1, Math.min(6, Math.round(Number(a.chapter) || 1)));
-    return {chapter: k, lines: [`SVar:${id}:DB$ ${charm}`, ...modes], text: `${ROMAN[k - 1]} — ${capitalize(choose)}${bullets}`};
+    const ks = chaptersOf(a);
+    return {chapter: ks[0], chapters: ks, body: `${capitalize(choose)}${bullets}`, lines: [`SVar:${id}:DB$ ${charm}`, ...modes],
+      text: `${ks.map(k => ROMAN[k - 1]).join(', ')} — ${capitalize(choose)}${bullets}`};
   }
   if (w.kind === 'A') {
     if (a.when === 'loyalty') {
@@ -3944,6 +4075,10 @@ export function displayLines(d) {
   if (d.fx && d.fx !== 'none') {
     out.push(`SVar:AtelierFx:${d.fx}`);
   }
+  // Sur la carte, seulement le texte d'ambiance (les capacités restent dans Forge et en partie).
+  if (d.hideText) {
+    out.push('SVar:AtelierHideText:1');
+  }
   // Extension perso (son identifiant), rareté et artiste : en bas de la carte et à côté du type.
   if (/^[a-z0-9]{1,20}$/.test(d.set || '')) {
     out.push(`SVar:AtelierSet:${d.set}`);
@@ -3979,13 +4114,13 @@ export function cleanModeName(t) {
 export function readDisplay(script) {
   const get = (k) => (String(script || '').match(new RegExp(`^SVar:${k}:(\\S+)`, 'm')) || [])[1];
   return {frame: get('AtelierFrame') || 'modern', frameColor: get('AtelierFrameColor') || 'auto', lang: get('AtelierLang') === 'en' ? 'en' : 'fr',
-    frameText: get('AtelierFrameText') === 'light' ? 'light' : 'dark', fx: get('AtelierFx') || 'none',
+    frameText: get('AtelierFrameText') === 'light' ? 'light' : 'dark', fx: get('AtelierFx') || 'none', hideText: get('AtelierHideText') === '1',
     set: get('AtelierSet') || '', rarity: get('AtelierRarity') || '', artist: cleanArtist((String(script || '').match(/^SVar:AtelierArtist:(.*)$/m) || [])[1])};
 }
 
 /** Le script avec d'autres réglages d'affichage (pour le mode script). */
 export function withDisplay(script, d) {
-  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx|Set|Rarity|Artist):/.test(l));
+  const kept = String(script || '').split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx|HideText|Set|Rarity|Artist):/.test(l));
   while (kept.length && !kept[kept.length - 1].trim()) {
     kept.pop();
   }
@@ -4100,15 +4235,109 @@ function withAbilityName(r, label) {
   });
   let text = w + r.text;
   if (r.chapter) {
-    text = r.text.replace(/^([IVX]+ — )/, `$1${w}`);
+    text = r.text.replace(/^([IVX, ]+ — )/, `$1${w}`);
+    return {...r, lines, text, body: r.body ? w + r.body : r.body};
   } else if (/^(\[[^\]]+\] :|[+−]?\d+:) /.test(r.text)) {
     text = r.text.replace(/^(\[[^\]]+\] :|[+−]?\d+:) /, `$1 ${w}`);
   }
   return {...r, lines, text};
 }
 
-/** Le script complet d'une carte du formulaire. */
+/**
+ * Cartes à deux faces : [id, libellé, « AlternateMode » de Forge, le verso a-t-il son propre coût, aide].
+ * Transformable, jour/nuit et bataille : le verso n'a pas de coût (ses couleurs sont dites à part).
+ */
+export const DFC_MODES = [
+  ['', 'Une seule face'],
+  ['transform', 'Recto verso qui se transforme (créature ↔ enchantement…)', 'DoubleFaced', false,
+    'Le recto se retourne avec l\'effet « La transformer » (dans une capacité), ou dans l\'autre sens depuis le verso.'],
+  ['daynight', 'Jour et nuit (Diurne / Nocturne)', 'DoubleFaced', false,
+    'Diurne au recto, Nocturne au verso : la carte se retourne quand le jour devient la nuit, et l\'inverse.'],
+  ['battle', 'Bataille (siège) : vaincue, elle se retourne', 'DoubleFaced', false,
+    'Le recto est une bataille avec sa défense ; vaincue, elle est exilée puis lancée retournée (le verso).'],
+  ['modal', 'Recto verso modale (on joue la face de son choix)', 'Modal', true,
+    'Chaque face a son coût : on lance (ou joue) celle qu\'on veut.'],
+  ['adventure', 'Aventure (un éphémère ou un rituel dans la carte)', 'Adventure', true,
+    'Le verso est le sort d\'aventure : lancé, la carte part en exil, puis on peut lancer le recto depuis l\'exil.'],
+  ['prepare', 'Préparée (un sort qu\'on copie quand elle est préparée)', 'Prepare', true,
+    'Le verso est le sort de la carte. Une capacité « La préparer » la rend préparée : on peut alors lancer une copie du sort.'],
+];
+
+/** Ce qui fait une face (le verso d'une carte) : tout sauf la présentation et les faces. */
+export function facePart(f) {
+  const out = {};
+  for (const k of ['name', 'cost', 'colors', 'types', 'legendary', 'subtypes', 'power', 'toughness', 'loyaltyStart', 'keywords', 'kwValues',
+    'abilities', 'flavor', 'classCosts', 'caseCond']) {
+    if (f[k] !== undefined) {
+      out[k] = f[k];
+    }
+  }
+  return out;
+}
+
+/** Le script complet d'une carte du formulaire (avec son verso, pour une carte à deux faces). */
 export function buildScript(form) {
+  const mode = DFC_MODES.find(m => m[0] && m[0] === form.dfc);
+  if (!mode || !form.back || form.token) {
+    return buildFace(form);
+  }
+  const en = form.lang === 'en';
+  const front = {...form, back: null};
+  const back = {...facePart(form.back), lang: form.lang, token: false, flavor: form.back.flavor || ''};
+  back.types = [...(back.types || [])];
+  if (mode[0] === 'adventure' || mode[0] === 'prepare') {
+    // Le sort d'aventure (ou de la carte préparée) : un éphémère ou un rituel.
+    if (!back.types.some(t => t === 'Instant' || t === 'Sorcery')) {
+      back.types = ['Sorcery'];
+    }
+    back.power = undefined;
+    back.toughness = undefined;
+    if (mode[0] === 'adventure') {
+      back.subtypes = [...new Set([...forgeSubtypes(back.subtypes || ''), 'Adventure'])].join(' ');
+    }
+  }
+  const a = buildFace(front).split('\n');
+  const b = buildFace(back).split('\n').filter(l => !/^SVar:Atelier(Frame|FrameColor|FrameText|Lang|Fx|HideText|Set|Rarity|Artist):/.test(l));
+  const oracleA = a.findIndex(l => l.startsWith('Oracle:'));
+  const addOracle = (lines, i, pre) => {
+    if (i >= 0) {
+      lines[i] = `Oracle:${pre}${lines[i].slice(7) ? '\\n' + lines[i].slice(7) : ''}`;
+    } else {
+      lines.push(`Oracle:${pre}`);
+    }
+  };
+  if (mode[0] === 'battle') {
+    // Une bataille : siège, avec sa défense (le nombre de marqueurs à lui retirer pour la vaincre).
+    const t = a.findIndex(l => l.startsWith('Types:'));
+    a[t] = 'Types:Battle Siege';
+    a.splice(t + 1, 0, `Defense:${Math.max(1, Math.min(20, Math.round(Number(form.defense) || 5)))}`);
+    a.splice(0, a.length, ...a.filter(l => !l.startsWith('PT:')));
+    addOracle(a, a.findIndex(l => l.startsWith('Oracle:')), en ? '(As a Siege enters, choose an opponent to protect it. You and others can attack it. When it\'s defeated, exile it, then cast it transformed.)'
+      : '(Au moment où un siège arrive sur le champ de bataille, choisissez un adversaire pour le protéger. Vous et d\'autres pouvez l\'attaquer. Quand il est vaincu, exilez-le, puis lancez-le transformé.)');
+  }
+  if (mode[0] === 'daynight') {
+    a.splice(Math.max(1, oracleA), 0, 'K:Daybound');
+    b.push('K:Nightbound');
+    addOracle(a, a.findIndex(l => l.startsWith('Oracle:')), en ? 'Daybound (If a player casts no spells during their own turn, it becomes night next turn.)'
+      : 'Diurne (Si un joueur ne lance aucun sort pendant son propre tour, il devient la nuit au tour suivant.)');
+    addOracle(b, b.findIndex(l => l.startsWith('Oracle:')), en ? 'Nightbound (If a player casts at least two spells during their own turn, it becomes day next turn.)'
+      : 'Nocturne (Si un joueur lance au moins deux sorts pendant son propre tour, il devient le jour au tour suivant.)');
+  }
+  if (!mode[3]) {
+    // Le verso d'une carte qui se transforme n'a pas de coût : ses couleurs (celles choisies, sinon celles du recto).
+    const cols = (back.colors && back.colors.length ? back.colors : [...'WUBRG'].filter(c => forgeCost(form.cost).includes(c)));
+    const words = [...'WUBRG'].filter(c => cols.includes(c)).map(c => COLOR_WORDS[c]);
+    const m = b.findIndex(l => l.startsWith('ManaCost:'));
+    b[m] = 'ManaCost:no cost';
+    b.splice(m + 1, 0, `Colors:${words.join(',') || 'colorless'}`);
+  }
+  const at = a.findIndex(l => l.startsWith('Oracle:'));
+  a.splice(at >= 0 ? at : a.length, 0, `AlternateMode:${mode[2]}`);
+  return [...a, '', 'ALTERNATE', '', ...b].join('\n');
+}
+
+/** Le script d'une face (une carte à une face, ou le recto / le verso d'une carte à deux faces). */
+function buildFace(form) {
   // Les sous-types marchent comme dans le jeu : le mot-clé qui les fait marcher, le type de carte qu'ils demandent.
   const f = {...form, types: [...(form.types || [])], keywords: [...(form.keywords || [])], kwValues: {...(form.kwValues || {})}};
   linkSubtypes(f, {keepTypes: true});
@@ -4181,8 +4410,10 @@ export function buildScript(form) {
       return;
     }
     if (r.chapter) {
-      if (!chapters.has(r.chapter)) {
-        chapters.set(r.chapter, {id: `Atelier${i + 1}`, r});
+      // Un chapitre peut avoir plusieurs capacités (elles s'enchaînent), une capacité plusieurs chapitres (« I, II — »).
+      const entry = {id: `Atelier${i + 1}`, r};
+      for (const k of r.chapters || [r.chapter]) {
+        chapters.set(k, [...(chapters.get(k) || []), entry]);
       }
       return;
     }
@@ -4265,19 +4496,53 @@ export function buildScript(form) {
   if (chapters.size) {
     const max = Math.max(...chapters.keys());
     const ids = [];
+    const pushed = new Set();
+    const isDb = (l) => /^SVar:[^:]+:DB\$ /.test(l);
     for (let k = 1; k <= max; k++) {
-      const c = chapters.get(k);
-      if (c) {
-        ids.push(c.id);
-        lines.push(...c.r.lines);
-        text.push(named(c.r.text, name));
-      } else {
+      const list = chapters.get(k) || [];
+      if (!list.length) {
         // Chapitre sans capacité : rien ne se passe.
         ids.push(`AtelierCh${k}`);
         lines.push(`SVar:AtelierCh${k}:DB$ Cleanup | SpellDescription$ —`);
+      } else if (list.length === 1) {
+        ids.push(list[0].id);
+        if (!pushed.has(list[0].id)) {
+          pushed.add(list[0].id);
+          lines.push(...list[0].r.lines);
+        }
+      } else {
+        // Plusieurs capacités sur ce chapitre : une copie de chacune pour ce chapitre, enchaînées (SubAbility$).
+        const copies = list.map((c) => {
+          const re = new RegExp(`\\b${c.id}(?![0-9])`, 'g');
+          return {id: `${c.id}c${k}`, lines: c.r.lines.map(l => l.replace(re, `${c.id}c${k}`))};
+        });
+        copies.forEach((c, j) => {
+          if (j < copies.length - 1) {
+            const last = c.lines.map(isDb).lastIndexOf(true);
+            c.lines[last] += ` | SubAbility$ ${copies[j + 1].id}`;
+          }
+          lines.push(...c.lines);
+        });
+        ids.push(copies[0].id);
       }
     }
     lines.push(`K:Chapter:${max}:${ids.join(',')}`);
+    // Le texte : les chapitres qui font la même chose ensemble (« I, II — … »), plusieurs capacités à la suite.
+    const groups = [];
+    for (let k = 1; k <= max; k++) {
+      const list = chapters.get(k) || [];
+      const key = list.map(c => c.id).join(',');
+      const g = groups[groups.length - 1];
+      if (g && g.key === key && key) {
+        g.ks.push(k);
+      } else {
+        groups.push({key, ks: [k], list});
+      }
+    }
+    for (const g of groups.filter(x => x.key)) {
+      const body = g.list.map(c => named(c.r.body || c.r.text.replace(/^[IVX, ]+ — /, ''), name)).join(' ');
+      text.push(`${g.ks.map(k => ROMAN[k - 1]).join(', ')} — ${body}`);
+    }
   }
   if (text.length) {
     lines.push(`Oracle:${text.join('\\n')}`);

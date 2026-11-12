@@ -116,7 +116,8 @@ export class SearchPanel {
     this.onRemove = onRemove;
     this.counts = counts || (() => 0);
     this.identityLock = identityLock || (() => null);
-    this.query = {text: '', inText: false, colors: [], colorMode: 'any', types: [], typeMode: 'all', commanderLegal: false, commandersOnly: false, popular: popularFirst};
+    // Le texte cherché : dans le nom, et dans le texte des cartes (chaque mot, n'importe où) sauf si on décoche « Dans le texte ».
+    this.query = {text: '', inText: true, colors: [], colorMode: 'any', types: [], typeMode: 'all', commanderLegal: false, commandersOnly: false, popular: popularFirst};
     this.offset = 0;
     this.total = 0;
     this.loading = false;
@@ -151,7 +152,7 @@ export class SearchPanel {
             </select></div>
           <div class="sh-row">
             <button class="sh-pill set-btn" title="N'afficher que les cartes d'une extension">${icon('book')}<span>Extension : toutes</span></button>
-            <label class="tchip" title="Chercher le mot aussi dans le texte des cartes"><input type="checkbox" class="intext"><i></i><span>Dans le texte</span></label>
+            <label class="tchip" title="Chercher aussi les mots dans le texte des cartes (chacun, n'importe où)"><input type="checkbox" class="intext" checked><i></i><span>Dans le texte</span></label>
             <label class="tchip"><input type="checkbox" class="legal"><i></i><span>Légales en Commander</span></label>
             <label class="tchip"><input type="checkbox" class="cmdonly"><i></i><span>Peuvent être commandant</span></label>
             ${this.owned ? '' : '<label class="tchip" title="Seulement les cartes faites dans l\'Atelier"><input type="checkbox" class="customonly"><i></i><span>Cartes perso</span></label>'}
@@ -399,7 +400,7 @@ export class SearchPanel {
   countFilters() {
     const q = this.query;
     const n = (q.colors.length ? 1 : 0) + q.types.length + (q.cmcMin !== undefined ? 1 : 0) + (q.cmcMax !== undefined ? 1 : 0)
-      + (q.inText ? 1 : 0) + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.custom ? 1 : 0) + (q.set ? 1 : 0) + (q.creatureType ? 1 : 0);
+      + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.custom ? 1 : 0) + (q.set ? 1 : 0) + (q.creatureType ? 1 : 0);
     this.root.querySelector('.filters-btn .n').textContent = n ? String(n) : '';
   }
 

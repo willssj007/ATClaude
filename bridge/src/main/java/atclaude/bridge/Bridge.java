@@ -403,7 +403,8 @@ public final class Bridge {
                 return CustomCards.validate(m.get("script").getAsString(), optString(m, "previous"));
             case "customSave":
                 return CustomCards.save(m.get("script").getAsString(), optString(m, "previous"), optString(m, "art"),
-                        m.has("form") && !m.get("form").isJsonNull() ? m.get("form").toString() : null, optString(m, "frameImage"));
+                        m.has("form") && !m.get("form").isJsonNull() ? m.get("form").toString() : null, optString(m, "frameImage"),
+                        optString(m, "backArt"));
             case "customDelete":
                 return CustomCards.delete(m.get("name").getAsString());
             case "customTypes":

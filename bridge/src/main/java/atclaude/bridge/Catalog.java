@@ -42,6 +42,9 @@ import java.util.regex.Pattern;
  * Les cartes et leurs traductions viennent de Forge ; l'index de recherche est construit au premier usage.
  */
 final class Catalog {
+    /** Repère de niveau d'une classe dans le texte de Forge (« //Level_2// »), avec son retour à la ligne. */
+    static final java.util.regex.Pattern LEVEL_MARK = java.util.regex.Pattern.compile("(?m)^//Level_\\d+//\\R?|\\\\n//Level_\\d+//");
+
 
     private static final int DEFAULT_LIMIT = 60;
     private static final Pattern DECK_LINE = Pattern.compile("^(\\d+)\\s*x?\\s+(.+)$");
@@ -120,7 +123,9 @@ final class Catalog {
                 final StringBuilder names = new StringBuilder(normalize(nameEn)).append('\n').append(normalize(nameFr));
                 final StringBuilder texts = new StringBuilder();
                 final StringBuilder types = new StringBuilder();
-                for (final ICardFace face : faces(rules)) {
+                // Une carte à une seule face n'a pas de liste de faces : son texte est celui de sa face principale.
+                final List<ICardFace> all = faces(rules).isEmpty() && rules.getMainPart() != null ? List.of(rules.getMainPart()) : faces(rules);
+                for (final ICardFace face : all) {
                     final String faceFr = translated(face.getName());
                     names.append('\n').append(normalize(face.getName())).append('\n').append(normalize(faceFr));
                     texts.append(normalize(face.getOracleText())).append('\n')
@@ -166,6 +171,7 @@ final class Catalog {
     JsonElement search(final JsonObject q) {
         final String text = normalize(str(q, "text"));
         final boolean inText = bool(q, "inText");
+        final String[] words = text.isEmpty() ? new String[0] : text.trim().split("\\s+");
         final String colors = upper(q, "colors");
         final String colorMode = str(q, "colorMode").isEmpty() ? "any" : str(q, "colorMode");
         final List<String> types = new ArrayList<>();
@@ -203,8 +209,18 @@ final class Catalog {
             if (onlyOwned && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
             if (owned != null && e.card().getRules().isCustom()) continue; // cartes perso : Sandbox seulement
             if (!text.isEmpty()) {
-                final boolean nameHit = e.searchName().contains(text);
-                if (!nameHit && !(inText && e.searchText().contains(text))) {
+                // Le nom contient ce qui est tapé ; sinon (« Dans le texte »), chaque mot est dans le nom ou le texte de la carte.
+                boolean hit = e.searchName().contains(text);
+                if (!hit && inText) {
+                    hit = true;
+                    for (final String w : words) {
+                        if (!e.searchName().contains(w) && !e.searchText().contains(w)) {
+                            hit = false;
+                            break;
+                        }
+                    }
+                }
+                if (!hit) {
                     continue;
                 }
             }
@@ -387,13 +403,14 @@ final class Catalog {
             String textEn = main != null ? main.getOracleText() : rules.getOracleText();
             if (other != null && SECONDARY_SPELLS.contains(split)) {
                 // Aventure (et cousines) : le sort imprimé dans la même carte, sous le texte principal.
-                text += "\n\n" + halfText(other, true);
-                textEn += "\n\n" + halfText(other, false);
+                text = (text.trim().isEmpty() ? "" : text + "\n\n") + halfText(other, true, rules.isCustom());
+                textEn = (textEn.trim().isEmpty() ? "" : textEn + "\n\n") + halfText(other, false, rules.isCustom());
             }
             // Terrain de base : son rappel de mana en français (« ({T} : Ajoutez {W}.) »).
             final java.util.regex.Matcher basic = Reprints.BASIC_REMINDER.matcher(text.trim());
-            o.addProperty("text", basic.matches() ? "({T} : Ajoutez " + basic.group(1) + ".)" : text);
-            o.addProperty("textEn", textEn);
+            // Classe : les repères « //Level_2// » du texte de Forge n'ont rien à faire à l'écran.
+            o.addProperty("text", basic.matches() ? "({T} : Ajoutez " + basic.group(1) + ".)" : LEVEL_MARK.matcher(text).replaceAll(""));
+            o.addProperty("textEn", LEVEL_MARK.matcher(textEn).replaceAll(""));
         }
         if (main != null && rules.getType().isCreature()) {
             o.addProperty("power", main.getPower());
@@ -401,6 +418,9 @@ final class Catalog {
         }
         if (main != null && rules.getType().isPlaneswalker()) {
             o.addProperty("loyalty", main.getInitialLoyalty());
+        }
+        if (main != null && rules.getType().isBattle() && main.getDefense() != null) {
+            o.addProperty("defense", main.getDefense());
         }
         if (other != null && (CardSplitType.DUAL_FACED_CARDS.contains(split) || split == CardSplitType.Flip)) {
             // Recto verso (transformables, modales, fusion) et cartes retournables : l'autre face, à part.
@@ -433,6 +453,9 @@ final class Catalog {
             final String frame = CustomCards.frameKey(nameEn);
             if (frame != null) {
                 o.addProperty("customFrame", frame);
+            }
+            if (o.has("back") && o.get("back").isJsonObject()) {
+                CustomCards.addBackDisplay(o.getAsJsonObject("back"), o, rules, nameEn);
             }
         }
         if (Reprints.EDITION.equals(pc.getEdition())) {
@@ -707,10 +730,15 @@ final class Catalog {
 
     /** « Nom {coût} — type » puis le texte d'une moitié ou d'un sort d'aventure. */
     private static String halfText(final ICardFace face, final boolean french) {
+        return halfText(face, french, CustomCards.frontOf(face.getName()) != null);
+    }
+
+    /** custom : le sort d'une carte perso (aventure, carte préparée), son type en français comme sur les cartes perso. */
+    private static String halfText(final ICardFace face, final boolean french, final boolean custom) {
         final ManaCost cost = face.getManaCost();
         return (french ? translated(face.getName()) : face.getName())
                 + (cost == null || cost.isNoCost() ? "" : " " + cost)
-                + " — " + (french ? faceType(face) : face.getType().toString())
+                + " — " + (french ? (custom ? CustomCards.typeLine(face.getType()) : faceType(face)) : face.getType().toString())
                 + "\n" + faceText(face, false, french);
     }
 

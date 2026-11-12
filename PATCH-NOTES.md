@@ -2,6 +2,51 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.7.0 — Cartes à deux faces, effets enchaînés avec X, sagas et classes
+
+### Cartes à deux faces (Atelier)
+- **Nouveau choix « Faces »** en haut du formulaire, avec une bascule **Recto / Verso** : le formulaire, l'aperçu et l'illustration montrent la face choisie. Chaque face a son nom, ses types, sa force, ses mots-clés et ses capacités.
+- **Recto verso qui se transforme** : créature ↔ créature, enchantement ↔ créature, artefact ↔ terrain… Le nouvel effet « La transformer » retourne la carte (depuis le recto ou le verso). Le verso n'a pas de coût : on choisit ses couleurs.
+- **Jour et nuit** : Diurne au recto, Nocturne au verso, la carte se retourne avec le jour et la nuit.
+- **Recto verso modale (MDFC)** : chaque face a son coût, on joue celle qu'on veut (un sort d'un côté, un terrain de l'autre…).
+- **Aventure** : le verso est un éphémère ou un rituel d'aventure, écrit sous le texte de la carte.
+- **Préparée** : le verso est le sort de la carte ; le nouvel effet « La préparer » permet d'en lancer une copie.
+- **Bataille (siège)** : le recto a sa défense (dans un écusson en bas à droite) ; vaincue, elle se retourne sur son verso.
+- En partie, en recherche et dans le deck builder, le verso garde le cadre de l'Atelier, avec sa propre illustration (sinon celle du recto). Le verso et son illustration suivent le compte sur les autres appareils.
+
+### Effets et règles
+- **« …, puis … » avec X** : un effet enchaîné a maintenant son propre nombre :
+  - le même X que l'effet principal (« Détruisez X créatures ciblées, puis créez X jetons ») ;
+  - le nombre de permanents détruits, exilés ou sacrifiés juste avant (« détruisez une créature ciblée, puis créez autant de jetons ») ;
+  - ou n'importe quel X calculé (créatures, terrains, points de vie…).
+- **Le nombre d'un effet se choisit à côté de l'effet** (N, ou X payé, ou un X calculé) au lieu d'être caché dans « Effet perso » ; un X s'affiche à la place du chiffre.
+- **Combat** : « Une créature ciblée que vous contrôlez se bat contre une créature ciblée que vous ne contrôlez pas ».
+- **Blessures au bloqueur** : « elle inflige N blessures à la créature qui la bloque » (ou à chaque créature qui la bloque, ou à la créature qu'elle bloque), et un nouveau déclencheur « Quand une de vos créatures devient bloquée ».
+- **Mettre en jeu sans payer** : mettre une carte d'un type (créature, artefact, permanent…) de votre main sur le champ de bataille, et lancer un sort de votre main de valeur de mana N (ou X) ou moins sans payer son coût.
+- **Engager ses permanents comme coût** : en plus des jetons, créatures et artefacts, « Engagez X (ou N) permanents / terrains / enchantements dégagés que vous contrôlez ».
+- **Perte de points de vie** : conditions « si un adversaire a perdu des points de vie ce tour-ci », « si vos adversaires ont perdu au moins N points de vie ce tour-ci », « si vous avez perdu des points de vie ce tour-ci », et X = les points de vie que vous avez perdus ce tour-ci.
+
+### Mécaniques
+- **Sagas** : plusieurs capacités sur un même chapitre se suivent (avant, seule la première comptait), et une capacité peut couvrir plusieurs chapitres (« I, II — »). Sur la carte, les numéros de chapitre sont dans des insignes.
+- **Classes** : chaque niveau (son coût et « Niveau 2 ») est dans un bandeau, comme sur les vraies classes.
+- **Suspecter** (une créature ciblée, ou elle-même) et **Voiler** la carte du dessus de votre bibliothèque.
+- **Dévorement de nourriture**, **d'artefacts** et **de terrains**, à côté de Dévorement.
+- **Mana phyrexian** : un bouton « Phyrexian ϕ » dans le choix du coût, puis une couleur ({R/P}, payable avec 2 points de vie).
+- Vérifiés dans Forge : Fouille, Progéniture, Mue, Mégamue, Déguisement, Lecture rapide, Manifester l'effroi, affaires (« À résoudre — »).
+
+### Atelier, affichage
+- **Seulement le texte d'ambiance** (onglet Apparence) : la carte cache le texte de ses capacités et ne garde que le texte d'ambiance ; les capacités marchent toujours en partie.
+- **Symbole du mana rouge** : une vraie flamme, qui ne se confond plus avec la goutte du bleu.
+- **Vaisseaux spatiaux** : le seuil « STATION N+ » dans un bandeau, ses capacités en dessous.
+- **Classes réimprimées** : plus de repères « //Level_2// » dans le texte, et le rappel des niveaux en français.
+
+### Recherche
+- **Chercher dans le texte des cartes**, par mots : chaque mot tapé peut être dans le nom ou dans le texte (« détruisez artefact » trouve les cartes qui détruisent un artefact). Activé par défaut (interrupteur « Dans le texte ») ; les cartes trouvées par leur nom restent en tête, les autres filtres ne changent pas.
+
+### Corrections
+- **En partie, l'aperçu au survol** (PC) marche aussi pour les cartes des fenêtres de cimetière, d'exil et de main, pas seulement pour celles du champ de bataille.
+- **Effets enchaînés qui utilisaient X** : le X était ignoré après « puis » ; il compte maintenant.
+
 ## 0.6.9 — Proportions des cartes perso
 
 ### Corrections

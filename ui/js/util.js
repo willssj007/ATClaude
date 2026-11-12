@@ -25,6 +25,12 @@ const COLOR_VAR = {W: '--mana-W', U: '--mana-U', B: '--mana-B', R: '--mana-R', G
 /** Un symbole de mana : « W », « 3 », « W/U », « G/P », « T »... */
 export function symbol(sym) {
   const s = String(sym).toUpperCase();
+  if (/^[WUBRGC]\/P$/.test(s)) {
+    // Phyrexian : un rond de la couleur avec ϕ.
+    const a = s[0];
+    const v = COLOR_VAR[a] ? `var(${COLOR_VAR[a]})` : 'var(--mana-C)';
+    return `<span class="ms ms-phy${'UB'.includes(a) ? ' ms-phy-d' : ''}" style="--h1:${v}" title="${esc(s)} (phyrexian)">ϕ</span>`;
+  }
   if (s.includes('/')) {
     const [a, b] = s.split('/');
     const v1 = COLOR_VAR[a] ? `var(${COLOR_VAR[a]})` : 'var(--mana-C)';

@@ -330,6 +330,10 @@ final class Reprints {
         if (!flavor.isEmpty()) {
             o.addProperty("flavor", flavor);
         }
+        // Classe, affaire : les lignes que Forge écrit en anglais (rappel, « Level 2 », « Solved »), en français.
+        if (o.has("text") && !o.get("text").isJsonNull() && !"en".equals(str(r, "lang"))) {
+            o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
+        }
         // Terrain de base : le rappel de mana en français, un grand symbole de mana, ou rien. En partie, Forge ne donne pas
         // de texte aux terrains de base : leur mana vient alors de leur nom.
         final String text = o.has("text") && !o.get("text").isJsonNull() ? o.get("text").getAsString().trim() : "";

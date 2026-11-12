@@ -51,6 +51,8 @@ final class CustomCards {
 
     /** Nom de la carte (celui du script) → son fichier. */
     private static final Map<String, File> FILES = new ConcurrentHashMap<>();
+    /** Verso d'une carte perso à deux faces : le nom du verso → celui du recto (la carte). */
+    private static final Map<String, String> BACKS = new ConcurrentHashMap<>();
     /** Supprimées pendant cette session : Forge les garde jusqu'au prochain lancement, les recherches non. */
     private static final Set<String> DELETED = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     /** Noms des jetons perso (fichiers du dossier des jetons, dans la base des jetons de Forge et pas dans celle des cartes). */
@@ -117,9 +119,11 @@ final class CustomCards {
         final File[] list = cardsDir().listFiles((d, n) -> n.endsWith(".txt"));
         if (list != null) {
             for (final File f : list) {
-                final String name = nameOf(read(f));
+                final String text = read(f);
+                final String name = nameOf(text);
                 if (name != null) {
                     FILES.put(name, f);
+                    registerBack(name, text);
                 }
             }
         }
@@ -186,12 +190,16 @@ final class CustomCards {
 
     /** Illustration d'une carte perso (clé « custom:Nom »), ou null. */
     static File art(final String key) {
-        final String name = key.startsWith(ART_PREFIX) ? key.substring(ART_PREFIX.length()) : key;
+        String name = key.startsWith(ART_PREFIX) ? key.substring(ART_PREFIX.length()) : key;
+        final boolean back = name.endsWith(BACK_KEY);
+        if (back) {
+            name = name.substring(0, name.length() - BACK_KEY.length());
+        }
         final File f = FILES.get(name);
         if (f == null) {
             return null;
         }
-        final File art = new File(artDir(), base(f) + ".jpg");
+        final File art = new File(artDir(), base(f) + (back ? BACK_ART : ".jpg"));
         return art.isFile() ? art : null;
     }
 
@@ -788,6 +796,12 @@ final class CustomCards {
 
     /** Comme {@link #save(String, String, String, String)}, avec le cadre importé (PNG ; "" le retire, null le garde). */
     static synchronized JsonObject save(final String script, final String previous, final String art, final String form, final String frame) {
+        return save(script, previous, art, form, frame, null);
+    }
+
+    /** backArt : l'illustration du verso d'une carte à deux faces (null : la garder, "" : la retirer). */
+    static synchronized JsonObject save(final String script, final String previous, final String art, final String form, final String frame,
+            final String backArt) {
         validate(script, previous);
         final CardRules rules = parse(script, previous);
         final String name = rules.getName();
@@ -797,9 +811,11 @@ final class CustomCards {
         File file = FILES.get(name);
         File oldArt = null;
         File oldFrame = null;
+        File oldBack = null;
         if (file != null && !DELETED.contains(name) && !dir.getAbsoluteFile().equals(file.getAbsoluteFile().getParentFile())) {
             // Une carte devenue jeton (ou l'inverse) : nouveau fichier, l'illustration et le cadre suivent.
             oldArt = new File(artDir(), base(file) + ".jpg");
+            oldBack = new File(artDir(), base(file) + BACK_ART);
             oldFrame = new File(frameDir(), base(file) + ".png");
             delete(new File(formsDir(), base(file) + ".json"));
             delete(file);
@@ -813,6 +829,7 @@ final class CustomCards {
             // Renommée : l'ancienne carte disparaît (de la base de Forge au prochain lancement), son illustration suit.
             final File old = FILES.remove(previous);
             oldArt = new File(artDir(), base(old) + ".jpg");
+            oldBack = new File(artDir(), base(old) + BACK_ART);
             oldFrame = new File(frameDir(), base(old) + ".png");
             delete(new File(formsDir(), base(old) + ".json"));
             delete(old);
@@ -821,6 +838,19 @@ final class CustomCards {
         }
         write(file, script.replace("\r", "").trim() + "\n");
         FILES.put(name, file);
+        registerBack(name, script);
+        if (previous != null && !previous.equals(name)) {
+            BACKS.values().removeIf(previous::equals);
+        }
+        final File backFile = new File(artDir(), base(file) + BACK_ART);
+        if (backArt == null && oldBack != null && oldBack.isFile() && !oldBack.equals(backFile)) {
+            try {
+                Files.move(oldBack.toPath(), backFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (final IOException e) {
+                System.err.println("Illustration du verso non déplacée : " + e.getMessage());
+            }
+        }
+        writeArt(backFile, backArt);
         DELETED.remove(name);
         tomb(name, false);
         final File formFile = new File(formsDir(), base(file) + ".json");
@@ -917,9 +947,11 @@ final class CustomCards {
             return false;
         }
         delete(new File(artDir(), base(f) + ".jpg"));
+        delete(new File(artDir(), base(f) + BACK_ART));
         delete(new File(frameDir(), base(f) + ".png"));
         delete(new File(formsDir(), base(f) + ".json"));
         delete(f);
+        BACKS.values().removeIf(name::equals);
         DELETED.add(name);
         TOKENS.remove(name);
         changed();
@@ -1348,6 +1380,7 @@ final class CustomCards {
                     case "AtelierLang" -> lang = "en".equals(value) ? "en" : "fr";
                     case "AtelierFrameText" -> text = "light".equals(value) ? "light" : "dark";
                     case "AtelierFx" -> fx = value;
+                    case "AtelierHideText" -> o.addProperty("hideText", "1".equals(value));
                     case "AtelierRarity" -> {
                         if (value.matches("[CURMS]")) {
                             o.addProperty("crarity", value);
@@ -1371,6 +1404,38 @@ final class CustomCards {
     }
 
     /** La carte perso de ce nom, telle que Forge l'a lue (null si ce n'en est pas une). */
+    /** Le texte d'ambiance du verso (sa ligne « SVar:AtelierFlavor »), à la place de celui du recto. */
+    static void backFlavor(final JsonObject o, final CardRules rules) {
+        o.remove("flavor");
+        if (rules == null || rules.getOtherPart() == null) {
+            return;
+        }
+        for (final Map.Entry<String, String> v : rules.getOtherPart().getVariables()) {
+            if ("AtelierFlavor".equals(v.getKey()) && v.getValue() != null && !v.getValue().trim().isEmpty()) {
+                o.addProperty("flavor", v.getValue().trim().replace("\\n", "\n"));
+            }
+        }
+    }
+
+    /** Le verso d'une carte perso à deux faces (recherche, deck builder, Atelier) : le cadre du recto, son illustration. */
+    static void addBackDisplay(final JsonObject back, final JsonObject front, final CardRules rules, final String name) {
+        back.addProperty("custom", true);
+        back.addProperty("image", "");
+        for (final String k : new String[] {"frame", "frameColor", "frameText", "fx", "lang", "crarity", "artist", "hideText", "cset"}) {
+            if (front.has(k)) {
+                back.add(k, front.get(k));
+            }
+        }
+        backFlavor(back, rules);
+        if (rules != null && rules.getOtherPart() != null) {
+            back.addProperty("typeLine", typeLine(rules.getOtherPart().getType(), front.has("lang") ? front.get("lang").getAsString() : "fr"));
+        }
+        final String art = backArtKey(name);
+        if (art != null) {
+            back.addProperty("customArt", art);
+        }
+    }
+
     static CardRules rules(final String name) {
         final String token = tokenScript(name);
         if (token != null) {
@@ -1404,6 +1469,7 @@ final class CustomCards {
      * malédiction »). Généré depuis SUBTYPES (ui/js/cardscript.js).
      */
     private static final Map<String, String> SUBTYPES_FR = Map.ofEntries(
+            Map.entry("Siege", "siège"),
             Map.entry("Equipment", "équipement"),
             Map.entry("Fortification", "fortification"),
             Map.entry("Vehicle", "véhicule"),
@@ -1612,6 +1678,14 @@ final class CustomCards {
                     // sans illustration
                 }
             }
+            final File backArt = new File(artDir(), base(e.getValue()) + BACK_ART);
+            if (backArt.isFile()) {
+                try {
+                    c.addProperty("backArt", B64.encode(Files.readAllBytes(backArt.toPath())));
+                } catch (final IOException ex) {
+                    // sans illustration du verso
+                }
+            }
             final File frame = new File(frameDir(), base(e.getValue()) + ".png");
             if (frame.isFile()) {
                 try {
@@ -1787,7 +1861,7 @@ final class CustomCards {
             try {
                 final JsonObject saved = save(c.has("script") ? c.get("script").getAsString() : "", present ? name : null,
                         c.has("art") ? c.get("art").getAsString() : "", c.has("form") ? c.get("form").getAsString() : null,
-                        c.has("frameImage") ? c.get("frameImage").getAsString() : "");
+                        c.has("frameImage") ? c.get("frameImage").getAsString() : "", c.has("backArt") ? c.get("backArt").getAsString() : "");
                 final File f = FILES.get(saved.get("name").getAsString());
                 if (f != null && at > 0) {
                     f.setLastModified(at);
@@ -1823,6 +1897,58 @@ final class CustomCards {
         }
         return null;
     }
+
+    /** Écrit une illustration (data URL ou base64), la retire (""), ou la laisse (null). */
+    private static void writeArt(final File file, final String art) {
+        if (art == null) {
+            return;
+        }
+        if (art.isEmpty()) {
+            delete(file);
+            return;
+        }
+        final byte[] bytes = B64.decode(art.startsWith("data:") ? art.substring(art.indexOf(',') + 1) : art);
+        if (bytes.length > 2_000_000) {
+            throw new IllegalArgumentException("Illustration trop lourde.");
+        }
+        try {
+            Files.write(file.toPath(), bytes);
+        } catch (final IOException e) {
+            throw new IllegalStateException("Illustration non enregistrée : " + e.getMessage());
+        }
+    }
+
+    /** Le nom du verso d'une carte à deux faces (après « ALTERNATE »), ou null. */
+    static String backNameOf(final String script) {
+        final String[] parts = script.replace("\r", "").split("(?m)^ALTERNATE\\s*$", 2);
+        return parts.length < 2 ? null : nameOf(parts[1]);
+    }
+
+    private static void registerBack(final String front, final String script) {
+        BACKS.values().removeIf(front::equals);
+        final String back = backNameOf(script);
+        if (back != null) {
+            BACKS.put(back, front);
+        }
+    }
+
+    /** Le recto (la carte perso) d'un verso, ou null si ce n'est pas le verso d'une carte perso. */
+    static String frontOf(final String faceName) {
+        final String front = faceName == null ? null : BACKS.get(faceName);
+        return front != null && isCustom(front) ? front : null;
+    }
+
+    /** Clé de l'illustration du verso (la sienne, sinon celle du recto), ou null. */
+    static String backArtKey(final String front) {
+        final File f = isCustom(front) ? FILES.get(front) : null;
+        if (f != null && new File(artDir(), base(f) + BACK_ART).isFile()) {
+            return ART_PREFIX + front + BACK_KEY;
+        }
+        return artKey(front);
+    }
+
+    static final String BACK_KEY = "#back";
+    private static final String BACK_ART = ".back.jpg";
 
     /** Nom de fichier tiré du nom de la carte : « Professeur X » → professeur_x. */
     private static String base(final String name) {

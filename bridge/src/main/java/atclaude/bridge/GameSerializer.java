@@ -302,11 +302,17 @@ final class GameSerializer {
         flag(o, "battle", s.isBattle());
         final boolean scheme = s.getType() != null && s.getType().isScheme();
         final boolean ongoing = s.getType() != null && s.getType().hasSupertype(forge.card.CardType.Supertype.Ongoing);
-        if (CustomCards.isCustom(s.getName())) {
+        // Le verso d'une carte perso à deux faces : la carte perso (son recto) donne le cadre, l'illustration du verso.
+        final String frontOfBack = CustomCards.frontOf(s.getName());
+        if (CustomCards.isCustom(s.getName()) || frontOfBack != null) {
             // Carte perso : cadre dessiné avec son illustration, type en français.
+            final String card = frontOfBack != null ? frontOfBack : s.getName();
             o.addProperty("custom", true);
             o.addProperty("image", "");
-            CustomCards.addDisplay(o, CustomCards.rules(s.getName()));
+            CustomCards.addDisplay(o, CustomCards.rules(card));
+            if (frontOfBack != null) {
+                CustomCards.backFlavor(o, CustomCards.rules(card));
+            }
             final boolean english = "en".equals(o.get("lang").getAsString());
             o.addProperty("typeLine", CustomCards.typeLine(s.getType(), o.get("lang").getAsString()));
             o.addProperty("text", customOrder(withoutEngineLines(o.get("text").getAsString()), s, english));
@@ -317,11 +323,11 @@ final class GameSerializer {
                 // Jeton perso : le cadre dit déjà « Jeton », pas de ligne « Token » en tête du texte.
                 o.addProperty("text", o.get("text").getAsString().replaceFirst("^Token\\s*(\\n|$)", ""));
             }
-            final String frame = CustomCards.frameKey(s.getName());
+            final String frame = CustomCards.frameKey(card);
             if (frame != null) {
                 o.addProperty("customFrame", frame);
             }
-            final String art = CustomCards.artKey(s.getName());
+            final String art = frontOfBack != null ? CustomCards.backArtKey(card) : CustomCards.artKey(card);
             if (art != null) {
                 o.addProperty("customArt", art);
             }

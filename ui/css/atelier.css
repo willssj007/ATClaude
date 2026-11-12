@@ -278,3 +278,11 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
 .ate-rpgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
 .ate-rpcell { cursor: pointer; text-align: center; }
 .ate-rpcell .small { margin-top: 4px; }
+
+/* Nombre calculé (X) à la place du champ du nombre. */
+.ate-xbadge { display: inline-grid; place-items: center; min-width: 40px; height: 36px; padding: 0 10px; border-radius: 10px; font: 700 17px/1 var(--title-font);
+  color: var(--gold); background: rgb(var(--gold-rgb) / 0.12); border: 1px solid rgb(var(--gold-rgb) / 0.4); }
+
+/* Cartes à deux faces : le choix des faces et la bascule recto / verso. */
+.ate-faces .seg { margin-top: 8px; display: inline-flex; flex-wrap: wrap; }
+.ate-faces .seg button { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
