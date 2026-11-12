@@ -2,6 +2,12 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.7.1 — Retirer ce qu'un adversaire contrôle
+
+### Atelier
+- **Détruire, exiler ou renvoyer dans la main « … qu'un adversaire contrôle »** : trois effets directs dans « Détruire, exiler, contrer », avec dans « Quoi » seulement ce que contrôlent les adversaires : une créature (par défaut), un permanent, un permanent non-terrain, un artefact, un enchantement, un artefact ou un enchantement, un terrain, un planeswalker ou un jeton.
+- Ces types de l'adversaire marchent aussi avec « Détruire / exiler N (ou X) permanents ciblés », « Détruire / exiler tous les permanents d'un type » et « … de valeur de mana N ou moins » (« Détruisez tous les artefacts que vos adversaires contrôlent »).
+
 ## 0.7.0 — Cartes à deux faces, effets enchaînés avec X, sagas et classes
 
 ### Cartes à deux faces (Atelier)

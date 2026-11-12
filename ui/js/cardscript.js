@@ -473,6 +473,21 @@ const PERM_PLURAL = {
   oppNonland: ['permanents non-terrain ciblés que vos adversaires contrôlent', 'target nonland permanents your opponents control',
     'chaque permanent non-terrain qu\'un adversaire contrôle', 'each nonland permanent an opponent controls'],
   permanent: ['permanents ciblés', 'target permanents', 'chaque permanent', 'each permanent'],
+  token: ['jetons ciblés', 'target tokens', 'chaque jeton', 'each token'],
+  oppPermanent: ['permanents ciblés que vos adversaires contrôlent', 'target permanents your opponents control', 'chaque permanent qu\'un adversaire contrôle',
+    'each permanent an opponent controls'],
+  oppArtifact: ['artefacts ciblés que vos adversaires contrôlent', 'target artifacts your opponents control', 'chaque artefact qu\'un adversaire contrôle',
+    'each artifact an opponent controls'],
+  oppEnchantment: ['enchantements ciblés que vos adversaires contrôlent', 'target enchantments your opponents control',
+    'chaque enchantement qu\'un adversaire contrôle', 'each enchantment an opponent controls'],
+  oppArtEnch: ['artefacts et enchantements ciblés que vos adversaires contrôlent', 'target artifacts and/or enchantments your opponents control',
+    'chaque artefact et chaque enchantement qu\'un adversaire contrôle', 'each artifact and each enchantment an opponent controls'],
+  oppLand: ['terrains ciblés que vos adversaires contrôlent', 'target lands your opponents control', 'chaque terrain qu\'un adversaire contrôle',
+    'each land an opponent controls'],
+  oppPlaneswalker: ['planeswalkers ciblés que vos adversaires contrôlent', 'target planeswalkers your opponents control',
+    'chaque planeswalker qu\'un adversaire contrôle', 'each planeswalker an opponent controls'],
+  oppToken: ['jetons ciblés que vos adversaires contrôlent', 'target tokens your opponents control', 'chaque jeton qu\'un adversaire contrôle',
+    'each token an opponent controls'],
 };
 
 /** Un type de Forge (« Artifact,Enchantment ») avec une propriété en plus (« cmcLE3 ») sur chacune de ses parties. */
@@ -665,6 +680,7 @@ export const EFFECTS = [
   {id: 'destroy', group: 'removal', label: 'Détruire une créature ciblée'},
   {id: 'destroyPermanent', group: 'removal', label: 'Détruire un permanent non-terrain ciblé'},
   {id: 'destroyArtEnch', group: 'removal', label: 'Détruire un artefact ou un enchantement ciblé'},
+  {id: 'destroyOpp', group: 'removal', label: 'Détruire une créature (ou un permanent, un artefact…) ciblé qu\'un adversaire contrôle', pt: 'opp'},
   {id: 'destroyTyped', group: 'removal', label: 'Détruire un permanent ciblé d\'un type (artefact, terrain, planeswalker…)', pt: true},
   {id: 'wrath', group: 'removal', label: 'Détruire toutes les créatures'},
   {id: 'destroyAllTyped', group: 'removal', label: 'Détruire tous les permanents d\'un type (au choix)', pt: true},
@@ -673,12 +689,14 @@ export const EFFECTS = [
   {id: 'edict', group: 'removal', label: 'Chaque adversaire sacrifie une créature'},
   {id: 'sacrificeEach', group: 'removal', label: 'Chaque joueur sacrifie une créature'},
   {id: 'exile', group: 'removal', label: 'Exiler une créature ciblée'},
+  {id: 'exileOpp', group: 'removal', label: 'Exiler une créature (ou un permanent, un artefact…) ciblé qu\'un adversaire contrôle', pt: 'opp'},
   {id: 'exileTyped', group: 'removal', label: 'Exiler un permanent ciblé d\'un type (au choix)', pt: true},
   {id: 'exileAllTyped', group: 'removal', label: 'Exiler tous les permanents d\'un type (au choix)', pt: true},
   {id: 'exileN', group: 'removal', label: 'Exiler N (ou X) permanents ciblés d\'un type', n: true, pt: true},
   {id: 'exileMv', group: 'removal', label: 'Exiler chaque permanent d\'un type de valeur de mana N (ou X) ou moins', n: true, pt: true},
   {id: 'bounce', group: 'removal', label: 'Renvoyer une créature ciblée dans la main'},
   {id: 'bounceTyped', group: 'removal', label: 'Renvoyer un permanent ciblé d\'un type dans la main', pt: true},
+  {id: 'bounceOpp', group: 'removal', label: 'Renvoyer dans la main une créature (ou un permanent…) ciblé qu\'un adversaire contrôle', pt: 'opp'},
   {id: 'bounceAllTyped', group: 'removal', label: 'Renvoyer tous les permanents d\'un type dans la main', pt: true},
   {id: 'tuck', group: 'removal', label: 'Mettre un permanent ciblé au-dessous de la bibliothèque', pt: true},
   {id: 'tuckTop', group: 'removal', label: 'Mettre un permanent ciblé au-dessus de la bibliothèque de son propriétaire', pt: true},
@@ -877,7 +895,26 @@ export const PERM_TYPES = [
     'tous les permanents non-terrain que vos adversaires contrôlent', 'all nonland permanents your opponents control'],
   ['permanent', 'Permanent', 'un permanent ciblé', 'target permanent', 'tous les permanents', 'all permanents'],
   ['token', 'Card.token', 'un jeton ciblé', 'target token', 'tous les jetons', 'all tokens'],
+  // Ce qu'un adversaire contrôle.
+  ['oppPermanent', 'Permanent.OppCtrl', 'un permanent ciblé qu\'un adversaire contrôle', 'target permanent an opponent controls',
+    'tous les permanents que vos adversaires contrôlent', 'all permanents your opponents control'],
+  ['oppArtifact', 'Artifact.OppCtrl', 'un artefact ciblé qu\'un adversaire contrôle', 'target artifact an opponent controls',
+    'tous les artefacts que vos adversaires contrôlent', 'all artifacts your opponents control'],
+  ['oppEnchantment', 'Enchantment.OppCtrl', 'un enchantement ciblé qu\'un adversaire contrôle', 'target enchantment an opponent controls',
+    'tous les enchantements que vos adversaires contrôlent', 'all enchantments your opponents control'],
+  ['oppArtEnch', 'Artifact.OppCtrl,Enchantment.OppCtrl', 'un artefact ou un enchantement ciblé qu\'un adversaire contrôle',
+    'target artifact or enchantment an opponent controls', 'tous les artefacts et enchantements que vos adversaires contrôlent',
+    'all artifacts and enchantments your opponents control'],
+  ['oppLand', 'Land.OppCtrl', 'un terrain ciblé qu\'un adversaire contrôle', 'target land an opponent controls',
+    'tous les terrains que vos adversaires contrôlent', 'all lands your opponents control'],
+  ['oppPlaneswalker', 'Planeswalker.OppCtrl', 'un planeswalker ciblé qu\'un adversaire contrôle', 'target planeswalker an opponent controls',
+    'tous les planeswalkers que vos adversaires contrôlent', 'all planeswalkers your opponents control'],
+  ['oppToken', 'Card.token+OppCtrl', 'un jeton ciblé qu\'un adversaire contrôle', 'target token an opponent controls',
+    'tous les jetons que vos adversaires contrôlent', 'all tokens your opponents control'],
 ];
+
+/** Les types « qu'un adversaire contrôle » (effets « Détruire / exiler / renvoyer … qu'un adversaire contrôle »). */
+export const OPP_PERM_TYPES = PERM_TYPES.filter(t => /OppCtrl/.test(t[1]));
 
 /** Types de cartes cherchées : [id, pour Forge, « une carte de … », « a … card »]. */
 export const CARD_KINDS = [
@@ -2974,6 +3011,14 @@ function effectBase(a, id) {
       return {p: 'UntapAll | ValidCards$ Creature.YouCtrl', fr: 'dégagez toutes les créatures que vous contrôlez', en: 'untap all creatures you control'};
     case 'sacrificeSelf':
       return {p: 'Sacrifice | Defined$ Self', fr: 'sacrifiez CARDNAME', en: 'sacrifice CARDNAME'};
+    case 'destroyOpp':
+    case 'exileOpp':
+    case 'bounceOpp': {
+      // « … qu'un adversaire contrôle » : l'effet d'un type, avec un type de l'adversaire (une créature par défaut).
+      const pt = OPP_PERM_TYPES.some(t => t[0] === a.permType) ? a.permType : 'oppCreature';
+      const typed = {destroyOpp: 'destroyTyped', exileOpp: 'exileTyped', bounceOpp: 'bounceTyped'}[a.effect];
+      return effectBase({...a, effect: typed, permType: pt}, id);
+    }
     case 'destroyTyped': {
       const t = permType(a);
       return {p: `Destroy | ${target({v: t[1], prompt: `Choisissez ${t[2]}`})}`, fr: `détruisez ${t[2]}`, en: `destroy ${t[3]}`};

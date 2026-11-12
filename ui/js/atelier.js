@@ -8,7 +8,7 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {DFC_MODES, facePart, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
+import {DFC_MODES, facePart, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
@@ -1883,7 +1883,10 @@ export class Atelier {
       out += row('', sel('keyword', KEYWORDS, h.keyword || 'Flying'));
     }
     if (e.pt) {
-      out += row('Quoi', sel('permType', PERM_TYPES.map(t => [t[0], t[2].replace(/ ciblée?$/, '').replace(/^une? /, '')]), h.permType || 'creature'));
+      // « … qu'un adversaire contrôle » : seulement les types de l'adversaire.
+      const pts = e.pt === 'opp' ? OPP_PERM_TYPES : PERM_TYPES;
+      const cur = pts.some(t => t[0] === h.permType) ? h.permType : pts[0][0];
+      out += row('Quoi', sel('permType', pts.map(t => [t[0], t[2].replace(/ ciblée?( |$)/, '$1').replace(/^une? /, '')]), cur));
     }
     if (e.ct) {
       out += row('Quelle carte', sel('cardKind', CARD_KINDS.map(t => [t[0], t[2]]), h.cardKind || 'card'));
