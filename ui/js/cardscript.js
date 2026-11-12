@@ -1120,7 +1120,8 @@ export const SUBTYPES = [
   ['Plains', 'Plaine', ['Land'], {mana: 'W'}], ['Island', 'Île', ['Land'], {mana: 'U'}], ['Swamp', 'Marais', ['Land'], {mana: 'B'}],
   ['Mountain', 'Montagne', ['Land'], {mana: 'R'}], ['Forest', 'Forêt', ['Land'], {mana: 'G'}],
   ['Cave', 'Caverne', ['Land'], {}], ['Desert', 'Désert', ['Land'], {}], ['Gate', 'Porte', ['Land'], {}], ['Lair', 'Repaire', ['Land'], {}],
-  ['Locus', 'Site', ['Land'], {}], ['Sphere', 'Sphère', ['Land'], {}], ['Town', 'Ville', ['Land'], {}], ['Planet', 'Planète', ['Land'], {}],
+  ['Locus', 'Site', ['Land'], {}], ['Sphere', 'Sphère', ['Land'], {}], ['Town', 'Ville', ['Land'], {}], ['Planet', 'Planète', ['Land'], {kw: ['Station'],
+    note: 'Un terrain avec Station : ses capacités « seulement à STATION N+ » marchent à partir de N marqueurs charge.'}],
   ['Urza\'s', 'd\'Urza', ['Land'], {}], ['Mine', 'Mine', ['Land'], {}], ['Power-Plant', 'Centrale', ['Land'], {}], ['Tower', 'Tour', ['Land'], {}],
   ['Arcane', 'Arcane', ['Instant', 'Sorcery'], {note: 'Les sorts d\'arcane reçoivent l\'Imprégnation d\'arcane.'}],
   ['Lesson', 'Leçon', ['Instant', 'Sorcery'], {note: 'Une leçon se cherche hors de la partie (réserve) avec Apprentissage.'}],
@@ -4147,7 +4148,14 @@ export function autoSubtypes(f) {
 export function needsPT(f) {
   const types = f.types || [];
   const subs = forgeSubtypes(f.subtypes);
-  return types.includes('Creature') || (f.keywords || []).some(k => keywordOptions(k).pt) || subs.includes('Vehicle') || subs.includes('Spacecraft');
+  return types.includes('Creature') || (f.keywords || []).some(k => keywordOptions(k).pt && !(k === 'Station' && isPlanet(f)))
+    || subs.includes('Vehicle') || subs.includes('Spacecraft');
+}
+
+/** Une planète : un terrain (pas un artefact) avec Station ; à STATION N+, il gagne des capacités, sans devenir une créature. */
+export function isPlanet(f) {
+  const types = f.types || [];
+  return types.includes('Land') && !types.includes('Artifact') && !forgeSubtypes(f.subtypes).includes('Spacecraft');
 }
 
 /** L'IA d'une aura : la mettre sur ses créatures (Pump), sur celles de l'adversaire (Curse) ou en prendre le contrôle. */
@@ -4370,6 +4378,7 @@ function buildFace(form) {
     text.push(mana);
   }
   const kws = (f.keywords || []).filter(k => KW_FR[k]);
+  let stationN = 0;
   for (const k of kws) {
     const line = keywordLine(f, k);
     if (line) {
@@ -4390,13 +4399,13 @@ function buildFace(form) {
       text.push(t);
     }
     if (k === 'Station') {
-      // « STATION 6+ » : à partir de N marqueurs charge, le vaisseau est une créature-artefact (sa force et son endurance).
-      const n = Math.max(1, Number(keywordValue(f, 'Station')) || 1);
-      const st = en ? `STATION ${n}+ — It's an artifact creature.` : `STATION ${n}+ — C'est une créature-artefact.`;
-      lines.push(`S:Mode$ Continuous | AffectedDefined$ Self | Affected$ Card.counters_GE${n}_CHARGE | AddType$ Creature | Description$ ${st}`);
-      text.push(st);
+      // « STATION 6+ » : écrit après les capacités (le vaisseau y devient une créature-artefact, la planète y gagne ses
+      // capacités « à STATION N+ »).
+      stationN = Math.max(1, Number(keywordValue(f, 'Station')) || 1);
     }
   }
+  // Capacités « à STATION N+ » : ajoutées par un effet permanent à partir de N marqueurs charge.
+  const station = {params: {}, lines: [], text: []};
   // Chapitres de saga : un par numéro (le premier compte), dans l'ordre ; « K:Chapter » les nomme tous.
   const chapters = new Map();
   // Classe : les capacités des niveaux 2 et 3 ; affaire : les capacités « Résolue — ».
@@ -4418,6 +4427,22 @@ function buildFace(form) {
       return;
     }
     const t = named(r.text, name);
+    if (stationN && a.station) {
+      // Une capacité « à STATION N+ » : une SVar que l'effet permanent de la station ajoute (AddAbility$, AddTrigger$…).
+      r.lines.forEach((l, k) => {
+        const m = /^(T|S|A):(.*)$/.exec(l);
+        if (!m) {
+          station.lines.push(l);
+          return;
+        }
+        const id = `Atelier${i + 1}S${k}`;
+        const param = {T: 'AddTrigger', S: 'AddStaticAbility', A: 'AddAbility'}[m[1]];
+        station.lines.push(`SVar:${id}:${m[2]}${m[1] === 'A' ? '' : ' | Secondary$ True'}`);
+        (station.params[param] = station.params[param] || []).push(id);
+      });
+      station.text.push(t);
+      return;
+    }
     const lvl = isClass ? Math.max(1, Math.min(3, Math.round(Number(a.level) || 1))) : 1;
     if (lvl > 1) {
       // Une capacité de niveau : une SVar que « K:Class » ajoute (AddTrigger$, AddStaticAbility$…).
@@ -4492,6 +4517,18 @@ function buildFace(form) {
     if (t) {
       text.push(t);
     }
+  }
+  if (stationN) {
+    // Vaisseau spatial : une créature-artefact à STATION N+ ; planète (un terrain) : seulement ses capacités.
+    const planet = isPlanet(f);
+    const head = `STATION ${stationN}+`;
+    const parts = [...(planet ? [] : ['AddType$ Creature']), ...Object.entries(station.params).map(([k, v]) => `${k}$ ${v.join(' & ')}`)];
+    const first = planet ? head : (en ? `${head} — It's an artifact creature.` : `${head} — C'est une créature-artefact.`);
+    if (parts.length) {
+      lines.push(`S:Mode$ Continuous | AffectedDefined$ Self | Affected$ Card.counters_GE${stationN}_CHARGE | ${parts.join(' | ')} | Description$ ${[first, ...station.text].join(' ')}`,
+        ...station.lines);
+    }
+    text.push(first, ...station.text);
   }
   if (chapters.size) {
     const max = Math.max(...chapters.keys());

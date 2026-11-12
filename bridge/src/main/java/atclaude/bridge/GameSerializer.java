@@ -343,7 +343,7 @@ final class GameSerializer {
             // Le type des machinations est parfois resté en anglais dans Forge (« Scheme ») : son nom officiel.
             o.addProperty("typeLine", ongoing ? "Machination continue" : "Machination");
         }
-        if (s.isCreature()) {
+        if (s.isCreature() || s.getType().hasSubtype("Vehicle") || s.getType().hasSubtype("Spacecraft")) {
             o.addProperty("power", s.getPower());
             o.addProperty("toughness", s.getToughness());
         }

@@ -1761,6 +1761,8 @@ export class Atelier {
         ${w.nLabel ? `<span class="muted small">${esc(w.nLabel)}</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       <div class="ate-ab-row"><input type="text" class="ate-abname" data-a="flavor" value="${esc(a.flavor || '')}" maxlength="40"
         placeholder="Nom de la capacité (facultatif)"></div>
+      ${this.form.keywords.includes('Station') ? `<div class="ate-ab-row"><label class="ate-check" title="Elle ne marche qu'à partir de N marqueurs charge (Station)">
+        <input type="checkbox" data-a="station"${a.station ? ' checked' : ''}> Seulement à STATION ${esc(String(keywordValue(this.form, 'Station') || ''))}+</label></div>` : ''}
       ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
         <span class="muted small">la capacité marche à partir de ce niveau de la classe</span></div>` : ''}
       ${isCase ? `<div class="ate-ab-row"><label class="ate-check"><input type="checkbox" data-a="solved"${a.solved ? ' checked' : ''}> Résolue —
@@ -2186,7 +2188,8 @@ export class Atelier {
       f.keywords = adding ? [...f.keywords, k] : f.keywords.filter(x => x !== k);
       // Enchanter fait une aura, Équipement un équipement, Pilotage un véhicule : le type de carte qui va avec.
       const o = keywordOptions(k);
-      if (adding && o.base && !f.types.includes(o.base)) {
+      // Station sur un terrain : une planète (pas un vaisseau spatial).
+      if (adding && o.base && !f.types.includes(o.base) && !(k === 'Station' && f.types.includes('Land'))) {
         f.types = [...f.types.filter(t => !(o.base === 'Enchantment' && t === 'Creature' && k === 'Enchant') && !(o.base === 'Artifact' && t === 'Creature' && k !== 'Reconfigure' && k !== 'Living metal')), o.base];
       }
       this.renderLeft();

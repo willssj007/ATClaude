@@ -412,7 +412,8 @@ final class Catalog {
             o.addProperty("text", basic.matches() ? "({T} : Ajoutez " + basic.group(1) + ".)" : LEVEL_MARK.matcher(text).replaceAll(""));
             o.addProperty("textEn", LEVEL_MARK.matcher(textEn).replaceAll(""));
         }
-        if (main != null && rules.getType().isCreature()) {
+        // Véhicule, vaisseau spatial : leur force et leur endurance sont imprimées, même s'ils ne sont pas encore des créatures.
+        if (main != null && (rules.getType().isCreature() || rules.getType().hasSubtype("Vehicle") || rules.getType().hasSubtype("Spacecraft"))) {
             o.addProperty("power", main.getPower());
             o.addProperty("toughness", main.getToughness());
         }

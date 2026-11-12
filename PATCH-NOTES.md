@@ -32,12 +32,13 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 - **Suspecter** (une créature ciblée, ou elle-même) et **Voiler** la carte du dessus de votre bibliothèque.
 - **Dévorement de nourriture**, **d'artefacts** et **de terrains**, à côté de Dévorement.
 - **Mana phyrexian** : un bouton « Phyrexian ϕ » dans le choix du coût, puis une couleur ({R/P}, payable avec 2 points de vie).
+- **Terrains planètes** : un terrain avec le sous-type Planète reçoit Station (sans devenir un vaisseau spatial ni une créature). Chaque capacité peut être cochée « Seulement à STATION N+ » : elle ne marche qu'à partir de N marqueurs charge, comme sur les planètes d'Edge of Eternities. La même option marche sur un vaisseau spatial (ses capacités de créature à STATION N+).
 - Vérifiés dans Forge : Fouille, Progéniture, Mue, Mégamue, Déguisement, Lecture rapide, Manifester l'effroi, affaires (« À résoudre — »).
 
 ### Atelier, affichage
 - **Seulement le texte d'ambiance** (onglet Apparence) : la carte cache le texte de ses capacités et ne garde que le texte d'ambiance ; les capacités marchent toujours en partie.
 - **Symbole du mana rouge** : une vraie flamme, qui ne se confond plus avec la goutte du bleu.
-- **Vaisseaux spatiaux** : le seuil « STATION N+ » dans un bandeau, ses capacités en dessous.
+- **Vaisseaux spatiaux** : le seuil « STATION N+ » dans un bandeau, ses capacités en dessous ; la force et l'endurance d'un vaisseau (ou d'un véhicule) sont affichées sur la carte, comme sur les vraies, même avant qu'il soit une créature.
 - **Classes réimprimées** : plus de repères « //Level_2// » dans le texte, et le rappel des niveaux en français.
 
 ### Recherche
