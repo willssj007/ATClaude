@@ -4636,6 +4636,30 @@ function buildFace(form) {
   if (f.token) {
     lines.push('SVar:AtelierToken:True');
   }
+  // Plusieurs capacités « Effet du sort » : un seul sort qui les fait toutes, l'une après l'autre (chacune avec sa propre
+  // condition), et pas plusieurs façons de lancer la carte au choix.
+  const spells = lines.map((l, i) => (l.startsWith('A:SP$ ') ? i : -1)).filter(i => i >= 0);
+  if (spells.length > 1) {
+    const at = (name) => lines.findIndex(l => l.startsWith(`SVar:${name}:`));
+    const tail = (i) => {
+      let k = i;
+      for (let guard = 0; guard < 60; guard++) {
+        const m = /\| SubAbility\$ (\S+)/.exec(lines[k]);
+        const j = m ? at(m[1]) : -1;
+        if (j < 0) {
+          return k;
+        }
+        k = j;
+      }
+      return k;
+    };
+    for (let k = 1; k < spells.length; k++) {
+      const name = `AtelierSpell${k + 1}`;
+      const end = tail(spells[k - 1]);
+      lines[spells[k]] = `SVar:${name}:DB$ ${lines[spells[k]].slice(6).replace(/ \| Cost\$ [^|]*/, '')}`;
+      lines[end] += ` | SubAbility$ ${name}`;
+    }
+  }
   // Surcharge recopie le sort de la carte : Forge doit lire le sort (« A:SP$ ») avant le mot-clé.
   const over = lines.findIndex(l => l.startsWith('K:Overload'));
   if (over >= 0) {
