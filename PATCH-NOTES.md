@@ -17,8 +17,8 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 ### Effets et règles
 - **« …, puis … » avec X** : un effet enchaîné a maintenant son propre nombre :
   - le même X que l'effet principal (« Détruisez X créatures ciblées, puis créez X jetons ») ;
-  - le nombre de permanents détruits, exilés ou sacrifiés juste avant (« détruisez une créature ciblée, puis créez autant de jetons ») ;
-  - ou n'importe quel X calculé (créatures, terrains, points de vie…).
+  - le nombre de permanents créés, détruits, exilés ou sacrifiés juste avant (« créez trois jetons Trésor, puis X blessures à chaque créature adverse, X étant le nombre de jetons créés ainsi » ; « détruisez une créature ciblée, puis créez autant de jetons ») ;
+  - ou n'importe quel X calculé (créatures, terrains, points de vie, jetons artefact que vous contrôlez…).
 - **Le nombre d'un effet se choisit à côté de l'effet** (N, ou X payé, ou un X calculé) au lieu d'être caché dans « Effet perso » ; un X s'affiche à la place du chiffre.
 - **Combat** : « Une créature ciblée que vous contrôlez se bat contre une créature ciblée que vous ne contrôlez pas ».
 - **Blessures au bloqueur** : « elle inflige N blessures à la créature qui la bloque » (ou à chaque créature qui la bloque, ou à la créature qu'elle bloque), et un nouveau déclencheur « Quand une de vos créatures devient bloquée ».
@@ -40,6 +40,8 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 - **Symbole du mana rouge** : une vraie flamme, qui ne se confond plus avec la goutte du bleu.
 - **Vaisseaux spatiaux** : le seuil « STATION N+ » dans un bandeau, ses capacités en dessous ; la force et l'endurance d'un vaisseau (ou d'un véhicule) sont affichées sur la carte, comme sur les vraies, même avant qu'il soit une créature.
 - **Classes réimprimées** : plus de repères « //Level_2// » dans le texte, et le rappel des niveaux en français.
+
+- **Catégories dans la liste de l'Atelier** : en plus des extensions, des pastilles Créatures, Artefacts, Enchantements, Terrains, Planeswalkers, Éphémères et rituels, Batailles (avec le nombre de cartes) ; le choix est retenu.
 
 ### Recherche
 - **Chercher dans le texte des cartes**, par mots : chaque mot tapé peut être dans le nom ou dans le texte (« détruisez artefact » trouve les cartes qui détruisent un artefact). Activé par défaut (interrupteur « Dans le texte ») ; les cartes trouvées par leur nom restent en tête, les autres filtres ne changent pas.

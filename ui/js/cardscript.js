@@ -968,6 +968,7 @@ export const AMOUNTS = [
   ['enchantments', 'X = le nombre d\'enchantements que vous contrôlez'],
   ['permanents', 'X = le nombre de permanents que vous contrôlez'],
   ['tokens', 'X = le nombre de jetons que vous contrôlez'],
+  ['artifactTokens', 'X = le nombre de jetons artefact que vous contrôlez'],
   ['oppCreatures', 'X = le nombre de créatures que vos adversaires contrôlent'],
   ['hand', 'X = le nombre de cartes dans votre main'],
   ['life', 'X = votre total de points de vie'],
@@ -1481,6 +1482,7 @@ function amountOf(a) {
     case 'artifacts': return ['Count$Valid Artifact.YouCtrl', 'le nombre d\'artefacts que vous contrôlez', 'the number of artifacts you control'];
     case 'enchantments': return ['Count$Valid Enchantment.YouCtrl', 'le nombre d\'enchantements que vous contrôlez', 'the number of enchantments you control'];
     case 'permanents': return ['Count$Valid Permanent.YouCtrl', 'le nombre de permanents que vous contrôlez', 'the number of permanents you control'];
+    case 'artifactTokens': return ['Count$Valid Artifact.token+YouCtrl', 'le nombre de jetons artefact que vous contrôlez', 'the number of artifact tokens you control'];
     case 'tokens': return ['Count$Valid Card.token+YouCtrl', 'le nombre de jetons que vous contrôlez', 'the number of tokens you control'];
     case 'oppCreatures': return ['Count$Valid Creature.OppCtrl', 'le nombre de créatures que vos adversaires contrôlent', 'the number of creatures your opponents control'];
     case 'hand': return ['Count$CardsInYourHand', 'le nombre de cartes dans votre main', 'the number of cards in your hand'];
@@ -1640,9 +1642,11 @@ function chainOf(a, id, lang) {
         mx = a.amount && a.amount !== 'fixed' ? amountOf({...a}) : null;
       } else if (m.amount === 'prev') {
         const prev = k === 0 ? a.effect : (a.then[k - 1] || {}).effect || '';
-        const done = /exile/i.test(prev) ? ['exilés', 'exiled'] : /sacrific|edict/i.test(prev) ? ['sacrifiés', 'sacrificed']
-          : /bounce|tuck/i.test(prev) ? ['renvoyés', 'returned'] : /destroy|wrath/i.test(prev) ? ['détruits', 'destroyed'] : ['touchés', 'affected'];
-        mx = ['Count$RememberedSize', `le nombre de permanents ${done[0]} ainsi`, `the number of permanents ${done[1]} this way`];
+        const done = /token|populate|amass|investigate|incubate/i.test(prev) ? ['jetons créés', 'tokens created']
+          : /exile/i.test(prev) ? ['permanents exilés', 'permanents exiled'] : /sacrific|edict/i.test(prev) ? ['permanents sacrifiés', 'permanents sacrificed']
+          : /bounce|tuck/i.test(prev) ? ['permanents renvoyés', 'permanents returned'] : /destroy|wrath/i.test(prev) ? ['permanents détruits', 'permanents destroyed']
+          : ['permanents touchés', 'permanents affected'];
+        mx = ['Count$RememberedSize', `le nombre de ${done[0]} ainsi`, `the number of ${done[1]} this way`];
         items[items.length - 1].remember = true;
         remember = true;
       } else {
@@ -1679,7 +1683,7 @@ function chainOf(a, id, lang) {
   // Le compte des permanents touchés : retenus par l'effet d'avant, oubliés à la fin.
   items.forEach((it) => {
     if (it.remember) {
-      it.head += ' | RememberDestroyed$ True | RememberChanged$ True | RememberSacrificed$ True';
+      it.head += ' | RememberDestroyed$ True | RememberChanged$ True | RememberSacrificed$ True | RememberTokens$ True';
     }
   });
   if (remember) {

@@ -44,6 +44,9 @@ const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
   keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none', set: '', rarity: '', artist: '',
 });
+/** Catégories de la liste de l'Atelier : [types de Forge (une expression), libellé]. */
+const CARD_KIND_FILTERS = [['', 'Tous les types'], ['Creature', 'Créatures'], ['Artifact', 'Artefacts'], ['Enchantment', 'Enchantements'],
+  ['Land', 'Terrains'], ['Planeswalker', 'Planeswalkers'], ['Instant|Sorcery', 'Éphémères et rituels'], ['Battle', 'Batailles']];
 /** La présentation d'une carte (le verso d'une carte à deux faces garde celle du recto). */
 const lookOf = (f) => ({frame: f.frame, frameColor: f.frameColor, lang: f.lang, frameText: f.frameText, fx: f.fx, hideText: f.hideText,
   set: f.set, rarity: f.rarity, artist: f.artist});
@@ -204,11 +207,30 @@ export class Atelier {
       setFilter = '';
     }
     this.setFilter = setFilter;
-    const inSet = (c) => !setFilter || (setFilter === '-' ? !this.setOf(c) : this.setOf(c) === setFilter);
+    // Catégorie : le type de carte (mes artefacts, mes créatures…), en plus de l'extension.
+    let kindFilter = this.kindFilter;
+    if (kindFilter === undefined) {
+      try {
+        kindFilter = JSON.parse(localStorage.getItem('at.atelier.kind') || '""');
+      } catch (e) {
+        kindFilter = '';
+      }
+    }
+    if (!CARD_KIND_FILTERS.some(([v]) => v === kindFilter)) {
+      kindFilter = '';
+    }
+    this.kindFilter = kindFilter;
+    const typeOf = (c) => String((c.card && c.card.typeEn) || '');
+    const isKind = (c, k) => !k || new RegExp(`\\b(${k})\\b`).test(typeOf(c));
+    const inSet = (c) => (!setFilter || (setFilter === '-' ? !this.setOf(c) : this.setOf(c) === setFilter)) && isKind(c, kindFilter);
     // Réimpressions (cartes officielles avec une illustration perso) : rangées avec les cartes de leur extension.
     const reprints = (d.reprints || []).map(r => ({name: r.nameFr || r.name, card: r.card, reprint: r, set: sets.some(x => x.id === r.set) ? r.set : ''}));
     const cards = [...d.cards.filter(c => !c.token && inSet(c)), ...reprints.filter(inSet)];
     const tokens = d.cards.filter(c => c.token && inSet(c));
+    const everything = [...d.cards, ...reprints];
+    const kinds = CARD_KIND_FILTERS.filter(([v]) => !v || everything.some(c => isKind(c, v)));
+    const kindChip = ([v, label]) => `<button class="chip${kindFilter === v ? ' on' : ''}" data-kfilter="${esc(v)}">${esc(label)}
+      <span class="ate-gn">${everything.filter(c => isKind(c, v)).length}</span></button>`;
     const noSet = d.cards.filter(c => !this.setOf(c)).length + reprints.filter(r => !r.set).length;
     const setChip = (v, label, count, set) => `<button class="chip${setFilter === v ? ' on' : ''}" data-sfilter="${esc(v)}">${set ? setLogoHtml(set) : ''}${esc(label)}
       <span class="ate-gn">${count}</span></button>`;
@@ -223,6 +245,7 @@ export class Atelier {
         règles, et se choisit dans le deck builder comme une autre impression (pinceau d'une ligne du deck).</p>
       ${sets.length ? `<div class="ate-groups chips ate-setfilter">${setChip('', 'Toutes les extensions', d.cards.length + reprints.length)}${sets.map(x => setChip(x.id, x.name, d.cards.filter(c => this.setOf(c) === x.id).length + reprints.filter(r => r.set === x.id).length, x)).join('')}
         ${noSet ? setChip('-', 'Sans extension', noSet) : ''}</div>` : ''}
+      ${kinds.length > 2 ? `<div class="ate-groups chips ate-kindfilter">${kinds.map(kindChip).join('')}</div>` : ''}
       ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
         <button class="btn small gold" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
         <button class="btn small" data-rput${sel.size ? '' : ' disabled'}>Rareté…</button>
@@ -276,7 +299,7 @@ export class Atelier {
       }
       const grid = el('<div class="ate-grid ate-cards"></div>');
       if (!list.length) {
-        grid.appendChild(el(`<p class="muted">${setFilter ? 'Aucune carte dans cette extension.' : 'Aucune carte perso pour l\'instant.'}</p>`));
+        grid.appendChild(el(`<p class="muted">${this.kindFilter ? 'Aucune carte de ce type ici.' : setFilter ? 'Aucune carte dans cette extension.' : 'Aucune carte perso pour l\'instant.'}</p>`));
       }
       list.forEach(c => grid.appendChild(tileOf(c)));
       holder.appendChild(grid);
@@ -302,6 +325,17 @@ export class Atelier {
         return;
       }
       const tile = e.target.closest('.ate-tile');
+      const kf = e.target.closest('[data-kfilter]');
+      if (kf) {
+        this.kindFilter = kf.dataset.kfilter;
+        try {
+          localStorage.setItem('at.atelier.kind', JSON.stringify(this.kindFilter));
+        } catch (err) {
+          // mémoire du navigateur indisponible : le filtre ne sera pas retenu
+        }
+        this.renderList();
+        return;
+      }
       const sf = e.target.closest('[data-sfilter]');
       if (sf) {
         this.setFilter = sf.dataset.sfilter;
@@ -2033,7 +2067,7 @@ export class Atelier {
     const tapped = parent.when === 'activated' && parent.tapX;
     const list = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped).map(([v, l]) => [v, v === 'fixed' ? 'N : le nombre indiqué' : l]);
     if (chained) {
-      list.splice(1, 0, ['same', 'X = le même X que l\'effet principal'], ['prev', 'X = le nombre de permanents détruits, exilés ou sacrifiés juste avant']);
+      list.splice(1, 0, ['same', 'X = le même X que l\'effet principal'], ['prev', 'X = le nombre de permanents créés, détruits, exilés ou sacrifiés juste avant']);
     }
     const v = m.amount || 'fixed';
     return `<div class="ate-ab-row"><span class="muted small">Nombre</span>
