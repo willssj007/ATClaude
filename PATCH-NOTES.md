@@ -2,6 +2,11 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.7.2 — X partout dans l'Atelier
+
+### Atelier
+- **Plus de « N » dans l'Atelier, seulement des X** : tous les effets (« Elle gagne +X/+X », « Détruire X permanents ciblés », « Regarder les X cartes du dessus », « Monstruosité X »…), les déclencheurs (« de force X ou plus »), les conditions (« Si vous contrôlez au moins X créatures »), les emblèmes et les coûts (« payez X points de vie ») écrivent X. Le chiffre se tape dans la case à côté, ou X se calcule avec « Nombre » (X payé, créatures, jetons créés juste avant…).
+
 ## 0.7.1 — Retirer ce qu'un adversaire contrôle, sorts à plusieurs effets
 
 ### Atelier

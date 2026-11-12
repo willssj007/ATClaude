@@ -1525,7 +1525,7 @@ export class Atelier {
     const list = CONDITIONS.filter(([id]) => !['none', 'yourTurn', 'notYourTurn', 'kicked', 'tappedAtLeast'].includes(id));
     const c = f.caseCond || '';
     return `<select data-case="caseCond"><option value="">— choisir —</option>${list.map(([id, l]) => `<option value="${id}"${id === c ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-      ${CONDITIONS_N.includes(c) ? `<input type="number" data-case="caseN" value="${esc(f.caseN ?? 3)}" min="0" max="99" style="width:64px" title="N">` : ''}
+      ${CONDITIONS_N.includes(c) ? `<input type="number" data-case="caseN" value="${esc(f.caseN ?? 3)}" min="0" max="99" style="width:64px" title="X">` : ''}
       ${c === 'control' ? `<input type="text" data-case="caseType" data-typepick readonly value="${esc(f.caseType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}`;
   }
 
@@ -1790,12 +1790,12 @@ export class Atelier {
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${w.counterSel ? `<div class="ate-ab-row"><span class="muted small">Marqueur</span>${counterSelect('a', 'whenCounter', a.whenCounter, 'CHARGE')}
-        ${w.nth ? `<span class="muted small">N =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
+        ${w.nth ? `<span class="muted small">X =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       ${w.kinds || w.nLabel ? `<div class="ate-ab-row">${w.kinds ? `${sel('whenKind', WHEN_KINDS[w.kinds].map(k => [k[0], k[1]]), whenKindOf(w, a.whenKind)[0])}` : ''}
         ${w.nLabel ? `<span class="muted small">${esc(w.nLabel)}</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       <div class="ate-ab-row"><input type="text" class="ate-abname" data-a="flavor" value="${esc(a.flavor || '')}" maxlength="40"
         placeholder="Nom de la capacité (facultatif)"></div>
-      ${this.form.keywords.includes('Station') ? `<div class="ate-ab-row"><label class="ate-check" title="Elle ne marche qu'à partir de N marqueurs charge (Station)">
+      ${this.form.keywords.includes('Station') ? `<div class="ate-ab-row"><label class="ate-check" title="Elle ne marche qu'à partir de X marqueurs charge (Station)">
         <input type="checkbox" data-a="station"${a.station ? ' checked' : ''}> Seulement à STATION ${esc(String(keywordValue(this.form, 'Station') || ''))}+</label></div>` : ''}
       ${isClass ? `<div class="ate-ab-row"><span class="muted small">Niveau</span>${sel('level', [['1', '1 (dès l\'arrivée)'], ['2', '2'], ['3', '3']], String(a.level || 1))}
         <span class="muted small">la capacité marche à partir de ce niveau de la classe</span></div>` : ''}
@@ -1931,7 +1931,7 @@ export class Atelier {
       const em = h.emblem || 'anthem';
       out += row('L\'emblème', sel('emblem', EMBLEMS, em));
       if (['anthem', 'extraLand', 'reduceCost'].includes(em)) {
-        out += row('N', `<input type="number" data-${attr}="n" value="${esc(h.n ?? 1)}" min="1" max="20" style="width:70px">`);
+        out += row('X', `<input type="number" data-${attr}="n" value="${esc(h.n ?? 1)}" min="1" max="20" style="width:70px">`);
       }
       if (em === 'grantKeyword') {
         out += row('', sel('keyword', KEYWORDS, h.keyword || 'Flying'));
@@ -1947,7 +1947,7 @@ export class Atelier {
     const cond = a.cond || 'none';
     return `<div class="ate-ab-row"><span class="muted small">Tant que</span>
       <select data-a="cond">${list.map(([v, l]) => `<option value="${v}"${v === cond ? ' selected' : ''}>${esc(v === 'none' ? 'Toujours' : l.replace(/^Si /, '').replace(/^S'il /, 'Il '))}</option>`).join('')}</select>
-      ${CONDITIONS_N.includes(cond) ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
+      ${CONDITIONS_N.includes(cond) ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
       ${cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
       ${cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>`;
   }
@@ -2044,7 +2044,7 @@ export class Atelier {
     const cond = CONDITIONS_N.includes(m.cond);
     return `<div class="ate-ab-row"><span class="muted small">Seulement</span>
       <select data-sf="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-      ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
+      ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
       ${m.cond === 'control' ? `<input type="text" data-sf="condType" data-typepick readonly value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
       ${m.cond === 'countersAtLeast' ? counterSelect('sf', 'condCounter', m.condCounter, 'CHARGE') : ''}</div>`;
   }
@@ -2068,7 +2068,7 @@ export class Atelier {
    */
   amountRow(m, key, parent, chained = false) {
     const tapped = parent.when === 'activated' && parent.tapX;
-    const list = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped).map(([v, l]) => [v, v === 'fixed' ? 'N : le nombre indiqué' : l]);
+    const list = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped).map(([v, l]) => [v, v === 'fixed' ? 'Le nombre tapé (un chiffre)' : l]);
     if (chained) {
       list.splice(1, 0, ['same', 'X = le même X que l\'effet principal'], ['prev', 'X = le nombre de permanents créés, détruits, exilés ou sacrifiés juste avant']);
     }
@@ -2093,7 +2093,7 @@ export class Atelier {
       <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— condition, « et puis »</span></summary>
       <div class="ate-ab-row"><span class="muted small">Seulement</span>
         <select data-a="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
-        ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="N">` : ''}
+        ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
         ${a.cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
         ${a.cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>
       <div class="ate-modes">${then.map((m, k) => this.subEffectHtml(a, m, k, 'then', 'Et puis', true)).join('')}
