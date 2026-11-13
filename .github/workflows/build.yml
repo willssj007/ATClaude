@@ -29,7 +29,7 @@ jobs:
       - name: Version
         id: version
         run: |
-          VERSION="0.7.$(( ${{ github.run_number }} - 53 ))"
+          VERSION="0.8.$(( ${{ github.run_number }} - 57 ))"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version $VERSION"

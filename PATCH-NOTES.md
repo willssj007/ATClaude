@@ -2,7 +2,7 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.7.4 — Niveaux de l'IA, 2 contre 2, cube, Gauntlet, test de main
+## 0.8.0 — Niveaux de l'IA, 2 contre 2, cube, Gauntlet, test de main, vérification de tout le jeu
 
 ### Salon
 - **Niveau de chaque IA**, à côté de son style de jeu : **Facile** (25 % de points de vie en moins), **Normal** (l'IA de Forge telle quelle), **Difficile** (sa bibliothèque est mélangée en sa faveur : terrains bien répartis, ni noyée ni à court) et **Expert** (pareil, avec 25 % de points de vie en plus).
