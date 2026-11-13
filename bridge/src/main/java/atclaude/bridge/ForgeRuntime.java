@@ -131,6 +131,11 @@ public final class ForgeRuntime {
         final long forgeDone = System.nanoTime();
         CustomCards.init();
         Reprints.init();
+        // Niveaux de l'IA : copies « justes » des personnalités ; la pioche lissée ne sert qu'aux IA Difficile et Expert.
+        AiLevels.install();
+        FModel.getPreferences().setPref(FPref.UI_ENABLE_AI_CHEATS, String.valueOf(AiLevels.ready()));
+        // Textes français des cartes récentes (impressions françaises de Scryfall gardées en cache).
+        FrenchCards.init();
         French.prebuildVariantMappings();
         System.out.println("Démarrage : Forge " + (forgeDone - started) / 1_000_000 + " ms, traductions "
                 + (System.nanoTime() - forgeDone) / 1_000_000 + " ms");

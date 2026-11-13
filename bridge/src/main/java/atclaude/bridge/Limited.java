@@ -31,12 +31,20 @@ final class Limited {
     private static final int SEATS = 8;
     private static final int PACKS = 3;
     static final String CUSTOM = "custom:";
+    /** Un cube de Forge (res/cube) : « cube:nom du fichier ». */
+    static final String CUBE = "cube:";
+    private static final int CUBE_PACK = 15;
 
     /** La partie limitée en cours de préparation (une seule à la fois) : extension, cartes, draft. */
     private static String set = "";
     private static List<PaperCard> myPool = new ArrayList<>();
     private static Deck aiDeck;
     private static Draft draft;
+    /** Le cube de la partie en préparation : ses cartes mélangées, distribuées sans remise booster après booster. */
+    private static String cubeOf = "";
+    private static List<PaperCard> cubeAll = new ArrayList<>();
+    private static List<PaperCard> cubeLeft = new ArrayList<>();
+    private static JsonArray cubeList;
 
     private Limited() { }
 
@@ -46,6 +54,9 @@ final class Limited {
     static List<PaperCard> pack(final String code) {
         if (code.startsWith(CUSTOM)) {
             return customPack(code.substring(CUSTOM.length()));
+        }
+        if (code.startsWith(CUBE)) {
+            return cubePack(code.substring(CUBE.length()));
         }
         final CardEdition ed = FModel.getMagicDb().getEditions().get(code);
         if (ed == null || ed.getBoosterTemplate() == null) {
@@ -95,6 +106,86 @@ final class Limited {
         for (int i = 0; i < n; i++) {
             pack.add(src.get(RANDOM.nextInt(src.size())));
         }
+    }
+
+    // ------------------------------------------------------------------ cubes
+
+    private static java.io.File cubeFile(final String id) {
+        if (id == null || id.isEmpty() || id.contains("/") || id.contains("\\") || id.contains("..")) {
+            throw new IllegalArgumentException("Cube inconnu.");
+        }
+        final java.io.File f = new java.io.File(forge.localinstance.properties.ForgeConstants.DECK_CUBE_DIR, id + ".dck");
+        if (!f.isFile()) {
+            throw new IllegalArgumentException("Cube introuvable : " + id);
+        }
+        return f;
+    }
+
+    /** Le cube remis à neuf (toutes ses cartes, mélangées) : au début de chaque scellé ou draft. */
+    private static void resetCube(final String id) {
+        final Deck d = forge.deck.io.DeckSerializer.fromFile(cubeFile(id));
+        final List<PaperCard> all = d == null ? new ArrayList<>() : new ArrayList<>(d.getMain().toFlatList());
+        if (all.size() < CUBE_PACK) {
+            throw new IllegalArgumentException("Ce cube n'a pas assez de cartes.");
+        }
+        cubeOf = id;
+        cubeAll = all;
+        cubeLeft = new ArrayList<>(all);
+        java.util.Collections.shuffle(cubeLeft, RANDOM);
+    }
+
+    /** Un booster de cube : 15 cartes prises sans remise (le cube est remélangé s'il n'en reste plus assez). */
+    private static List<PaperCard> cubePack(final String id) {
+        if (!id.equals(cubeOf) || cubeAll.isEmpty()) {
+            resetCube(id);
+        }
+        if (cubeLeft.size() < CUBE_PACK) {
+            final List<PaperCard> again = new ArrayList<>(cubeAll);
+            java.util.Collections.shuffle(again, RANDOM);
+            cubeLeft.addAll(again);
+        }
+        final List<PaperCard> pack = new ArrayList<>(cubeLeft.subList(0, CUBE_PACK));
+        cubeLeft.subList(0, CUBE_PACK).clear();
+        return pack;
+    }
+
+    /** Les cubes de Forge : code, nom, nombre de cartes (compté dans le fichier, sans charger les cartes). */
+    static synchronized JsonArray cubes() {
+        if (cubeList != null) {
+            return cubeList;
+        }
+        final JsonArray out = new JsonArray();
+        final java.io.File[] files = new java.io.File(forge.localinstance.properties.ForgeConstants.DECK_CUBE_DIR).listFiles((dir, n) -> n.endsWith(".dck"));
+        if (files != null) {
+            java.util.Arrays.sort(files, Comparator.comparing(f -> f.getName().toLowerCase(java.util.Locale.ROOT)));
+            for (final java.io.File f : files) {
+                int n = 0;
+                boolean main = false;
+                for (final String line : forge.util.FileUtil.readFile(f.getPath())) {
+                    final String t = line.trim();
+                    if (t.startsWith("[")) {
+                        main = t.equalsIgnoreCase("[main]");
+                    } else if (main && !t.isEmpty() && Character.isDigit(t.charAt(0))) {
+                        final int sp = t.indexOf(' ');
+                        try {
+                            n += sp > 0 ? Integer.parseInt(t.substring(0, sp)) : 1;
+                        } catch (final NumberFormatException e) {
+                            n++;
+                        }
+                    }
+                }
+                if (n >= CUBE_PACK * 6) {
+                    final String id = f.getName().substring(0, f.getName().length() - 4);
+                    final JsonObject o = new JsonObject();
+                    o.addProperty("code", CUBE + id);
+                    o.addProperty("name", id);
+                    o.addProperty("count", n);
+                    out.add(o);
+                }
+            }
+        }
+        cubeList = out;
+        return out;
     }
 
     /** Les extensions perso qui ont des cartes (pour leurs boosters). */
@@ -152,6 +243,9 @@ final class Limited {
     /** Scellé : mes six boosters (ouverts), et ceux de l'adversaire, dont Forge fait son deck. */
     static synchronized JsonObject sealed(final String code) {
         set = code;
+        if (code.startsWith(CUBE)) {
+            resetCube(code.substring(CUBE.length()));
+        }
         draft = null;
         myPool = new ArrayList<>();
         final JsonArray packs = new JsonArray();
@@ -208,6 +302,9 @@ final class Limited {
     /** Draft : huit joueurs, trois boosters chacun. Renvoie l'état (mon booster en main, mes cartes). */
     static synchronized JsonObject draftStart(final String code) {
         set = code;
+        if (code.startsWith(CUBE)) {
+            resetCube(code.substring(CUBE.length()));
+        }
         final Draft d = new Draft();
         for (int seat = 0; seat < SEATS; seat++) {
             final List<List<PaperCard>> mine = new ArrayList<>();

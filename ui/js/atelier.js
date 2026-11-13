@@ -246,49 +246,73 @@ export class Atelier {
     const tokens = d.cards.filter(c => c.token && inSet(c));
     const everything = [...d.cards, ...reprints];
     const kinds = CARD_KIND_FILTERS.filter(([v]) => !v || everything.some(c => isKind(c, v)));
-    const kindChip = ([v, label]) => `<button class="chip${kindFilter === v ? ' on' : ''}" data-kfilter="${esc(v)}">${esc(label)}
-      <span class="ate-gn">${everything.filter(c => isKind(c, v)).length}</span></button>`;
-    const noSet = d.cards.filter(c => !this.setOf(c)).length + reprints.filter(r => !r.set).length;
-    const setChip = (v, label, count, set) => `<button class="chip${setFilter === v ? ' on' : ''}" data-sfilter="${esc(v)}">${set ? setLogoHtml(set) : ''}${esc(label)}
-      <span class="ate-gn">${count}</span></button>`;
+    const noSet = d.cards.filter(c => !c.token && !this.setOf(c)).length + reprints.filter(r => !r.set).length;
     const sel = this.selection;
+    // Onglets : mes cartes, mes jetons, mes extensions, mes types de créature (une chose à la fois).
+    let tab = this.listTab;
+    if (tab === undefined) {
+      try {
+        tab = JSON.parse(localStorage.getItem('at.atelier.tab') || '"cards"');
+      } catch (e) {
+        tab = 'cards';
+      }
+    }
+    if (!['cards', 'tokens', 'sets', 'types'].includes(tab)) {
+      tab = 'cards';
+    }
+    this.listTab = tab;
+    const allTokens = d.cards.filter(c => c.token);
+    const cardCount = d.cards.length - allTokens.length + reprints.length;
+    const tabBtn = (v, ic, label, n) => `<button data-ltab="${v}" class="${tab === v ? 'on' : ''}">${icon(ic)} ${label}${n !== undefined ? ` <span class="ate-gn">${n}</span>` : ''}</button>`;
+    const help = (text) => `<details class="ate-help"><summary>Comment ça marche ?</summary><p class="muted small">${text}</p></details>`;
+    const primary = tab === 'cards' ? '<button class="btn gold" data-new>＋ Nouvelle carte</button>'
+      : tab === 'tokens' ? '<button class="btn gold" data-new-token>＋ Nouveau jeton</button>'
+        : tab === 'sets' ? '<button class="btn gold" data-newset>＋ Nouvelle extension</button>' : '';
+    const setOpt = (v, label, count) => `<option value="${esc(v)}"${setFilter === v ? ' selected' : ''}>${esc(label)} (${count})</option>`;
     this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
-      <div class="ate-top"><h1>Atelier</h1>${d.cards.length ? `<button class="btn" data-organize>${sel ? 'Terminé' : 'Organiser'}</button>` : ''}
-        <button class="btn" data-reprint-new title="Une carte officielle (Sol Ring…) avec ton illustration, dans ton extension">＋ Réimpression</button>
-        <button class="btn" data-share title="Envoyer tes cartes, extensions et jetons dans un fichier (.atcards) à partager">${icon('scroll')} Partager…</button>
-        <button class="btn" data-import title="Ajouter les cartes d'un fichier .atcards reçu">Importer…</button>
-        <button class="btn gold" data-new>＋ Nouvelle carte</button></div>
-      <p class="muted small">Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles
-        se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker). Une <b>réimpression</b> est
-        une carte officielle (Sol Ring…) avec ton illustration, ta rareté et ton artiste, dans ton extension : elle garde ses
-        règles, et se choisit dans le deck builder comme une autre impression (pinceau d'une ligne du deck).</p>
-      ${sets.length ? `<div class="ate-groups chips ate-setfilter">${setChip('', 'Toutes les extensions', d.cards.length + reprints.length)}${sets.map(x => setChip(x.id, x.name, d.cards.filter(c => this.setOf(c) === x.id).length + reprints.filter(r => r.set === x.id).length, x)).join('')}
-        ${noSet ? setChip('-', 'Sans extension', noSet) : ''}</div>` : ''}
-      ${kinds.length > 2 ? `<div class="ate-groups chips ate-kindfilter">${kinds.map(kindChip).join('')}</div>` : ''}
+      <div class="ate-top"><h1>Atelier</h1>${primary}</div>
+      <div class="seg ate-tabs">${tabBtn('cards', 'cards', 'Cartes', cardCount)}${tabBtn('tokens', 'shield', 'Jetons', allTokens.length)}${tabBtn('sets', 'book', 'Extensions', sets.length)}${tabBtn('types', 'scroll', 'Types', d.types.length)}</div>
+      ${tab === 'cards' ? `
+      ${help(`Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles se trouvent dans la
+        recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker). Une <b>réimpression</b> est une carte officielle
+        (Sol Ring…) avec ton illustration, ta rareté et ton artiste, dans ton extension : elle garde ses règles, et se choisit dans le
+        deck builder comme une autre impression (pinceau d'une ligne du deck). <b>Organiser</b> range plusieurs cartes à la fois
+        (extension, rareté, partage) ; <b>Partager</b> les envoie dans un fichier .atcards, <b>Importer</b> ajoute celles d'un fichier reçu.`)}
+      <div class="ate-tools">
+        ${d.cards.length ? `<button class="btn small" data-organize>${sel ? 'Terminé' : 'Organiser'}</button>` : ''}
+        <button class="btn small" data-reprint-new title="Une carte officielle (Sol Ring…) avec ton illustration, dans ton extension">＋ Réimpression</button>
+        <button class="btn small" data-share title="Envoyer tes cartes, extensions et jetons dans un fichier (.atcards) à partager">${icon('scroll')} Partager…</button>
+        <button class="btn small" data-import title="Ajouter les cartes d'un fichier .atcards reçu">Importer…</button>
+      </div>
+      ${sets.length || kinds.length > 2 ? `<div class="ate-filters">
+        ${sets.length ? `<label class="field"><span>Extension</span><select data-sfilter-sel>${setOpt('', 'Toutes les extensions', d.cards.length - allTokens.length + reprints.length)}${sets.map(x => setOpt(x.id, x.name, d.cards.filter(c => !c.token && this.setOf(c) === x.id).length + reprints.filter(r => r.set === x.id).length)).join('')}
+          ${noSet ? setOpt('-', 'Sans extension', noSet) : ''}</select></label>` : ''}
+        ${kinds.length > 2 ? `<label class="field"><span>Type</span><select data-kfilter-sel>${kinds.map(([v, label]) => `<option value="${esc(v)}"${kindFilter === v ? ' selected' : ''}>${esc(label)} (${everything.filter(c => !c.token && isKind(c, v)).length})</option>`).join('')}</select></label>` : ''}
+      </div>` : ''}
       ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
         <button class="btn small gold" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
         <button class="btn small" data-rput${sel.size ? '' : ' disabled'}>Rareté…</button>
         <button class="btn small" data-sshare${sel.size ? '' : ' disabled'}>Partager…</button>
         <button class="btn small" data-gall>${cards.length + tokens.length && [...cards, ...tokens].every(c => sel.has(c.name)) ? 'Aucune' : 'Toutes'}</button></div>` : ''}
-      <div class="ate-cardgroups"></div>
-      <div class="ate-top"><h2>Mes extensions</h2><button class="btn" data-newset>＋ Nouvelle extension</button></div>
-      <p class="muted small">Tes propres extensions : un nom, un code (comme « MH3 ») et un logo. Le logo s'affiche sur tes cartes à
-        droite du type, de la couleur de leur rareté, avec leur numéro dans l'extension et l'artiste en bas. Chaque extension se
-        cherche dans le menu des cartes et le deck builder (bouton « Extension »). Une carte se range dans une extension dans
-        son onglet « Apparence », ou plusieurs à la fois avec « Organiser ».</p>
+      <div class="ate-cardgroups"></div>` : ''}
+      ${tab === 'sets' ? `
+      ${help(`Tes propres extensions : un nom, un code (comme « MH3 ») et un logo. Le logo s'affiche sur tes cartes à droite du type,
+        de la couleur de leur rareté, avec leur numéro dans l'extension et l'artiste en bas. Chaque extension se cherche dans le menu
+        des cartes et le deck builder (bouton « Extension »), et donne des boosters pour le scellé et le draft (Limité). Une carte se
+        range dans une extension dans son onglet « Apparence », ou plusieurs à la fois avec « Organiser » (onglet Cartes).`)}
       <div class="ate-sets">${sets.length ? sets.map(x => `<button class="ate-set panel" data-editset="${esc(x.id)}">${setLogoHtml(x, 'big')}
         <span><b>${esc(x.name)}</b><span class="muted small">${esc(x.code)} · ${x.count} carte${x.count > 1 ? 's' : ''}</span></span></button>`).join('')
-        : '<p class="muted">Aucune extension pour l\'instant.</p>'}</div>
-      <div class="ate-top"><h2>Mes jetons</h2><button class="btn" data-new-token>＋ Nouveau jeton</button></div>
-      <p class="muted small">Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso
-        les créent (effet « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.</p>
-      <div class="ate-grid ate-tokens">${tokens.length ? '' : `<p class="muted">${setFilter ? 'Aucun jeton dans cette extension.' : 'Aucun jeton perso pour l\'instant.'}</p>`}</div>
-      <h2>Types de créature perso</h2>
-      <p class="muted small">Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et
-        un effet qui cite un type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.</p>
+        : '<p class="muted">Aucune extension pour l\'instant.</p>'}</div>` : ''}
+      ${tab === 'tokens' ? `
+      ${help(`Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso les créent (effet
+        « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.`)}
+      <div class="ate-grid ate-tokens">${allTokens.length ? '' : '<p class="muted">Aucun jeton perso pour l\'instant.</p>'}</div>` : ''}
+      ${tab === 'types' ? `
+      ${help(`Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et un effet qui cite un
+        type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.`)}
       <div class="ate-types">${d.types.map(t => `<span class="ate-type">${esc(t)}<button data-untype="${esc(t)}" title="Retirer">✕</button></span>`).join('')}
         <span class="ate-addtype"><input type="text" placeholder="Nouveau type (un mot)" maxlength="30"><button class="btn small" data-addtype>Ajouter</button></span>
-      </div>
+      </div>` : ''}
     </div>`;
     const tileOf = (c) => {
       if (c.reprint) {
@@ -306,7 +330,7 @@ export class Atelier {
       return tile;
     };
     // Toutes les extensions : un bloc par extension (puis les cartes sans extension) ; une extension choisie : ses cartes.
-    const holder = this.root.querySelector('.ate-cardgroups');
+    const holder = this.root.querySelector('.ate-cardgroups') || document.createElement('div');
     // Dans une extension : l'ordre de leurs numéros (« 007/120 »).
     const numbered = (list) => list.slice().sort((a, b) => ((a.card && a.card.cset && a.card.cset.n) || 9999) - ((b.card && b.card.cset && b.card.cset.n) || 9999));
     const blocks = !setFilter && sets.some(x => cards.some(c => this.setOf(c) === x.id))
@@ -325,7 +349,32 @@ export class Atelier {
       holder.appendChild(grid);
     }
     const tgrid = this.root.querySelector('.ate-tokens');
-    tokens.forEach(c => tgrid.appendChild(tileOf(c)));
+    if (tgrid) {
+      allTokens.forEach(c => tgrid.appendChild(tileOf(c)));
+    }
+    const remember = (key, value) => {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (err) {
+        // mémoire du navigateur indisponible : le choix ne sera pas retenu
+      }
+    };
+    const sfSel = this.root.querySelector('[data-sfilter-sel]');
+    if (sfSel) {
+      sfSel.addEventListener('change', () => {
+        this.setFilter = sfSel.value;
+        remember('at.atelier.set', this.setFilter);
+        this.renderList();
+      });
+    }
+    const kfSel = this.root.querySelector('[data-kfilter-sel]');
+    if (kfSel) {
+      kfSel.addEventListener('change', () => {
+        this.kindFilter = kfSel.value;
+        remember('at.atelier.kind', this.kindFilter);
+        this.renderList();
+      });
+    }
     this.root.onclick = async (e) => {
       if (this.pressed()) {
         return;
@@ -342,6 +391,18 @@ export class Atelier {
       }
       if (e.target.closest('[data-reprint-new]')) {
         this.pickReprint();
+        return;
+      }
+      const lt = e.target.closest('[data-ltab]');
+      if (lt) {
+        this.listTab = lt.dataset.ltab;
+        try {
+          localStorage.setItem('at.atelier.tab', JSON.stringify(this.listTab));
+        } catch (err) {
+          // onglet non retenu
+        }
+        this.selection = null;
+        this.renderList();
         return;
       }
       const tile = e.target.closest('.ate-tile');
@@ -428,11 +489,14 @@ export class Atelier {
         }
       }
     };
-    this.root.querySelector('.ate-addtype input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.root.querySelector('[data-addtype]').click();
-      }
-    });
+    const typeInput = this.root.querySelector('.ate-addtype input');
+    if (typeInput) {
+      typeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          this.root.querySelector('[data-addtype]').click();
+        }
+      });
+    }
   }
 
   /**
@@ -756,13 +820,14 @@ export class Atelier {
         <div class="ate-side panel">
           <div class="ate-preview"></div>
           <div class="ate-msg muted small"></div>
-          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
+          <div class="ate-art"><button class="btn small" data-art>${icon('brush')} Illustration…</button><button class="btn small" data-noart title="Retirer l'illustration">Retirer</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
           <div class="ate-actions">
             <button class="btn gold" data-save>Enregistrer</button>
             ${rec ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
           </div>
         </div>
       </div>
+      <div class="ate-dock"><span class="ate-dock-gap"></span><button class="btn gold" data-save>Enregistrer</button></div>
     </div>`;
     this.check = debounce(() => this.validate(), 150);
     this.root.addEventListener('click', this.onEditClick = (e) => this.editClick(e));
@@ -879,7 +944,7 @@ export class Atelier {
     this.form.token = !!(this.form.token || (entry && entry.token));
     this.form.colors = this.form.colors || [];
     this.form.kwValues = this.form.kwValues || {};
-    this.kwOpen = new Set(['combat', ...KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3])]);
+    this.kwOpen = new Set(KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3]));
     this.moreOpen = new Set();
     this.costOpen = new Set();
     this.kwQuery = '';
@@ -901,7 +966,7 @@ export class Atelier {
         <button class="btn small" data-back>← Retour</button>
         <h1>${entry ? (this.form.token ? 'Modifier le jeton' : 'Modifier la carte') : this.form.token ? 'Nouveau jeton' : 'Nouvelle carte'}</h1>
         <div class="ate-undo"><button class="btn small" data-undo disabled title="Annuler (Ctrl+Z)">↶</button><button class="btn small" data-redo disabled title="Rétablir (Ctrl+Y)">↷</button></div>
-        <div class="seg ate-mode"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button><button data-tab="look">Apparence</button></div>
+        <div class="seg ate-modetabs"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button><button data-tab="look">Apparence</button></div>
       </div>
       <div class="ate-body">
         <div class="ate-left"></div>
@@ -909,7 +974,7 @@ export class Atelier {
           <div class="ate-preview"></div>
           <div class="ate-msg muted small">Vérification par Forge…</div>
           ${entry && !this.form.token ? '<div class="ate-cstats muted small"></div>' : ''}
-          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
+          <div class="ate-art"><button class="btn small" data-art>${icon('brush')} Illustration…</button><button class="btn small" data-noart title="Retirer l'illustration">Retirer</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
           ${entry && !this.form.token && entry.card ? '<button class="btn small" data-alt-art title="Une réimpression : la même carte avec une autre illustration, sans la renommer">↻ Autre illustration…</button>' : ''}
           <div class="ate-actions">
             <button class="btn gold" data-save>Enregistrer</button>
@@ -917,6 +982,11 @@ export class Atelier {
             ${entry ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
           </div>
         </div>
+      </div>
+      <div class="ate-dock">
+        <button class="btn small" data-undo disabled title="Annuler">↶</button><button class="btn small" data-redo disabled title="Rétablir">↷</button>
+        ${this.onTry && !this.form.token ? `<button class="btn" data-try title="Enregistrer la carte, puis lancer une partie contre l'IA avec elle en main">${icon('play')} Essayer</button>` : ''}
+        <button class="btn gold" data-save>Enregistrer</button>
       </div>
     </div>`;
     this.check = debounce(() => this.validate(), 350);
@@ -981,12 +1051,12 @@ export class Atelier {
   }
 
   undoButtons() {
-    const u = this.root.querySelector('[data-undo]');
-    const r = this.root.querySelector('[data-redo]');
-    if (u && r) {
+    this.root.querySelectorAll('[data-undo]').forEach((u) => {
       u.disabled = this.histPos <= 0;
+    });
+    this.root.querySelectorAll('[data-redo]').forEach((r) => {
       r.disabled = this.histPos >= this.hist.length - 1;
-    }
+    });
   }
 
   /** Revient d'un pas en arrière (-1) ou en avant (+1). */
@@ -1660,7 +1730,10 @@ export class Atelier {
       return `<label class="ate-kwv-row ate-kwv-n"><span class="muted small">${esc(k[1])}${k[4] === 'gen' ? ' (coût générique)' : ''}</span>
         <input type="number" data-kwv="${esc(k[0])}" value="${esc(keywordValue(f, k[0]))}" min="${k[4] === 'gen' ? 0 : 1}" max="20"></label>`;
     }).join('');
-    return `<div class="ate-kw"><input type="search" class="ate-kwq" placeholder="Chercher un mot-clé : vol, kick, suspension, enchanter…" value="${esc(this.kwQuery || '')}">
+    const chosen = KW_ALL.filter(k => f.keywords.includes(k[0]));
+    return `<div class="ate-kw">${chosen.length ? `<div class="ate-chips ate-kwchosen">${chosen.map(k => `<button class="chip on" data-kw="${esc(k[0])}" title="Retirer ${esc(k[1])}">${esc(k[1])} ✕</button>`).join('')}</div>`
+      : '<p class="muted small ate-kwnone">Aucun mot-clé : cherche-le, ou ouvre un groupe.</p>'}
+      <input type="search" class="ate-kwq" placeholder="Chercher un mot-clé : vol, kick, suspension, enchanter…" value="${esc(this.kwQuery || '')}">
       <div class="ate-kwbox">${this.keywordChipsHtml(f)}</div></div>${values ? `<div class="ate-kwv">${values}</div>` : ''}`;
   }
 

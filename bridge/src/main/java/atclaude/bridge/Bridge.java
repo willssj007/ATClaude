@@ -247,7 +247,7 @@ public final class Bridge {
             "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic",
             "careerSwapChallenge", "creatureTypes", "customCards", "customValidate", "customSave", "customDelete", "customTypes",
             "customSets", "customSetSave", "customSetDelete", "reprintSave", "reprintDelete", "limitedSets", "limitedSealed", "draftStart",
-            "draftState", "draftPick", "limitedPool", "limitedAuto", "limitedSetup", "puzzles", "shareExport", "shareImport", "shareImage", "whatsNew");
+            "draftState", "draftPick", "limitedPool", "limitedAuto", "limitedSetup", "puzzles", "frenchCards", "shareExport", "shareImport", "shareImage", "whatsNew");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -640,10 +640,16 @@ public final class Bridge {
                 return Career.boosterSets();
             case "puzzles":
                 return Puzzles.list();
+            case "frenchCards":
+                return m.has("refresh") ? FrenchCards.refresh(m.has("force") && m.get("force").getAsBoolean(), () -> {
+                    catalog.invalidateIndex();
+                    sendEvent("frenchCards", e -> e.add("status", FrenchCards.status()));
+                }) : FrenchCards.status();
             case "limitedSets": {
                 final JsonObject o = new JsonObject();
                 o.add("sets", Career.boosterSets());
                 o.add("custom", Limited.customSets());
+                o.add("cubes", Limited.cubes());
                 return o;
             }
             case "limitedSealed":
@@ -721,7 +727,7 @@ public final class Bridge {
         o.addProperty("inMatch", session != null);
         if (ForgeRuntime.isReady()) {
             final com.google.gson.JsonArray profiles = new com.google.gson.JsonArray();
-            forge.ai.AiProfileUtil.getProfilesDisplayList().forEach(profiles::add);
+            AiLevels.displayList().forEach(profiles::add);
             o.add("aiProfiles", profiles);
         }
         if (session != null) {

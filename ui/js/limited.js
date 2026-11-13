@@ -1,10 +1,13 @@
-// Formats limités de la Sandbox, contre l'IA : scellé (six boosters), draft (huit joueurs, sept IA), avec les boosters
-// d'une extension de Magic ou d'une extension perso de l'Atelier ; et les énigmes de Forge (une situation à résoudre).
+// Formats de la Sandbox contre l'IA, en dehors du salon : scellé (six boosters), draft (huit joueurs, sept IA), avec les
+// boosters d'une extension de Magic, d'un cube de Forge ou d'une extension perso de l'Atelier ; la Gauntlet (un deck, cinq
+// manches de plus en plus dures) ; et les énigmes de Forge (une situation à résoudre).
 
 import {bridge} from './bridge.js';
 import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox} from './dialogs.js';
 import {icon} from './icons.js';
+import * as gauntlet from './gauntlet.js';
+import {LEVELS} from './lobby.js';
 import {esc, prefs, toast} from './util.js';
 
 const BASICS = [['Plains', 'W', 'Plaine'], ['Island', 'U', 'Île'], ['Swamp', 'B', 'Marais'], ['Mountain', 'R', 'Montagne'], ['Forest', 'G', 'Forêt']];
@@ -15,9 +18,11 @@ function colorsOf(card) {
 }
 
 export class LimitedScreen {
-  constructor(root, {onStart}) {
+  constructor(root, {onStart, getDecks, playerName}) {
     this.root = root;
     this.onStart = onStart;
+    this.getDecks = getDecks;
+    this.playerName = playerName || (() => 'Moi');
     this.stage = 'home';
     this.tab = prefs.get('limitedTab') || 'sealed';
     this.set = prefs.get('limitedSet') || '';
@@ -47,24 +52,27 @@ export class LimitedScreen {
       }
     }
     const {sets, custom} = this.sets;
+    const cubes = this.sets.cubes || [];
     if (!this.set) {
       this.set = (sets[0] && sets[0].code) || '';
     }
     const opt = (s) => `<option value="${esc(s.code)}"${s.code === this.set ? ' selected' : ''}>${esc(s.name)}${s.year ? ` (${esc(s.year)})` : ''}${s.count ? ` — ${s.count} cartes` : ''}</option>`;
     const tab = (v, ic, l) => `<button data-tab="${v}" class="${this.tab === v ? 'on' : ''}">${icon(ic)} ${l}</button>`;
     this.root.innerHTML = `<div class="page lim">
-      <h1>Limité et énigmes</h1>
-      <p class="muted">Des formats contre l'IA de Forge, en dehors des decks : le <b>scellé</b> (tu ouvres six boosters et tu
-        construis un deck de 40 cartes), le <b>draft</b> (huit joueurs dont sept IA ouvrent trois boosters chacun : tu prends une
-        carte et tu passes le reste), et les <b>énigmes</b> (une situation de jeu toute prête à résoudre).</p>
-      <div class="seg lim-tabs">${tab('sealed', 'booster', 'Scellé')}${tab('draft', 'cards', 'Draft')}${tab('puzzles', 'book', 'Énigmes')}</div>
-      ${this.tab === 'puzzles' ? '<div class="lim-puzzles"></div>' : `<div class="panel lim-setup">
+      <h1>Limité et défis</h1>
+      <p class="muted">Des formats contre l'IA de Forge : le <b>scellé</b> (tu ouvres six boosters et tu construis un deck de
+        40 cartes), le <b>draft</b> (huit joueurs dont sept IA ouvrent trois boosters chacun : tu prends une carte et tu passes le
+        reste), la <b>Gauntlet</b> (ton deck contre cinq adversaires de plus en plus forts) et les <b>énigmes</b>.</p>
+      <div class="seg lim-tabs">${tab('sealed', 'booster', 'Scellé')}${tab('draft', 'cards', 'Draft')}${tab('gauntlet', 'swords', 'Gauntlet')}${tab('puzzles', 'book', 'Énigmes')}</div>
+      ${this.tab === 'puzzles' ? '<div class="lim-puzzles"></div>' : this.tab === 'gauntlet' ? '<div class="lim-gauntlet"></div>' : `<div class="panel lim-setup">
         <label class="field"><span>Boosters de</span><select data-set>
           ${custom.length ? `<optgroup label="Mes extensions (Atelier)">${custom.map(opt).join('')}</optgroup>` : ''}
-          <optgroup label="Extensions de Magic">${sets.map(opt).join('')}</optgroup></select></label>
+          <optgroup label="Extensions de Magic">${sets.map(opt).join('')}</optgroup>
+          ${cubes.length ? `<optgroup label="Cubes (${cubes.length})">${cubes.map(opt).join('')}</optgroup>` : ''}</select></label>
         <p class="muted small">${this.tab === 'sealed' ? 'Six boosters pour toi, six autres pour l\'IA (Forge construit son deck). Puis ton deck : au moins 40 cartes, terrains de base à volonté.'
           : 'Trois rondes de 14 ou 15 choix : le booster passe à gauche, puis à droite, puis à gauche. L\'IA garde ses couleurs. Puis ton deck de 40 cartes contre un des drafteurs IA.'}
-          Une extension perso donne des boosters de 10 communes, 3 peu communes et une rare (ou mythique) : range tes cartes par rareté dans l'Atelier.</p>
+          ${String(this.set).startsWith('cube:') ? 'Un cube : une sélection de cartes toutes différentes ; chaque booster en prend 15 au hasard, sans remise (pas de doublons entre les boosters).'
+          : 'Une extension perso donne des boosters de 10 communes, 3 peu communes et une rare (ou mythique) : range tes cartes par rareté dans l\'Atelier.'}</p>
         <button class="btn gold" data-lstart>${this.tab === 'sealed' ? `${icon('booster')} Ouvrir mes six boosters` : `${icon('cards')} Commencer le draft`}</button>
       </div>`}
     </div>`;
@@ -76,8 +84,12 @@ export class LimitedScreen {
     const sel = this.root.querySelector('[data-set]');
     if (sel) {
       sel.addEventListener('change', () => {
+        const cube = String(this.set).startsWith('cube:');
         this.set = sel.value;
         prefs.set('limitedSet', this.set);
+        if (cube !== this.set.startsWith('cube:')) {
+          this.renderHome(); // l'aide change
+        }
       });
     }
     const go = this.root.querySelector("[data-lstart]");
@@ -86,7 +98,88 @@ export class LimitedScreen {
     }
     if (this.tab === 'puzzles') {
       this.renderPuzzles();
+    } else if (this.tab === 'gauntlet') {
+      this.renderGauntlet();
     }
+  }
+
+  /** Ouvre l'onglet Gauntlet (après une manche). */
+  openGauntlet() {
+    this.stage = 'home';
+    this.tab = 'gauntlet';
+    prefs.set('limitedTab', this.tab);
+    this.renderHome();
+  }
+
+  // ------------------------------------------------------------------ Gauntlet
+
+  async renderGauntlet() {
+    const box = this.root.querySelector('.lim-gauntlet');
+    if (!box) {
+      return;
+    }
+    const g = gauntlet.current();
+    const levelName = v => (LEVELS.find(l => l[0] === v) || [v, v])[1];
+    if (!g) {
+      box.innerHTML = '<p class="muted">Chargement des decks…</p>';
+      let decks;
+      try {
+        decks = await this.getDecks();
+      } catch (e) {
+        box.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+        return;
+      }
+      const mine = decks.decks || [];
+      const precons = decks.precons || [];
+      const last = prefs.get('gauntletDeck') || (mine[0] && mine[0].key) || (precons[0] && precons[0].key) || '';
+      const opt = d => `<option value="${esc(d.key)}"${d.key === last ? ' selected' : ''}>${esc(d.name)}${d.format === 'constructed' ? ' (construit)' : ''}</option>`;
+      box.innerHTML = `<div class="panel lim-setup">
+        <label class="field"><span>Ton deck</span><select data-gdeck>
+          ${mine.length ? `<optgroup label="Mes decks">${mine.map(opt).join('')}</optgroup>` : ''}
+          ${precons.length ? `<optgroup label="Préconstruits Commander">${precons.map(d => opt({...d, format: 'commander'})).join('')}</optgroup>` : ''}
+        </select></label>
+        <ol class="lim-ladder">${gauntlet.ROUNDS.map(r => `<li><b>${esc(r.title)}</b> · ${esc(r.foe)} <span class="muted small">IA ${esc(levelName(r.level))}</span></li>`).join('')}</ol>
+        <p class="muted small">Cinq manches d'affilée avec le même deck, contre des IA de plus en plus fortes (Commander : des préconstruits
+          tirés au hasard ; construit : des decks générés par Forge). Une défaite arrête la série, une égalité se rejoue.
+          ${gauntlet.best() ? `Ton record : ${gauntlet.best()} manche${gauntlet.best() > 1 ? 's' : ''} gagnée${gauntlet.best() > 1 ? 's' : ''}.` : ''}</p>
+        <button class="btn gold" data-gstart>${icon('swords')} Commencer la Gauntlet</button>
+      </div>`;
+      box.querySelector('[data-gstart]').addEventListener('click', () => {
+        const key = box.querySelector('[data-gdeck]').value;
+        const deck = mine.find(d => d.key === key) || {...(precons.find(d => d.key === key) || {}), format: 'commander'};
+        if (!deck.key) {
+          toast('Choisis un deck.', {error: true});
+          return;
+        }
+        prefs.set('gauntletDeck', key);
+        const started = gauntlet.start(deck, precons);
+        this.onStart(gauntlet.setupFor(started, this.playerName()));
+      });
+      return;
+    }
+    const status = (i) => g.results[i] === 'win' ? 'won' : g.results[i] === 'loss' ? 'lost' : i === g.round && !g.over ? 'next' : '';
+    const mark = {won: icon('check'), lost: icon('skull'), next: icon('play'), '': ''};
+    box.innerHTML = `<div class="panel lim-setup">
+      <h3 class="lim-gtitle">${g.champion ? `${icon('crown')} Gauntlet remportée !` : g.over ? 'Gauntlet terminée' : `Gauntlet en cours : manche ${g.round + 1} sur ${gauntlet.ROUNDS.length}`}</h3>
+      <p class="muted small">Deck : <b>${esc(g.deckName)}</b> · ${g.results.filter(x => x === 'win').length} manche(s) gagnée(s)${gauntlet.best() ? ` · record ${gauntlet.best()}` : ''}</p>
+      <ol class="lim-ladder">${gauntlet.ROUNDS.map((r, i) => `<li class="${status(i)}">${mark[status(i)]}<b>${esc(r.title)}</b> · ${esc(r.foe)} <span class="muted small">IA ${esc(levelName(r.level))}</span></li>`).join('')}</ol>
+      <div class="lim-gbtns">
+        ${g.over ? `<button class="btn gold" data-gnew>${icon('swords')} Nouvelle Gauntlet</button>`
+          : `<button class="btn gold" data-gnext>${icon('play')} Jouer la manche ${g.round + 1}</button><button class="btn" data-gquit>Abandonner la Gauntlet</button>`}
+      </div>
+    </div>`;
+    const on = (sel, fn) => box.querySelector(sel) && box.querySelector(sel).addEventListener('click', fn);
+    on('[data-gnext]', () => this.onStart(gauntlet.setupFor(g, this.playerName())));
+    on('[data-gnew]', () => {
+      gauntlet.abandon();
+      this.renderGauntlet();
+    });
+    on('[data-gquit]', async () => {
+      if (await confirmBox('Abandonner la Gauntlet ?', 'La série s\'arrête ici ; tes manches gagnées comptent pour le record.', {yes: 'Abandonner', danger: true})) {
+        gauntlet.abandon();
+        this.renderGauntlet();
+      }
+    });
   }
 
   // ------------------------------------------------------------------ énigmes

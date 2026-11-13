@@ -2,6 +2,32 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.7.4 — Niveaux de l'IA, 2 contre 2, cube, Gauntlet, test de main
+
+### Salon
+- **Niveau de chaque IA**, à côté de son style de jeu : **Facile** (25 % de points de vie en moins), **Normal** (l'IA de Forge telle quelle), **Difficile** (sa bibliothèque est mélangée en sa faveur : terrains bien répartis, ni noyée ni à court) et **Expert** (pareil, avec 25 % de points de vie en plus).
+- **2 contre 2** dans « Variante » : ton allié (choisi parmi les IA) et toi contre deux IA. Chacun garde ses points de vie et son deck, on n'attaque que l'équipe adverse, les tours alternent entre les équipes. L'équipe gagne même si un de ses joueurs a été éliminé avant la fin.
+
+### Limité et défis
+- **Cubes** : les 94 cubes de Forge (Vintage, Legacy, Pauper, Arena, Old School…) donnent des boosters pour le scellé et le draft. Chaque booster prend 15 cartes du cube, sans remise : pas de doublons entre les boosters.
+- **Gauntlet** : ton deck contre cinq adversaires d'affilée, de plus en plus forts (Facile, Normal, Normal, Difficile, Expert). Commander : des préconstruits tirés au hasard ; construit : des decks générés par Forge. Une défaite arrête la série, une égalité se rejoue ; « Manche suivante » sur l'écran de fin, et ton record est gardé.
+- La tuile de l'accueil s'appelle maintenant « Limité et défis ».
+
+### Decks
+- **Tester la main** dans l'éditeur de deck : 7 cartes au hasard, mulligan (règle de Londres : on repioche 7 cartes et on en remet une par mulligan sous la bibliothèque), « Piocher » pour les tours suivants, et les chances d'avoir 0 à 7 terrains en main de départ.
+
+### Cartes en français
+- **Texte français des cartes récentes** : les cartes trop récentes pour les traductions de Forge prennent le nom, le type et le texte de leur impression française (Scryfall), dans la recherche, le deck builder et en partie (pile comprise). Vérifié en tâche de fond une fois par jour et gardé sur l'appareil ; réglage « Texte français des cartes récentes » et bouton « Mettre à jour maintenant ».
+- Une fenêtre de Forge disait « … de la plate-forme de … » : elle dit maintenant « (deck de …) », et les titres des fenêtres commencent par une majuscule.
+
+### Lisibilité
+- **Gros texte** (Réglages, « Lisibilité ») : les textes à lire passent un cran au-dessus (carte agrandie, journal, pile, consignes de la partie, fenêtres, menus, notes).
+
+### Atelier
+- **Accueil en onglets** : Cartes, Jetons, Extensions et Types, chacun avec son bouton de création. Les filtres (extension, type de carte) sont deux menus au lieu de deux murs de pastilles, et les explications se déplient avec « Comment ça marche ? ».
+- **Éditeur plus clair** : les onglets Formulaire, Script Forge et Apparence sont à plat (sur téléphone, ils s'affichaient dans une boîte verticale en pointillés) ; les mots-clés choisis sont en tête (touche pour retirer), et les groupes de mots-clés restent repliés tant qu'on n'y a rien choisi.
+- **Barre d'actions toujours visible** sur téléphone (en bas) : Annuler, Rétablir, Essayer, Enregistrer. Plus besoin de remonter tout le formulaire pour enregistrer.
+
 ## 0.7.3 — Planechase, scellé et draft, énigmes, partage de cartes perso
 
 ### Mises à jour

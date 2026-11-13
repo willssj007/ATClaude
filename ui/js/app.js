@@ -8,6 +8,7 @@ import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCare
 import {Decks} from './decks.js';
 import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} from './dialogs.js';
 import {Game} from './game.js';
+import * as gauntlet from './gauntlet.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
 import {enhanceSelects} from './select.js';
@@ -54,6 +55,7 @@ function lazyScreen(name, load) {
   return {
     lazy: true,
     preload: () => get().catch(() => {}),
+    ready: () => get().catch(() => null),
     get instance() {
       return instance;
     },
@@ -188,7 +190,8 @@ async function tryCard(name) {
 function newGame(rematch) {
   return new Game($('#screen-game'), {
     onExit: leaveMatch,
-    onRematch: () => (game && game.career ? leaveMatch().then(() => showScreen('duel')) : rematch()),
+    onRematch: () => (game && game.career ? leaveMatch().then(() => showScreen('duel'))
+      : lastSetup && lastSetup.gauntlet ? leaveMatch().then(() => nextGauntletRound()) : rematch()),
     onMenu: () => showScreen('home'),
     onRewind: rewindMatch,
     // Le replay de la partie finie est le plus récent (gardé avant l'écran de fin).
@@ -204,6 +207,40 @@ function newGame(rematch) {
       }
     },
   });
+}
+
+/** Gros texte (Réglages) : un attribut sur la racine, que les feuilles de styles suivent. */
+function applyBigText() {
+  document.documentElement.toggleAttribute('data-bigtext', !!prefs.get('bigText'));
+}
+
+/**
+ * Texte français des cartes récentes : le pont cherche sur Scryfall les impressions françaises qui manquent à Forge
+ * (au plus une fois par jour, sauf `force`), en tâche de fond.
+ */
+async function refreshFrenchCards(force = false) {
+  if (!prefs.get('frenchCards') && !force) {
+    return null;
+  }
+  try {
+    return await bridge.request('frenchCards', {refresh: true, force});
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Gauntlet : la manche suivante tout de suite, ou l'écran de la Gauntlet si la série est finie. */
+async function nextGauntletRound() {
+  const g = gauntlet.current();
+  if (g && !g.over) {
+    startMatch(gauntlet.setupFor(g, screens.lobby.playerName));
+    return;
+  }
+  showScreen('limited');
+  const screen = await screens.limited.ready();
+  if (screen && screen.openGauntlet) {
+    screen.openGauntlet();
+  }
 }
 
 /** Sandbox : la partie reprend au moment calme précédent (le moteur garde les dernières photos de la partie). */
@@ -332,7 +369,7 @@ function homeScreen() {
           <div class="tile panel" data-go="lobby">${icon('swords', 'tile-ic')}<h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
           <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
           <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
-          <div class="tile panel" data-go="limited">${icon('booster', 'tile-ic')}<h3>Limité et énigmes</h3><p class="muted">Scellé et draft contre l'IA (extensions de Magic ou les tiennes), et des énigmes à résoudre.</p></div>`;
+          <div class="tile panel" data-go="limited">${icon('booster', 'tile-ic')}<h3>Limité et défis</h3><p class="muted">Scellé et draft contre l'IA (extensions, cubes ou les tiennes), Gauntlet en cinq manches et énigmes.</p></div>`;
       root.innerHTML = `<div class="page">
         ${saved ? savedGameHtml(saved) : ''}
         <div class="hero">
@@ -468,6 +505,8 @@ function settingsScreen() {
         ${row('images', 'Images des cartes', 'Télécharge les images depuis Scryfall et les garde en cache sur l\'appareil.')}
         <div class="row"><div><b>Langue des images</b><p class="muted small">En français quand Scryfall a une impression française de la carte, sinon en anglais.</p></div>
           <select data-pref-select="imageLang"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
+        ${row('frenchCards', 'Texte français des cartes récentes', 'Les cartes plus récentes que les traductions de Forge prennent le nom, le type et le texte de leur impression française (Scryfall), vérifiés une fois par jour.')}
+        <div class="row fr-cards"><div><p class="muted small fr-status">…</p></div><button class="btn small" data-fr-refresh>Mettre à jour maintenant</button></div>
         ${row('animations', 'Animations', 'Déplacements de cartes, bannières de tour, effets de points de vie.')}
         ${row('musicOn', 'Musique d\'ambiance', 'Musiques douces, médiévales et féeriques, dans les menus et en partie.')}
         <div class="row"><div><b>Volume de la musique</b></div><input type="range" min="0" max="100" data-pref-range="musicVolume"></div>
@@ -476,6 +515,8 @@ function settingsScreen() {
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
         ${bridge.android || bridge.ios ? '' : row('discordPresence', 'Montrer ma partie sur Discord', 'Si Discord est ouvert sur cet ordinateur, ton profil affiche ton mode, ton deck, tes points de vie et le tour.')}
+        <h2 style="margin-top:26px">Lisibilité</h2>
+        ${row('bigText', 'Gros texte', 'Agrandit les textes à lire : cartes agrandies, journal, pile, consignes de la partie, fenêtres, menus et notes.')}
         <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>
         <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques, bruitages, icônes et illustrations des apparences : composés, synthétisés et dessinés pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
@@ -511,6 +552,12 @@ function settingsScreen() {
         if (i.dataset.pref === 'discordPresence') {
           sendPresence();
         }
+        if (i.dataset.pref === 'bigText') {
+          applyBigText();
+        }
+        if (i.dataset.pref === 'frenchCards' && i.checked) {
+          refreshFrenchCards(true);
+        }
       }));
       bridge.request('hello').then(h => {
         root.querySelector('.version').textContent = `${h.appVersion ? `${h.channel === 'test' ? 'AT TEST' : 'Arcane Table'} ${h.appVersion} · ` : ''}Version de Forge : ${h.version}`;
@@ -519,9 +566,21 @@ function settingsScreen() {
         root.querySelector('.appearance').innerHTML = html;
         livePreviews(root.querySelector('.appearance'));
       });
+      const frStatus = (st) => {
+        const node = root.querySelector('.fr-status');
+        if (node && st) {
+          node.textContent = `${st.cards} carte${st.cards > 1 ? 's' : ''} traduite${st.cards > 1 ? 's' : ''} depuis Scryfall${st.at ? `, dernière vérification le ${new Date(st.at).toLocaleDateString('fr-FR')}` : ''}.${st.running || st.status ? ` ${st.status}` : ''}`;
+        }
+      };
+      bridge.request('frenchCards').then(frStatus).catch(() => {});
+      this.frStatus = frStatus;
       root.onclick = (e) => {
         if (e.target.closest('[data-update-check]')) {
           checkUpdates();
+          return;
+        }
+        if (e.target.closest('[data-fr-refresh]')) {
+          refreshFrenchCards(true).then(frStatus);
           return;
         }
         if (e.target.closest('[data-a]') && isPlaneswalker()) {
@@ -553,6 +612,7 @@ function afterSync(r) {
   applyMode();
   refreshAudio();
   applyThemes();
+  applyBigText();
   if (current !== 'game' && current !== 'account' && screens[current] && screens[current].show) {
     screens[current].show();
   }
@@ -578,6 +638,8 @@ function onReady(hello) {
     screens.atelier.preload();
     screens.boosters.preload();
   }), 8000);
+  // Texte français des cartes récentes : vérifié en tâche de fond, au plus une fois par jour.
+  setTimeout(() => refreshFrenchCards(false), 20000);
   if (!(hello && hello.inMatch)) {
     whatsNew(hello && hello.appVersion);
   }
@@ -632,6 +694,7 @@ function init() {
     });
   }
   applyThemes();
+  applyBigText();
   initAudio();
   enhanceSelects();
   screens.home = homeScreen();
@@ -654,7 +717,8 @@ function init() {
     clearTimeout(atelierSync);
     atelierSync = setTimeout(() => syncNow({auto: true, onDone: afterSync}), 4000);
   }, onTry: tryCard})));
-  screens.limited = lazyScreen('limited', () => import('./limited.js').then(m => new m.LimitedScreen($('#screen-limited'), {onStart: startMatch})));
+  screens.limited = lazyScreen('limited', () => import('./limited.js').then(m => new m.LimitedScreen($('#screen-limited'),
+    {onStart: startMatch, getDecks: () => getDecks(true), playerName: () => screens.lobby.playerName})));
   screens.replay = new ReplayScreen($('#screen-replay'), {onClose: () => showScreen('stats')});
   screens.stats = new StatsScreen($('#screen-stats'), {onWatch: (id) => {
     showScreen('replay');
@@ -718,12 +782,19 @@ function init() {
     }
   });
   bridge.on('dialog', (d) => handleForgeDialog(d));
+  bridge.on('frenchCards', (m) => {
+    if (screens.settings && screens.settings.frStatus) {
+      screens.settings.frStatus(m.status);
+    }
+  });
   bridge.on('dialogClosed', (m) => closeForgeDialog(m.id));
   bridge.on('notice', (m) => toast(m.message, {title: m.title}));
   bridge.on('error', (m) => toast(m.message, {title: 'Erreur', error: true, duration: 6000}));
   bridge.on('gameOver', (m) => {
+    // Gauntlet : la manche jouée est notée (gagnée, perdue ou à rejouer).
+    const g = lastSetup && lastSetup.gauntlet ? gauntlet.record(lastSetup, m) : null;
     if (game) {
-      game.gameOver(m);
+      game.gameOver(g ? {...m, gauntlet: g} : m);
     }
     // Trophées et decks à jour sur les autres appareils.
     setTimeout(() => syncNow({auto: true, onDone: afterSync}), 1500);

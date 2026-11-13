@@ -95,6 +95,20 @@ const CARD_STATUS = {
 const PLAYER_KEYWORDS = {Hexproof: 'Défense talismanique', Shroud: 'Linceul', 'Protection from everything': 'Protection contre tout'};
 
 /** Pose une propriété CSS seulement si elle change (chaque écriture fait recalculer le style de ce qu'il y a dessous). */
+/** Gauntlet : où en est la série après cette manche. */
+function gauntletLine(g) {
+  if (g.champion) {
+    return `${icon('crown')} Gauntlet remportée : ${g.total} manches sur ${g.total} !`;
+  }
+  if (g.result === 'draw') {
+    return `Gauntlet : égalité à la manche ${g.round}, elle se rejoue.`;
+  }
+  if (g.over) {
+    return `Gauntlet terminée à la manche ${g.round} : ${g.wins} manche${g.wins > 1 ? 's' : ''} gagnée${g.wins > 1 ? 's' : ''}.`;
+  }
+  return `${icon('check')} Gauntlet : manche ${g.round} sur ${g.total} gagnée. Prochaine : manche ${g.round + 1}.`;
+}
+
 function setProp(node, prop, value) {
   node._props = node._props || {};
   if (node._props[prop] !== value) {
@@ -1395,7 +1409,8 @@ export class Game {
         `Archenemy : ${p.schemeDeck} machination(s) dans sa pile${ongoing ? `, ${ongoing} continue(s) en cours` : ''} (touche pour voir sa zone de commandement)`,
         ` data-zone="command" data-pid="${p.id}"`);
     } else if (team && !isMe && p.team === meP.team) {
-      html += chip('ally', 'shield', '', 'Allié : ton équipe contre l\'Archenemy (vous ne pouvez pas vous attaquer)');
+      html += chip('ally', 'shield', '', this.state.players.some(x => x.archenemy) ? 'Allié : ton équipe contre l\'Archenemy (vous ne pouvez pas vous attaquer)'
+        : 'Allié : ton équipe (vous ne pouvez pas vous attaquer)');
     }
     if (!isMe) {
       if (p.controlledByMe) {
@@ -2690,13 +2705,14 @@ export class Game {
     const title = info.draw ? 'Égalité' : info.teamWin ? 'Victoire de l\'équipe !' : won ? 'Victoire !' : 'Défaite';
     const box = el(`<div class="game-over${won ? '' : ' defeat'}"><div class="box panel">
       <h1>${title}</h1>
+      ${info.gauntlet ? `<div class="gauntlet-line">${gauntletLine(info.gauntlet)}</div>` : ''}
       <div class="details">${esc((info.details || []).join('\n'))}${info.turns ? `\nPartie terminée au tour ${info.turns}.` : ''}</div>
       <div class="reward-slot">${this.career ? rewardHtml(this.reward) : ''}</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn" data-go="board">Voir le plateau</button>
         ${this.onReplay ? `<button class="btn" data-go="replay">${icon('play')} Revoir la partie</button>` : ''}
         <button class="btn" data-go="menu">Retour au menu</button>
-        <button class="btn gold" data-go="again">${this.career ? 'Duel suivant' : 'Revanche'}</button>
+        <button class="btn gold" data-go="again">${this.career ? 'Duel suivant' : info.gauntlet ? (info.gauntlet.over ? 'Voir la Gauntlet' : info.gauntlet.result === 'draw' ? 'Rejouer la manche' : 'Manche suivante') : 'Revanche'}</button>
       </div></div></div>`);
     fillRewardCards(box, this.reward);
     box.addEventListener('click', (e) => {

@@ -1,5 +1,6 @@
 // Decks : liste, édition (deck builder orienté Commander), import Moxfield ou texte, export.
 
+import {openHandTest} from './handtest.js';
 import {bracketBadgeHtml, openAnalysis, openDeckStats, openEdhrec, summaryLineHtml} from './analysis.js';
 import {bridge} from './bridge.js';
 import {addFlipButton, cardElement, loadImage, showZoom, onLongPress} from './cards.js';
@@ -569,6 +570,7 @@ export class Decks {
       <div class="db-actions">
         <button class="btn small" data-act="play">${icon('swords')} Jouer</button>
         <button class="btn small" data-act="analysis">Analyse</button>
+        <button class="btn small" data-act="hand" title="Piocher une main de départ au hasard, faire des mulligans, voir les chances d'avoir des terrains">${icon('cards')} Tester la main</button>
         <button class="btn small" data-act="basics" title="Compléter le deck avec des terrains de base aux couleurs du commandant">${icon('mountain')} Terrains de base</button>
         ${d.format === 'commander' && !d.career ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
         <details class="db-more"><summary class="btn small" title="Autres actions">⋯ Plus</summary>
@@ -689,6 +691,8 @@ export class Decks {
           if (await this.save()) {
             this.onPlay(this.deckKey());
           }
+        } else if (a === 'hand') {
+          openHandTest(d);
         } else if (a === 'analysis') {
           if (this.analysis) {
             openAnalysis(this.deck, this.analysis);

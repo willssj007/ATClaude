@@ -121,6 +121,9 @@ const DEFAULTS = {
   discordPresence: true,
   // Chercher une nouvelle version au lancement de l'appli.
   autoUpdate: true,
+  // Textes plus grands (lisibilité), et texte français des cartes récentes pris sur Scryfall.
+  bigText: false,
+  frenchCards: true,
   showEnglish: false,
   lastSetup: null,
   menuTheme: 'arcane',
@@ -181,7 +184,7 @@ export const prefs = {
   },
 };
 
-const SYNCED = ['images', 'imageLang', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'lastSetup', 'menuTheme', 'boardTheme', 'cardBack'];
+const SYNCED = ['images', 'imageLang', 'bigText', 'frenchCards', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'lastSetup', 'menuTheme', 'boardTheme', 'cardBack'];
 
 export const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
 

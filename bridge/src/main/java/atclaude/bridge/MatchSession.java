@@ -96,6 +96,8 @@ final class MatchSession {
     private boolean career;
     /** Variante Archenemy (Sandbox, à 4) : pas de sauvegarde, Forge ne garde pas la pile de machinations. */
     private boolean archenemy;
+    /** 2 contre 2 (équipes 0 et 1). */
+    private boolean teams;
     /** Variante Planechase (Sandbox) : pas de sauvegarde non plus, Forge ne garde pas les paquets planaires. */
     private boolean planechase;
     /** Énigme (Sandbox) : son identifiant, ou null. Ni sauvegarde, ni statistiques ; résolue quand on gagne. */
@@ -173,7 +175,7 @@ final class MatchSession {
         }
         final boolean commander = career || !"constructed".equals(str(setup, "format"));
         final GameType type = commander ? GameType.Commander : GameType.Constructed;
-        final JsonArray seats = setup.getAsJsonArray("players");
+        JsonArray seats = setup.getAsJsonArray("players");
         if (seats == null || seats.size() < 2 || seats.size() > 4) {
             throw new IllegalArgumentException("Une partie se joue à 2, 3 ou 4 joueurs.");
         }
@@ -188,6 +190,13 @@ final class MatchSession {
         // Planechase (règles officielles, 901) : chaque joueur a son paquet planaire ; le plan du dessus est ouvert,
         // le joueur actif peut lancer le dé planaire (une fois gratuite, puis {1} de plus à chaque lancer du tour).
         final boolean planechase = !career && !archenemy && setup.has("planechase") && !str(setup, "planechase").isEmpty();
+        // 2 contre 2 : deux équipes de deux, chacun ses points de vie ; on n'attaque que l'équipe adverse et la partie
+        // se termine quand une équipe est éliminée. Les tours alternent entre les équipes (moi, un adversaire, mon allié,
+        // l'autre adversaire) : les places sont remises dans cet ordre.
+        final boolean teams = !career && !archenemy && twoTeams(seats);
+        if (teams) {
+            seats = alternate(seats);
+        }
         final Set<GameType> variants = EnumSet.noneOf(GameType.class);
         if (commander) {
             variants.add(GameType.Commander);
@@ -226,14 +235,18 @@ final class MatchSession {
             } else {
                 rp = commander ? RegisteredPlayer.forCommander(deck) : new RegisteredPlayer(deck);
             }
+            if (teams) {
+                rp.setTeamNumber(seat.get("team").getAsInt());
+            }
             final boolean ai = seat.has("ai") && seat.get("ai").getAsBoolean();
             final String name = str(seat, "name").isEmpty() ? (ai ? "IA " + (aiIndex + 1) : "Moi") : str(seat, "name");
             final LobbyPlayer lobby;
             if (ai) {
                 aiIndex++;
-                final String profile = str(seat, "profile");
-                final LobbyPlayer base = profile.isEmpty() ? GamePlayerUtil.createAiPlayer(name, aiIndex)
-                        : GamePlayerUtil.createAiPlayer(name, aiIndex, profile);
+                // Niveau (Facile, Normal, Difficile, Expert) : points de vie de départ et mélange de la bibliothèque.
+                final String level = career ? "normal" : str(seat, "level");
+                final LobbyPlayer base = GamePlayerUtil.createAiPlayer(name, aiIndex, AiLevels.profile(str(seat, "profile"), level));
+                rp.setStartingLife(AiLevels.life(rp.getStartingLife(), level));
                 lobby = !(base instanceof forge.ai.LobbyPlayerAi la) || freeMulligans == Mulligans.FORGE_DEFAULT && !isArchenemy
                         ? base : Mulligans.ai(la, freeMulligans, isArchenemy);
             } else {
@@ -272,6 +285,7 @@ final class MatchSession {
         session.career = career;
         session.archenemy = archenemy;
         session.planechase = planechase;
+        session.teams = teams;
         session.setup = setup;
         session.savedSetup = resolved;
         if (save != null) {
@@ -362,7 +376,7 @@ final class MatchSession {
         players.add(human);
         final RegisteredPlayer ai = new RegisteredPlayer(new Deck());
         ai.setStartingHand(0);
-        ai.setPlayer(GamePlayerUtil.createAiPlayer("IA", 1));
+        ai.setPlayer(GamePlayerUtil.createAiPlayer("IA", 1, AiLevels.profile("", "normal")));
         players.add(ai);
         Texts.reset();
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
@@ -1128,16 +1142,69 @@ final class MatchSession {
             final Player me = g == null ? null : humanPlayer(g);
             if (me != null && outcome != null && !outcome.isDraw()) {
                 m.addProperty("won", won(g, outcome, me));
-                m.addProperty("teamWin", archenemy && !outcome.isWinner(me.getRegisteredPlayer()) && won(g, outcome, me));
+                m.addProperty("teamWin", (archenemy || teams) && !outcome.isWinner(me.getRegisteredPlayer()) && won(g, outcome, me));
             }
             m.addProperty("archenemy", archenemy);
             m.addProperty("planechase", planechase);
+            m.addProperty("teams", teams);
             final JsonArray lines = new JsonArray();
             if (outcome != null) {
                 outcome.getOutcomeStrings().forEach(lines::add);
             }
             m.add("details", lines);
         });
+    }
+
+    /** Quatre places réparties en deux équipes de deux (« team » : 0 ou 1). */
+    private static boolean twoTeams(final JsonArray seats) {
+        if (seats.size() != 4) {
+            return false;
+        }
+        int zero = 0;
+        for (final JsonElement e : seats) {
+            final JsonObject s = e.getAsJsonObject();
+            if (!s.has("team") || !s.get("team").isJsonPrimitive()) {
+                return false;
+            }
+            final int t = s.get("team").getAsInt();
+            if (t != 0 && t != 1) {
+                return false;
+            }
+            zero += t == 0 ? 1 : 0;
+        }
+        return zero == 2;
+    }
+
+    /** Les places dans l'ordre des tours : moi, un adversaire, mon allié, l'autre adversaire. */
+    private static JsonArray alternate(final JsonArray seats) {
+        JsonObject me = null;
+        for (final JsonElement e : seats) {
+            if (!(e.getAsJsonObject().has("ai") && e.getAsJsonObject().get("ai").getAsBoolean())) {
+                me = e.getAsJsonObject();
+                break;
+            }
+        }
+        if (me == null) {
+            return seats;
+        }
+        final int mine = me.get("team").getAsInt();
+        final List<JsonObject> allies = new ArrayList<>();
+        final List<JsonObject> foes = new ArrayList<>();
+        for (final JsonElement e : seats) {
+            final JsonObject s = e.getAsJsonObject();
+            if (s != me) {
+                (s.get("team").getAsInt() == mine ? allies : foes).add(s);
+            }
+        }
+        if (allies.size() != 1 || foes.size() != 2) {
+            return seats;
+        }
+        final JsonArray out = new JsonArray();
+        out.add(me);
+        out.add(foes.get(0));
+        out.add(allies.get(0));
+        out.add(foes.get(1));
+        return out;
     }
 
     /**
@@ -1148,8 +1215,8 @@ final class MatchSession {
         if (outcome.isWinner(p.getRegisteredPlayer())) {
             return true;
         }
-        if (!archenemy) {
-            return false;
+        if (p.getTeam() < 0) {
+            return false; // chacun pour soi
         }
         for (final Player other : game.getRegisteredPlayers()) {
             if (other.getTeam() == p.getTeam() && outcome.isWinner(other.getRegisteredPlayer())) {
@@ -1181,6 +1248,7 @@ final class MatchSession {
         meta.addProperty("result", outcome.isDraw() ? "draw" : won(game, outcome, me) ? "win" : "loss");
         meta.addProperty("archenemy", archenemy);
         meta.addProperty("planechase", planechase);
+        meta.addProperty("teams", teams);
         meta.addProperty("conceded", me.getOutcome() != null && me.getOutcome().lossState == forge.game.player.GameLossReason.Conceded);
         meta.addProperty("me", me.getId());
         final JsonArray players = new JsonArray();
@@ -1229,6 +1297,9 @@ final class MatchSession {
         }
         if (planechase) {
             g.addProperty("planechase", true);
+        }
+        if (teams) {
+            g.addProperty("teams", true);
         }
         final boolean won = !outcome.isDraw() && won(game, outcome, me);
         g.addProperty("result", outcome.isDraw() ? "draw" : won ? "win" : "loss");

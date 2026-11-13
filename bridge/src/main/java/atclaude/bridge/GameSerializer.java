@@ -148,6 +148,8 @@ final class GameSerializer {
             o.addProperty("team", gp.getTeam());
             o.addProperty("archenemy", gp.getTeam() == 0);
             o.addProperty("schemeDeck", p.getZoneSize(ZoneType.SchemeDeck));
+        } else if (gp != null && gp.getTeam() >= 0) {
+            o.addProperty("team", gp.getTeam()); // 2 contre 2
         }
         if (gp != null && gv.getGame().getRules().hasAppliedVariant(forge.game.GameType.Planechase)) {
             o.addProperty("planarDeck", p.getZoneSize(ZoneType.PlanarDeck));

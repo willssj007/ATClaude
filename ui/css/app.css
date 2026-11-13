@@ -454,6 +454,12 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 }
 .seat.has-art.art-only::before { background-position: 100% 50%; }
 .seat .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seat .fields.ai { grid-template-columns: 1.2fr 1fr 1fr; }
+.seat.team-a { border-color: rgb(90 170 230 / 0.6); background: rgb(30 90 150 / 0.14); }
+.seat.team-b { border-color: rgb(214 120 72 / 0.55); background: rgb(140 60 20 / 0.12); }
+.seat.team-a .seat-role { color: #9fd0ff; }
+.seat.team-b .seat-role { color: #ffb38a; }
+.lobby-levels { margin: -4px 0 10px; line-height: 1.5; }
 .seat .fields select, .seat .fields input, .seat .fields .csel { width: 100%; }
 .seat .deck-line { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
 .seat .seat-bk { flex: none; }
@@ -684,7 +690,7 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   .hero { padding: 24px 18px; }
   .hero h1 { font-size: 26px; }
   #topbar .brand span { display: none; }
-  .seat .fields { grid-template-columns: 1fr; }
+  .seat .fields { grid-template-columns: 1fr; } .seat .fields.ai { grid-template-columns: 1fr 1fr; } .seat .fields.ai input[data-f="name"] { grid-column: 1 / -1; }
   .card-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
 }
 
@@ -1559,6 +1565,14 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 
 /* Limité (scellé, draft) et énigmes */
 .lim .lim-tabs { margin: 10px 0 14px; }
+.lim-ladder { margin: 2px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.lim-ladder li { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; flex-wrap: wrap; }
+.lim-ladder li .ic { width: 15px; height: 15px; flex: none; }
+.lim-ladder li.won { border-color: rgb(120 200 120 / 0.55); color: #b7f0b7; }
+.lim-ladder li.lost { border-color: rgb(220 90 90 / 0.55); color: #ffb0a8; }
+.lim-ladder li.next { border-color: rgb(var(--gold-rgb) / 0.7); background: rgb(var(--gold-rgb) / 0.08); }
+.lim-gtitle { margin: 0; display: flex; align-items: center; gap: 8px; }
+.lim-gbtns { display: flex; gap: 8px; flex-wrap: wrap; }
 .lim-setup { display: flex; flex-direction: column; gap: 10px; max-width: 640px; padding: 14px 16px; }
 .lim-setup select { width: 100%; }
 .lim-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -1584,3 +1598,47 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 @media (max-width: 640px) { .lim-grid .mcard { --w: 104px; } .lim-mini .mcard { --w: 70px; } }
 /* Salon : une rangée de choix trop longue pour la colonne passe à la ligne au lieu de déborder. */
 .lobby .seg { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+
+/* Test de main de départ (éditeur de deck) */
+.ht { display: flex; flex-direction: column; gap: 10px; }
+.ht-odds { padding: 10px 12px; display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.ht-odds > .small { flex: 1 1 260px; line-height: 1.5; }
+.ht-bars { display: flex; gap: 4px; align-items: flex-end; height: 54px; }
+.ht-bar { width: 18px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 10px; color: var(--muted); }
+.ht-bar i { display: block; width: 100%; background: rgb(255 255 255 / 0.25); border-radius: 3px 3px 0 0; }
+.ht-bar.good i { background: rgb(var(--gold-rgb) / 0.8); }
+.ht-msg { margin: 0; font-weight: 600; }
+.ht-hand { display: flex; flex-wrap: wrap; gap: 6px; }
+.ht-hand .mcard { --w: 112px; cursor: pointer; transition: transform 0.15s, opacity 0.15s; }
+.ht-hand .mcard.ht-under { opacity: 0.35; transform: translateY(8px); }
+.ht-hand .mcard.ht-new { outline: 2px solid var(--gold-2); }
+@media (max-width: 640px) { .ht-hand .mcard { --w: 86px; } }
+
+/* Gros texte (Réglages) : les textes qu'on lit vraiment (cartes agrandies, journal, pile, invites de la partie,
+   fenêtres, menus, petites notes) passent un cran au-dessus. Les cartes elles-mêmes gardent leur taille. */
+:root[data-bigtext] body { font-size: 16px; }
+:root[data-bigtext] .small { font-size: 14px; }
+:root[data-bigtext] .btn { font-size: 15.5px; }
+:root[data-bigtext] .btn.small { font-size: 14.5px; }
+:root[data-bigtext] input, :root[data-bigtext] select, :root[data-bigtext] textarea { font-size: 16px; }
+:root[data-bigtext] .csel-item { font-size: 16px; min-height: 44px; }
+:root[data-bigtext] .csel-panel.sheet .csel-item { font-size: 17px; }
+:root[data-bigtext] .toast { font-size: 16px; }
+:root[data-bigtext] .modal header h2 { font-size: 21px; }
+:root[data-bigtext] .modal .body, :root[data-bigtext] .modal .message { font-size: 16px; }
+:root[data-bigtext] .choice-list button { font-size: 16px; }
+:root[data-bigtext] .choice-grid .pick .lbl { font-size: 14px; }
+:root[data-bigtext] #zoom .zoom-info { font-size: 17px; }
+:root[data-bigtext] #zoom .zoom-info .name { font-size: 26px; }
+:root[data-bigtext] .prompt { font-size: 15px; max-height: 8em; }
+:root[data-bigtext] .log-entry { font-size: 15px; }
+:root[data-bigtext] .log-turn h4 { font-size: 15px; }
+:root[data-bigtext] .stack-item .txt { font-size: 14.5px; max-height: 7.5em; }
+:root[data-bigtext] .stack-panel[data-size="s"] .stack-item .txt { font-size: 13px; max-height: 5.2em; }
+:root[data-bigtext] .stack-panel[data-size="l"] .stack-item .txt { font-size: 16px; max-height: 9em; }
+:root[data-bigtext] .stack-item .who { font-size: 12.5px; }
+:root[data-bigtext] .stack-item .tgt { font-size: 13px; }
+:root[data-bigtext] .settings .row p, :root[data-bigtext] .muted { line-height: 1.5; }
+@media (max-width: 640px) {
+  :root[data-bigtext] .prompt { font-size: 13.5px; }
+}

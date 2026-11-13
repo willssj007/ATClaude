@@ -32,6 +32,8 @@ final class Texts {
     private static final Pattern LINE_START = Pattern.compile("(?m)^carte face cachée");
     private static final String FACE_DOWN = "carte face cachée";
     private static final Pattern SEARCH_YOUR = Pattern.compile("\\bRechercher vous (bibliothèque|main|cimetière|exil)");
+    /** Forge traduit « from X's Deck » par « de la plate-forme de X ». */
+    private static final Pattern PLATFORM = Pattern.compile(" de la plate-forme (?:de |d')?");
     private static final Pattern YOUR_ZONE = Pattern.compile("\\b(de|dans|à|sur|depuis) vous (bibliothèque|main|cimetière|exil|zone de commandement|champ de bataille|réserve)");
     private static final int CACHE_SIZE = 800;
 
@@ -128,6 +130,9 @@ final class Texts {
         // Forge remplace « {player's} » par « vous » : « une carte de vous bibliothèque ».
         result = SEARCH_YOUR.matcher(result).replaceAll("Fouiller votre $1");
         result = YOUR_ZONE.matcher(result).replaceAll("$1 votre $2");
+        if (result.contains("plate-forme")) {
+            result = PLATFORM.matcher(result).replaceAll(" (deck de ").replaceAll("\\(deck de ([^)]*)$", "(deck de $1)");
+        }
         if (!unresolved[0] && version == patternVersion) {
             // Un identifiant non reconnu (partie en cours de modification, carte pas encore vue) sera
             // retenté à la prochaine photo.

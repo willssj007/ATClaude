@@ -292,3 +292,41 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
 .ate-cstats { margin: 4px 0; line-height: 1.4; } .ate-cstats .ic { width: 14px; height: 14px; vertical-align: -2px; color: var(--gold-2); }
 .ate-undo { display: inline-flex; gap: 4px; } .ate-undo .btn { min-width: 38px; font-size: 16px; line-height: 1; }
 .ate-sharelist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; } .ate-sharelist .btn { justify-content: flex-start; text-align: left; gap: 6px; }
+
+/* Accueil de l'Atelier : onglets, outils, filtres en menus, explications repliées. */
+.atelier .ate-tabs { margin: 4px 0 10px; flex-wrap: wrap; max-width: 100%; }
+.atelier .ate-tabs .ic { width: 15px; height: 15px; }
+.atelier .ate-tabs .ate-gn { margin-left: 2px; }
+.ate-help { margin: 0 0 10px; }
+.ate-help summary { cursor: pointer; color: var(--muted); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+.ate-help summary::before { content: '?'; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid var(--line-strong); font-size: 11px; font-weight: 700; }
+.ate-help summary::-webkit-details-marker { display: none; }
+.ate-help[open] summary { color: var(--text); }
+.ate-help p { margin: 6px 0 0; max-width: 760px; }
+.ate-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.ate-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.ate-filters .field { flex: 1 1 220px; max-width: 360px; margin: 0; }
+.ate-filters select { width: 100%; }
+
+/* Éditeur : onglets Formulaire / Script / Apparence à plat ; mots-clés choisis en tête. */
+.ate-modetabs { flex-wrap: wrap; max-width: 100%; }
+.ate-kwchosen { margin-bottom: 8px; }
+.ate-kwchosen .chip { font-weight: 600; }
+.ate-kwnone { margin: 0 0 6px; }
+.ate-art .ic { width: 14px; height: 14px; }
+/* Barre d'actions toujours visible sur téléphone (le formulaire est long : plus besoin de remonter pour enregistrer). */
+.ate-dock { display: none; }
+@media (max-width: 760px), (max-height: 520px) {
+  .atelier-edit { padding-bottom: calc(76px + var(--safe-bottom, 0px)); }
+  .ate-dock {
+    display: flex; gap: 8px; align-items: center; justify-content: flex-end; position: fixed; z-index: 30;
+    left: 0; right: 0; bottom: 0; padding: 10px 14px calc(10px + var(--safe-bottom, 0px));
+    background: rgb(12 14 26 / 0.94); border-top: 1px solid var(--line-strong); backdrop-filter: blur(8px);
+  }
+  .ate-dock [data-redo] { margin-right: auto; }
+  .ate-dock [data-undo], .ate-dock [data-redo] { min-width: 42px; font-size: 18px; }
+  .ate-dock .btn:not(.small) { min-height: 42px; }
+  .atelier-edit .ate-top .ate-undo, .ate-actions [data-save], .ate-actions [data-try] { display: none; }
+}
+.ate-dock-gap { margin-right: auto; }

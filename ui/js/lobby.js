@@ -6,7 +6,11 @@ import {confirmBox} from './dialogs.js';
 import {icon} from './icons.js';
 import {artOnly, esc, el, prefs, toast, avatarHtml, ownPhotoUrl} from './util.js';
 
-const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless: 'Agressive', Experimental: 'Expérimentale'};
+const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless: 'Agressive', Experimental: 'Expérimentale',
+  'Random (Every Match)': 'Au hasard', 'Random (Every Game)': 'Au hasard (chaque partie)'};
+/** Niveaux de l'IA : valeur, nom, effet (aide). */
+export const LEVELS = [['facile', 'Facile', '25 % de points de vie en moins'], ['normal', 'Normal', 'l\'IA de Forge telle quelle'],
+  ['difficile', 'Difficile', 'pioche toujours bien dosée en terrains'], ['expert', 'Expert', 'pioche dosée et 25 % de points de vie en plus']];
 const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
 /** Machinations de l'Archenemy : 20 tirées au hasard dans un produit officiel, ou parmi toutes. */
 const SCHEME_SETS = [['all', 'Toutes'], ['OARC', 'Archenemy (2010)'], ['OE01', 'Nicol Bolas (2017)']];
@@ -41,7 +45,11 @@ export class Lobby {
     // Mulligans gratuits : absent = règle de Forge, -1 = illimités.
     this.mulligans = last && typeof last.mulligans === 'number' ? last.mulligans : null;
     // Variante Archenemy : la place de l'Archenemy (0 : moi), la série de machinations.
-    this.variant = last && typeof last.archenemy === 'number' ? 'archenemy' : last && last.planechase ? 'planechase' : 'none';
+    this.variant = last && typeof last.archenemy === 'number' ? 'archenemy' : last && last.planechase ? 'planechase'
+      : last && last.players && last.players.some(p => typeof p.team === 'number') ? 'teams' : 'none';
+    // 2 contre 2 : la place de mon allié (les deux autres forment l'équipe adverse).
+    const allyAt = last && last.players ? last.players.findIndex((p, i) => i > 0 && p.team === 0) : -1;
+    this.ally = allyAt > 0 ? allyAt : 1;
     this.archenemy = last && typeof last.archenemy === 'number' ? last.archenemy : 1;
     this.schemes = last && last.schemes || 'all';
     // Planechase : la série de plans de chaque paquet planaire.
@@ -91,23 +99,30 @@ export class Lobby {
   }
 
   render() {
-    if (this.variant === 'archenemy') {
-      this.count = 4; // l'Archenemy contre une équipe de trois
+    if (this.variant === 'archenemy' || this.variant === 'teams') {
+      this.count = 4; // l'Archenemy contre une équipe de trois ; deux équipes de deux
     }
     while (this.seats.length < this.count) {
       const n = this.seats.length;
-      this.seats.push({name: 'IA ' + n, ai: true, deckKey: this.defaultDeck(false), profile: ''});
+      this.seats.push({name: 'IA ' + n, ai: true, deckKey: this.defaultDeck(false), profile: '', level: 'normal'});
     }
     this.seats.length = this.count;
     const profiles = this.profiles.length ? this.profiles : ['Default'];
     const arch = this.variant === 'archenemy';
     const planar = this.variant === 'planechase';
-    const seatHtml = this.seats.map((s, i) => `<div class="seat${arch && i === this.archenemy ? ' archenemy' : ''}" data-i="${i}">
+    const duo = this.variant === 'teams';
+    if (duo && (this.ally < 1 || this.ally > 3)) {
+      this.ally = 1;
+    }
+    const mate = i => i === 0 || i === this.ally;
+    const seatHtml = this.seats.map((s, i) => `<div class="seat${arch && i === this.archenemy ? ' archenemy' : ''}${duo ? (mate(i) ? ' team-a' : ' team-b') : ''}" data-i="${i}">
       ${arch ? `<span class="seat-role">${i === this.archenemy ? `${icon('horns')} Archenemy` : `${icon('shield')} Équipe`}</span>` : ''}
+      ${duo ? `<span class="seat-role">${mate(i) ? `${icon('shield')} Mon équipe` : `${icon('swords')} Adversaires`}</span>` : ''}
       ${avatarHtml(s.name, i, 44, s.ai ? '' : ownPhotoUrl())}
-      <div class="fields">
+      <div class="fields${s.ai ? ' ai' : ''}">
         <input type="text" data-f="name" value="${esc(s.name)}" maxlength="24" placeholder="Nom">
-        ${s.ai ? `<select data-f="profile">${profiles.map(p => `<option value="${esc(p)}"${p === s.profile ? ' selected' : ''}>IA ${esc(PROFILE_LABELS[p] || p)}</option>`).join('')}</select>`
+        ${s.ai ? `<select data-f="level" title="Niveau de l'IA">${LEVELS.map(([v, label]) => `<option value="${v}"${v === (s.level || 'normal') ? ' selected' : ''}>${label}</option>`).join('')}</select>
+          <select data-f="profile" title="Style de jeu">${profiles.map(p => `<option value="${esc(p)}"${p === s.profile ? ' selected' : ''}>${esc(PROFILE_LABELS[p] || p)}</option>`).join('')}</select>`
           : '<div class="muted small" style="align-self:center">Vous</div>'}
         <div class="deck-line"><select data-f="deckKey">${this.deckOptions(s.deckKey)}</select><span class="seat-bk"></span></div>
       </div>
@@ -129,10 +144,12 @@ export class Lobby {
               <button data-v="none" class="${arch || planar ? '' : 'on'}">Aucune</button>
               <button data-v="archenemy" class="${arch ? 'on' : ''}">${icon('horns')} Archenemy</button>
               <button data-v="planechase" class="${planar ? 'on' : ''}">${icon('dice')} Planechase</button>
+              <button data-v="teams" class="${duo ? 'on' : ''}">${icon('shield')} 2 contre 2</button>
             </div>
             <div class="muted small">${arch ? `L'Archenemy (${this.format === 'commander' ? '60' : '40'} points de vie) joue en premier et met une machination à exécution au début de chacun de ses tours ; les trois autres font équipe contre lui et ne peuvent attaquer que lui.`
               : planar ? 'Chaque joueur a un paquet planaire de 10 plans (2 phénomènes au plus). Le plan ouvert change les règles pour tout le monde. Pendant ta phase principale, pile vide, tu peux lancer le dé planaire : gratuit la première fois du tour, puis {1} de plus à chaque lancer. Planeswalker : on change de plan ; chaos : l\'effet de chaos du plan se déclenche.'
-              : 'Archenemy : un joueur contre une équipe de trois, avec ses machinations. Planechase : on voyage de plan en plan avec le dé planaire.'}</div>
+              : duo ? 'Ton allié et toi contre deux IA. Chacun garde ses points de vie et son deck ; on n\'attaque que l\'équipe adverse. Les tours alternent entre les équipes ; l\'équipe dont les deux joueurs sont éliminés perd.'
+              : 'Archenemy : un joueur contre une équipe de trois, avec ses machinations. Planechase : on voyage de plan en plan avec le dé planaire. 2 contre 2 : deux équipes de deux.'}</div>
           </div>
           ${planar ? `<div class="field"><span>Plans</span>
             <div class="seg" data-seg="planes">
@@ -150,6 +167,10 @@ export class Lobby {
               ${SCHEME_SETS.map(([v, label]) => `<button data-v="${v}" class="${this.schemes === v ? 'on' : ''}">${label}</button>`).join('')}
             </div>
             <div class="muted small">20 machinations différentes, mélangées, tirées ${this.schemes === 'all' ? 'parmi toutes celles de Magic' : `de ${SCHEME_SETS.find(x => x[0] === this.schemes)[1]}`}.</div>
+          </div>` : duo ? `<div class="field"><span>Mon allié</span>
+            <div class="seg" data-seg="ally">
+              ${this.seats.slice(1).map((s, k) => `<button data-v="${k + 1}" class="${k + 1 === this.ally ? 'on' : ''}">${esc(s.name || 'IA ' + (k + 1))}</button>`).join('')}
+            </div>
           </div>` : `<div class="field"><span>Joueurs</span>
             <div class="seg" data-seg="count">
               ${[2, 3, 4].map(n => `<button data-v="${n}" class="${this.count === n ? 'on' : ''}">${n}</button>`).join('')}
@@ -167,6 +188,7 @@ export class Lobby {
         </div>
         <div class="box panel">
           <h3>Places</h3>
+          <p class="muted small lobby-levels">Niveau de chaque IA : ${LEVELS.map(([, label, help]) => `<b>${label}</b> (${help})`).join(', ')}. À côté du niveau, son style de jeu (équilibré, prudent, agressif…).</p>
           ${seatHtml}
         </div>
       </div>
@@ -192,6 +214,8 @@ export class Lobby {
         this.schemes = b.dataset.v;
       } else if (seg.dataset.seg === 'planes') {
         this.planes = b.dataset.v;
+      } else if (seg.dataset.seg === 'ally') {
+        this.ally = Number(b.dataset.v);
       } else {
         this.count = Number(b.dataset.v);
       }
@@ -264,8 +288,14 @@ export class Lobby {
     }
     const setup = {
       format: this.format,
-      players: this.seats.map(s => ({name: s.name.trim() || (s.ai ? 'IA' : 'Moi'), ai: s.ai, deckKey: s.deckKey, profile: s.ai ? s.profile || '' : ''})),
+      players: this.seats.map(s => ({name: s.name.trim() || (s.ai ? 'IA' : 'Moi'), ai: s.ai, deckKey: s.deckKey, profile: s.ai ? s.profile || '' : '',
+        ...(s.ai ? {level: s.level || 'normal'} : {})})),
     };
+    if (this.variant === 'teams') {
+      setup.players.forEach((p, i) => {
+        p.team = i === 0 || i === this.ally ? 0 : 1;
+      });
+    }
     if (this.mulligans !== null) {
       setup.mulligans = this.mulligans;
     }
