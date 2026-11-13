@@ -445,6 +445,8 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
   background: rgb(0 0 0 / 0.45); color: var(--muted); }
 .seat.archenemy .seat-role { color: #ff9a8a; }
 .seat-role .ic { width: 13px; height: 13px; }
+/* L'étiquette du camp (Archenemy, 2 contre 2) a sa ligne au-dessus des champs : elle ne cache plus le menu du style. */
+.seat:has(> .seat-role) { padding-top: 34px; }
 .seat { position: relative; overflow: hidden; }
 .seat > * { position: relative; z-index: 1; }
 .seat.has-art::before {

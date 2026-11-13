@@ -141,7 +141,7 @@ export class Lobby {
           </div>
           <div class="field"><span>Variante</span>
             <div class="seg" data-seg="variant">
-              <button data-v="none" class="${arch || planar ? '' : 'on'}">Aucune</button>
+              <button data-v="none" class="${arch || planar || duo ? '' : 'on'}">Aucune</button>
               <button data-v="archenemy" class="${arch ? 'on' : ''}">${icon('horns')} Archenemy</button>
               <button data-v="planechase" class="${planar ? 'on' : ''}">${icon('dice')} Planechase</button>
               <button data-v="teams" class="${duo ? 'on' : ''}">${icon('shield')} 2 contre 2</button>
