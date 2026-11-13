@@ -504,7 +504,7 @@ function settingsScreen() {
         <h2 style="margin-top:26px">Jeu</h2>
         ${row('images', 'Images des cartes', 'Télécharge les images depuis Scryfall et les garde en cache sur l\'appareil.')}
         <div class="row"><div><b>Langue des images</b><p class="muted small">En français quand Scryfall a une impression française de la carte, sinon en anglais.</p></div>
-          <select data-pref-select="imageLang"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
+          <select data-pref-select="imageLang" aria-label="Langue des images"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         ${row('frenchCards', 'Texte français des cartes récentes', 'Les cartes plus récentes que les traductions de Forge prennent le nom, le type et le texte de leur impression française (Scryfall), vérifiés une fois par jour.')}
         <div class="row fr-cards"><div><p class="muted small fr-status">…</p></div><button class="btn small" data-fr-refresh>Mettre à jour maintenant</button></div>
         ${row('animations', 'Animations', 'Déplacements de cartes, bannières de tour, effets de points de vie.')}

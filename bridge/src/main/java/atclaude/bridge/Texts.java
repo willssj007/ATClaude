@@ -33,7 +33,7 @@ final class Texts {
     private static final String FACE_DOWN = "carte face cachée";
     private static final Pattern SEARCH_YOUR = Pattern.compile("\\bRechercher vous (bibliothèque|main|cimetière|exil)");
     /** Forge traduit « from X's Deck » par « de la plate-forme de X ». */
-    private static final Pattern PLATFORM = Pattern.compile(" de la plate-forme (?:de |d')?");
+    private static final Pattern PLATFORM = Pattern.compile(" de la plate-forme\\s+(?:de\\s+|d')?");
     private static final Pattern YOUR_ZONE = Pattern.compile("\\b(de|dans|à|sur|depuis) vous (bibliothèque|main|cimetière|exil|zone de commandement|champ de bataille|réserve)");
     private static final int CACHE_SIZE = 800;
 
@@ -130,8 +130,12 @@ final class Texts {
         // Forge remplace « {player's} » par « vous » : « une carte de vous bibliothèque ».
         result = SEARCH_YOUR.matcher(result).replaceAll("Fouiller votre $1");
         result = YOUR_ZONE.matcher(result).replaceAll("$1 votre $2");
+        // En-tête de Forge pour les effets qui ne viennent pas d'une capacité de la carte.
+        if (result.contains("Non ability features")) {
+            result = result.replaceAll("Non ability features:\\s*", "Effets en cours :\n");
+        }
         if (result.contains("plate-forme")) {
-            result = PLATFORM.matcher(result).replaceAll(" (deck de ").replaceAll("\\(deck de ([^)]*)$", "(deck de $1)");
+            result = PLATFORM.matcher(result).replaceAll(" (deck : ").replaceAll("\\(deck : ([^)\\n]*)$", "(deck : $1)");
         }
         if (!unresolved[0] && version == patternVersion) {
             // Un identifiant non reconnu (partie en cours de modification, carte pas encore vue) sera
@@ -155,6 +159,9 @@ final class Texts {
             final String hit = matchName(before, id, card);
             if (hit != null) {
                 out.append(before, 0, before.length() - hit.length()).append(display(gui, hit, card));
+            } else if (card != null && (before.endsWith(" Jeton") || before.endsWith(" Token"))) {
+                // Jeton devenu autre chose (copie) : son ancien nom reste, sans l'identifiant.
+                out.append(before.endsWith(" Token") ? before.substring(0, before.length() - 6) + " Jeton" : before);
             } else if (card != null && card.isFaceDown() && before.endsWith(" ")) {
                 // « … à  (12) » : Forge a écrit le nom vide d'une carte face cachée.
                 out.append(before).append(FACE_DOWN);
@@ -198,10 +205,13 @@ final class Texts {
             } catch (final RuntimeException e) {
                 // États modifiés pendant la lecture : on se contente des noms déjà connus.
             }
-            for (final String n : new ArrayList<>(names)) {
-                if (n != null && !n.isEmpty()) {
-                    names.add(French.cardName(n));
-                }
+        }
+        // Les noms français aussi, même pour une carte qui n'existe plus (jeton mort, carte partie dans la bibliothèque).
+        for (final String n : new ArrayList<>(names)) {
+            if (n != null && !n.isEmpty()) {
+                final String fr = French.cardName(n);
+                names.add(fr);
+                names.add(GameSerializer.tokenOrder(fr));
             }
         }
         names.removeIf(n -> n == null || n.isEmpty());
@@ -233,7 +243,7 @@ final class Texts {
             }
         }
         final String fr = French.cardName(hit);
-        return fr == null || fr.isEmpty() ? hit : fr;
+        return GameSerializer.tokenOrder(fr == null || fr.isEmpty() ? hit : fr);
     }
 
     /** Remplace les noms anglais des cartes de la partie (« cast Lightning Bolt ») par leur nom français. */

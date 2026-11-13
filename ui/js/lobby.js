@@ -124,7 +124,7 @@ export class Lobby {
         ${s.ai ? `<select data-f="level" title="Niveau de l'IA">${LEVELS.map(([v, label]) => `<option value="${v}"${v === (s.level || 'normal') ? ' selected' : ''}>${label}</option>`).join('')}</select>
           <select data-f="profile" title="Style de jeu">${profiles.map(p => `<option value="${esc(p)}"${p === s.profile ? ' selected' : ''}>${esc(PROFILE_LABELS[p] || p)}</option>`).join('')}</select>`
           : '<div class="muted small" style="align-self:center">Vous</div>'}
-        <div class="deck-line"><select data-f="deckKey">${this.deckOptions(s.deckKey)}</select><span class="seat-bk"></span></div>
+        <div class="deck-line"><select data-f="deckKey" title="Deck">${this.deckOptions(s.deckKey)}</select><span class="seat-bk"></span></div>
       </div>
     </div>`).join('');
     this.root.innerHTML = `<div class="page">

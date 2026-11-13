@@ -220,8 +220,27 @@ final class French {
         }
         if (out == null) {
             out = cleanTrigger(forge);
+            // Une phrase de la carte (déclencheur différé…) : prise dans son texte français.
+            if (looksEnglish(out) && game != null) {
+                try {
+                    for (final SpellAbilityStackInstance si : game.getStack()) {
+                        if (si.getId() == item.getId() && si.getSpellAbility() != null) {
+                            final String fr = sentenceFromOracle(out, si.getSpellAbility().getHostCard());
+                            if (fr != null) {
+                                out = fr;
+                            }
+                            break;
+                        }
+                    }
+                } catch (final RuntimeException e) {
+                    // pile modifiée pendant la lecture
+                }
+            }
         }
         out = Texts.clean(out);
+        if (out != null && out.indexOf("NAME") >= 0 && item.getSourceCard() != null && item.getSourceCard().getCurrentState() != null) {
+            out = GameSerializer.withNames(out, GameSerializer.translatedName(item.getSourceCard().getCurrentState()));
+        }
         if (!failed) {
             STACK_CACHE.put(key, out);
         }
@@ -493,6 +512,64 @@ final class French {
             // Partie modifiée pendant la lecture : invite laissée telle quelle.
             return text;
         }
+    }
+
+    private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\r?\\n+");
+    private static final Pattern ENGINE_SUFFIX = Pattern.compile("\\s*\\[[^\\]]*\\]\\s*$");
+
+    private static String sentenceKey(final String s, final String name) {
+        String k = s.toLowerCase(Locale.ROOT);
+        if (name != null && !name.isEmpty()) {
+            k = k.replace(name.toLowerCase(Locale.ROOT), "cardname");
+        }
+        return k.replaceAll("\\([^)]*\\)", "").replaceAll("[^\\p{L}\\p{N}+/{}-]+", " ").trim();
+    }
+
+    private static String[] sentences(final String text) {
+        return SENTENCE_END.split(text.replace("\\n", "\n").trim());
+    }
+
+    /**
+     * Une phrase anglaise d'une carte (déclencheur différé, partie d'une capacité : « At the beginning of that combat,
+     * untap all creatures you control. ») : la phrase française au même rang dans le texte traduit de la carte, quand les
+     * deux textes ont autant de phrases. Sinon null.
+     */
+    static String sentenceFromOracle(final String english, final Card host) {
+        if (english == null || host == null || !looksEnglish(english)) {
+            return null;
+        }
+        try {
+            final CardRules rules = host.getRules();
+            if (rules == null) {
+                return null;
+            }
+            final String core = ENGINE_SUFFIX.matcher(english).replaceAll("").trim();
+            final String suffix = english.substring(Math.min(english.length(), english.indexOf(core) + core.length())).trim();
+            for (final ICardFace face : new ICardFace[]{rules.getMainPart(), rules.getOtherPart()}) {
+                if (face == null || face.getOracleText() == null) {
+                    continue;
+                }
+                final String fr = CardTranslation.getTranslatedOracle(face.getName());
+                if (fr == null || fr.isEmpty()) {
+                    continue;
+                }
+                final String[] en = sentences(face.getOracleText());
+                final String[] frs = sentences(fr);
+                if (en.length != frs.length || en.length < 2) {
+                    continue;
+                }
+                final String want = sentenceKey(core, face.getName());
+                for (int i = 0; i < en.length; i++) {
+                    if (!want.isEmpty() && sentenceKey(en[i], face.getName()).equals(want)) {
+                        final String nameFr = cardName(face.getName());
+                        return frs[i].trim().replace("CARDNAME", nameFr == null ? face.getName() : nameFr) + (suffix.isEmpty() ? "" : " " + suffix);
+                    }
+                }
+            }
+        } catch (final RuntimeException e) {
+            // Carte modifiée pendant la lecture : texte de Forge.
+        }
+        return null;
     }
 
     /** Lignes du journal que Forge écrit en anglais. */

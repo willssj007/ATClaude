@@ -2560,7 +2560,7 @@ export class Game {
         <section><h3>Ajouter une carte</h3>
           <div class="cheat-search"><input type="search" class="card-q" placeholder="Nom en français ou en anglais" style="width:100%"><div class="cheat-results"></div><div class="cheat-picked"></div></div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <select class="card-zone"><option value="hand">Main</option><option value="battlefield">Champ de bataille</option><option value="library">Dessus de la bibliothèque</option><option value="graveyard">Cimetière</option><option value="exile">Exil</option></select>
+            <select class="card-zone" aria-label="Où la mettre"><option value="hand">Main</option><option value="battlefield">Champ de bataille</option><option value="library">Dessus de la bibliothèque</option><option value="graveyard">Cimetière</option><option value="exile">Exil</option></select>
             <input type="number" class="card-count" value="1" min="1" max="20" style="width:64px">
             <button class="btn gold small" data-add-card>Ajouter</button>
           </div>

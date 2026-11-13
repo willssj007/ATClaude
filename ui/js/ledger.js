@@ -30,7 +30,7 @@ export async function openLedger() {
           <input type="number" class="lg-n" data-for="mana" value="1000" min="1" step="100">
           <button class="btn small" data-op="mana" data-sign="1">Ajouter</button><button class="btn small" data-op="mana" data-sign="-1">Retirer</button></div>
         <div class="lg-row"><b>Boosters</b><span class="lg-now">${(c.boosters || []).length}</span>
-          <select class="lg-set"><option value="">Extension au hasard</option>${sets.map(s => `<option value="${esc(s.code)}">${esc(s.name)} (${esc(s.code)})</option>`).join('')}</select>
+          <select class="lg-set" aria-label="Extension"><option value="">Extension au hasard</option>${sets.map(s => `<option value="${esc(s.code)}">${esc(s.name)} (${esc(s.code)})</option>`).join('')}</select>
           <input type="number" class="lg-n" data-for="boosters" value="1" min="1" max="100">
           <button class="btn small" data-op="boosters" data-sign="1">Ajouter</button></div>
         ${RARITIES.map(r => `<div class="lg-row"><b>Jetons ${esc(RARITY_FR[r])}s</b><span class="lg-now">${wildcardHtml(r, wc[r] || 0)}</span>

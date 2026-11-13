@@ -133,17 +133,21 @@ final class FrenchCards {
             for (final Map.Entry<String, String[]> e : cards.entrySet()) {
                 final String en = e.getKey();
                 final String[] fr = e.getValue();
-                if (names.containsKey(en) && !names.get(en).isEmpty()) {
-                    continue;
+                boolean added = false;
+                // Ce que Forge a déjà (nom, type ou texte) est gardé ; seul ce qui manque vient de Scryfall.
+                if (!known(names, en)) {
+                    names.put(en, fr[0]);
+                    added = true;
                 }
-                names.put(en, fr[0]);
-                if (!fr[1].isEmpty()) {
+                if (!fr[1].isEmpty() && !known(types, en)) {
                     types.put(en, fr[1]);
+                    added = true;
                 }
-                if (!fr[2].isEmpty()) {
+                if (!fr[2].isEmpty() && !known(oracles, en)) {
                     oracles.put(en, fr[2].replace("\n", "\r\n\r\n"));
+                    added = true;
                 }
-                n++;
+                n += added ? 1 : 0;
             }
         }
         return n;
@@ -194,9 +198,22 @@ final class FrenchCards {
         return status();
     }
 
-    /** Les extensions (code Scryfall) des cartes sans nom français, de la plus fournie à la moins fournie. */
+    /** Une face sans nom français, ou avec un texte anglais mais pas de texte français. */
+    private static boolean missing(final Map<String, String> names, final Map<String, String> oracles, final ICardFace face) {
+        if (face == null) {
+            return false;
+        }
+        if (!known(names, face.getName())) {
+            return true;
+        }
+        final String oracle = face.getOracleText();
+        return oracles != null && oracle != null && !oracle.isBlank() && !known(oracles, face.getName());
+    }
+
+    /** Les extensions (code Scryfall) des cartes sans nom ou sans texte français, de la plus fournie à la moins fournie. */
     private static List<String> missingSets(final boolean force) {
         final Map<String, String> names = forgeMap("translatednames");
+        final Map<String, String> oracles = forgeMap("translatedoracles");
         if (names == null) {
             return List.of();
         }
@@ -204,8 +221,8 @@ final class FrenchCards {
         final long now = System.currentTimeMillis();
         for (final PaperCard pc : FModel.getMagicDb().getCommonCards().getUniqueCards()) {
             final CardRules r = pc.getRules();
-            if (r == null || CustomCards.isCustom(pc.getName()) || r.getType().isBasicLand() || known(names, r.getName())
-                    || r.getMainPart() != null && known(names, r.getMainPart().getName())) {
+            if (r == null || CustomCards.isCustom(pc.getName()) || r.getType().isBasicLand()
+                    || !missing(names, oracles, r.getMainPart()) && !missing(names, oracles, r.getOtherPart())) {
                 continue;
             }
             final Set<String> seen = new java.util.HashSet<>();
@@ -229,13 +246,14 @@ final class FrenchCards {
     private static int run(final boolean force) {
         final List<String> sets = missingSets(force);
         final Map<String, String> names = forgeMap("translatednames");
+        final Map<String, String> oracles = forgeMap("translatedoracles");
         final Map<String, String[]> found = new LinkedHashMap<>();
         int i = 0;
         for (final String code : sets) {
             i++;
             status = "Extension " + code.toUpperCase(Locale.ROOT) + " (" + i + "/" + sets.size() + ")…";
             try {
-                fetchSet(code, names, found);
+                fetchSet(code, names, oracles, found);
                 SETS.put(code, System.currentTimeMillis());
             } catch (final IOException e) {
                 status = "Scryfall injoignable : " + e.getMessage();
@@ -254,7 +272,8 @@ final class FrenchCards {
     }
 
     /** Les impressions françaises d'une extension (toutes les pages de la recherche). */
-    private static void fetchSet(final String code, final Map<String, String> names, final Map<String, String[]> found) throws IOException {
+    private static void fetchSet(final String code, final Map<String, String> names, final Map<String, String> oracles,
+                                 final Map<String, String[]> found) throws IOException {
         String url = API + "cards/search?unique=prints&include_extras=true&q="
                 + URLEncoder.encode("set:" + code + " lang:fr", "UTF-8");
         for (int page = 0; url != null && page < 12; page++) {
@@ -263,7 +282,7 @@ final class FrenchCards {
                 return; // aucune carte française dans cette extension
             }
             for (final JsonElement e : o.getAsJsonArray("data")) {
-                addCard(e.getAsJsonObject(), names, found);
+                addCard(e.getAsJsonObject(), names, oracles, found);
             }
             url = o.has("has_more") && o.get("has_more").getAsBoolean() && o.has("next_page") ? o.get("next_page").getAsString() : null;
         }
@@ -274,7 +293,8 @@ final class FrenchCards {
     }
 
     /** Une carte française de Scryfall : chacune de ses faces (recto, verso, aventure…) qui manque à Forge. */
-    private static void addCard(final JsonObject c, final Map<String, String> names, final Map<String, String[]> found) {
+    private static void addCard(final JsonObject c, final Map<String, String> names, final Map<String, String> oracles,
+                                final Map<String, String[]> found) {
         if (!"fr".equals(str(c, "lang"))) {
             return;
         }
@@ -287,8 +307,10 @@ final class FrenchCards {
         for (final JsonObject f : faces) {
             final String en = str(f, "name");
             final String nameFr = str(f, "printed_name");
+            final boolean hasName = names != null && known(names, en);
+            final boolean hasText = oracles != null && known(oracles, en) || str(f, "printed_text").isEmpty();
             if (en.isEmpty() || nameFr.isEmpty() || nameFr.equals(en) && str(f, "printed_text").isEmpty()
-                    || names != null && known(names, en) || found.containsKey(en)) {
+                    || hasName && hasText || found.containsKey(en)) {
                 continue;
             }
             found.put(en, new String[]{nameFr, str(f, "printed_type_line"), str(f, "printed_text")});

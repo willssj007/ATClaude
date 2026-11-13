@@ -1,0 +1,75 @@
+# Phrases des jetons de Forge (res/tokenscripts), qui n'ont pas de traduction : une ligne « anglais|français ».
+# La comparaison ignore la casse, les espaces en trop et le point final.
+This creature can't block.|Cette créature ne peut pas bloquer.
+This creature is all colors.|Cette créature est de toutes les couleurs.
+{T}: Add one mana of any color.|{T} : Ajoutez un mana de la couleur de votre choix.
+{T}: Add {G}.|{T} : Ajoutez {G}.
+{T}: Add {C}.|{T} : Ajoutez {C}.
+({T}: Add {G}.)|({T} : Ajoutez {G}.)
+Sacrifice this creature: Add {C}.|Sacrifiez cette créature : Ajoutez {C}.
+{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.|{T} : Ajoutez {C}. Ce mana ne peut pas être dépensé pour lancer un sort non-artefact.
+{T}, Sacrifice this token: Add one mana of any color.|{T}, sacrifiez ce jeton : Ajoutez un mana de la couleur de votre choix.
+{T}, Sacrifice this artifact: Add one mana of any color.|{T}, sacrifiez cet artefact : Ajoutez un mana de la couleur de votre choix.
+{T}, Sacrifice this token: Add three mana of any one color.|{T}, sacrifiez ce jeton : Ajoutez trois manas d'une même couleur.
+{T}, Sacrifice this artifact: Add {R} or {G}. You gain 2 life.|{T}, sacrifiez cet artefact : Ajoutez {R} ou {G}. Vous gagnez 2 points de vie.
+{2}, {T}, Sacrifice this artifact: You gain 3 life.|{2}, {T}, sacrifiez cet artefact : Vous gagnez 3 points de vie.
+{2}, {T}, Sacrifice this token: You gain 3 life.|{2}, {T}, sacrifiez ce jeton : Vous gagnez 3 points de vie.
+{2}, {T}, Sacrifice this token: You gain 6 life.|{2}, {T}, sacrifiez ce jeton : Vous gagnez 6 points de vie.
+{2}, Sacrifice this artifact: Draw a card.|{2}, sacrifiez cet artefact : Piochez une carte.
+{2}, Sacrifice this token: Draw a card.|{2}, sacrifiez ce jeton : Piochez une carte.
+{1}, {T}, Discard a card, Sacrifice this artifact: Draw a card.|{1}, {T}, défaussez-vous d'une carte, sacrifiez cet artefact : Piochez une carte.
+{1}, {T}, Sacrifice this artifact: Target creature you control explores. Activate only as a sorcery.|{1}, {T}, sacrifiez cet artefact : La créature ciblée que vous contrôlez explore. N'activez qu'en tant que rituel.
+{T}, Sacrifice this artifact: Add one mana of any color. Activate only as a sorcery.|{T}, sacrifiez cet artefact : Ajoutez un mana de la couleur de votre choix. N'activez qu'en tant que rituel.
+{2}: Transform this token.|{2} : Transformez ce jeton.
+{2}: Transform this artifact.|{2} : Transformez cet artefact.
+{T}: Tap target creature.|{T} : Engagez la créature ciblée.
+{W}, {T}: Tap target creature.|{W}, {T} : Engagez la créature ciblée.
+{T}: Draw a card.|{T} : Piochez une carte.
+{B}: Regenerate this creature.|{B} : Régénérez cette créature.
+{R}: This token gets +1/+0 until end of turn.|{R} : Ce jeton gagne +1/+0 jusqu'à la fin du tour.
+{R}: This creature gets +1/+0 until end of turn.|{R} : Cette créature gagne +1/+0 jusqu'à la fin du tour.
+{T}, Sacrifice this token: It deals 2 damage to any target.|{T}, sacrifiez ce jeton : Il inflige 2 blessures à n'importe quelle cible.
+{T}, Sacrifice this token: Exile the top card of your library. You may play that card this turn. Activate only as a sorcery.|{T}, sacrifiez ce jeton : Exilez la carte du dessus de votre bibliothèque. Vous pouvez jouer cette carte ce tour-ci. N'activez qu'en tant que rituel.
+{T}, Sacrifice this token: Destroy target creature with the greatest power.|{T}, sacrifiez ce jeton : Détruisez la créature ciblée avec la plus grande force.
+{T}, Sacrifice this token: Target creature gains deathtouch and indestructible until end of turn.|{T}, sacrifiez ce jeton : La créature ciblée acquiert le contact mortel et l'indestructible jusqu'à la fin du tour.
+{T}: Target creature you control gets +1/+0 until end of turn. Activate only as a sorcery.|{T} : La créature ciblée que vous contrôlez gagne +1/+0 jusqu'à la fin du tour. N'activez qu'en tant que rituel.
+{T}: Put a loyalty counter on each planeswalker you control.|{T} : Mettez un marqueur « loyauté » sur chaque planeswalker que vous contrôlez.
+{T}: Add {R}. Spend this mana only to cast a planeswalker spell.|{T} : Ajoutez {R}. Ne dépensez ce mana que pour lancer un sort de planeswalker.
+{T}: Add {R} or {G}.|{T} : Ajoutez {R} ou {G}.
+Whenever this creature deals combat damage to a player, draw a card.|À chaque fois que cette créature inflige des blessures de combat à un joueur, piochez une carte.
+Whenever this creature deals combat damage to a player, you get that many {E}.|À chaque fois que cette créature inflige des blessures de combat à un joueur, vous recevez autant de {E}.
+This token can block only creatures with flying.|Ce jeton ne peut bloquer que des créatures avec le vol.
+This creature can block only creatures with flying.|Cette créature ne peut bloquer que des créatures avec le vol.
+This creature's power and toughness are each equal to the number of lands you control.|La force et l'endurance de cette créature sont chacune égales au nombre de terrains que vous contrôlez.
+This creature's power and toughness are each equal to the number of creatures you control.|La force et l'endurance de cette créature sont chacune égales au nombre de créatures que vous contrôlez.
+This creature can't be blocked.|Cette créature ne peut pas être bloquée.
+This creature attacks each combat if able.|Cette créature attaque à chaque combat si possible.
+Creatures you control attack each combat if able.|Les créatures que vous contrôlez attaquent à chaque combat si possible.
+Equipped creature gets +1/+0.|La créature équipée gagne +1/+0.
+Equipped creature gets +1/+1.|La créature équipée gagne +1/+1.
+Enchanted creature gets +1/+1.|La créature enchantée gagne +1/+1.
+Enchanted creature gets +2/+2.|La créature enchantée gagne +2/+2.
+Changeling (This token is every creature type.)|Changelin (Ce jeton a tous les types de créature.)
+Changeling|Changelin
+Protection from each color|Protection contre chaque couleur
+When this creature dies, draw a card.|Quand cette créature meurt, piochez une carte.
+When this creature dies, you gain 1 life.|Quand cette créature meurt, vous gagnez 1 point de vie.
+When this token dies, draw a card.|Quand ce jeton meurt, piochez une carte.
+At the beginning of your upkeep, sacrifice this creature.|Au début de votre entretien, sacrifiez cette créature.
+At the beginning of the end step, sacrifice this creature.|Au début de l'étape de fin, sacrifiez cette créature.
+At the beginning of the next end step, sacrifice this creature.|Au début de la prochaine étape de fin, sacrifiez cette créature.
+At the beginning of the end step, exile this creature.|Au début de l'étape de fin, exilez cette créature.
+This creature gets +1/+1 for each other creature you control.|Cette créature gagne +1/+1 pour chaque autre créature que vous contrôlez.
+Other creatures you control get +1/+1.|Les autres créatures que vous contrôlez gagnent +1/+1.
+Sacrifice this creature: Add {R}.|Sacrifiez cette créature : Ajoutez {R}.
+Sacrifice this creature: You gain 1 life.|Sacrifiez cette créature : Vous gagnez 1 point de vie.
+{1}, Sacrifice this artifact: You gain 3 life.|{1}, sacrifiez cet artefact : Vous gagnez 3 points de vie.
+{2}, {T}, Sacrifice this artifact: Draw a card.|{2}, {T}, sacrifiez cet artefact : Piochez une carte.
+Enchant creature|Enchanter : créature
+Enchant player|Enchanter : joueur
+Equip {1}|Équipement {1}
+Equip {2}|Équipement {2}
+Equip {3}|Équipement {3}
+Toxic 1|Toxique 1
+Toxic 2|Toxique 2
+Token|Jeton

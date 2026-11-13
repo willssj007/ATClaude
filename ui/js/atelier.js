@@ -1179,7 +1179,7 @@ export class Atelier {
     const mode = DFC_MODES.find(m => m[0] === (front.dfc || '')) || DFC_MODES[0];
     const backName = this.face === 'back' ? this.form.name : (front.back && front.back.name);
     return `<div class="ate-field ate-faces"><span>Faces</span>
-      <div class="ate-ab-row"><select data-dfc>${DFC_MODES.map(([v, l]) => `<option value="${v}"${v === mode[0] ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+      <div class="ate-ab-row"><select data-dfc aria-label="Faces">${DFC_MODES.map(([v, l]) => `<option value="${v}"${v === mode[0] ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
       ${mode[0] ? `<div class="seg ate-faceseg"><button data-face="front" class="${this.face !== 'back' ? 'on' : ''}">Recto${front.name ? ' : ' + esc(front.name) : ''}</button>
         <button data-face="back" class="${this.face === 'back' ? 'on' : ''}">Verso${backName ? ' : ' + esc(backName) : ''}</button></div>
         <p class="muted small">${esc(mode[4])} Le formulaire montre la face choisie ; l'illustration aussi.</p>` : ''}

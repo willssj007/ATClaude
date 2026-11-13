@@ -82,7 +82,7 @@ export class BoostersScreen {
         <div class="shop-pack"></div>
         <div class="shop-info">
           <span class="vs-label">Extension (${list.length}, de la plus récente à la plus ancienne)</span>
-          <select class="shop-set">${setOptions(list, current.code)}</select>
+          <select class="shop-set" aria-label="Extension du booster">${setOptions(list, current.code)}</select>
           <h2 class="shop-name"></h2>
           <div class="muted small shop-meta"></div>
           <p class="muted small">14 cartes, au format des vrais boosters de l'extension : communes, peu communes, et au moins une rare ou une mythique.</p>

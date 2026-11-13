@@ -298,7 +298,14 @@ final class GameSerializer {
         final ManaCost cost = s.getManaCost();
         o.addProperty("cost", cost == null || cost.isNoCost() ? "" : cost.toString());
         o.addProperty("typeLine", CardDetailUtil.formatCardType(s, true));
-        o.addProperty("text", inGame ? Texts.clean(plainText(CardDetailUtil.composeCardText(s, gv, true))) : "");
+        o.addProperty("text", inGame ? withNames(Texts.clean(plainText(CardDetailUtil.composeCardText(s, gv, true))), o.get("name").getAsString()) : "");
+        // Jetons de Forge et cartes sans traduction : type et lignes restés en anglais, en français quand on sait.
+        if (ENGLISH_TYPE.matcher(o.get("typeLine").getAsString()).find() && s.getType() != null) {
+            o.addProperty("typeLine", CustomCards.typeLine(s.getType()));
+        }
+        if (inGame) {
+            o.addProperty("text", EnglishLines.translate(o.get("text").getAsString()));
+        }
         o.addProperty("colors", colors(s.getColors()));
         o.addProperty("image", s.getImageKey());
         o.addProperty("set", s.getSetCode());
@@ -406,9 +413,30 @@ final class GameSerializer {
                 .trim();
     }
 
+    /**
+     * Forge laisse parfois ses marques « CARDNAME » / « NICKNAME » dans un texte traduit (capacité donnée par une autre
+     * carte, phrase traduite sans le nom) : le nom de la carte, ou son nom court (avant la virgule d'une légende).
+     */
+    private static final Pattern ENGLISH_TYPE = Pattern.compile("^(?:(?:Legendary|Basic|Snow|World|Token) )*(?:Artifact|Enchantment|Land|Creature|Planeswalker|Instant|Sorcery|Battle|Kindred|Tribal)\\b");
+
+    static String withNames(final String text, final String name) {
+        if (text == null || name == null || text.indexOf("NAME") < 0) {
+            return text;
+        }
+        final int comma = name.indexOf(',');
+        final String nick = comma > 0 ? name.substring(0, comma).trim() : name;
+        return text.replace("NICKNAME", nick).replace("CARDNAME", name);
+    }
+
     static String translatedName(final CardStateView s) {
         final String translated = French.cardName(s.getName());
-        return translated == null || translated.isEmpty() ? s.getName() : translated;
+        return tokenOrder(translated == null || translated.isEmpty() ? s.getName() : translated);
+    }
+
+    /** Forge nomme les jetons « Diablotin Jeton » : en français, « Jeton Diablotin ». */
+    static String tokenOrder(final String name) {
+        return name != null && name.endsWith(" Jeton") && name.length() > 6 && name.indexOf(" Jeton") == name.length() - 6
+                ? "Jeton " + name.substring(0, name.length() - 6) : name;
     }
 
     /** Ce que Forge ajoute au texte pour son propre affichage (commandant, « Non ability features ») : pas sur un cadre dessiné. */
@@ -554,6 +582,14 @@ final class GameSerializer {
         return list;
     }
 
+    private static forge.game.card.Card findCardSafe(final forge.game.Game game, final int id) {
+        try {
+            return game.findById(id);
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
     private static JsonArray log(final GameView gv) {
         final JsonArray list = new JsonArray();
         if (gv.getGameLog() == null) {
@@ -570,7 +606,15 @@ final class GameSerializer {
             Texts.remember(e.sourceCard());
             final JsonObject o = new JsonObject();
             o.addProperty("kind", e.type().name());
-            final String text = Texts.clean(French.logLine(e.message()));
+            String text = Texts.clean(French.logLine(e.message()));
+            if (French.looksEnglish(text) && e.sourceCard() != null && gv.getGame() != null) {
+                // Déclencheur différé ou morceau de capacité : la phrase française de la carte.
+                final forge.game.card.Card host = findCardSafe(gv.getGame(), e.sourceCard().getId());
+                final String fr = French.sentenceFromOracle(text, host);
+                if (fr != null) {
+                    text = Texts.clean(fr);
+                }
+            }
             o.addProperty("text", text);
             // La carte en cause, pour l'agrandir depuis le journal : seulement si le texte la nomme déjà
             // (une carte face cachée ou non révélée ne doit rien dévoiler de plus).

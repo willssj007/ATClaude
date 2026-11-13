@@ -227,35 +227,8 @@ export const PHASES = [
 ];
 
 // Forge ne traduit pas toutes ses invites (surtout le ciblage) : on traduit les tournures courantes.
-const NOUNS = [
-  [/\bany target\b/gi, 'n\'importe quelle cible'], [/\bcreatures?\b/gi, 'créature'], [/\bplayers?\b/gi, 'joueur'],
-  [/\bopponents?\b/gi, 'adversaire'], [/\bpermanents?\b/gi, 'permanent'], [/\bartifacts?\b/gi, 'artefact'],
-  [/\benchantments?\b/gi, 'enchantement'], [/\blands?\b/gi, 'terrain'], [/\bspells?\b/gi, 'sort'],
-  [/\bcards?\b/gi, 'carte'], [/\bnonland\b/gi, 'non-terrain'], [/\bnontoken\b/gi, 'non-jeton'], [/\byou control\b/gi, 'que vous contrôlez'],
-  [/\byou don't control\b/gi, 'que vous ne contrôlez pas'], [/\ban opponent controls\b/gi, 'qu\'un adversaire contrôle'], [/\bor\b/g, 'ou'],
-];
-const PROMPTS = [
-  [/^Select any target\.?$/i, 'Choisissez n\'importe quelle cible'],
-  [/^Select targets? for (.+)$/i, 'Choisissez les cibles de $1'],
-  [/^Select (?:a |an )?target (.+)$/i, (m, what) => 'Choisissez la cible : ' + NOUNS.reduce((s, [r, t]) => s.replace(r, t), what)],
-  [/^Select up to (\d+) target (.+)$/i, (m, n, what) => `Choisissez jusqu'à ${n} cible(s) : ` + NOUNS.reduce((s, [r, t]) => s.replace(r, t), what)],
-  [/^Waiting for (.*?)\.*$/i, 'En attente de $1…'],
-  [/^Pay Mana Cost:?/i, 'Payez le coût de mana :'],
-  [/^Choose a card to discard/i, 'Choisissez une carte à défausser'],
-  [/^Declare attackers/i, 'Déclarez les attaquants'],
-  [/^Declare blockers/i, 'Déclarez les bloqueurs'],
-];
-
-export function translatePrompt(text) {
-  return String(text || '').split('\n').map(line => {
-    for (const [re, to] of PROMPTS) {
-      if (re.test(line)) {
-        return line.replace(re, to);
-      }
-    }
-    return line;
-  }).join('\n');
-}
+// Consignes de Forge restées en anglais : voir prompts.js.
+export {translatePrompt} from './prompts.js';
 
 // ------------------------------------------------------------------ encoche de la caméra (Android)
 

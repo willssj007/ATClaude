@@ -20,6 +20,10 @@
     </dependencies>
     <build>
         <resources>
+            <!-- Textes du pont (titres de fenêtres traduits…). -->
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
             <!-- Les notes de version, pour la fenêtre « Quoi de neuf » après une mise à jour. -->
             <resource>
                 <directory>${project.basedir}/..</directory>

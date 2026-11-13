@@ -111,6 +111,44 @@ final class Dialogs {
     /** Titres que la traduction française de Forge laisse en anglais. */
     private static final Map<String, String> TITLES = Map.of("Name the token", "Choisir le jeton", "combien ?", "Combien ?");
 
+    /** Titres écrits en anglais dans les scripts de cartes (ChoiceTitle, ListTitle…) : leur traduction. */
+    private static volatile Map<String, String> scriptTitles;
+
+    private static Map<String, String> scriptTitles() {
+        Map<String, String> m = scriptTitles;
+        if (m == null) {
+            m = new java.util.HashMap<>();
+            try (java.io.InputStream in = Dialogs.class.getResourceAsStream("titles-fr.txt")) {
+                if (in != null) {
+                    for (final String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                        final int bar = line.indexOf('|');
+                        if (bar > 0 && !line.startsWith("#")) {
+                            m.put(line.substring(0, bar).trim().toLowerCase(java.util.Locale.ROOT), line.substring(bar + 1).trim());
+                        }
+                    }
+                }
+            } catch (final java.io.IOException | RuntimeException e) {
+                System.err.println("Titres traduits illisibles : " + e.getMessage());
+            }
+            scriptTitles = m;
+        }
+        return m;
+    }
+
+    /** Le titre en français s'il vient d'un script de carte (avec ou sans le « Choose » que Forge ajoute devant). */
+    static String scriptTitle(final String title) {
+        if (title == null || title.isEmpty()) {
+            return title;
+        }
+        final String key = title.trim().toLowerCase(java.util.Locale.ROOT);
+        final Map<String, String> m = scriptTitles();
+        String fr = m.get(key);
+        if (fr == null && key.startsWith("choose ")) {
+            fr = m.get(key.substring(7));
+        }
+        return fr == null ? title : fr;
+    }
+
     /** Un titre commence par une majuscule (« l'IA ne peut pas… » vient d'un morceau de phrase de Forge). */
     private static String capitalize(final String t) {
         return t == null || t.isEmpty() || !Character.isLowerCase(t.charAt(0)) ? t : Character.toUpperCase(t.charAt(0)) + t.substring(1);
@@ -118,7 +156,7 @@ final class Dialogs {
 
     private static JsonObject dialog(final String title, final String message) {
         final JsonObject d = new JsonObject();
-        d.addProperty("title", capitalize(Texts.clean(title == null ? null : TITLES.getOrDefault(title, title))));
+        d.addProperty("title", capitalize(Texts.clean(title == null ? null : scriptTitle(TITLES.getOrDefault(title, title)))));
         d.addProperty("message", Texts.clean(message));
         return d;
     }

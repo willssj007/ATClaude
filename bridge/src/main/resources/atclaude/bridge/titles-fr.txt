@@ -1,0 +1,226 @@
+# Titres des fenêtres écrits en anglais dans les scripts de cartes de Forge (ChoiceTitle, ListTitle…), en français.
+# Une ligne : titre anglais|titre français. « Choose » devant un titre de nombre (« amount of energy to pay ») est ajouté
+# par Forge : le titre se cherche aussi sans lui.
+Choose a nonland permanent you own|Choisissez un permanent non-terrain que vous possédez
+Choose an opponent|Choisissez un adversaire
+Choose a creature you control|Choisissez une créature que vous contrôlez
+amount of energy to pay|Quantité d'énergie à payer
+amount of mana to pay|Quantité de mana à payer
+Choose a creature card in your hand|Choisissez une carte de créature dans votre main
+Choose one of the exiled cards|Choisissez une des cartes exilées
+Choose an opponent to give control to|Choisissez l'adversaire qui en prend le contrôle
+Choose a creature you control with the greatest power|Choisissez une créature que vous contrôlez avec la plus grande force
+Choose an Equipment you control|Choisissez un équipement que vous contrôlez
+Choose a creature|Choisissez une créature
+You may choose a creature card in your hand|Vous pouvez choisir une carte de créature dans votre main
+Choose one to sacrifice|Choisissez celui à sacrifier
+You may choose a nonland card|Vous pouvez choisir une carte non-terrain
+Choose any number of creatures you control to distribute counters to|Choisissez des créatures que vous contrôlez entre lesquelles répartir les marqueurs
+Choose another player|Choisissez un autre joueur
+Choose an opponent to look at their hand|Choisissez l'adversaire dont regarder la main
+Choose an instant or sorcery card in your hand|Choisissez une carte d'éphémère ou de rituel dans votre main
+Choose a player|Choisissez un joueur
+Choose a creature card to reveal|Choisissez une carte de créature à révéler
+amount of life to pay|Points de vie à payer
+You may exile a nonland card from it|Vous pouvez en exiler une carte non-terrain
+Select a face-down creature you control|Choisissez une créature face cachée que vous contrôlez
+Choose up to two creatures to keep|Choisissez jusqu'à deux créatures à garder
+Choose one of those creatures to copy|Choisissez une de ces créatures à copier
+Choose any number of tapped nongreen creatures you control|Choisissez des créatures non-vertes engagées que vous contrôlez
+Choose an attacker to block|Choisissez un attaquant à bloquer
+Choose an artifact or creature card|Choisissez une carte d'artefact ou de créature
+Choose a nonland card in your hand|Choisissez une carte non-terrain dans votre main
+Choose a creature with the least toughness among creatures your opponents control|Choisissez une créature avec la plus petite endurance parmi celles de vos adversaires
+Choose a creature this player controls|Choisissez une créature que ce joueur contrôle
+Choose a creature that player controls|Choisissez une créature que ce joueur contrôle
+Choose a creature targeted by this spell|Choisissez une créature ciblée par ce sort
+Choose a creature or planeswalker with the highest mana value among creatures and planeswalkers you control|Choisissez votre créature ou planeswalker de plus grande valeur de mana
+Choose a creature card in your graveyard|Choisissez une carte de créature dans votre cimetière
+Choose a commander you own|Choisissez un commandant que vous possédez
+number of creatures to sacrifice|Nombre de créatures à sacrifier
+number of cards in your graveyard to exile|Nombre de cartes de votre cimetière à exiler
+mana value of Equipment to unattach|Valeur de mana de l'équipement à détacher
+how many white cards to exile|Combien de cartes blanches exiler
+how many times to pay the additional cost|Combien de fois payer le coût supplémentaire
+how many red cards to exile|Combien de cartes rouges exiler
+how many green cards to exile|Combien de cartes vertes exiler
+how many creatures to tap|Combien de créatures engager
+how many blue cards to exile|Combien de cartes bleues exiler
+how many black cards to exile|Combien de cartes noires exiler
+any number of creatures to target|Nombre de créatures à cibler
+any amount of red mana to pay|Quantité de mana rouge à payer
+amount of damage to be dealt|Blessures à infliger
+You may select a creature card|Vous pouvez choisir une carte de créature
+You may choose an instant or sorcery card in your hand|Vous pouvez choisir une carte d'éphémère ou de rituel dans votre main
+You may choose an artifact or creature card with mana value 3 you discarded this way|Vous pouvez choisir une carte d'artefact ou de créature de valeur de mana 3 défaussée ainsi
+You may choose an artifact or creature card with mana value 2 you discarded this way|Vous pouvez choisir une carte d'artefact ou de créature de valeur de mana 2 défaussée ainsi
+You may choose an artifact or creature card with mana value 1 you discarded this way|Vous pouvez choisir une carte d'artefact ou de créature de valeur de mana 1 défaussée ainsi
+You may choose an Equipment to unattach from that creature|Vous pouvez choisir un équipement à détacher de cette créature
+You may choose a token you control|Vous pouvez choisir un jeton que vous contrôlez
+You may choose a nonland permanent|Vous pouvez choisir un permanent non-terrain
+You may choose a nonland card in your hand|Vous pouvez choisir une carte non-terrain dans votre main
+You may choose a nonland card from it|Vous pouvez y choisir une carte non-terrain
+You may choose a creature you control to attach that equipment to|Vous pouvez choisir une de vos créatures à laquelle attacher cet équipement
+You may choose a creature|Vous pouvez choisir une créature
+You may choose a card with this name from your library|Vous pouvez choisir dans votre bibliothèque une carte de ce nom
+You may choose a card with the same name from your library|Vous pouvez choisir dans votre bibliothèque une carte du même nom
+You may choose a card with the same name from target opponent's library|Vous pouvez choisir dans la bibliothèque de l'adversaire ciblé une carte du même nom
+You may choose a card with mana value 3 or greater|Vous pouvez choisir une carte de valeur de mana 3 ou plus
+You may choose a card of this type to put onto the battlefield|Vous pouvez choisir une carte de ce type à mettre sur le champ de bataille
+You may choose a card of this type to put into your hand|Vous pouvez choisir une carte de ce type à mettre dans votre main
+You may choose a card of this type from defending player's graveyard to exile|Vous pouvez choisir une carte de ce type dans le cimetière du joueur défenseur, à exiler
+Select target attraction you control that doesn't have a midway counter on it|Choisissez une attraction ciblée que vous contrôlez sans marqueur « mi-parcours »
+Select another target creature you control|Choisissez une autre créature ciblée que vous contrôlez
+Select another creature you control|Choisissez une autre créature que vous contrôlez
+Select a nonland card|Choisissez une carte non-terrain
+Select a face-down permanent you control|Choisissez un permanent face cachée que vous contrôlez
+Secretly choose a creature or planeswalker targeted player controls|Choisissez en secret une créature ou un planeswalker du joueur ciblé
+Secretly choose a creature in your graveyard|Choisissez en secret une créature dans votre cimetière
+Secretly choose a creature|Choisissez une créature en secret
+Sacrifice any number of creatures with total power 12 or greater.|Sacrifiez des créatures d'une force totale de 12 ou plus.
+Reveal a card from your hand or the top of your library|Révélez une carte de votre main ou le dessus de votre bibliothèque
+Randomly chosen permanent to be destroyed|Permanent tiré au hasard, qui sera détruit
+How many times do you want repeat this process?|Combien de fois répéter cette action ?
+Exile with Volatile Chimera|Exiler avec la Chimère instable
+Exile any number of creature cards from your graveyard|Exilez des cartes de créature de votre cimetière
+Discard how many cards?|Combien de cartes défausser ?
+Creatures chosen by opponent.|Créatures choisies par l'adversaire.
+Chosen creatures. They will be destroyed.|Créatures choisies : elles seront détruites.
+Choose up to two creatures|Choisissez jusqu'à deux créatures
+Choose up to two creature cards to reveal|Choisissez jusqu'à deux cartes de créature à révéler
+Choose up to two creature and/or planeswalker cards in your hand|Choisissez jusqu'à deux cartes de créature ou de planeswalker dans votre main
+Choose up to two creature and/or land cards to reveal|Choisissez jusqu'à deux cartes de créature ou de terrain à révéler
+Choose up to two Soldiers you control|Choisissez jusqu'à deux Soldats que vous contrôlez
+Choose up to two Plains for each creature tapped|Choisissez jusqu'à deux Plaines par créature engagée
+Choose up to three nonland permanents you don't control.|Choisissez jusqu'à trois permanents non-terrain que vous ne contrôlez pas.
+Choose up to three Doctors|Choisissez jusqu'à trois Docteurs
+Choose up to that many creatures tapped this way|Choisissez jusqu'à autant de créatures engagées ainsi
+Choose up to one untapped creature you control to tap|Choisissez jusqu'à une créature dégagée que vous contrôlez, à engager
+Choose up to one permanent with mana value 3 or greater|Choisissez jusqu'à un permanent de valeur de mana 3 ou plus
+Choose up to one nonbasic land this player controls|Choisissez jusqu'à un terrain non-base que ce joueur contrôle
+Choose up to one creature that opponent controls to put a shy counter on|Choisissez jusqu'à une créature de cet adversaire sur laquelle mettre un marqueur « timide »
+Choose up to five permanents you control|Choisissez jusqu'à cinq permanents que vous contrôlez
+Choose up to X creatures and/or planeswalkers you control|Choisissez jusqu'à X créatures ou planeswalkers que vous contrôlez
+Choose two nontoken, non-Vehicle creatures you control|Choisissez deux créatures non-jetons et non-Véhicules que vous contrôlez
+Choose two cards to shuffle into opponent's library|Choisissez deux cartes à mélanger dans la bibliothèque de l'adversaire
+Choose two cards not to exile|Choisissez deux cartes à ne pas exiler
+Choose three permanents to keep|Choisissez trois permanents à garder
+Choose three nonland permanents you control|Choisissez trois permanents non-terrain que vous contrôlez
+Choose three lands to keep|Choisissez trois terrains à garder
+Choose this card and/or any number of commanders to distribute counters to|Choisissez cette carte ou des commandants entre lesquels répartir les marqueurs
+Choose six lands you control|Choisissez six terrains que vous contrôlez
+Choose six lands to keep|Choisissez six terrains à garder
+Choose one, two, or three creatures you control to distribute counters to|Choisissez une, deux ou trois de vos créatures entre lesquelles répartir les marqueurs
+Choose one to take 5 damage|Choisissez celui qui subit 5 blessures
+Choose one to exile|Choisissez celui à exiler
+Choose one or two creatures you control|Choisissez une ou deux créatures que vous contrôlez
+Choose one of the cards that entered the battlefield|Choisissez une des cartes arrivées sur le champ de bataille
+Choose one creature to keep untapped|Choisissez une créature à laisser dégagée
+Choose half the creatures (rounded up) target player controls|Choisissez la moitié (arrondie au supérieur) des créatures du joueur ciblé
+Choose five permanents you control|Choisissez cinq permanents que vous contrôlez
+Choose five lands to keep|Choisissez cinq terrains à garder
+Choose creatures to return to your hand|Choisissez les créatures à renvoyer dans votre main
+Choose creatures to put on the battlefield|Choisissez les créatures à mettre sur le champ de bataille
+Choose creature to put on the battlefield under your control|Choisissez la créature à mettre sur le champ de bataille sous votre contrôle
+Choose creature to exile|Choisissez la créature à exiler
+Choose creature to copy|Choisissez la créature à copier
+Choose any number of untapped creatures you control|Choisissez des créatures dégagées que vous contrôlez
+Choose any number of tapped creatures your opponents control to distribute counters to|Choisissez des créatures engagées de vos adversaires entre lesquelles répartir les marqueurs
+Choose any number of tapped creatures without flying you control|Choisissez des créatures engagées sans le vol que vous contrôlez
+Choose any number of tapped blue creatures you control|Choisissez des créatures bleues engagées que vous contrôlez
+Choose any number of other creatures that spell could target|Choisissez d'autres créatures que ce sort pourrait cibler
+Choose any number of non-Saga permanents with counters|Choisissez des permanents non-Sagas avec des marqueurs
+Choose any number of creatures you control|Choisissez des créatures que vous contrôlez
+Choose any number of creatures and/or Vehicles target player controls to distribute counters to|Choisissez des créatures ou Véhicules du joueur ciblé entre lesquels répartir les marqueurs
+Choose any number of creatures|Choisissez des créatures
+Choose any number of Planeswalkers you control|Choisissez des planeswalkers que vous contrôlez
+Choose any number of Human Werewolves you control|Choisissez des Humains Loups-garous que vous contrôlez
+Choose another attacking creature with lesser power|Choisissez une autre créature attaquante de force inférieure
+Choose an player with lowest life total|Choisissez un joueur ayant le moins de points de vie
+Choose an opponent whose top library card to exile|Choisissez l'adversaire dont exiler la carte du dessus de la bibliothèque
+Choose an opponent to draw a card|Choisissez l'adversaire qui pioche une carte
+Choose an opponent to create treasure tokens and scry 2|Choisissez l'adversaire qui crée des jetons Trésor et regarde les 2 cartes du dessus
+Choose an opponent to create a 1/1 red Survivor creature token.|Choisissez l'adversaire qui crée un jeton de créature 1/1 rouge Survivant.
+Choose an opponent to attach it to|Choisissez l'adversaire à qui l'attacher
+Choose an instant or sorcery card in your hand with mana value 3 or greater|Choisissez une carte d'éphémère ou de rituel de valeur de mana 3 ou plus dans votre main
+Choose an instant or sorcery card in your hand or graveyard|Choisissez une carte d'éphémère ou de rituel dans votre main ou votre cimetière
+Choose an face-down attacking or blocking creature|Choisissez une créature face cachée qui attaque ou qui bloque
+Choose an exiled card an opponent owns with a void counter on it|Choisissez une carte exilée d'un adversaire avec un marqueur « vide »
+Choose an equipped creature you control|Choisissez une créature équipée que vous contrôlez
+Choose an equipment to attach to this token|Choisissez un équipement à attacher à ce jeton
+Choose an equipment to attach to this creature|Choisissez un équipement à attacher à cette créature
+Choose an equipment card in your hand|Choisissez une carte d'équipement dans votre main
+Choose an artifact or enchantment|Choisissez un artefact ou un enchantement
+Choose an Incubator token you control|Choisissez un jeton Incubateur que vous contrôlez
+Choose an Equipment attached to the targeted creature|Choisissez un équipement attaché à la créature ciblée
+Choose amount of energy to pay|Quantité d'énergie à payer
+Choose a white creature card in your hand|Choisissez une carte de créature blanche dans votre main
+Choose a token|Choisissez un jeton
+Choose a source that shares a color with the exiled card|Choisissez une source qui a une couleur en commun avec la carte exilée
+Choose a source|Choisissez une source
+Choose a player with the most life or tied for most life|Choisissez un joueur ayant le plus de points de vie (ou à égalité)
+Choose a player to put two +1/+1 counters on a creature they control|Choisissez le joueur qui met deux marqueurs +1/+1 sur une de ses créatures
+Choose a player to draw a card|Choisissez le joueur qui pioche une carte
+Choose a player to create two Treasure tokens|Choisissez le joueur qui crée deux jetons Trésor
+Choose a player to attach this Curse to|Choisissez le joueur à qui attacher cette malédiction
+Choose a permanent you control to copy|Choisissez un de vos permanents à copier
+Choose a permanent you control|Choisissez un permanent que vous contrôlez
+Choose a permanent to untap|Choisissez un permanent à dégager
+Choose a party creature card in your hand|Choisissez une carte de créature de groupe dans votre main
+Choose a nonlegendary enchantment you control|Choisissez un enchantement non-légendaire que vous contrôlez
+Choose a nonlegendary creature to copy|Choisissez une créature non-légendaire à copier
+Choose a nonland permanent.|Choisissez un permanent non-terrain.
+Choose a nonland permanent you own for the second art sticker|Choisissez un permanent non-terrain que vous possédez pour le second autocollant d'illustration
+Choose a nonland permanent you control|Choisissez un permanent non-terrain que vous contrôlez
+Choose a nonland permanent with the highest mana value|Choisissez un permanent non-terrain de plus grande valeur de mana
+Choose a nonland permanent to put on the battlefield under your control|Choisissez un permanent non-terrain à mettre sur le champ de bataille sous votre contrôle
+Choose a nonland permanent in your hand|Choisissez une carte de permanent non-terrain dans votre main
+Choose a nonland card with mana value 3 or less|Choisissez une carte non-terrain de valeur de mana 3 ou moins
+Choose a nonland card exiled this way|Choisissez une carte non-terrain exilée ainsi
+Choose a nonland card among the cards exiled (that can't be played)|Choisissez une carte non-terrain parmi les cartes exilées (qui ne peuvent pas être jouées)
+Choose a noncreature, nonland card|Choisissez une carte non-créature et non-terrain
+Choose a non-Saga token you control|Choisissez un jeton non-Saga que vous contrôlez
+Choose a land that player controls|Choisissez un terrain que ce joueur contrôle
+Choose a face-down permanent you control to turn face up|Choisissez un de vos permanents face cachée à retourner face visible
+Choose a creature you want to control|Choisissez la créature dont vous voulez le contrôle
+Choose a creature you own that entered this turn|Choisissez une créature que vous possédez arrivée ce tour-ci
+Choose a creature you own|Choisissez une créature que vous possédez
+Choose a creature you control with equal or lesser power|Choisissez une de vos créatures de force égale ou inférieure
+Choose a creature you control to attach the Equipment to|Choisissez une de vos créatures à laquelle attacher l'équipement
+Choose a creature you control to attach an Equipment to|Choisissez une de vos créatures à laquelle attacher un équipement
+Choose a creature with the highest mana value|Choisissez une créature de plus grande valeur de mana
+Choose a creature to put a menace counter on|Choisissez une créature sur laquelle mettre un marqueur « menace »
+Choose a creature to put a deathtouch counter on|Choisissez une créature sur laquelle mettre un marqueur « contact mortel »
+Choose a creature to keep|Choisissez une créature à garder
+Choose a creature to exchange text boxes with|Choisissez une créature avec laquelle échanger les zones de texte
+Choose a creature to destroy|Choisissez une créature à détruire
+Choose a creature to copy|Choisissez une créature à copier
+Choose a creature to be stolen|Choisissez la créature qui sera volée
+Choose a creature or planeswalker with the highest mana value to sacrifice|Choisissez la créature ou le planeswalker de plus grande valeur de mana à sacrifier
+Choose a creature or planeswalker with the greatest mana value among creatures and planeswalkers you control|Choisissez votre créature ou planeswalker de plus grande valeur de mana
+Choose a creature or planeswalker to keep|Choisissez une créature ou un planeswalker à garder
+Choose a creature or planeswalker card in this player's graveyard|Choisissez une carte de créature ou de planeswalker dans le cimetière de ce joueur
+Choose a creature or planeswalker|Choisissez une créature ou un planeswalker
+Choose a creature or Vehicle you control|Choisissez une créature ou un Véhicule que vous contrôlez
+Choose a creature on the battlefield to copy|Choisissez une créature du champ de bataille à copier
+Choose a creature controlled by the player to your left|Choisissez une créature du joueur à votre gauche
+Choose a creature card with power 2 or less|Choisissez une carte de créature de force 2 ou moins
+Choose a creature card in your hand without blitz|Choisissez une carte de créature sans blitz dans votre main
+Choose a creature card in your hand or a creature you control|Choisissez une carte de créature dans votre main ou une créature que vous contrôlez
+Choose a creature card in this player's graveyard|Choisissez une carte de créature dans le cimetière de ce joueur
+Choose a creature card among the exiled cards to copy|Choisissez une carte de créature parmi les cartes exilées, à copier
+Choose a card with mana value 4 or greater|Choisissez une carte de valeur de mana 4 ou plus
+Choose a card to put on your opponent's battlefield|Choisissez une carte à mettre sur le champ de bataille de votre adversaire
+Choose a card to put into hand. If it's a land, you may put it onto the battlefield tapped instead.|Choisissez une carte à mettre dans votre main. Si c'est un terrain, vous pouvez plutôt le mettre engagé sur le champ de bataille.
+Choose a card that was revealed in targeted player's hand|Choisissez une carte révélée de la main du joueur ciblé
+Choose a card revealed this way or a card in their graveyard|Choisissez une carte révélée ainsi ou une carte de son cimetière
+Choose a card or permanent|Choisissez une carte ou un permanent
+Choose a card in your hand|Choisissez une carte dans votre main
+Choose a artifact that player controls|Choisissez un artefact que ce joueur contrôle
+Choose a Vehicle you control|Choisissez un Véhicule que vous contrôlez
+Choose a Sorcery|Choisissez un rituel
+Choose a Soldier card in your hand|Choisissez une carte de Soldat dans votre main
+Choose a Giant creature you control|Choisissez un Géant que vous contrôlez
+Choose a Gate card to put onto the battlefield|Choisissez une carte de Porte à mettre sur le champ de bataille
+Choose a Curse attached to you|Choisissez une malédiction attachée à vous
+Choose a Cave you control|Choisissez une Caverne que vous contrôlez

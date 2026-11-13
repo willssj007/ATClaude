@@ -426,7 +426,7 @@ export class DuelScreen {
         <button class="btn" data-buy-deck>${icon('mana')} Acheter un deck</button></div>
       <div class="versus">
         <div class="vs-side me"><div class="vs-label">Ton deck</div><div class="vs-tile mine"></div>
-          <select class="vs-deck">${decks.map(d => `<option value="${esc(d.key)}"${d.key === this.deckKey ? ' selected' : ''}${d.legal ? '' : ' disabled'}>${esc(d.name)}${d.legal ? '' : ' (incomplet)'}</option>`).join('')}</select></div>
+          <select class="vs-deck" aria-label="Ton deck">${decks.map(d => `<option value="${esc(d.key)}"${d.key === this.deckKey ? ' selected' : ''}${d.legal ? '' : ' disabled'}>${esc(d.name)}${d.legal ? '' : ' (incomplet)'}</option>`).join('')}</select></div>
         <div class="vs-mid"><span>VS</span></div>
         <div class="vs-side them"><div class="vs-label">Ton adversaire</div><div class="vs-tile theirs"><p class="muted small">Recherche d'un adversaire à ta mesure…</p></div>
           <div class="muted small vs-note"></div></div>
