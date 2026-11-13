@@ -17,6 +17,7 @@ import forge.item.PaperCard;
 import forge.model.FModel;
 import forge.util.CardTranslation;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +49,10 @@ final class French {
     private static final Pattern MANA = Pattern.compile("\\{T\\}: Add ((?:\\{[^}]+\\})+)\\.");
     private static final Pattern TARGET_LIST = Pattern.compile("ciblant \\[+(.*?)\\]+");
     private static final Pattern DISCARDS = Pattern.compile("^(.+?) discards (.+)\\.$");
+    /** « IA 2 a choisi Discard a card. pour Mog… » : le mode choisi, écrit en anglais par la carte. */
+    private static final Pattern CHOSE_MODE = Pattern.compile("^(.+?) a choisi (.+?) pour (.+)$");
+    private static final Pattern SEND_COUNTERED = Pattern.compile("^Send countered spell to (\\w+)$");
+    private static final Pattern CLASHED = Pattern.compile("^(.+?) clashed and put (.+) to the (top|bottom) of library\\.$");
 
     /** Texte de Forge d'un élément de pile (nettoyé) → texte français avec ses cibles, pour la ligne « résolu » du journal. */
     private static final Map<String, String> RESOLVED = Collections.synchronizedMap(new LinkedHashMap<>(64, 0.75f, true) {
@@ -183,6 +188,9 @@ final class French {
 
     /** Nom français d'une carte ou d'un jeton (celui de Forge, types de jetons corrigés). */
     static String cardName(final String name) {
+        if ("Puzzle Goal".equals(name)) {
+            return "Objectif de l'énigme"; // carte d'effet des énigmes, créée par Forge
+        }
         final String token = tokenName(name);
         return token != null ? token : CardTranslation.getTranslatedName(name);
     }
@@ -225,7 +233,10 @@ final class French {
                 try {
                     for (final SpellAbilityStackInstance si : game.getStack()) {
                         if (si.getId() == item.getId() && si.getSpellAbility() != null) {
-                            final String fr = sentenceFromOracle(out, si.getSpellAbility().getHostCard());
+                            String fr = sentenceFromOracle(out, si.getSpellAbility().getHostCard());
+                            if (fr == null) {
+                                fr = triggerHead(Texts.clean(out), si.getSpellAbility().getHostCard());
+                            }
                             if (fr != null) {
                                 out = fr;
                             }
@@ -360,7 +371,10 @@ final class French {
         if (chain.isEmpty()) {
             return null;
         }
-        String fr = CardTranslation.translateSingleDescriptionText(chain, host);
+        String fr = partsInFrench(sa, host);
+        if (fr == null) {
+            fr = CardTranslation.translateSingleDescriptionText(chain, host);
+        }
         if (fr.equals(chain)) {
             fr = CardTranslation.translateMultipleDescriptionText(chain, host);
         }
@@ -420,6 +434,37 @@ final class French {
     }
 
     /** Description de la capacité et de tous ses sous-effets. */
+    /**
+     * Capacité en plusieurs morceaux (« … deals 2 damage divided … » puis « Draw a card. ») : chaque morceau traduit à
+     * part, sinon seule la phrase la plus proche du tout était gardée (Électrolyse sans « Piochez une carte »). Null si
+     * un morceau n'a pas de traduction.
+     */
+    private static String partsInFrench(final SpellAbility sa, final Card host) {
+        final List<String> out = new ArrayList<>();
+        int parts = 0;
+        for (SpellAbility n = sa; n != null; n = n.getSubAbility()) {
+            final String d = n.getDescription();
+            if (d == null || d.trim().isEmpty()) {
+                continue;
+            }
+            // Une description peut tenir plusieurs phrases (« … one or two targets. Draw a card. ») : une par une.
+            for (final String part : d.trim().split("(?<=[.!?])\\s+(?=\\p{Lu})")) {
+                if (part.isBlank()) {
+                    continue;
+                }
+                parts++;
+                final String t = CardTranslation.translateSingleDescriptionText(part.trim(), host);
+                if (t.equals(part.trim()) || looksEnglish(t)) {
+                    return null;
+                }
+                if (!out.contains(t.trim())) {
+                    out.add(t.trim());
+                }
+            }
+        }
+        return parts < 2 ? null : String.join(" ", out);
+    }
+
     private static String chain(final SpellAbility sa) {
         final StringBuilder sb = new StringBuilder();
         for (SpellAbility n = sa; n != null; n = n.getSubAbility()) {
@@ -517,16 +562,29 @@ final class French {
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\r?\\n+");
     private static final Pattern ENGINE_SUFFIX = Pattern.compile("\\s*\\[[^\\]]*\\]\\s*$");
 
+    private static final Pattern THIS_CARD = Pattern.compile("\\bthis (creature|artifact|enchantment|land|permanent|planeswalker|card|spell"
+            + "|vehicle|equipment|aura|saga|battle|siege|class|case|room)\\b");
+
     private static String sentenceKey(final String s, final String name) {
         String k = s.toLowerCase(Locale.ROOT);
         if (name != null && !name.isEmpty()) {
             k = k.replace(name.toLowerCase(Locale.ROOT), "cardname");
+            final String fr = cardName(name);
+            if (fr != null && !fr.isEmpty()) {
+                k = k.replace(fr.toLowerCase(Locale.ROOT), "cardname");
+            }
         }
+        // « When this creature enters » (texte de la carte) = « When Raven Familiar enters the battlefield » (pile).
+        k = THIS_CARD.matcher(k).replaceAll("cardname").replace("enters the battlefield", "enters");
         return k.replaceAll("\\([^)]*\\)", "").replaceAll("[^\\p{L}\\p{N}+/{}-]+", " ").trim();
     }
 
     private static String[] sentences(final String text) {
         return SENTENCE_END.split(text.replace("\\n", "\n").trim());
+    }
+
+    private static String[] lines(final String text) {
+        return text.replace("\\n", "\n").replace("\r", "").trim().split("\n+");
     }
 
     /**
@@ -553,16 +611,24 @@ final class French {
                 if (fr == null || fr.isEmpty()) {
                     continue;
                 }
-                final String[] en = sentences(face.getOracleText());
-                final String[] frs = sentences(fr);
-                if (en.length != frs.length || en.length < 2) {
+                final String want = sentenceKey(core, face.getName());
+                if (want.isEmpty()) {
                     continue;
                 }
-                final String want = sentenceKey(core, face.getName());
-                for (int i = 0; i < en.length; i++) {
-                    if (!want.isEmpty() && sentenceKey(en[i], face.getName()).equals(want)) {
-                        final String nameFr = cardName(face.getName());
-                        return frs[i].trim().replace("CARDNAME", nameFr == null ? face.getName() : nameFr) + (suffix.isEmpty() ? "" : " " + suffix);
+                // Phrase par phrase quand les deux textes en ont autant, sinon ligne par ligne (un rappel entre
+                // parenthèses compte une phrase de plus dans une langue que dans l'autre).
+                final String[][] pairs = {sentences(face.getOracleText()), sentences(fr), lines(face.getOracleText()), lines(fr)};
+                for (int pass = 0; pass < 2; pass++) {
+                    final String[] en = pairs[pass * 2];
+                    final String[] frs = pairs[pass * 2 + 1];
+                    if (en.length != frs.length || en.length < 2) {
+                        continue;
+                    }
+                    for (int i = 0; i < en.length; i++) {
+                        if (sentenceKey(en[i], face.getName()).equals(want)) {
+                            final String nameFr = cardName(face.getName());
+                            return frs[i].trim().replace("CARDNAME", nameFr == null ? face.getName() : nameFr) + (suffix.isEmpty() ? "" : " " + suffix);
+                        }
                     }
                 }
             }
@@ -570,6 +636,108 @@ final class French {
             // Carte modifiée pendant la lecture : texte de Forge.
         }
         return null;
+    }
+
+    private static final Pattern EN_HEAD = Pattern.compile("^((?:When|Whenever|At)\\b[^,\\n]*,)\\s*(.+)$", Pattern.DOTALL);
+    private static final Pattern FR_HEAD = Pattern.compile("^((?:Quand|Lorsque|À chaque fois|Chaque fois|Au début|À la fin|Dès que|Dès qu')[^,\\n]*,)");
+
+    /**
+     * Déclencheur modal (« When X enters, • Piochez deux cartes. ») : Forge écrit le début de la capacité en anglais
+     * et le mode choisi en français. Le début est repris de la ligne française de la carte (même rang parmi les
+     * déclencheurs), le reste gardé. Null si la ligne n'a pas cette forme.
+     */
+    static String triggerHead(final String text, final Card host) {
+        if (text == null || host == null) {
+            return null;
+        }
+        final Matcher m = EN_HEAD.matcher(text.trim());
+        if (!m.matches() || looksEnglish(m.group(2).replaceAll("\\[[^\\]]*\\]", ""))) {
+            return null;
+        }
+        try {
+            final CardRules rules = host.getRules();
+            if (rules == null) {
+                return null;
+            }
+            for (final ICardFace face : new ICardFace[]{rules.getMainPart(), rules.getOtherPart()}) {
+                if (face == null || face.getOracleText() == null) {
+                    continue;
+                }
+                final String fr = CardTranslation.getTranslatedOracle(face.getName());
+                if (fr == null || fr.isEmpty()) {
+                    continue;
+                }
+                final List<String> enHeads = new ArrayList<>();
+                for (final String line : face.getOracleText().replace("\\n", "\n").split("\n")) {
+                    final Matcher h = EN_HEAD.matcher(line.trim());
+                    if (h.matches()) {
+                        enHeads.add(h.group(1));
+                    }
+                }
+                final List<String> frHeads = new ArrayList<>();
+                for (final String line : fr.replace("\\n", "\n").split("\n")) {
+                    final Matcher h = FR_HEAD.matcher(line.trim());
+                    if (h.find()) {
+                        frHeads.add(h.group(1));
+                    }
+                }
+                if (enHeads.isEmpty() || enHeads.size() != frHeads.size()) {
+                    continue;
+                }
+                int at = enHeads.size() == 1 ? 0 : -1;
+                final String nameFr = cardName(face.getName());
+                String head = m.group(1);
+                if (nameFr != null && !nameFr.isEmpty()) {
+                    head = head.replace(nameFr, face.getName());
+                }
+                final String want = sentenceKey(head.replaceAll("\\b(this (creature|artifact|enchantment|land|permanent|planeswalker))\\b", face.getName()), face.getName());
+                for (int i = 0; at < 0 && i < enHeads.size(); i++) {
+                    final String k = sentenceKey(enHeads.get(i).replace("CARDNAME", face.getName())
+                            .replaceAll("\\b(this (creature|artifact|enchantment|land|permanent|planeswalker))\\b", face.getName()), face.getName());
+                    if (k.equals(want)) {
+                        at = i;
+                    }
+                }
+                if (at < 0) {
+                    continue;
+                }
+                String rest = m.group(2).trim();
+                if (rest.startsWith("•")) {
+                    rest = rest.substring(1).trim();
+                }
+                if (!rest.isEmpty() && Character.isUpperCase(rest.charAt(0)) && (rest.length() < 2 || !Character.isUpperCase(rest.charAt(1)))) {
+                    rest = Character.toLowerCase(rest.charAt(0)) + rest.substring(1);
+                }
+                return frHeads.get(at) + " " + rest;
+            }
+        } catch (final RuntimeException e) {
+            // Carte modifiée pendant la lecture : texte de Forge.
+        }
+        return null;
+    }
+
+    /**
+     * Abonné aux événements de la partie : le texte français de chaque sort ou capacité est préparé dès son arrivée sur
+     * la pile (sur le fil de la partie). Sans ça, un sort qui se résout avant que l'écran ait montré la pile laissait sa
+     * ligne « résolu » du journal en anglais (« Électrolyse deals 2 damage divided to … »).
+     */
+    static final class StackWatcher {
+        private final Game game;
+
+        StackWatcher(final Game game) {
+            this.game = game;
+        }
+
+        @com.google.common.eventbus.Subscribe
+        public void receiveGameEvent(final forge.game.event.GameEvent ev) {
+            if (ev instanceof forge.game.event.GameEventSpellAbilityCast c && c.si() != null) {
+                try {
+                    stackText(game, c.si());
+                } catch (final RuntimeException e) {
+                    // texte préparé à l'affichage, comme avant
+                }
+            }
+        }
     }
 
     /** Lignes du journal que Forge écrit en anglais. */
@@ -592,6 +760,22 @@ final class French {
         final Matcher d = DISCARDS.matcher(out);
         if (d.matches()) {
             out = d.group(1) + " défausse " + d.group(2) + ".";
+        }
+        final Matcher cm = CHOSE_MODE.matcher(out);
+        if (cm.matches() && looksEnglish(cm.group(2))) {
+            final String mode = EnglishLines.translate(cm.group(2).trim());
+            if (!mode.equals(cm.group(2).trim())) {
+                out = cm.group(1) + " a choisi « " + mode.replaceAll("[.]$", "") + " » pour " + cm.group(3);
+            }
+        }
+        final Matcher sc = SEND_COUNTERED.matcher(out);
+        if (sc.matches()) {
+            out = "Sort contrecarré : pile → " + zone(sc.group(1)) + ".";
+        }
+        final Matcher cl = CLASHED.matcher(out);
+        if (cl.matches()) {
+            out = cl.group(1) + " révèle " + cl.group(2) + " pour la confrontation et la met " + ("top".equals(cl.group(3)) ? "au-dessus" : "au-dessous")
+                    + " de sa bibliothèque.";
         }
         out = MANA.matcher(out).replaceAll("{T} : Ajoutez $1.");
         out = TARGET_LIST.matcher(out).replaceAll("ciblant $1");

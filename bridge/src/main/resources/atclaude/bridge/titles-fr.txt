@@ -224,3 +224,4 @@ Choose a Giant creature you control|Choisissez un Géant que vous contrôlez
 Choose a Gate card to put onto the battlefield|Choisissez une carte de Porte à mettre sur le champ de bataille
 Choose a Curse attached to you|Choisissez une malédiction attachée à vous
 Choose a Cave you control|Choisissez une Caverne que vous contrôlez
+Select a permanent from among the milled cards|Choisissez un permanent parmi les cartes meulées

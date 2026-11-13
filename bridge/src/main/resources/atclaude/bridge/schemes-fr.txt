@@ -1,0 +1,71 @@
+# Machinations d'Archenemy que Forge laisse en anglais : nom anglais|nom français|type|texte (vide : celui de Forge).
+# « \n » sépare les lignes du texte, comme dans cardnames-fr-FR.txt.
+A Display of My Dark Power|Une démonstration de mon sombre pouvoir|Machination|Quand vous mettez cette machination à exécution, jusqu'à votre prochain tour, à chaque fois qu'un joueur engage un terrain pour du mana, ce joueur ajoute un mana supplémentaire de n'importe quel type que ce terrain a produit.
+A Reckoning Approaches|L'heure des comptes approche|Machination|Quand vous mettez cette machination à exécution, regardez les six cartes du dessus de votre bibliothèque. Vous pouvez mettre sur le champ de bataille une carte de créature parmi elles. Mettez le reste au-dessous de votre bibliothèque dans l'ordre de votre choix.
+All in Good Time|Chaque chose en son temps|Machination|
+All Shall Smolder in My Wake|Tout se consumera sur mon passage|Machination|
+Approach My Molten Realm|Approchez de mon royaume en fusion|Machination|
+Because I Have Willed It|Parce que je l'ai voulu|Machination continue|
+Behold My Grandeur|Contemplez ma grandeur|Machination|
+Behold the Power of Destruction|Contemplez le pouvoir de destruction|Machination|
+Bow to My Command|Pliez-vous à mes ordres|Machination continue|
+Choose Your Champion|Choisissez votre champion|Machination|
+Choose Your Demise|Choisissez votre fin|Machination|
+Dance, Pathetic Marionette|Danse, pathétique marionnette|Machination|
+Delight in the Hunt|Délectez-vous de la chasse|Machination|
+Drench the Soil in Their Blood|Abreuvez le sol de leur sang|Machination|Quand vous mettez cette machination à exécution, après cette phase principale, il y a une phase de combat supplémentaire suivie d'une phase principale supplémentaire. Les créatures que vous contrôlez acquièrent la vigilance jusqu'à la fin du tour.
+Embrace My Diabolical Vision|Embrassez ma vision diabolique|Machination|
+Every Dream a Nightmare|Chaque rêve, un cauchemar|Machination|
+Every Hope Shall Vanish|Tout espoir s'évanouira|Machination|
+Every Last Vestige Shall Rot|Jusqu'au dernier vestige, tout pourrira|Machination|
+Evil Comes to Fruition|Le mal porte ses fruits|Machination|
+Feed the Machine|Nourrissez la machine|Machination|
+For Each of You, a Gift|Pour chacun de vous, un présent|Machination|
+I Bask in Your Silent Awe|Je savoure votre muette stupeur|Machination continue|(Une machination continue reste face visible jusqu'à ce qu'elle soit abandonnée.)\nChaque adversaire ne peut pas lancer plus d'un sort à chaque tour.\nAu début de votre entretien, si aucun adversaire n'a lancé de sort depuis la fin de votre dernier tour, abandonnez cette machination.
+I Call on the Ancient Magics|J'invoque les magies anciennes|Machination|Quand vous mettez cette machination à exécution, chaque autre joueur cherche une carte dans sa bibliothèque, la révèle et la met dans sa main. Ensuite, vous cherchez deux cartes dans votre bibliothèque et vous les mettez dans votre main. Chaque joueur mélange.
+I Delight in Your Convulsions|Je me délecte de vos convulsions|Machination|Quand vous mettez cette machination à exécution, chaque adversaire perd 3 points de vie. Vous gagnez autant de points de vie que les points de vie perdus de cette manière.
+I Know All, I See All|Je sais tout, je vois tout|Machination continue|(Une machination continue reste face visible jusqu'à ce qu'elle soit abandonnée.)\nDégagez tous les permanents que vous contrôlez pendant l'étape de dégagement de chaque adversaire.\nAu début de chaque étape de fin, si au moins trois cartes ont été mises dans votre cimetière ce tour-ci depuis n'importe où, abandonnez cette machination.
+Ignite the Cloneforge!|Allumez la forge de clonage !|Machination|Quand vous mettez cette machination à exécution, créez un jeton qui est une copie d'un permanent ciblé qu'un adversaire contrôle.
+Imprison This Insolent Wretch|Emprisonnez ce misérable insolent|Machination continue|(Une machination continue reste face visible jusqu'à ce qu'elle soit abandonnée.)\nQuand vous mettez cette machination à exécution, choisissez un adversaire.\nLes permanents que contrôle le joueur choisi ne se dégagent pas pendant son étape de dégagement.\nQuand le joueur choisi est attaqué ou devient la cible d'un sort ou d'une capacité, abandonnez cette machination.
+Into the Earthen Maw|Dans la gueule de la terre|Machination|
+Introductions Are in Order|Les présentations s'imposent|Machination|
+Know Evil|Connaissez le mal|Machination|
+Know Naught but Fire|Ne connaissez que le feu|Machination|
+Look Skyward and Despair|Levez les yeux au ciel et désespérez|Machination|
+Make Yourself Useful|Rendez-vous utile|Machination|
+May Civilization Collapse|Que la civilisation s'effondre|Machination|
+Mortal Flesh Is Weak|La chair mortelle est faible|Machination|
+My Crushing Masterstroke|Mon coup de maître écrasant|Machination|
+My Forces Are Innumerable|Mes forces sont innombrables|Machination continue|
+My Genius Knows No Bounds|Mon génie ne connaît pas de limites|Machination|
+My Laughter Echoes|Mon rire résonne|Machination continue|
+My Undead Horde Awakens|Ma horde morte-vivante s'éveille|Machination continue|
+My Wish Is Your Command|Mon souhait est un ordre|Machination|
+Nature Demands an Offering|La nature exige une offrande|Machination|
+Nature Shields Its Own|La nature protège les siens|Machination continue|
+No One Will Hear Your Cries|Personne n'entendra vos cris|Machination|
+Nothing Can Stop Me Now|Rien ne peut plus m'arrêter|Machination continue|
+Only Blood Ends Your Nightmares|Seul le sang mettra fin à vos cauchemars|Machination|
+Pay Tribute to Me|Payez-moi tribut|Machination|
+Perhaps You've Met My Cohort|Vous connaissez peut-être mon acolyte|Machination|Quand vous mettez cette machination à exécution, cherchez une carte de planeswalker dans votre bibliothèque, mettez-la sur le champ de bataille, puis mélangez votre bibliothèque.
+Power Without Equal|Un pouvoir sans égal|Machination|
+Realms Befitting My Majesty|Des royaumes dignes de ma majesté|Machination|
+Roots of All Evil|Les racines de tout mal|Machination|
+Rotted Ones, Lay Siege|Pourrissants, assiégez-les|Machination|
+Surrender Your Thoughts|Livrez-moi vos pensées|Machination|
+The Dead Shall Serve|Les morts serviront|Machination|
+The Fate of the Flammable|Le sort de ce qui brûle|Machination|
+The Iron Guardian Stirs|Le gardien de fer s'éveille|Machination|
+The Mighty Will Fall|Les puissants tomberont|Machination|
+The Pieces Are Coming Together|Les pièces se mettent en place|Machination|
+The Very Soil Shall Shake|Le sol même tremblera|Machination continue|
+There Is No Refuge|Il n'y a aucun refuge|Machination|
+This World Belongs to Me|Ce monde m'appartient|Machination|
+Tooth, Claw, and Tail|Crocs, griffes et queue|Machination|
+What's Yours Is Now Mine|Ce qui est à vous est désormais à moi|Machination|
+When Will You Learn?|Quand apprendrez-vous ?|Machination|
+Which of You Burns Brightest?|Lequel de vous brûle le plus fort ?|Machination|
+Your Fate Is Thrice Sealed|Votre sort est trois fois scellé|Machination|
+Your Inescapable Doom|Votre perte inéluctable|Machination continue|(Une machination continue reste face visible.)\nAu début de votre étape de fin, mettez un marqueur « fatalité » sur cette machination, puis cette machination inflige un nombre de blessures égal au nombre de marqueurs « fatalité » sur elle à l'adversaire qui a le total de points de vie le plus élevé parmi vos adversaires. Si plusieurs joueurs sont à égalité pour le total de points de vie le plus élevé, vous en choisissez un.
+Your Puny Minds Cannot Fathom|Vos esprits chétifs ne peuvent comprendre|Machination|
+Your Will Is Not Your Own|Votre volonté ne vous appartient plus|Machination|

@@ -247,13 +247,14 @@ final class MatchSession {
                 final String level = career ? "normal" : str(seat, "level");
                 final LobbyPlayer base = GamePlayerUtil.createAiPlayer(name, aiIndex, AiLevels.profile(str(seat, "profile"), level));
                 rp.setStartingLife(AiLevels.life(rp.getStartingLife(), level));
-                lobby = !(base instanceof forge.ai.LobbyPlayerAi la) || freeMulligans == Mulligans.FORGE_DEFAULT && !isArchenemy
-                        ? base : Mulligans.ai(la, freeMulligans, isArchenemy);
+                // Toujours notre contrôleur d'IA (règle maison des mulligans, Archenemy, garde-fous contre les plantages de Forge).
+                lobby = base instanceof forge.ai.LobbyPlayerAi la ? Mulligans.ai(la, freeMulligans, isArchenemy) : base;
             } else {
                 if (human != null) {
                     throw new IllegalArgumentException("Un seul joueur humain par partie.");
                 }
-                lobby = HumanController.lobby(name, freeMulligans);
+                // Partie reprise : Forge a déjà dit au début de la partie quelles cartes l'IA joue mal.
+                lobby = HumanController.lobby(name, freeMulligans, save != null);
                 human = rp;
             }
             rp.setPlayer(lobby);
@@ -341,6 +342,9 @@ final class MatchSession {
         match.startMatch(type, variants.isEmpty() ? null : variants, players, human, gui);
         // La partie existe (son fil attend le mulligan du joueur) : on s'abonne à ses événements pour les statistiques.
         final Game game = match.getGame();
+        if (game != null) {
+            game.subscribeToEvents(new French.StackWatcher(game));
+        }
         final Player me = game == null ? null : humanPlayer(game);
         if (me != null) {
             final GameTracker t = new GameTracker(me.getId());
@@ -376,7 +380,8 @@ final class MatchSession {
         players.add(human);
         final RegisteredPlayer ai = new RegisteredPlayer(new Deck());
         ai.setStartingHand(0);
-        ai.setPlayer(GamePlayerUtil.createAiPlayer("IA", 1, AiLevels.profile("", "normal")));
+        final LobbyPlayer puzzleAi = GamePlayerUtil.createAiPlayer("IA", 1, AiLevels.profile("", "normal"));
+        ai.setPlayer(puzzleAi instanceof forge.ai.LobbyPlayerAi la ? Mulligans.ai(la, Mulligans.FORGE_DEFAULT, false) : puzzleAi);
         players.add(ai);
         Texts.reset();
         final BridgeGuiGame gui = new BridgeGuiGame(bridge);
@@ -394,6 +399,9 @@ final class MatchSession {
         final forge.game.GameRules rules = new forge.game.GameRules(GameType.Puzzle);
         rules.setGamesPerMatch(1);
         match.startMatch(rules, null, players, human, gui);
+        if (match.getGame() != null) {
+            match.getGame().subscribeToEvents(new French.StackWatcher(match.getGame()));
+        }
         session.applyYieldPrefs();
         return session;
     }
@@ -1149,7 +1157,7 @@ final class MatchSession {
             m.addProperty("teams", teams);
             final JsonArray lines = new JsonArray();
             if (outcome != null) {
-                outcome.getOutcomeStrings().forEach(lines::add);
+                outcome.getOutcomeStrings().forEach(l -> lines.add(l.replace("Puzzle Goal", "Objectif de l'énigme")));
             }
             m.add("details", lines);
         });
@@ -1464,7 +1472,11 @@ final class MatchSession {
             case "life" -> {
                 final Player p = player(m);
                 final int value = m.has("value") ? m.get("value").getAsInt() : p.getLife() + m.get("delta").getAsInt();
-                inGame(game, () -> p.setLife(Math.max(0, value), null));
+                inGame(game, () -> {
+                    p.setLife(Math.max(0, value), null);
+                    // Les règles d'état tout de suite : à 0, le joueur perd même si une invite (cible d'un déclencheur) est ouverte.
+                    game.getAction().checkStateEffects(true);
+                });
             }
             case "playerCounter" -> {
                 final Player p = player(m);

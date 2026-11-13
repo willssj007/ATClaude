@@ -63,6 +63,7 @@ final class FrenchCards {
 
     /** Au démarrage : le cache rejoint les traductions de Forge. */
     static synchronized void init() {
+        schemes();
         final File f = file();
         if (!f.isFile()) {
             return;
@@ -85,6 +86,39 @@ final class FrenchCards {
             System.err.println("Cache des textes français illisible : " + e.getMessage());
         }
         inject(CARDS);
+    }
+
+    /**
+     * Machinations d'Archenemy : Forge en laisse 69 en anglais (nom anglais, type « Scheme », nom et type glissés dans
+     * le texte, ou rien du tout). Leur traduction (schemes-fr.txt) remplace ce qu'il a ; un texte vide garde le sien.
+     */
+    private static void schemes() {
+        final Map<String, String> names = forgeMap("translatednames");
+        final Map<String, String> types = forgeMap("translatedtypes");
+        final Map<String, String> oracles = forgeMap("translatedoracles");
+        if (names == null || types == null || oracles == null) {
+            return;
+        }
+        try (java.io.InputStream in = FrenchCards.class.getResourceAsStream("schemes-fr.txt")) {
+            if (in == null) {
+                return;
+            }
+            synchronized (names) {
+                for (final String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                    final String[] p = line.split("\\|", -1);
+                    if (line.startsWith("#") || p.length < 4 || p[0].isEmpty()) {
+                        continue;
+                    }
+                    names.put(p[0], p[1]);
+                    types.put(p[0], p[2]);
+                    if (!p[3].trim().isEmpty()) {
+                        oracles.put(p[0], p[3].trim().replace("\\n", "\r\n\r\n"));
+                    }
+                }
+            }
+        } catch (final IOException | RuntimeException e) {
+            System.err.println("Machinations en français illisibles : " + e.getMessage());
+        }
     }
 
     private static synchronized void save() {

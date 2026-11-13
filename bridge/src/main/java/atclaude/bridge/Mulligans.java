@@ -8,7 +8,11 @@ import forge.game.card.Card;
 import forge.game.card.CardCollection;
 import forge.game.card.CardCollectionView;
 import forge.game.player.Player;
+import forge.game.spellability.SpellAbility;
 import forge.game.zone.ZoneType;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Mulligans gratuits, règle maison du salon : les {@code free} premiers mulligans de chaque joueur ne
@@ -95,6 +99,21 @@ final class Mulligans {
                     return true;
                 }
                 redraw(getPlayer());
+            }
+        }
+
+        /**
+         * Certaines logiques d'IA de Forge plantent sur un cas qu'elles n'attendent pas (Sin Prodder sans carte révélée :
+         * liste vide) ; le fil de la partie s'arrête alors et la partie reste gelée. L'IA prend plutôt le premier choix.
+         */
+        @Override
+        public SpellAbility chooseSingleSpellForEffect(final List<SpellAbility> spells, final SpellAbility sa, final String title,
+                final Map<String, Object> params) {
+            try {
+                return super.chooseSingleSpellForEffect(spells, sa, title, params);
+            } catch (final RuntimeException e) {
+                System.err.println("IA : premier choix pris après une erreur de Forge (" + e + ")");
+                return spells == null || spells.isEmpty() ? null : spells.get(0);
             }
         }
 

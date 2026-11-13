@@ -73,3 +73,15 @@ Equip {3}|Équipement {3}
 Toxic 1|Toxique 1
 Toxic 2|Toxique 2
 Token|Jeton
+If this creature would leave the battlefield, exile it instead.|Si cette créature devait quitter le champ de bataille, exilez-la à la place.
+If this permanent would become untapped, instead remove a stun counter from it.|Si ce permanent devait se dégager, retirez-en un marqueur « étourdissement » à la place.
+If it would leave the battlefield, exile it instead of putting it anywhere else.|S'il devait quitter le champ de bataille, exilez-le au lieu de le mettre n'importe où ailleurs.
+Skip your next untap step.|Passez votre prochaine étape de dégagement.
+Draw a card.|Piochez une carte.
+You gain 1 life. Draw a card at the beginning of next turn's upkeep.|Vous gagnez 1 point de vie. Piochez une carte au début de l'entretien du prochain tour.
+When this creature dies, it deals 1 damage to any target.|Quand cette créature meurt, elle inflige 1 blessure à n'importe quelle cible.
+Discard a card.|Défaussez-vous d'une carte.
+Sacrifice a creature.|Sacrifiez une créature.
+Sacrifice a permanent.|Sacrifiez un permanent.
+Lose 2 life.|Perdez 2 points de vie.
+Lose 3 life.|Perdez 3 points de vie.

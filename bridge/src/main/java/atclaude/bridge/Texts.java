@@ -159,9 +159,10 @@ final class Texts {
             final String hit = matchName(before, id, card);
             if (hit != null) {
                 out.append(before, 0, before.length() - hit.length()).append(display(gui, hit, card));
-            } else if (card != null && (before.endsWith(" Jeton") || before.endsWith(" Token"))) {
-                // Jeton devenu autre chose (copie) : son ancien nom reste, sans l'identifiant.
-                out.append(before.endsWith(" Token") ? before.substring(0, before.length() - 6) + " Jeton" : before);
+            } else if (before.endsWith(" Jeton") || before.endsWith(" Token")) {
+                // Jeton devenu autre chose (copie), ou mort avant d'avoir été montré (un jeton qui quitte le champ de
+                // bataille cesse d'exister) : son nom reste, sans l'identifiant, dans l'ordre français.
+                out.append(tokenName(before.endsWith(" Token") ? before.substring(0, before.length() - 6) + " Jeton" : before));
             } else if (card != null && card.isFaceDown() && before.endsWith(" ")) {
                 // « … à  (12) » : Forge a écrit le nom vide d'une carte face cachée.
                 out.append(before).append(FACE_DOWN);
@@ -176,6 +177,21 @@ final class Texts {
         }
         out.append(text, last, text.length());
         return out.toString();
+    }
+
+    /** « … : Mèche Jeton » → « … : Jeton Mèche » : le nom est ce qui suit la dernière ponctuation. */
+    private static String tokenName(final String before) {
+        int cut = -1;
+        for (final char c : new char[]{':', '.', ',', '(', '[', '→', '«', '—'}) {
+            cut = Math.max(cut, before.lastIndexOf(c));
+        }
+        final String head = before.substring(0, cut + 1);
+        final String name = before.substring(cut + 1);
+        final String trimmed = name.trim();
+        if (trimmed.length() <= 6 || !Character.isUpperCase(trimmed.charAt(0))) {
+            return before;
+        }
+        return head + name.substring(0, name.indexOf(trimmed)) + GameSerializer.tokenOrder(trimmed);
     }
 
     private static Card findCard(final Game game, final int id) {

@@ -304,7 +304,8 @@ final class GameSerializer {
             o.addProperty("typeLine", CustomCards.typeLine(s.getType()));
         }
         if (inGame) {
-            o.addProperty("text", EnglishLines.translate(o.get("text").getAsString()));
+            o.addProperty("text", "Puzzle Goal".equals(s.getName()) ? Puzzles.goalCardText(o.get("text").getAsString())
+                    : EnglishLines.translate(engineNotes(o.get("text").getAsString())));
         }
         o.addProperty("colors", colors(s.getColors()));
         o.addProperty("image", s.getImageKey());
@@ -428,7 +429,15 @@ final class GameSerializer {
         return text.replace("NICKNAME", nick).replace("CARDNAME", name);
     }
 
+    /** Carte d'effet d'une aventure : Forge la nomme « Carte (12)'s Adventure ». */
+    private static final Pattern ADVENTURE_EFFECT = Pattern.compile("^(.+?)(?: \\(\\d+\\))?'s Adventure$");
+
     static String translatedName(final CardStateView s) {
+        final java.util.regex.Matcher adv = s.getName() == null ? null : ADVENTURE_EFFECT.matcher(s.getName());
+        if (adv != null && adv.matches()) {
+            final String host = French.cardName(adv.group(1));
+            return "Aventure : " + (host == null || host.isEmpty() ? adv.group(1) : host);
+        }
         final String translated = French.cardName(s.getName());
         return tokenOrder(translated == null || translated.isEmpty() ? s.getName() : translated);
     }
@@ -487,6 +496,90 @@ final class GameSerializer {
 
     /** La ligne « Station » (le mot-clé seul) dans le texte d'une carte : Forge l'écrit après « STATION N+ ». */
     private static final Pattern STATION_KW = Pattern.compile("(?m)(^|\\r?\\n)\\s*(Station(?:\\s*\\([^\\r\\n]*\\))?)\\s*(?=\\r?\\n|$)");
+
+    /**
+     * Les notes que Forge ajoute en anglais au texte d'une carte en jeu (CardDetailUtil) : celles que le plateau montre
+     * déjà (marqueurs, blessures, carte attachée) sont retirées, les autres traduites.
+     */
+    private static final Object[][] ENGINE_NOTES = {
+        {Pattern.compile("^.+ counters: \\d+$"), null},
+        {Pattern.compile("^(?:Assigned )?Damage: \\d+$"), null},
+        {Pattern.compile("^\\*Attached to .*\\*$"), null},
+        {Pattern.compile("^Current Card Colors: .*$"), null},
+        {Pattern.compile("^Phased Out$"), "Hors phase"},
+        {Pattern.compile("^Intensity: (\\d+)$"), "Intensité : $1"},
+        {Pattern.compile("^Regeneration Shields: (\\d+)$"), "Boucliers de régénération : $1"},
+        {Pattern.compile("^Prevent the next (\\d+) damage that would be dealt to (.+) this turn\\.$"),
+            "Prévenez les $1 prochaines blessures qui devraient être infligées à $2 ce tour-ci."},
+        {Pattern.compile("^\\*Enchanting (.+)\\*$"), "Enchante $1"},
+        {Pattern.compile("^\\+Controlling: (.+)\\+$"), "Contrôle : $1"},
+        {Pattern.compile("^Sector: (.+)$"), "Secteur : $1"},
+        {Pattern.compile("^Sprocket: (.+)$"), "Pignon : $1"},
+        {Pattern.compile("^Protected by: (.+)$"), "Protégée par : $1"},
+        {Pattern.compile("^Imprinting: (.+)$"), "Empreinte : $1"},
+        {Pattern.compile("^Exiled until this leaves the battlefield: (.+)$"), "Exilée jusqu'à ce que cette carte quitte le champ de bataille : $1"},
+        {Pattern.compile("^Exiled: (.+)$"), "Exilées : $1"},
+        {Pattern.compile("^Haunted by: (.+)$"), "Hantée par : $1"},
+        {Pattern.compile("^Haunting (.+)$"), "Hante $1"},
+        {Pattern.compile("^Encoded: (.+)$"), "Encodée : $1"},
+        {Pattern.compile("^Must block (.+)$"), "Doit bloquer $1"},
+        {Pattern.compile("^Current Storm Count: (\\d+)$"), "Sorts lancés ce tour (tempête) : $1"},
+        {Pattern.compile("^Owner: (.+)$"), "Propriétaire : $1"},
+        {Pattern.compile("^\\(chosen type: (.+)\\)$"), "(type choisi : $1)"},
+        {Pattern.compile("^\\(noted types?: (.+)\\)$"), "(type noté : $1)"},
+        {Pattern.compile("^\\(chosen cards?: (.+)\\)$"), "(carte choisie : $1)"},
+        {Pattern.compile("^\\(chosen number: (.+)\\)$"), "(nombre choisi : $1)"},
+        {Pattern.compile("^\\(stored dice results: (.+)\\)$"), "(résultats de dé gardés : $1)"},
+        {Pattern.compile("^\\(chosen player: (.+)\\)$"), "(joueur choisi : $1)"},
+        {Pattern.compile("^\\(chosen mode: (.+)\\)$"), "(mode choisi : $1)"},
+        {Pattern.compile("^\\(named cards?: Hidden\\)$"), "(carte nommée : cachée)"},
+        {Pattern.compile("^\\(named cards?: (.+)\\)$"), "(carte nommée : $1)"},
+        {Pattern.compile("^\\(In room: (.+)\\)$"), "(pièce : $1)"},
+        {Pattern.compile("^\\(Class Level: (\\d+)\\)$"), "(niveau de classe : $1)"},
+        {Pattern.compile("^\\(Ring Level: (\\d+)\\)$"), "(niveau de l'Anneau : $1)"},
+        {Pattern.compile("^Text changed: all instances of (.+) are replaced by (.+)\\.$"), "Texte changé : « $1 » devient « $2 »."},
+    };
+
+    private static final Pattern CHOSEN_TYPE = Pattern.compile("^\\(type (?:choisi|noté) : (.+)\\)$");
+
+    static String engineNotes(final String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        final String[] lines = text.split("\n", -1);
+        final StringBuilder out = new StringBuilder(text.length());
+        boolean changed = false;
+        for (final String line : lines) {
+            String kept = line;
+            final String t = line.trim();
+            for (final Object[] note : ENGINE_NOTES) {
+                final java.util.regex.Matcher m = ((Pattern) note[0]).matcher(t);
+                if (m.matches()) {
+                    kept = note[1] == null ? null : m.replaceFirst((String) note[1]);
+                    break;
+                }
+            }
+            if (kept != null && kept != line) {
+                // « (type choisi : Goblin) » : le type en français quand une carte le traduit.
+                final java.util.regex.Matcher ct = CHOSEN_TYPE.matcher(kept);
+                if (ct.matches()) {
+                    final StringBuilder types = new StringBuilder();
+                    for (final String en : ct.group(1).split(",\\s*")) {
+                        final String fr = French.creatureTypeFr(en.trim());
+                        types.append(types.length() == 0 ? "" : ", ").append(fr == null ? en.trim() : fr);
+                    }
+                    kept = kept.substring(0, kept.indexOf(':') + 2) + types + ")";
+                }
+            }
+            if (kept != line) {
+                changed = true;
+            }
+            if (kept != null) {
+                out.append(kept).append('\n');
+            }
+        }
+        return changed ? out.toString().replaceAll("(\\r?\\n){3,}", "\n\n").trim() : text;
+    }
 
     static String withoutEngineLines(final String text) {
         if (text == null || text.isEmpty()) {
@@ -610,12 +703,15 @@ final class GameSerializer {
             if (French.looksEnglish(text) && e.sourceCard() != null && gv.getGame() != null) {
                 // Déclencheur différé ou morceau de capacité : la phrase française de la carte.
                 final forge.game.card.Card host = findCardSafe(gv.getGame(), e.sourceCard().getId());
-                final String fr = French.sentenceFromOracle(text, host);
+                String fr = French.sentenceFromOracle(text, host);
+                if (fr == null) {
+                    fr = French.triggerHead(text, host);
+                }
                 if (fr != null) {
                     text = Texts.clean(fr);
                 }
             }
-            o.addProperty("text", text);
+            o.addProperty("text", EnglishLines.translate(text));
             // La carte en cause, pour l'agrandir depuis le journal : seulement si le texte la nomme déjà
             // (une carte face cachée ou non révélée ne doit rien dévoiler de plus).
             final CardView src = e.sourceCard();

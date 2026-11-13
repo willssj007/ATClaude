@@ -37,17 +37,47 @@ import java.util.Map;
 final class HumanController extends PlayerControllerHuman {
 
     private final int free;
+    private final boolean own;
     private int taken;
+    private boolean quietAiWarning;
+
+    @Override
+    public void revealAISkipCards(final String message,
+            final Map<Player, Map<forge.deck.DeckSection, List<? extends forge.item.PaperCard>>> unplayable) {
+        if (!quietAiWarning) {
+            super.revealAISkipCards(message, unplayable);
+        }
+    }
 
     HumanController(final Game game, final Player player, final LobbyPlayerHuman lobby, final int free) {
         super(game, player, lobby);
         this.free = free;
+        this.own = true;
     }
 
     /** Joueur contrôlé par un autre (triche « contrôler ») : pas de mulligan à gérer. */
     HumanController(final Player slave, final LobbyPlayerHuman lobby, final PlayerControllerHuman master) {
         super(slave, lobby, master);
         this.free = Mulligans.FORGE_DEFAULT;
+        this.own = false;
+    }
+
+    /**
+     * Le joueur de l'appli. Forge le reconnaît à son joueur de salon « GUI », que l'appli n'utilise pas : sans ceci,
+     * une énigme ne trouve pas le joueur humain et plante au démarrage (Puzzle.addGoalEnforcement).
+     */
+    @Override
+    public boolean isGuiPlayer() {
+        return own;
+    }
+
+    /** Forge refuse une attaque avec ce message en anglais (créature obligée d'attaquer, attaquants limités…). */
+    @Override
+    public void notifyOfValue(final SpellAbility sa, final forge.game.GameObject target, final String value) {
+        super.notifyOfValue(sa, target, "Attack declaration invalid".equals(value)
+                ? "Attaque refusée : une créature doit attaquer si elle le peut, ou une règle en jeu limite les attaquants "
+                + "(« ne peut pas attaquer seule », nombre d'attaquants, joueur qu'on ne peut pas attaquer). Change ta sélection."
+                : value);
     }
 
     @Override
@@ -195,11 +225,18 @@ final class HumanController extends PlayerControllerHuman {
     }
 
     static LobbyPlayerHuman lobby(final String name, final int free) {
+        return lobby(name, free, false);
+    }
+
+    /** {@code resumed} : partie sauvegardée reprise, sans l'avertissement « l'IA ne peut pas bien jouer ces cartes ». */
+    static LobbyPlayerHuman lobby(final String name, final int free, final boolean resumed) {
         return new LobbyPlayerHuman(name, 0, 0) {
             @Override
             public Player createIngamePlayer(final Game game, final int id) {
                 final Player player = new Player(forge.util.GuiDisplayUtil.personalizeHuman(getName()), game, id);
-                player.setFirstController(new HumanController(game, player, this, free));
+                final HumanController c = new HumanController(game, player, this, free);
+                c.quietAiWarning = resumed;
+                player.setFirstController(c);
                 return player;
             }
 

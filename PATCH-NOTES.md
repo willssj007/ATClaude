@@ -28,6 +28,20 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 - **Éditeur plus clair** : les onglets Formulaire, Script Forge et Apparence sont à plat (sur téléphone, ils s'affichaient dans une boîte verticale en pointillés) ; les mots-clés choisis sont en tête (touche pour retirer), et les groupes de mots-clés restent repliés tant qu'on n'y a rien choisi.
 - **Barre d'actions toujours visible** sur téléphone (en bas) : Annuler, Rétablir, Essayer, Enregistrer. Plus besoin de remonter tout le formulaire pour enregistrer.
 
+### Corrections (vérification de tout le jeu)
+- **Énigmes** : elles plantaient au démarrage (la partie restait figée au premier tour). Elles se lancent et leur objectif s'applique ; la carte « Objectif de l'énigme » est en français.
+- **Partie figée par l'IA** : certaines logiques d'IA de Forge plantaient sur un cas imprévu (Sin Prodder sans carte révélée…), et la partie ne bougeait plus. L'IA prend maintenant le premier choix possible et la partie continue.
+- **Archenemy en français** : les 69 machinations que Forge laissait en anglais ont leur nom et leur type (« Machination », « Machination continue »), et les 10 qui n'avaient aucun texte français l'ont aussi.
+- **Reprise d'une partie sauvegardée** : la fenêtre « L'IA ne peut pas bien jouer ces cartes », déjà vue au début de la partie, ne revient plus bloquer la reprise.
+- **Attaque refusée** : le message « Attack declaration invalid » est remplacé par une explication en français (créature obligée d'attaquer, attaquants limités, joueur qu'on ne peut pas attaquer).
+- **Texte des cartes en partie** : plus de lignes de Forge en anglais à la fin du texte (« +1/+1 counters: 2 », blessures, carte attachée : le plateau les montre déjà) ; les autres notes sont traduites (type choisi, joueur choisi, niveau de classe, hors phase, boucliers de régénération…). L'effet d'une aventure s'appelle « Aventure : … » au lieu de « … (156)'s Adventure ».
+- **Jetons** : « Jeton Gobelin » au lieu de « Gobelin Jeton », sans numéro, même pour un jeton mort avant d'avoir été affiché ; les textes des jetons de Forge sont en français.
+- **Fenêtres de choix** : leurs titres et consignes (234 titres des scripts de Forge, et la plupart des consignes de ciblage) sont en français, avec une majuscule.
+- **Pile et journal** : la ligne « résolu » d'un sort qui se résout tout de suite (sans que la pile ait eu le temps de s'afficher) était en anglais (« Électrolyse deals 2 damage divided to … ») : son texte français est préparé dès que le sort arrive sur la pile. Un déclencheur modal ne mélange plus les deux langues (« When … enters, • Piochez deux cartes ») ; les phrases des capacités sont prises dans le texte français de la carte, phrase par phrase ou ligne par ligne. Une capacité en plusieurs morceaux est traduite en entier (Électrolyse garde « Piochez une carte »). Le journal traduit aussi la confrontation, le sort contrecarré, le mode choisi par l'IA (« Défaussez-vous d'une carte ») et d'autres lignes de Forge. Une ligne qu'on ne sait pas traduire en entier reste en anglais plutôt que de mélanger les deux langues.
+- **Texte français des cartes récentes** : seul ce qui manque vient de Scryfall (le nom ou le texte déjà traduits par Forge sont gardés).
+- **Triche « points de vie »** : un joueur mis à 0 perd tout de suite, même si une invite est ouverte (la cible d'un déclencheur, par exemple).
+- Mots-clés traduits en plus : Dévorement de nourriture, d'artefacts, de terrains ; Protection contre chaque couleur.
+
 ## 0.7.3 — Planechase, scellé et draft, énigmes, partage de cartes perso
 
 ### Mises à jour

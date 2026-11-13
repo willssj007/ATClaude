@@ -33,6 +33,26 @@ final class EnglishLines {
             + "Shadow|Horsemanship|Flanking|Banding|Persist|Undying|Myriad|Annihilator|Afflict|Exalted|Forestwalk|Islandwalk|"
             + "Swampwalk|Mountainwalk|Plainswalk|Skulk|Decayed|Living weapon|Crew|Token)\\b");
 
+    /** Phrases avec un nom de carte au milieu : motif anglais, remplacement français. */
+    private static final Object[][] PATTERNS = {
+        {java.util.regex.Pattern.compile("^You may have (.+) enter tapped as a copy of any land on the battlefield\\.?$"),
+            "Vous pouvez faire que $1 arrive engagé en tant que copie de n'importe quel terrain sur le champ de bataille."},
+        {java.util.regex.Pattern.compile("^You may have (.+) enter as a copy of any land on the battlefield\\.?$"),
+            "Vous pouvez faire que $1 arrive en tant que copie de n'importe quel terrain sur le champ de bataille."},
+        {java.util.regex.Pattern.compile("^You may have (.+) enter as a copy of any creature on the battlefield\\.?$"),
+            "Vous pouvez faire que $1 arrive en tant que copie de n'importe quelle créature sur le champ de bataille."},
+        {java.util.regex.Pattern.compile("^You may have (.+) enter as a copy of any artifact on the battlefield\\.?$"),
+            "Vous pouvez faire que $1 arrive en tant que copie de n'importe quel artefact sur le champ de bataille."},
+        {java.util.regex.Pattern.compile("^You may have (.+) enter as a copy of any enchantment on the battlefield\\.?$"),
+            "Vous pouvez faire que $1 arrive en tant que copie de n'importe quel enchantement sur le champ de bataille."},
+        // « You may cast Puissance du bouclier. » (aventure) : un nom de carte seulement, pas « spells as though… ».
+        {java.util.regex.Pattern.compile("^You may cast (\\p{Lu}(?:(?! as | from | without | this | that | it\\b| them\\b|spells|cards).)*?)\\.?$"),
+            "Vous pouvez lancer $1."},
+    };
+
+    /** « Draw a card. [Phase: IA 2] » : la note de Forge entre crochets, gardée à part. */
+    private static final java.util.regex.Pattern NOTE = java.util.regex.Pattern.compile("^(.*?)(\\s*\\[[^\\]]*\\])$");
+
     private static boolean english(final String s) {
         return French.looksEnglish(s) || KEYWORDS.matcher(s).find();
     }
@@ -84,11 +104,25 @@ final class EnglishLines {
                 out.append(line);
                 continue;
             }
-            String fr = phrases().get(key(core));
+            final java.util.regex.Matcher note = NOTE.matcher(core);
+            final String body = note.matches() ? note.group(1) : core;
+            final String tail = note.matches() ? note.group(2) : "";
+            String fr = phrases().get(key(body));
+            if (fr != null) {
+                fr = fr + tail;
+            }
+            for (int k = 0; fr == null && k < PATTERNS.length; k++) {
+                final java.util.regex.Matcher pm = ((java.util.regex.Pattern) PATTERNS[k][0]).matcher(body.trim());
+                if (pm.matches() && !French.looksEnglish(pm.group(1))) {
+                    fr = pm.replaceFirst((String) PATTERNS[k][1]) + tail;
+                }
+            }
             if (fr == null) {
                 // Mots-clés (« Flying, haste », « Toxic 1 ») : comme pour les cartes perso.
+                // Seulement une ligne traduite en entier : « When this creature enters, choisissez l'un — » mêlerait
+                // les deux langues, la ligne reste alors en anglais.
                 final String kw = CustomCards.frenchText(core.trim());
-                fr = kw != null && !kw.equals(core.trim()) ? kw : null;
+                fr = kw != null && !kw.equals(core.trim()) && !French.looksEnglish(kw) ? kw : null;
             }
             out.append(fr == null ? line : fr + cr);
         }

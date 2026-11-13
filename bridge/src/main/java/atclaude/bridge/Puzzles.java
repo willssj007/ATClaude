@@ -104,6 +104,32 @@ final class Puzzles {
         return out;
     }
 
+    /** Texte de la carte « Puzzle Goal » que Forge met dans la zone de commandement (son résumé de l'énigme, en anglais). */
+    static String goalCardText(final String en) {
+        if (en == null || en.isEmpty()) {
+            return en;
+        }
+        final StringBuilder out = new StringBuilder();
+        for (final String line : en.replace("\r", "").split("\n", -1)) {
+            final String t = line.trim();
+            String fr = line;
+            if (t.startsWith("WARNING: This puzzle is human-controlled")) {
+                fr = "Attention : vous décidez aussi pour l'adversaire (pas d'IA dans cette énigme). Votre solution doit marcher "
+                        + "quels que soient ses choix.";
+            } else if (t.startsWith("Difficulty: ")) {
+                fr = "Difficulté : " + t.substring(12);
+            } else if (t.startsWith("Goal: ")) {
+                fr = "Objectif : " + goal(t.substring(6));
+            } else if (t.startsWith("Turns Limit: ")) {
+                fr = "Limite de tours : " + t.substring(13);
+            } else if (!t.isEmpty()) {
+                fr = describe(t);
+            }
+            out.append(out.length() == 0 && fr.isEmpty() ? "" : fr).append('\n');
+        }
+        return out.toString().trim();
+    }
+
     private static String goal(final String g) {
         return switch (g.toLowerCase(java.util.Locale.ROOT)) {
             case "win" -> "Gagner";
