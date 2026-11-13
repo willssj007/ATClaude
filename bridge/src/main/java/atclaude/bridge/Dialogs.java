@@ -353,10 +353,23 @@ final class Dialogs {
         bridge.ask("reveal", d);
     }
 
+    private static final java.util.regex.Pattern PLANAR_RESULT = java.util.regex.Pattern.compile("Planar dice result: (\\w+)");
+
     void message(final String title, final String message) {
+        // Planechase : le résultat du dé planaire, en français.
+        final java.util.regex.Matcher die = message == null ? null : PLANAR_RESULT.matcher(message);
+        final boolean planar = die != null && die.find();
+        final String text = planar ? switch (die.group(1)) {
+            case "Planeswalk" -> "Symbole de planeswalker : on change de plan !";
+            case "Chaos" -> "Chaos ! L'effet de chaos du plan se déclenche.";
+            default -> "Face vide : il ne se passe rien.";
+        } : message;
         bridge.sendEvent("notice", m -> {
-            m.addProperty("title", Texts.clean(title));
-            m.addProperty("message", Texts.clean(message));
+            m.addProperty("title", planar ? "Dé planaire" : Texts.clean(title));
+            m.addProperty("message", Texts.clean(text));
+            if (planar) {
+                m.addProperty("planarDie", die.group(1).toLowerCase(java.util.Locale.ROOT));
+            }
         });
     }
 

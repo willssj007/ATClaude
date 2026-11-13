@@ -25,6 +25,8 @@ final class GameTracker {
     private volatile int lands;
     private volatile int turns;
     private volatile int spells;
+    /** Cartes perso jouées (lancées, ou terrains posés) : nom → nombre de fois, pour leurs statistiques. */
+    private final java.util.Map<String, Integer> customPlayed = new java.util.concurrent.ConcurrentHashMap<>();
     /** Mulligans et triche d'avant la reprise d'une partie sauvegardée. */
     private volatile int mulligansBefore;
     volatile boolean cheated;
@@ -55,6 +57,9 @@ final class GameTracker {
                     && (z.from() == null || z.from().zoneType() != ZoneType.Battlefield)
                     && c != null && c.getCurrentState() != null && c.getCurrentState().isLand()) {
                 lands++;
+                if (z.from() != null && z.from().zoneType() == ZoneType.Hand) {
+                    played(c);
+                }
             }
         } else if (ev instanceof GameEventTurnBegan t) {
             if (isMine(t.turnOwner())) {
@@ -63,8 +68,28 @@ final class GameTracker {
         } else if (ev instanceof GameEventSpellAbilityCast c) {
             if (c.si() != null && !c.si().isAbility() && !c.si().isTrigger() && isMine(c.si().getActivatingPlayer())) {
                 spells++;
+                played(c.si().getSourceCard());
             }
         }
+    }
+
+    private void played(final CardView c) {
+        if (c == null || c.getCurrentState() == null) {
+            return;
+        }
+        final String name = c.getCurrentState().getName();
+        final String front = CustomCards.frontOf(name);
+        final String card = front != null ? front : name;
+        if (CustomCards.isCustom(card)) {
+            customPlayed.merge(card, 1, Integer::sum);
+        }
+    }
+
+    /** {nom : fois jouée} des cartes perso jouées dans cette partie. */
+    JsonObject customPlayed() {
+        final JsonObject o = new JsonObject();
+        customPlayed.forEach(o::addProperty);
+        return o;
     }
 
     private boolean isMine(final PlayerView p) {
@@ -80,6 +105,7 @@ final class GameTracker {
         o.addProperty("spells", spells);
         o.addProperty("mulligans", mulligansBefore);
         o.addProperty("cheated", cheated);
+        o.add("customPlayed", customPlayed());
         return o;
     }
 
@@ -94,6 +120,9 @@ final class GameTracker {
         spells = num(o, "spells");
         mulligansBefore = num(o, "mulligans");
         cheated = o.has("cheated") && o.get("cheated").getAsBoolean();
+        if (o.has("customPlayed") && o.get("customPlayed").isJsonObject()) {
+            o.getAsJsonObject("customPlayed").entrySet().forEach(e -> customPlayed.put(e.getKey(), e.getValue().getAsInt()));
+        }
     }
 
     void setMulligansBefore(final int n) {

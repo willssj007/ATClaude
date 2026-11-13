@@ -3,8 +3,6 @@
 import {AccountScreen, loadProfile, onProfile, syncNow} from './account.js';
 import {initAudio, refreshAudio, setMusicMode} from './audio.js';
 import {bridge} from './bridge.js';
-import {Atelier} from './atelier.js';
-import {BoostersScreen} from './boosters.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
 import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCareer, wildcardsHtml} from './career.js';
 import {Decks} from './decks.js';
@@ -13,7 +11,7 @@ import {Game} from './game.js';
 import {Lobby} from './lobby.js';
 import {SearchPanel} from './search.js';
 import {enhanceSelects} from './select.js';
-import {checkUpdates} from './updates.js';
+import {checkUpdates, watchUpdates, whatsNew} from './updates.js';
 import {icon} from './icons.js';
 import {ReplayScreen} from './replay.js';
 import {StatsScreen} from './stats.js';
@@ -31,8 +29,43 @@ let decksCache = null;
 let ready = false;
 
 /** Écrans réservés à un mode : le Sandbox a ses salons, le Planeswalker ses duels et ses boosters. */
-const SANDBOX_ONLY = ['lobby'];
+const SANDBOX_ONLY = ['lobby', 'limited'];
 const PLANESWALKER_ONLY = ['duel', 'boosters'];
+
+/**
+ * Écran chargé à la première visite (l'Atelier et son générateur de scripts, la boutique et ses boosters en 3D font
+ * près de la moitié du code de l'interface) : le démarrage n'a plus à les lire. Ils se préparent ensuite en tâche de fond.
+ */
+function lazyScreen(name, load) {
+  let instance = null;
+  let loading = null;
+  const get = () => {
+    if (!loading) {
+      loading = load().then((s) => {
+        instance = s;
+        return s;
+      }).catch((e) => {
+        loading = null;
+        throw e;
+      });
+    }
+    return loading;
+  };
+  return {
+    lazy: true,
+    preload: () => get().catch(() => {}),
+    get instance() {
+      return instance;
+    },
+    show() {
+      get().then((s) => {
+        if (current === name) {
+          s.show();
+        }
+      }).catch(e => toast(e.message, {error: true}));
+    },
+  };
+}
 
 function showScreen(name) {
   if (isPlaneswalker() && SANDBOX_ONLY.includes(name)) {
@@ -127,12 +160,37 @@ async function startMatch(setup) {
   }
 }
 
+/**
+ * « Essayer en partie » (Atelier) : une partie de la Sandbox avec le dernier deck joué contre une IA, la carte perso
+ * arrive dans ma main une fois les mulligans faits.
+ */
+async function tryCard(name) {
+  if (!name) {
+    return;
+  }
+  if (isPlaneswalker()) {
+    toast('L\'essai en partie se fait dans la Sandbox (change de mode depuis l\'accueil).', {title: 'Atelier'});
+    return;
+  }
+  const decks = await getDecks(true).catch(() => ({decks: []}));
+  const last = prefs.get('lastSetup');
+  const mine = last && last.players && last.players.find(p => !p.ai);
+  const format = last && last.format || 'commander';
+  const known = (decks.decks || []).some(d => mine && d.key === mine.deckKey) || (decks.precons || []).some(d => mine && d.key === mine.deckKey);
+  const deckKey = known ? mine.deckKey : format === 'commander' ? 'random' : 'randomConstructed';
+  toast(`« ${name} » arrive dans ta main après les mulligans.`, {title: 'Essai en partie'});
+  startMatch({format, tryCards: [name], players: [{name: (mine && mine.name) || screens.lobby.playerName || 'Moi', ai: false, deckKey},
+    {name: 'IA 1', ai: true, deckKey: format === 'commander' ? 'random' : 'randomConstructed', profile: ''}]});
+}
+
+
 /** Écran de partie. Duel de carrière : « Duel suivant » ramène à l'écran Duel, avec le nouvel adversaire. */
 function newGame(rematch) {
   return new Game($('#screen-game'), {
     onExit: leaveMatch,
     onRematch: () => (game && game.career ? leaveMatch().then(() => showScreen('duel')) : rematch()),
     onMenu: () => showScreen('home'),
+    onRewind: rewindMatch,
     // Le replay de la partie finie est le plus récent (gardé avant l'écran de fin).
     onReplay: async () => {
       try {
@@ -146,6 +204,31 @@ function newGame(rematch) {
       }
     },
   });
+}
+
+/** Sandbox : la partie reprend au moment calme précédent (le moteur garde les dernières photos de la partie). */
+async function rewindMatch() {
+  if (!await confirmBox('Revenir en arrière ?', 'La partie reprend au moment calme précédent (le début de la phase d\'avant, à peu près). Ce qui s\'est passé depuis est oublié.',
+    {yes: 'Revenir en arrière'})) {
+    return;
+  }
+  closeAllForgeDialogs();
+  if (game) {
+    game.destroy();
+  }
+  game = newGame(() => startMatch(lastSetup || prefs.get('lastSetup')));
+  game.pauseUntilResumed('Retour en arrière…');
+  inMatch = true;
+  showScreen('game');
+  try {
+    await bridge.request('rewind');
+    bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
+  } catch (e) {
+    toast(e.message, {title: 'Retour en arrière', error: true, duration: 6000});
+    // La partie en cours continue : on la réaffiche.
+    bridge.send('state');
+    game.resumed();
+  }
 }
 
 /** Reprend la partie sauvegardée (l'application avait été fermée en pleine partie). */
@@ -248,7 +331,8 @@ function homeScreen() {
         : `
           <div class="tile panel" data-go="lobby">${icon('swords', 'tile-ic')}<h3>Jouer</h3><p class="muted">1 à 3 adversaires IA, Commander ou Construit.</p></div>
           <div class="tile panel" data-go="decks">${icon('cards', 'tile-ic')}<h3>Decks</h3><p class="muted">${decks.decks.length} deck(s) perso · ${decks.precons.length} préconstruits Commander.</p></div>
-          <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>`;
+          <div class="tile panel" data-go="cards">${icon('book', 'tile-ic')}<h3>Cartes</h3><p class="muted">Cherche parmi toutes les cartes, en français ou en anglais.</p></div>
+          <div class="tile panel" data-go="limited">${icon('booster', 'tile-ic')}<h3>Limité et énigmes</h3><p class="muted">Scellé et draft contre l'IA (extensions de Magic ou les tiennes), et des énigmes à résoudre.</p></div>`;
       root.innerHTML = `<div class="page">
         ${saved ? savedGameHtml(saved) : ''}
         <div class="hero">
@@ -397,7 +481,7 @@ function settingsScreen() {
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
         <p class="muted small version"></p>
         <h2 style="margin-top:26px">Mises à jour</h2>
-        ${row('autoUpdate', 'Chercher les mises à jour au lancement', bridge.ios ? 'Prévenir quand une nouvelle version est publiée (sur iPhone et iPad, elle se réinstalle avec ton outil d\'installation).'
+        ${row('autoUpdate', 'Chercher les mises à jour automatiquement', bridge.ios ? 'Prévenir quand une nouvelle version est publiée (sur iPhone et iPad, elle se réinstalle avec ton outil d\'installation).'
           : 'Prévenir quand une nouvelle version est publiée, et l\'installer en un toucher (tes decks, ton compte et tes cartes perso restent).')}
         <button class="btn" data-update-check>Vérifier maintenant</button>
       </div>`;
@@ -487,6 +571,16 @@ function onReady(hello) {
       checkUpdates({auto: true});
     }
   }, 4000);
+  watchUpdates(() => !inMatch);
+  // L'Atelier et la boutique se préparent quand l'appli n'a rien d'autre à faire (premier affichage instantané).
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1));
+  setTimeout(() => idle(() => {
+    screens.atelier.preload();
+    screens.boosters.preload();
+  }), 8000);
+  if (!(hello && hello.inMatch)) {
+    whatsNew(hello && hello.appVersion);
+  }
   checkUnlocks();
   $('#loading').classList.add('hidden');
   if (autotest) {
@@ -548,18 +642,19 @@ function init() {
   screens.cards = cardsScreen();
   screens.duel = new DuelScreen($('#screen-duel'), {onStart: startMatch, onBoosters: () => showScreen('boosters'), playerName: () => screens.lobby.playerName,
     duelRunning: () => inMatch && !!(game && game.career), endDuel: () => leaveMatch(null)});
-  screens.boosters = new BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')});
+  screens.boosters = lazyScreen('boosters', () => import('./boosters.js').then(m => new m.BoostersScreen($('#screen-boosters'), {onDuel: () => showScreen('duel')})));
   screens.settings = settingsScreen();
   screens.trophies = new Trophies($('#screen-trophies'));
   let atelierSync = null;
-  screens.atelier = new Atelier($('#screen-atelier'), {onChanged: () => {
+  screens.atelier = lazyScreen('atelier', () => import('./atelier.js').then(m => new m.Atelier($('#screen-atelier'), {onChanged: () => {
     // Une carte perso créée ou supprimée : les listes de decks et la recherche se refont.
     decksCache = null;
     screens.cards.reset();
     // Et elle part sur le compte GitHub quelques secondes après (une seule synchro pour plusieurs changements).
     clearTimeout(atelierSync);
     atelierSync = setTimeout(() => syncNow({auto: true, onDone: afterSync}), 4000);
-  }});
+  }, onTry: tryCard})));
+  screens.limited = lazyScreen('limited', () => import('./limited.js').then(m => new m.LimitedScreen($('#screen-limited'), {onStart: startMatch})));
   screens.replay = new ReplayScreen($('#screen-replay'), {onClose: () => showScreen('stats')});
   screens.stats = new StatsScreen($('#screen-stats'), {onWatch: (id) => {
     showScreen('replay');

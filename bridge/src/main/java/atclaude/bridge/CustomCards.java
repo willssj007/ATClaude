@@ -349,6 +349,11 @@ final class CustomCards {
         return f.isFile() ? SET_PREFIX + id + ":" + f.lastModified() : null;
     }
 
+    /** La rareté d'une carte perso (C, U, R, M, S ou vide). */
+    static String rarityOf(final String name) {
+        return svar(rules(name), "AtelierRarity");
+    }
+
     /** Valeur d'une ligne « SVar:Nom:… » d'une carte (vide si elle n'en a pas). */
     private static String svar(final CardRules rules, final String key) {
         if (rules != null && rules.getMainPart() != null) {
@@ -1577,7 +1582,7 @@ final class CustomCards {
                 case Legendary -> " légendaire";
                 case Basic -> " de base";
                 case Snow -> "";
-                case World -> " du monde";
+                case World -> fem ? " mondiale" : " mondial";
                 default -> " " + st.name().toLowerCase(Locale.ROOT);
             });
         }
@@ -1698,6 +1703,124 @@ final class CustomCards {
         }
         o.add("cards", cards);
         return o;
+    }
+
+    // ------------------------------------------------------------------ partage (fichier .atcards)
+
+    private static final java.util.regex.Pattern SET_LINE = java.util.regex.Pattern.compile("(?m)^SVar:AtelierSet:(\\S+)\\s*$");
+
+    /**
+     * Fichier de partage : les cartes choisies (toutes si names est vide), leurs extensions (avec les extensions
+     * choisies dans sets), les réimpressions de ces extensions et les types perso. Ni les suppressions, ni le reste.
+     */
+    static synchronized JsonObject shareExport(final Set<String> names, final Set<String> sets) {
+        final JsonObject all = export();
+        final JsonObject out = new JsonObject();
+        out.addProperty("format", "arcane-table-cards");
+        out.addProperty("version", 1);
+        out.add("types", all.get("types"));
+        final JsonObject cards = new JsonObject();
+        final Set<String> usedSets = new java.util.HashSet<>(sets);
+        final JsonObject allCards = obj(all, "cards");
+        for (final String n : allCards.keySet()) {
+            if (names.isEmpty() && sets.isEmpty() || names.contains(n)) {
+                final JsonObject c = allCards.getAsJsonObject(n);
+                cards.add(n, c);
+                final java.util.regex.Matcher m = SET_LINE.matcher(str(c, "script"));
+                if (m.find()) {
+                    usedSets.add(m.group(1));
+                }
+            }
+        }
+        out.add("cards", cards);
+        final JsonArray outSets = new JsonArray();
+        for (final com.google.gson.JsonElement e : all.getAsJsonArray("sets")) {
+            if (names.isEmpty() && sets.isEmpty() || usedSets.contains(str(e.getAsJsonObject(), "id"))) {
+                outSets.add(e);
+            }
+        }
+        out.add("sets", outSets);
+        final JsonArray reprints = new JsonArray();
+        for (final com.google.gson.JsonElement e : all.getAsJsonArray("reprints")) {
+            final String set = str(e.getAsJsonObject(), "set");
+            if (names.isEmpty() && sets.isEmpty() || !set.isEmpty() && sets.contains(set)) {
+                reprints.add(e);
+            }
+        }
+        out.add("reprints", reprints);
+        return out;
+    }
+
+    /**
+     * Ajoute les cartes d'un fichier de partage : ses cartes (une carte du même nom est remplacée), ses extensions et
+     * réimpressions (en plus de celles de cet appareil), ses types perso (ajoutés aux miens). Rien n'est supprimé.
+     */
+    static synchronized JsonObject shareImport(final JsonObject shared) {
+        if (shared == null || !"arcane-table-cards".equals(str(shared, "format"))) {
+            throw new IllegalArgumentException("Ce fichier n'est pas un partage de cartes d'Arcane Table (.atcards).");
+        }
+        final JsonObject local = export();
+        final long now = System.currentTimeMillis();
+        final JsonObject remote = new JsonObject();
+        // Types : les miens, puis les nouveaux.
+        final JsonArray types = local.getAsJsonArray("types").deepCopy();
+        final Set<String> knownTypes = new java.util.HashSet<>();
+        types.forEach(t -> knownTypes.add(t.getAsString()));
+        int newTypes = 0;
+        if (shared.has("types") && shared.get("types").isJsonArray()) {
+            for (final com.google.gson.JsonElement t : shared.getAsJsonArray("types")) {
+                if (knownTypes.add(t.getAsString())) {
+                    types.add(t);
+                    newTypes++;
+                }
+            }
+        }
+        remote.add("types", types);
+        remote.addProperty("typesAt", newTypes > 0 ? now : 0);
+        // Extensions et réimpressions : les miennes, plus celles du fichier (même identifiant : celle du fichier).
+        final int[] added = new int[2];
+        remote.add("sets", unionById(local.getAsJsonArray("sets"), arr(shared, "sets"), added, 0));
+        remote.addProperty("setsAt", added[0] > 0 ? now : 0);
+        remote.add("reprints", unionById(local.getAsJsonArray("reprints"), arr(shared, "reprints"), added, 1));
+        remote.addProperty("reprintsAt", added[1] > 0 ? now : 0);
+        // Cartes : celles du fichier, plus récentes que tout ce qui est ici.
+        final JsonObject cards = new JsonObject();
+        final JsonObject theirs = obj(shared, "cards");
+        for (final String n : theirs.keySet()) {
+            final JsonObject c = theirs.getAsJsonObject(n).deepCopy();
+            c.addProperty("at", now);
+            cards.add(n, c);
+        }
+        remote.add("cards", cards);
+        apply(merge(local, remote, true));
+        final JsonObject r = new JsonObject();
+        r.addProperty("cards", cards.size());
+        r.addProperty("sets", added[0]);
+        r.addProperty("reprints", added[1]);
+        r.addProperty("types", newTypes);
+        return r;
+    }
+
+    private static JsonArray arr(final JsonObject o, final String key) {
+        return o.has(key) && o.get(key).isJsonArray() ? o.getAsJsonArray(key) : new JsonArray();
+    }
+
+    private static JsonArray unionById(final JsonArray mine, final JsonArray theirs, final int[] added, final int slot) {
+        final Map<String, com.google.gson.JsonElement> byId = new java.util.LinkedHashMap<>();
+        mine.forEach(e -> byId.put(str(e.getAsJsonObject(), "id"), e));
+        for (final com.google.gson.JsonElement e : theirs) {
+            if (!e.isJsonObject()) {
+                continue;
+            }
+            final String id = str(e.getAsJsonObject(), "id");
+            if (!byId.containsKey(id) || !byId.get(id).equals(e)) {
+                added[slot]++;
+            }
+            byId.put(id, e);
+        }
+        final JsonArray out = new JsonArray();
+        byId.values().forEach(out::add);
+        return out;
     }
 
     /**

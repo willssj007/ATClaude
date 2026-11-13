@@ -18,4 +18,16 @@
             <artifactId>forge-gui</artifactId>
         </dependency>
     </dependencies>
+    <build>
+        <resources>
+            <!-- Les notes de version, pour la fenêtre « Quoi de neuf » après une mise à jour. -->
+            <resource>
+                <directory>${project.basedir}/..</directory>
+                <includes>
+                    <include>PATCH-NOTES.md</include>
+                </includes>
+                <targetPath>atclaude/bridge</targetPath>
+            </resource>
+        </resources>
+    </build>
 </project>

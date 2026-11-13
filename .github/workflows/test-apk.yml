@@ -29,7 +29,7 @@ jobs:
       # La version en préparation (celle de la prochaine publication, à changer avec build.yml), puis le numéro du build de test.
       - name: Version
         run: |
-          VERSION="0.7.0-test.${{ github.run_number }}"
+          VERSION="0.7.3-test.${{ github.run_number }}"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "Version $VERSION"
 
@@ -45,6 +45,19 @@ jobs:
 
       - name: Compiler le pont
         run: mvn -B -q install -DskipTests
+
+      # Chaque effet, déclencheur, mot-clé et sorte de carte de l'Atelier : le script généré doit être accepté par le
+      # vrai moteur (l'hôte ordinateur, démarré ici sans fenêtre). Un seul refus arrête le build de test.
+      - name: Tests de l'Atelier par Forge
+        run: |
+          mkdir -p "$RUNNER_TEMP/at-data"
+          java -Xmx3g -jar "$(ls desktop/target/desktop-*.jar | head -1)" --assets "$FORGE_DIR/forge-gui" \
+            --data "$RUNNER_TEMP/at-data" --ui ui --no-browser > "$RUNNER_TEMP/host.log" 2>&1 &
+          HOST=$!
+          for i in $(seq 1 240); do grep -q "Forge pr" "$RUNNER_TEMP/host.log" && break; sleep 2; done
+          grep -q "Forge pr" "$RUNNER_TEMP/host.log" || { tail -60 "$RUNNER_TEMP/host.log"; exit 1; }
+          node tests/atelier-forge.mjs
+          kill $HOST || true
 
       - name: Préparer les ressources et l'interface
         run: |

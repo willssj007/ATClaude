@@ -69,13 +69,14 @@ final class WebController extends UIViewController {
                         }
                     }
                     case "atclaudeUrl" -> openExternal(body);
+                    case "atclaudeShare" -> shareFile(body);
                     case "atclaudeOrientation" -> setAnyOrientation("any".equals(body));
                     case "atclaudeLog" -> System.out.println("[page] " + body);
                     default -> { }
                 }
             }
         };
-        for (final String name : new String[] {"atclaude", "atclaudeUrl", "atclaudeOrientation", "atclaudeLog"}) {
+        for (final String name : new String[] {"atclaude", "atclaudeUrl", "atclaudeOrientation", "atclaudeLog", "atclaudeShare"}) {
             content.addScriptMessageHandler(messages, name);
         }
         // Erreurs de la page dans le journal de l'application (app.log).
@@ -217,6 +218,25 @@ final class WebController extends UIViewController {
         }
         DispatchQueue.getMainQueue().async(() ->
                 UIApplication.getSharedApplication().openURL(new NSURL(url), new UIApplicationOpenURLOptions(), null));
+    }
+
+    /** Feuille de partage d'iOS pour un fichier préparé par le pont (cartes perso, image d'une carte). */
+    private void shareFile(final String path) {
+        final java.io.File file = new java.io.File(path == null ? "" : path);
+        if (!file.isFile()) {
+            return;
+        }
+        DispatchQueue.getMainQueue().async(() -> {
+            final org.robovm.apple.uikit.UIActivityViewController share = new org.robovm.apple.uikit.UIActivityViewController(
+                    new org.robovm.apple.foundation.NSArray<>(new NSURL(file)), null);
+            // iPad : la feuille s'ouvre en bulle, attachée au milieu de l'écran.
+            final org.robovm.apple.uikit.UIPopoverPresentationController pop = share.getPopoverPresentationController();
+            if (pop != null && web != null) {
+                pop.setSourceView(web);
+                pop.setSourceRect(new org.robovm.apple.coregraphics.CGRect(web.getBounds().getWidth() / 2, web.getBounds().getHeight() / 2, 1, 1));
+            }
+            presentViewController(share, true, null);
+        });
     }
 
     // ------------------------------------------------------------------ messages vers la page

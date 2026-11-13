@@ -246,7 +246,8 @@ public final class Bridge {
             "clearStats", "savedGame", "career", "careerStart", "careerReset", "boosterSets", "buyBooster", "openBooster", "openBoosters",
             "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic",
             "careerSwapChallenge", "creatureTypes", "customCards", "customValidate", "customSave", "customDelete", "customTypes",
-            "customSets", "customSetSave", "customSetDelete", "reprintSave", "reprintDelete");
+            "customSets", "customSetSave", "customSetDelete", "reprintSave", "reprintDelete", "limitedSets", "limitedSealed", "draftStart",
+            "draftState", "draftPick", "limitedPool", "limitedAuto", "limitedSetup", "puzzles", "shareExport", "shareImport", "shareImage", "whatsNew");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -385,12 +386,78 @@ public final class Bridge {
         return new JsonObject();
     }
 
+    /** Fichier de partage des cartes perso choisies (names) ou d'extensions entières (sets) : son chemin, et son contenu. */
+    private JsonElement shareExport(final JsonObject m) {
+        final java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        final java.util.Set<String> sets = new java.util.LinkedHashSet<>();
+        if (m.has("names") && m.get("names").isJsonArray()) {
+            m.getAsJsonArray("names").forEach(e -> names.add(e.getAsString()));
+        }
+        if (m.has("sets") && m.get("sets").isJsonArray()) {
+            m.getAsJsonArray("sets").forEach(e -> sets.add(e.getAsString()));
+        }
+        final JsonObject data = CustomCards.shareExport(names, sets);
+        final String label = optString(m, "label").replaceAll("[^\\p{L}\\p{N} _-]", "").trim();
+        final String name = "ArcaneTable-" + (label.isEmpty() ? "cartes" : label.replace(' ', '-')) + ".atcards";
+        final JsonObject o = shareFile(name, data.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), true);
+        o.addProperty("count", data.getAsJsonObject("cards").size());
+        return o;
+    }
+
+    /**
+     * Écrit un fichier à partager dans le dossier que l'appli sait partager (Android : le dossier des mises à jour, servi
+     * par son fournisseur de fichiers) ; withData : renvoie aussi son contenu (ordinateur : téléchargement par la page).
+     */
+    private JsonObject shareFile(final String name, final byte[] bytes, final boolean text) {
+        final String safe = name == null || name.isEmpty() ? "partage" : name.replaceAll("[^A-Za-z0-9._-]", "_");
+        final java.io.File dir = new java.io.File(System.getProperty("atclaude.updatesDir",
+                new java.io.File(System.getProperty("java.io.tmpdir"), "arcane-table-partage").getPath()));
+        dir.mkdirs();
+        final java.io.File f = new java.io.File(dir, safe);
+        try {
+            java.nio.file.Files.write(f.toPath(), bytes);
+        } catch (final java.io.IOException e) {
+            throw new IllegalStateException("Fichier de partage impossible à écrire : " + e.getMessage());
+        }
+        final JsonObject o = new JsonObject();
+        o.addProperty("path", f.getAbsolutePath());
+        o.addProperty("name", safe);
+        o.addProperty("size", bytes.length);
+        // Ordinateur (ni Android, qui donne son dossier des mises à jour, ni iPhone) : la page télécharge le contenu.
+        if (System.getProperty("atclaude.updatesDir") == null && !ios) {
+            o.addProperty(text ? "text" : "base64", text ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+                    : B64.encode(bytes));
+        }
+        return o;
+    }
+
+    /** Les nouveautés de cette version (première section des notes de version livrées avec l'appli). */
+    private JsonElement whatsNew() {
+        final JsonObject o = new JsonObject();
+        o.addProperty("version", appVersion);
+        String notes = "";
+        try (java.io.InputStream in = Bridge.class.getResourceAsStream("PATCH-NOTES.md")) {
+            if (in != null) {
+                final String md = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                final int start = md.indexOf("\n## ");
+                final int end = start < 0 ? -1 : md.indexOf("\n## ", start + 4);
+                notes = start < 0 ? "" : md.substring(start + 1, end < 0 ? md.length() : end).trim();
+            }
+        } catch (final java.io.IOException e) {
+            notes = "";
+        }
+        o.addProperty("notes", notes);
+        return o;
+    }
+
     private JsonElement handle(final String type, final JsonObject m) {
         switch (type) {
             case "imageDirect":
                 return ImageService.directUrls(m.has("key") ? m.get("key").getAsString() : null, m.has("lang") ? m.get("lang").getAsString() : null);
             case "hello":
                 return hello();
+            case "whatsNew":
+                return whatsNew();
             case "searchCards":
                 return catalog.search(m.getAsJsonObject("query"));
             case "creatureTypes":
@@ -399,6 +466,12 @@ public final class Bridge {
                 return Catalog.tokenList();
             case "customCards":
                 return CustomCards.state();
+            case "shareExport":
+                return shareExport(m);
+            case "shareImport":
+                return CustomCards.shareImport(com.google.gson.JsonParser.parseString(m.get("data").getAsString()).getAsJsonObject());
+            case "shareImage":
+                return shareFile(optString(m, "name"), B64.decode(m.get("png").getAsString()), false);
             case "customValidate":
                 return CustomCards.validate(m.get("script").getAsString(), optString(m, "previous"));
             case "customSave":
@@ -565,6 +638,28 @@ public final class Bridge {
                 return Career.summary(catalog);
             case "boosterSets":
                 return Career.boosterSets();
+            case "puzzles":
+                return Puzzles.list();
+            case "limitedSets": {
+                final JsonObject o = new JsonObject();
+                o.add("sets", Career.boosterSets());
+                o.add("custom", Limited.customSets());
+                return o;
+            }
+            case "limitedSealed":
+                return Limited.sealed(m.get("set").getAsString());
+            case "draftStart":
+                return Limited.draftStart(m.get("set").getAsString());
+            case "draftState":
+                return Limited.draftState();
+            case "draftPick":
+                return Limited.draftPick(m.get("name").getAsString());
+            case "limitedPool":
+                return Limited.pool();
+            case "limitedAuto":
+                return Limited.autoDeck();
+            case "limitedSetup":
+                return Limited.setup(m.getAsJsonArray("cards"), m.getAsJsonObject("lands"), optString(m, "name"));
             case "buyBooster":
                 return Career.buy(catalog, m.get("set").getAsString());
             case "openBooster":
@@ -591,6 +686,22 @@ public final class Bridge {
             case "deleteSaved":
                 SaveGame.delete(null);
                 return null;
+            case "rewind": {
+                // Sandbox : la partie reprend depuis la photo d'avant (début de la phase précédente, à peu près).
+                final MatchSession cur = session;
+                if (cur == null) {
+                    throw new IllegalStateException("Aucune partie en cours.");
+                }
+                final java.util.List<JsonObject> older = new java.util.ArrayList<>();
+                final JsonObject target = cur.rewindTarget(older);
+                if (target == null) {
+                    throw new IllegalStateException("Rien à annuler pour l'instant : la partie n'a pas encore d'étape précédente.");
+                }
+                endSession();
+                session = MatchSession.resume(this, catalog, target);
+                session.keepHistory(older);
+                return null;
+            }
             default:
                 final MatchSession current = session;
                 if (current == null) {

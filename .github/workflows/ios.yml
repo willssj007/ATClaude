@@ -11,7 +11,7 @@ on:
         description: Mac de GitHub (Intel quand les Mac Apple sont saturés)
         type: choice
         options: [macos-latest, macos-15-intel]
-        default: macos-latest
+        default: macos-15-intel
 
 permissions:
   contents: write
@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   ipa:
-    runs-on: ${{ inputs.runner || 'macos-latest' }}
+    runs-on: ${{ inputs.runner || 'macos-15-intel' }}
     timeout-minutes: 150
     env:
       FORGE_DIR: ${{ github.workspace }}/../forge-src

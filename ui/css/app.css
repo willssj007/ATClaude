@@ -1556,3 +1556,29 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 /* Mana phyrexian : la couleur du mana, avec le signe ϕ (payable avec 2 points de vie). */
 .ms.ms-phy { background: var(--h1); color: #1b1b22; font-weight: 800; font-family: Georgia, 'Times New Roman', serif; }
 .ms.ms-phy.ms-phy-d { color: #fff; }
+
+/* Limité (scellé, draft) et énigmes */
+.lim .lim-tabs { margin: 10px 0 14px; }
+.lim-setup { display: flex; flex-direction: column; gap: 10px; max-width: 640px; padding: 14px 16px; }
+.lim-setup select { width: 100%; }
+.lim-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.lim-top h2 { margin: 0; flex: 1; display: flex; align-items: center; gap: 8px; }
+.lim-top h2 .ok { color: #8fe08f; }
+.lim-top h2 .warn { color: #ffd27a; }
+.lim-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+.lim-grid .mcard { --w: 132px; cursor: pointer; transition: transform 0.15s; }
+.lim-grid .mcard:hover { transform: translateY(-3px); }
+.lim-grid .mcard.picked { outline: 3px solid var(--gold-2); }
+.lim-mini .mcard { --w: 84px; }
+.lim-pack h3 { margin: 4px 0 0; }
+.lim-lands { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 8px 12px; margin: 6px 0 10px; }
+.lim-land { display: inline-flex; align-items: center; gap: 4px; opacity: 0.75; }
+.lim-land.used { opacity: 1; }
+.lim-land b { min-width: 22px; text-align: center; }
+.lim-plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-top: 10px; }
+.lim-p { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text); border: 1px solid var(--line); }
+.lim-p:hover { border-color: rgb(var(--gold-rgb) / 0.6); }
+.lim-p.done { opacity: 0.75; }
+.lim-pn { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.lim-pn .ic { width: 16px; height: 16px; color: var(--gold-2); flex: none; }
+@media (max-width: 640px) { .lim-grid .mcard { --w: 104px; } .lim-mini .mcard { --w: 70px; } }

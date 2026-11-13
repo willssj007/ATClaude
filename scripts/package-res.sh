@@ -19,6 +19,10 @@ mkdir -p "$OUT/res"
 for dir in ai blockdata cube defaults editions effects formats lists setlookup tokenscripts; do
   cp -r "$SRC/$dir" "$OUT/res/$dir"
 done
+# Énigmes (puzzles) et classements des cartes pour le draft et le scellé contre l'IA (les cubes ne servent pas).
+cp -r "$SRC/puzzle" "$OUT/res/puzzle"
+mkdir -p "$OUT/res/draft"
+cp -r "$SRC/draft/rankings" "$OUT/res/draft/rankings"
 mkdir -p "$OUT/res/quest"
 for dir in commanderprecons precons themes; do
   cp -r "$SRC/quest/$dir" "$OUT/res/quest/$dir"

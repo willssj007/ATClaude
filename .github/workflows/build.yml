@@ -160,13 +160,12 @@ jobs:
 
   ios:
     needs: apk
-    # Deux sortes de Mac de GitHub à la fois (Apple Silicon et Intel) : les premiers sont parfois saturés, et la tâche
-    # est annulée faute de machine au bout d'un quart d'heure. Chacune construit le même IPA ; la dernière arrivée
-    # remplace celui de la première dans la release.
+    # Mac Intel de GitHub : les Mac Apple Silicon (macos-latest) sont saturés et leur tâche était annulée faute de
+    # machine au bout d'un quart d'heure, ce qui marquait toute la construction en échec alors que l'IPA était publié.
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-latest, macos-15-intel]
+        runner: [macos-15-intel]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     env:

@@ -189,7 +189,8 @@ export class Game {
    * replay : partie enregistrée, revue sans pouvoir jouer (les actions ne partent pas ; toucher une carte l'agrandit).
    * onBuild(table) : après chaque construction du plateau (le lecteur de replay y remet ses commandes).
    */
-  constructor(root, {onExit, onRematch, onMenu, onReplay = null, replay = false, onBuild = null}) {
+  constructor(root, {onExit, onRematch, onMenu, onReplay = null, replay = false, onBuild = null, onRewind = null}) {
+    this.onRewind = onRewind;
     this.root = root;
     this.onReplay = onReplay;
     this.replay = replay;
@@ -268,10 +269,11 @@ export class Game {
       <div class="board">
         <div class="half opp-half"></div>
         <div class="divider" title="Glisser pour agrandir un côté du plateau · double-touche : moitié-moitié">
-          <div class="div-start"><div class="turn-label"></div></div>
+          <div class="div-start"><div class="turn-label"></div><span class="plane-host"></span></div>
           <div class="phases"></div>
           <div class="atk-bar hidden"></div>
           <div class="div-end">
+            <span class="die-host"></span>
             <span class="pill-host"></span>
             ${opponents.length > 1 ? `<button class="tool" data-set-view="all">${icon('cards')}</button>` : ''}
             <button class="tool hold-tool" data-hold aria-pressed="false" title="Garder la priorité : après mes sorts, m'arrêter pour pouvoir y répondre">${icon('hourglass')}<span class="tool-label">Priorité</span></button>
@@ -805,6 +807,15 @@ export class Game {
     if (!state.players || !state.players.length) {
       return;
     }
+    // Planechase : le dé planaire (effet de Forge) et les plans ouverts ont leur place à eux, pas dans les piles.
+    for (const p of state.players) {
+      const cmd = p.zones && p.zones.command;
+      if (cmd && cmd.some(c => c.planarDie || c.plane || c.phenomenon)) {
+        p.planarDie = cmd.find(c => c.planarDie) || null;
+        p.planes = cmd.filter(c => c.plane || c.phenomenon);
+        p.zones.command = cmd.filter(c => !c.planarDie && !c.plane && !c.phenomenon);
+      }
+    }
     const me0 = state.players.find(p => p.me) || state.players[0];
     const key = [me0.id, ...this.opponentsOf(state, me0).map(p => p.id)].join(',');
     if (key !== this.layoutKey) {
@@ -1056,6 +1067,7 @@ export class Game {
     this.lifeEffects(state, prev);
     this.turnBanner(state, me);
     this.schemeReveal(state);
+    this.planeView(state);
     requestAnimationFrame(() => this.drawArrows(state));
     this.refreshTray();
     if (this.drawer === 'log') {
@@ -1267,6 +1279,98 @@ export class Game {
     this.table.appendChild(box);
     // Le temps de lire : plus long pour un long texte.
     this.schemeOut = setTimeout(close, Math.min(15000, 6000 + (card.text || '').length * 35));
+  }
+
+  /**
+   * Planechase : le plan (ou phénomène) ouvert, couché, sur la ligne du milieu, et le dé planaire (gratuit au premier
+   * lancer du tour, puis {1} de plus à chaque fois). Un nouveau plan s'annonce en grand.
+   */
+  planeView(state) {
+    const host = this.table.querySelector('.plane-host');
+    const dieHost = this.table.querySelector('.die-host');
+    if (!host || !dieHost) {
+      return;
+    }
+    if (!state.game.planechase) {
+      host.innerHTML = '';
+      dieHost.innerHTML = '';
+      return;
+    }
+    const planes = state.players.flatMap(p => (p.planes || []).map(c => ({card: c, owner: p})));
+    const me = state.players.find(p => p.me);
+    const die = me && me.planarDie;
+    const cost = state.game.planarRolls || 0;
+    const ready = !!(die && die.playable) && !this.replay;
+    const key = `${planes.map(x => x.card.id + ':' + (x.card.nameFr || x.card.name)).join(',')}|${ready}|${cost}`;
+    if (host._key !== key) {
+      host._key = key;
+      host.innerHTML = `${planes.map(({card}) => `<button class="plane-chip" data-plane="${card.id}" title="${esc(card.nameFr || card.name || '')} (touche pour lire)">
+          <span class="pc-art"></span><span class="pc-name">${esc(card.nameFr || card.name || '')}</span></button>`).join('')}`;
+      dieHost.innerHTML = `<button class="tool die-tool${ready ? ' ready' : ''}" data-die${ready ? '' : ' disabled'} title="${ready ? `Lancer le dé planaire${cost ? ` (coût : {${cost}})` : ' (gratuit)'}` : 'Dé planaire : à lancer pendant ta phase principale, pile vide'}">${icon('dice')}<span class="tool-label">${cost ? `{${cost}}` : 'Dé'}</span></button>`;
+      planes.forEach(({card}, i) => {
+        host.querySelectorAll('.pc-art')[i].appendChild(cardElement(card, 'pc-card'));
+      });
+      host.querySelectorAll('[data-plane]').forEach(b => b.addEventListener('click', () => {
+        const x = planes.find(y => String(y.card.id) === b.dataset.plane);
+        if (x) {
+          this.showPlane(x.owner, x.card, true);
+        }
+      }));
+      const btn = dieHost.querySelector('[data-die]');
+      btn.addEventListener('click', () => {
+        if (die && !btn.disabled) {
+          this.act('card', {id: die.id});
+        }
+      });
+    }
+    // Arrivée sur un nouveau plan (pas ceux déjà là au premier affichage d'une partie commencée).
+    const first = !this.seenPlanes;
+    this.seenPlanes = this.seenPlanes || new Set();
+    const fresh = planes.filter(x => !this.seenPlanes.has(x.card.id));
+    planes.forEach(x => this.seenPlanes.add(x.card.id));
+    if (fresh.length && !(first && state.game.turn > 1)) {
+      const last = fresh[fresh.length - 1];
+      clearTimeout(this.planeWait);
+      const show = () => {
+        if (!this.table || !this.table.isConnected) {
+          return;
+        }
+        if (document.querySelector('#dialogs .modal-back')) {
+          this.planeWait = setTimeout(show, 400);
+          return;
+        }
+        this.showPlane(last.owner, last.card, false);
+      };
+      show();
+    }
+  }
+
+  /** Un plan en grand, couché comme sur la table, avec son texte. manual : ouvert en touchant le plan. */
+  showPlane(owner, card, manual) {
+    this.table.querySelectorAll('.plane-reveal').forEach(n => n.remove());
+    clearTimeout(this.planeOut);
+    const phen = !!card.phenomenon;
+    const box = el(`<div class="plane-reveal${phen ? ' phen' : ''}">
+      <div class="sr-label">${icon('dice')} ${manual ? (phen ? 'Phénomène en cours' : 'Plan en cours') : phen ? 'Phénomène !' : `${esc(owner.name)} arrive sur un nouveau plan`}</div>
+      <div class="pr-card"></div>
+      <div class="pr-text">
+        <div class="sr-name">${esc(card.nameFr || card.name || '')}</div>
+        <div class="sr-type">${esc(card.typeLine || (phen ? 'Phénomène' : 'Plan'))}</div>
+        <div class="sr-rules">${rulesHtml(card.text || '')}</div>
+        <div class="sr-hint">Touche pour fermer.</div>
+      </div>
+    </div>`);
+    box.querySelector('.pr-card').appendChild(cardElement(card, 'pr-img'));
+    const close = () => {
+      clearTimeout(this.planeOut);
+      box.classList.add('out');
+      setTimeout(() => box.remove(), 600);
+    };
+    box.addEventListener('click', close);
+    this.table.appendChild(box);
+    if (!manual) {
+      this.planeOut = setTimeout(close, Math.min(15000, 6000 + (card.text || '').length * 35));
+    }
   }
 
   renderPlayerHead(box, p, isMe) {
@@ -2380,6 +2484,7 @@ export class Game {
           <h3>Partie</h3>
           <div style="display:flex;flex-direction:column;gap:8px">
             <button class="btn" data-menu="passTurn">Passer jusqu'à la fin du tour</button>
+            ${this.career || !this.onRewind ? '' : `<button class="btn" data-menu="rewind" title="Reprendre la partie au moment calme précédent (début de phase)">${icon('undo')} Revenir en arrière</button>`}
             <button class="btn" data-menu="leave">Retour au menu (la partie est gardée)</button>
             <button class="btn danger" data-menu="concede">Abandonner la partie</button>
             <p class="muted small">La partie est sauvegardée à chaque phase calme : si l'application se ferme, elle se reprend depuis l'accueil.</p>
@@ -2398,6 +2503,13 @@ export class Game {
       bridge.send('passTurn');
       this.closeDrawer();
     });
+    const rewind = drawer.querySelector('[data-menu="rewind"]');
+    if (rewind) {
+      rewind.addEventListener('click', () => {
+        this.closeDrawer();
+        this.onRewind();
+      });
+    }
     drawer.querySelector('[data-menu="concede"]').addEventListener('click', async () => {
       if (await confirmBox('Abandonner ?', 'La partie sera perdue.', {yes: 'Abandonner', danger: true})) {
         bridge.send('concede');

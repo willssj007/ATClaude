@@ -388,7 +388,15 @@ final class Catalog {
         final String typeEn = rules.getType().toString();
         final CardSplitType split = rules.getSplitType();
         final ICardFace other = rules.getOtherPart();
-        if (split == CardSplitType.Split && main != null && other != null) {
+        // Pièce perso (deux portes) : affichée comme une carte à deux faces, la première porte devant, l'autre au verso.
+        final boolean customSplit = split == CardSplitType.Split && main != null && other != null && (rules.isCustom() || CustomCards.isCustom(nameEn));
+        if (customSplit) {
+            // Le nom affiché : la première porte (le nom de la carte reste « Porte A // Porte B » pour les decks).
+            o.addProperty("nameFr", main.getName());
+            o.addProperty("cost", main.getManaCost() == null || main.getManaCost().isNoCost() ? "" : main.getManaCost().toString());
+            o.addProperty("cmc", main.getManaCost() == null ? 0 : main.getManaCost().getCMC());
+        }
+        if (split == CardSplitType.Split && main != null && other != null && !customSplit) {
             // Carte scindée (Feu // Glace) : les deux moitiés, chacune avec son coût, son type et son texte traduits.
             final String t1 = faceType(main);
             final String t2 = faceType(other);
@@ -423,7 +431,7 @@ final class Catalog {
         if (main != null && rules.getType().isBattle() && main.getDefense() != null) {
             o.addProperty("defense", main.getDefense());
         }
-        if (other != null && (CardSplitType.DUAL_FACED_CARDS.contains(split) || split == CardSplitType.Flip)) {
+        if (other != null && (CardSplitType.DUAL_FACED_CARDS.contains(split) || split == CardSplitType.Flip || customSplit)) {
             // Recto verso (transformables, modales, fusion) et cartes retournables : l'autre face, à part.
             o.add("back", faceJson(rules, other, split == CardSplitType.Flip ? "" : pc.getImageKey(true)));
         }

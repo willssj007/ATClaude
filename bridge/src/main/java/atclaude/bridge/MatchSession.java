@@ -96,6 +96,16 @@ final class MatchSession {
     private boolean career;
     /** Variante Archenemy (Sandbox, à 4) : pas de sauvegarde, Forge ne garde pas la pile de machinations. */
     private boolean archenemy;
+    /** Variante Planechase (Sandbox) : pas de sauvegarde non plus, Forge ne garde pas les paquets planaires. */
+    private boolean planechase;
+    /** Énigme (Sandbox) : son identifiant, ou null. Ni sauvegarde, ni statistiques ; résolue quand on gagne. */
+    private String puzzle;
+    /**
+     * Sandbox : les dernières photos de la partie (une par moment calme, la plus récente à la fin), pour revenir en
+     * arrière. Gardées en mémoire, et passées à la partie reprise pour revenir encore plus loin.
+     */
+    private final java.util.ArrayDeque<JsonObject> history = new java.util.ArrayDeque<>();
+    private static final int HISTORY = 12;
     private static final Set<PhaseType> SAVE_PHASES = EnumSet.of(PhaseType.UPKEEP, PhaseType.DRAW, PhaseType.MAIN1, PhaseType.MAIN2, PhaseType.END_OF_TURN);
 
     private MatchSession(final Bridge bridge, final BridgeGuiGame gui, final HostedMatch match) {
@@ -115,9 +125,47 @@ final class MatchSession {
         return start(bridge, catalog, save.getAsJsonObject("setup"), save);
     }
 
+    /**
+     * Revenir en arrière (Sandbox) : la photo d'avant la dernière (la dernière est l'état où l'on est). Renvoie null s'il
+     * n'y en a pas. older reçoit les photos encore plus anciennes, pour la partie reprise.
+     */
+    JsonObject rewindTarget(final java.util.List<JsonObject> older) {
+        if (career || archenemy || planechase) {
+            throw new IllegalStateException(career ? "Pas de retour en arrière en mode Planeswalker." : "Cette variante ne se sauvegarde pas : pas de retour en arrière.");
+        }
+        synchronized (history) {
+            if (history.size() < 2) {
+                return null;
+            }
+            history.removeLast();
+            final JsonObject target = history.peekLast();
+            older.addAll(history);
+            return target;
+        }
+    }
+
+    /** Les photos plus anciennes reprises d'une partie précédente (retour en arrière), la dernière étant celle d'où l'on repart. */
+    void keepHistory(final java.util.List<JsonObject> older) {
+        synchronized (history) {
+            history.clear();
+            history.addAll(older);
+            // La photo d'où l'on repart sera reprise au premier moment calme de la partie reprise.
+            history.pollLast();
+        }
+    }
+
+    boolean canRewind() {
+        synchronized (history) {
+            return !career && !archenemy && !planechase && history.size() >= 2;
+        }
+    }
+
     private static MatchSession start(final Bridge bridge, final Catalog catalog, final JsonObject setup, final JsonObject save) {
         if (!ForgeRuntime.isReady()) {
             throw new IllegalStateException("Forge est encore en cours de chargement.");
+        }
+        if (setup.has("puzzle")) {
+            return startPuzzle(bridge, setup);
         }
         final boolean career = setup.has("career") && setup.get("career").getAsBoolean();
         if (career && save == null) {
@@ -137,12 +185,18 @@ final class MatchSession {
         if (archenemy && (seats.size() != 4 || archenemySeat >= seats.size())) {
             throw new IllegalArgumentException("Une partie Archenemy se joue à 4 : l'Archenemy contre une équipe de trois joueurs.");
         }
+        // Planechase (règles officielles, 901) : chaque joueur a son paquet planaire ; le plan du dessus est ouvert,
+        // le joueur actif peut lancer le dé planaire (une fois gratuite, puis {1} de plus à chaque lancer du tour).
+        final boolean planechase = !career && !archenemy && setup.has("planechase") && !str(setup, "planechase").isEmpty();
         final Set<GameType> variants = EnumSet.noneOf(GameType.class);
         if (commander) {
             variants.add(GameType.Commander);
         }
         if (archenemy) {
             variants.add(GameType.Archenemy);
+        }
+        if (planechase) {
+            variants.add(GameType.Planechase);
         }
         final List<RegisteredPlayer> players = new ArrayList<>();
         RegisteredPlayer human = null;
@@ -167,6 +221,8 @@ final class MatchSession {
                 final List<PaperCard> schemes = isArchenemy ? Schemes.deck(str(setup, "schemes")) : null;
                 rp = RegisteredPlayer.forVariants(seats.size(), variants, deck, schemes, isArchenemy, null, null);
                 rp.setTeamNumber(isArchenemy ? 0 : 1);
+            } else if (planechase) {
+                rp = RegisteredPlayer.forVariants(seats.size(), variants, deck, null, false, Planes.deck(str(setup, "planechase")), null);
             } else {
                 rp = commander ? RegisteredPlayer.forCommander(deck) : new RegisteredPlayer(deck);
             }
@@ -215,6 +271,7 @@ final class MatchSession {
         session.commanderFormat = commander;
         session.career = career;
         session.archenemy = archenemy;
+        session.planechase = planechase;
         session.setup = setup;
         session.savedSetup = resolved;
         if (save != null) {
@@ -243,10 +300,27 @@ final class MatchSession {
                 bridge.sendEvent("resumed", m -> { });
                 gui.markDirty();
             });
-        } else if (commander) {
-            // Au début du premier tour, sur le fil de la partie : posé depuis un autre fil pendant les mulligans,
-            // l'effet croisait parfois Forge en train de remplir les zones (plantage dans GameAction.moveTo).
-            match.setStartGameHook(() -> noCommanderDamageLoss(match.getGame()));
+        } else {
+            // « Essayer en partie » (Atelier) : la carte perso arrive dans ma main au début du premier tour.
+            final JsonArray tries = setup.has("tryCards") && setup.get("tryCards").isJsonArray() ? setup.getAsJsonArray("tryCards") : null;
+            if (commander || tries != null) {
+                // Au début du premier tour, sur le fil de la partie : posé depuis un autre fil pendant les mulligans,
+                // l'effet croisait parfois Forge en train de remplir les zones (plantage dans GameAction.moveTo).
+                match.setStartGameHook(() -> {
+                    if (commander) {
+                        noCommanderDamageLoss(match.getGame());
+                    }
+                    if (tries != null) {
+                        final Player me = humanPlayer(match.getGame());
+                        for (final JsonElement e : tries) {
+                            final PaperCard pc = catalog.resolve(e.getAsString());
+                            if (me != null && pc != null) {
+                                match.getGame().getAction().moveToHand(Card.fromPaperCard(pc, me), null);
+                            }
+                        }
+                    }
+                });
+            }
         }
         gui.attach(session);
         match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
@@ -267,6 +341,45 @@ final class MatchSession {
                 session.markCheated(game);
             }
         }
+        if (save == null && setup.has("tryCards") && game != null) {
+            session.markCheated(game); // partie d'essai : ni trophées ni succès
+        }
+        session.applyYieldPrefs();
+        return session;
+    }
+
+    /**
+     * Une énigme de Forge : deux joueurs sans deck, la situation de l'énigme mise en place au début de la partie (cartes,
+     * points de vie, phase), avec son objectif (Forge fait perdre si le temps est écoulé).
+     */
+    private static MatchSession startPuzzle(final Bridge bridge, final JsonObject setup) {
+        final String id = str(setup, "puzzle");
+        final forge.gamemodes.puzzle.Puzzle pz = Puzzles.load(id);
+        final List<RegisteredPlayer> players = new ArrayList<>();
+        final RegisteredPlayer human = new RegisteredPlayer(new Deck());
+        human.setStartingHand(0);
+        human.setPlayer(HumanController.lobby(str(setup, "name").isEmpty() ? "Moi" : str(setup, "name"), Mulligans.FORGE_DEFAULT));
+        players.add(human);
+        final RegisteredPlayer ai = new RegisteredPlayer(new Deck());
+        ai.setStartingHand(0);
+        ai.setPlayer(GamePlayerUtil.createAiPlayer("IA", 1));
+        players.add(ai);
+        Texts.reset();
+        final BridgeGuiGame gui = new BridgeGuiGame(bridge);
+        final HostedMatch match = GuiBase.getInterface().hostMatch();
+        final MatchSession session = new MatchSession(bridge, gui, match);
+        session.puzzle = id;
+        session.setup = setup;
+        session.savedSetup = setup.deepCopy();
+        match.setStartGameHook(() -> {
+            pz.applyToGame(match.getGame());
+            gui.markDirty();
+        });
+        gui.attach(session);
+        match.setOnMatchOver(() -> bridge.sendEvent("matchOver", m -> { }));
+        final forge.game.GameRules rules = new forge.game.GameRules(GameType.Puzzle);
+        rules.setGamesPerMatch(1);
+        match.startMatch(rules, null, players, human, gui);
         session.applyYieldPrefs();
         return session;
     }
@@ -826,8 +939,8 @@ final class MatchSession {
 
     /** Sauvegarde aux moments calmes : le joueur a la priorité, la pile est vide, hors combat. Une fois par phase. */
     private void maybeSave(final PlayerControllerHuman c, final Input input) {
-        if (archenemy) {
-            return; // la pile de machinations ne se sauvegarde pas : une partie Archenemy ne se reprend pas
+        if (archenemy || planechase || puzzle != null) {
+            return; // ni la pile de machinations, ni les paquets planaires, ni les énigmes : la partie ne se reprend pas
         }
         final Game game = game();
         if (game == null || game.isGameOver() || !game.getStack().isEmpty()) {
@@ -866,6 +979,14 @@ final class MatchSession {
                         return;
                     }
                     SaveGame.write(snapshot);
+                    if (!career) {
+                        synchronized (history) {
+                            history.addLast(snapshot);
+                            while (history.size() > HISTORY) {
+                                history.removeFirst();
+                            }
+                        }
+                    }
                 } catch (final RuntimeException e) {
                     lastSaveKey = "";
                     System.err.println("Sauvegarde ratée : " + e);
@@ -893,6 +1014,7 @@ final class MatchSession {
             final JsonObject a = new JsonObject();
             final int players = game.getRegisteredPlayers().size();
             final String format = archenemy ? (commanderFormat ? "Archenemy Commander" : "Archenemy")
+                    : planechase ? (commanderFormat ? "Planechase Commander" : "Planechase")
                     : commanderFormat ? (players > 2 ? "Commander à " + players : "Duel Commander") : (players > 2 ? "Partie à " + players : "Duel");
             a.addProperty("details", (career ? "Planeswalker · " : "Sandbox · ") + format);
             final Deck deck = me.getRegisteredPlayer().getDeck();
@@ -971,8 +1093,18 @@ final class MatchSession {
     void onGameFinished() {
         // Partie terminée : rien à reprendre.
         SaveGame.delete(sessionId);
+        if (puzzle != null) {
+            final Game g = game();
+            final Player me = g == null ? null : humanPlayer(g);
+            final GameOutcome o = gui.getGameView() == null ? null : gui.getGameView().getOutcome();
+            if (me != null && o != null && !o.isDraw() && o.isWinner(me.getRegisteredPlayer())) {
+                Puzzles.markSolved(puzzle);
+            }
+        }
         try {
-            recordGame();
+            if (puzzle == null) {
+                recordGame();
+            }
         } catch (final RuntimeException e) {
             System.err.println("Partie non comptée dans les statistiques : " + e);
         }
@@ -999,6 +1131,7 @@ final class MatchSession {
                 m.addProperty("teamWin", archenemy && !outcome.isWinner(me.getRegisteredPlayer()) && won(g, outcome, me));
             }
             m.addProperty("archenemy", archenemy);
+            m.addProperty("planechase", planechase);
             final JsonArray lines = new JsonArray();
             if (outcome != null) {
                 outcome.getOutcomeStrings().forEach(lines::add);
@@ -1047,6 +1180,7 @@ final class MatchSession {
         meta.addProperty("turns", outcome.getLastTurnNumber());
         meta.addProperty("result", outcome.isDraw() ? "draw" : won(game, outcome, me) ? "win" : "loss");
         meta.addProperty("archenemy", archenemy);
+        meta.addProperty("planechase", planechase);
         meta.addProperty("conceded", me.getOutcome() != null && me.getOutcome().lossState == forge.game.player.GameLossReason.Conceded);
         meta.addProperty("me", me.getId());
         final JsonArray players = new JsonArray();
@@ -1093,6 +1227,9 @@ final class MatchSession {
             g.addProperty("archenemy", true);
             g.addProperty("wasArchenemy", me.getTeam() == 0);
         }
+        if (planechase) {
+            g.addProperty("planechase", true);
+        }
         final boolean won = !outcome.isDraw() && won(game, outcome, me);
         g.addProperty("result", outcome.isDraw() ? "draw" : won ? "win" : "loss");
         g.addProperty("conceded", conceded);
@@ -1113,6 +1250,24 @@ final class MatchSession {
         final String key = str(humanSeat, "deckKey");
         deck.addProperty("key", key.isEmpty() || key.startsWith("random") ? (commanderFormat ? "random" : "randomConstructed") : key);
         g.add("deck", deck);
+        // Cartes perso : celles de mon deck et combien de fois chacune a été jouée (statistiques de l'Atelier).
+        final JsonArray customs = new JsonArray();
+        final Deck myDeck = me.getRegisteredPlayer().getDeck();
+        final java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (final forge.deck.DeckSection sec : new forge.deck.DeckSection[] {forge.deck.DeckSection.Commander, forge.deck.DeckSection.Main}) {
+            if (myDeck.has(sec)) {
+                myDeck.get(sec).toFlatList().forEach(pc -> {
+                    if (CustomCards.isCustom(pc.getName())) {
+                        seen.add(pc.getName());
+                    }
+                });
+            }
+        }
+        seen.forEach(customs::add);
+        if (!seen.isEmpty() || t.customPlayed().size() > 0) {
+            g.add("customDeck", customs);
+            g.add("customPlayed", t.customPlayed());
+        }
         final JsonArray opponents = new JsonArray();
         for (final Player p : game.getRegisteredPlayers()) {
             if (p == me) {
@@ -1216,10 +1371,15 @@ final class MatchSession {
                                 // un planeswalker sans loyauté, une bataille sans défense.
                                 startingCounters(put, put.isPlaneswalker(), forge.game.card.CounterEnumType.LOYALTY, put.getBaseLoyalty());
                                 startingCounters(put, put.isBattle(), forge.game.card.CounterEnumType.DEFENSE, put.getCurrentState().getBaseDefense());
+                                // Règle du monde : seul le permanent « Monde » arrivé le plus récemment reste (son heure
+                                // d'arrivée n'est notée par Forge que pour une carte arrivée par les voies du jeu).
+                                put.updateWorldTimestamp(game.getNextTimestamp());
                             }
                         }
                     }
                     if (zone == ZoneType.Battlefield) {
+                        // Les actions d'état tout de suite (légende, monde, endurance 0), comme après un vrai sort.
+                        game.getAction().checkStateEffects(true);
                         game.getTriggerHandler().runWaitingTriggers();
                         game.getStack().addAllTriggeredAbilitiesToStack();
                     }

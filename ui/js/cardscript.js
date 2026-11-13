@@ -311,6 +311,7 @@ export const WHEN = [
   {id: 'blocked', kind: 'T', label: 'Quand elle devient bloquée'},
   {id: 'unblocked', kind: 'T', label: 'Quand elle attaque et n\'est pas bloquée'},
   {id: 'allyBlocked', kind: 'T', label: 'Quand une de vos créatures devient bloquée'},
+  {id: 'unlockDoor', kind: 'T', label: 'Quand vous déverrouillez cette porte (pièce)'},
   {id: 'blocksCreature', kind: 'T', label: 'Quand elle devient bloquée par une créature (une fois par bloqueur)'},
   {id: 'becomesTarget', kind: 'T', label: 'Quand elle devient la cible d\'un sort ou d\'une capacité'},
   {id: 'becomesTargetOpp', kind: 'T', label: 'Quand elle devient la cible d\'un sort ou d\'une capacité qu\'un adversaire contrôle'},
@@ -1154,7 +1155,7 @@ export const SUBTYPES = [
   ['Background', 'Passé', ['Enchantment'], {legendary: true, note: 'Un enchantement légendaire pour le commandant (« Choisissez un passé ») : « Qui » propose « Les créatures Commandant que vous possédez ».'}],
   ['Shard', 'Éclat', ['Enchantment'], {ability: true}],
   ['Shrine', 'Reliquaire', ['Enchantment'], {}], ['Plan', 'Plan', ['Enchantment'], {}],
-  ['Room', 'Pièce', ['Enchantment'], {no: 'Une pièce a deux portes : c\'est une carte double, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
+  ['Room', 'Pièce', ['Enchantment'], {note: 'Une pièce a deux portes : choisis « Pièce » dans les faces de la carte (en haut du formulaire), chaque porte a son coût et ses capacités.'}],
   ['Plains', 'Plaine', ['Land'], {mana: 'W'}], ['Island', 'Île', ['Land'], {mana: 'U'}], ['Swamp', 'Marais', ['Land'], {mana: 'B'}],
   ['Mountain', 'Montagne', ['Land'], {mana: 'R'}], ['Forest', 'Forêt', ['Land'], {mana: 'G'}],
   ['Cave', 'Caverne', ['Land'], {}], ['Desert', 'Désert', ['Land'], {}], ['Gate', 'Porte', ['Land'], {}], ['Lair', 'Repaire', ['Land'], {}],
@@ -1164,8 +1165,8 @@ export const SUBTYPES = [
   ['Arcane', 'Arcane', ['Instant', 'Sorcery'], {note: 'Les sorts d\'arcane reçoivent l\'Imprégnation d\'arcane.'}],
   ['Lesson', 'Leçon', ['Instant', 'Sorcery'], {note: 'Une leçon se cherche hors de la partie (réserve) avec Apprentissage.'}],
   ['Trap', 'Piège', ['Instant', 'Sorcery'], {}], ['Chorus', 'Chorus', ['Instant', 'Sorcery'], {}],
-  ['Adventure', 'Aventure', ['Instant', 'Sorcery'], {no: 'Une aventure est la seconde moitié d\'une carte de créature : c\'est une carte double, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
-  ['Omen', 'Présage', ['Instant', 'Sorcery'], {no: 'Un présage est la seconde moitié d\'une carte de créature : c\'est une carte double, que l\'Atelier ne fait pas encore. Le sous-type reste sans sa mécanique.'}],
+  ['Adventure', 'Aventure', ['Instant', 'Sorcery'], {note: 'Une aventure est la seconde moitié d\'une carte de créature : choisis « Aventure » dans les faces de la carte (en haut du formulaire), le verso est le sort d\'aventure.'}],
+  ['Omen', 'Présage', ['Instant', 'Sorcery'], {note: 'Un présage est la seconde moitié d\'une carte : choisis « Présage » dans les faces de la carte (en haut du formulaire), le verso est le sort du présage.'}],
   ['Mount', 'Monture', ['Creature'], {kw: ['Saddle'], note: 'Une monture se selle (mot-clé Seller) : elle est « sellée » jusqu\'à la fin du tour.'}],
 ];
 const SUB_BY = new Map(SUBTYPES.map(s => [s[0], s]));
@@ -3940,6 +3941,7 @@ function triggerTable(a, card = null) {
     unblocked: ['Mode$ AttackerUnblocked | ValidCard$ Card.Self', 'À chaque fois que CARDNAME attaque et n\'est pas bloquée', 'Whenever CARDNAME attacks and isn\'t blocked'],
     allyBlocked: ['Mode$ AttackerBlocked | ValidCard$ Creature.YouCtrl | TriggerZones$ Battlefield', 'À chaque fois qu\'une créature que vous contrôlez devient bloquée',
       'Whenever a creature you control becomes blocked'],
+    unlockDoor: ['Mode$ UnlockDoor | ValidPlayer$ You | ValidCard$ Card.Self | ThisDoor$ True', 'Quand vous déverrouillez cette porte', 'When you unlock this door'],
     blocksCreature: ['Mode$ AttackerBlockedByCreature | ValidCard$ Card.Self', 'À chaque fois que CARDNAME devient bloquée par une créature',
       'Whenever CARDNAME becomes blocked by a creature'],
     becomesTarget: ['Mode$ BecomesTarget | ValidTarget$ Card.Self | TriggerZones$ Battlefield', 'À chaque fois que CARDNAME devient la cible d\'un sort ou d\'une capacité',
@@ -4318,12 +4320,84 @@ export const DFC_MODES = [
     'Le verso est le sort d\'aventure : lancé, la carte part en exil, puis on peut lancer le recto depuis l\'exil.'],
   ['prepare', 'Préparée (un sort qu\'on copie quand elle est préparée)', 'Prepare', true,
     'Le verso est le sort de la carte. Une capacité « La préparer » la rend préparée : on peut alors lancer une copie du sort.'],
+  ['room', 'Pièce (un enchantement à deux portes)', 'Split', true,
+    'Deux portes, chacune avec son coût : on lance l\'une ou l\'autre, qui arrive déverrouillée. Comme un rituel, payer le coût d\'une porte verrouillée la déverrouille. Déclencheur utile : « Quand vous déverrouillez cette porte ».'],
+  ['omen', 'Présage (un sort qui retourne dans la bibliothèque)', 'Omen', true,
+    'Le verso est le sort du présage : lancé, la carte est mélangée dans la bibliothèque au lieu d\'aller au cimetière. Le recto se lance normalement.'],
 ];
+
+/** Un coût de Forge (« 2 B B », « W/U », « no cost ») dans le format du formulaire (« {2}{B}{B} »). */
+function costToForm(cost) {
+  const c = String(cost || '').trim();
+  if (!c || /^no cost$/i.test(c)) {
+    return '';
+  }
+  return c.split(/\s+/).map(p => `{${p.replace(/[{}]/g, '')}}`).join('');
+}
+
+/**
+ * Script Forge → formulaire : nom, coût, supertypes, types, sous-types, force et endurance, loyauté, mots-clés connus
+ * de l'Atelier. Les capacités écrites en script (A:, T:, S:, R:) et les mots-clés inconnus sont comptés dans skipped :
+ * le formulaire ne sait pas les lire, ils sont à refaire avec « + Capacité ».
+ */
+export function scriptToForm(script) {
+  const lines = String(script || '').split('\n').map(l => l.replace(/\r$/, ''));
+  const alt = lines.findIndex(l => l.trim() === 'ALTERNATE');
+  const main = alt >= 0 ? lines.slice(0, alt) : lines;
+  const get = (k) => {
+    const l = main.find(x => x.startsWith(k + ':'));
+    return l ? l.slice(k.length + 1).trim() : '';
+  };
+  const form = {name: get('Name'), cost: costToForm(get('ManaCost')), types: [], legendary: false, world: false, subtypes: '',
+    keywords: [], kwValues: {}, abilities: []};
+  const subs = [];
+  for (const w of get('Types').split(/\s+/).filter(Boolean)) {
+    if (w === 'Legendary') {
+      form.legendary = true;
+    } else if (w === 'World') {
+      form.world = true;
+    } else if (CARD_TYPES.some(c => c[0] === w)) {
+      form.types.push(w);
+    } else if (!['Snow', 'Basic', 'Ongoing', 'Elite', 'Host', '-'].includes(w)) {
+      subs.push(w);
+    }
+  }
+  form.subtypes = subs.join(' ');
+  const pt = /^(\d+)\/(\d+)$/.exec(get('PT'));
+  if (pt) {
+    form.power = Number(pt[1]);
+    form.toughness = Number(pt[2]);
+  }
+  if (/^\d+$/.test(get('Loyalty'))) {
+    form.loyaltyStart = Number(get('Loyalty'));
+  }
+  const skipped = [];
+  for (const l of main) {
+    if (l.startsWith('K:')) {
+      const [id, ...rest] = l.slice(2).split(':');
+      const def = KW_BY[id];
+      if (def && !(def[7] && def[7].line)) {
+        form.keywords.push(id);
+        if (rest.length) {
+          form.kwValues[id] = def[4] === 'cost' ? costToForm(rest.join(':')) : rest.join(':');
+        }
+      } else {
+        skipped.push(l);
+      }
+    } else if (/^(A|T|S|R):/.test(l)) {
+      skipped.push(l);
+    }
+  }
+  if (alt >= 0) {
+    skipped.push('ALTERNATE');
+  }
+  return {form, skipped};
+}
 
 /** Ce qui fait une face (le verso d'une carte) : tout sauf la présentation et les faces. */
 export function facePart(f) {
   const out = {};
-  for (const k of ['name', 'cost', 'colors', 'types', 'legendary', 'subtypes', 'power', 'toughness', 'loyaltyStart', 'keywords', 'kwValues',
+  for (const k of ['name', 'cost', 'colors', 'types', 'legendary', 'world', 'subtypes', 'power', 'toughness', 'loyaltyStart', 'keywords', 'kwValues',
     'abilities', 'flavor', 'classCosts', 'caseCond']) {
     if (f[k] !== undefined) {
       out[k] = f[k];
@@ -4342,15 +4416,24 @@ export function buildScript(form) {
   const front = {...form, back: null};
   const back = {...facePart(form.back), lang: form.lang, token: false, flavor: form.back.flavor || ''};
   back.types = [...(back.types || [])];
-  if (mode[0] === 'adventure' || mode[0] === 'prepare') {
+  if (mode[0] === 'room') {
+    // Une pièce : deux portes, deux enchantements « Pièce » (sans force ni endurance).
+    for (const face of [front, back]) {
+      face.types = ['Enchantment'];
+      face.subtypes = [...new Set([...forgeSubtypes(face.subtypes || '').filter(t => t !== 'Room'), 'Room'])].join(' ');
+      face.power = undefined;
+      face.toughness = undefined;
+    }
+  }
+  if (mode[0] === 'adventure' || mode[0] === 'prepare' || mode[0] === 'omen') {
     // Le sort d'aventure (ou de la carte préparée) : un éphémère ou un rituel.
     if (!back.types.some(t => t === 'Instant' || t === 'Sorcery')) {
       back.types = ['Sorcery'];
     }
     back.power = undefined;
     back.toughness = undefined;
-    if (mode[0] === 'adventure') {
-      back.subtypes = [...new Set([...forgeSubtypes(back.subtypes || ''), 'Adventure'])].join(' ');
+    if (mode[0] === 'adventure' || mode[0] === 'omen') {
+      back.subtypes = [...new Set([...forgeSubtypes(back.subtypes || ''), mode[0] === 'omen' ? 'Omen' : 'Adventure'])].join(' ');
     }
   }
   const a = buildFace(front).split('\n');
@@ -4371,6 +4454,18 @@ export function buildScript(form) {
     a.splice(0, a.length, ...a.filter(l => !l.startsWith('PT:')));
     addOracle(a, a.findIndex(l => l.startsWith('Oracle:')), en ? '(As a Siege enters, choose an opponent to protect it. You and others can attack it. When it\'s defeated, exile it, then cast it transformed.)'
       : '(Au moment où un siège arrive sur le champ de bataille, choisissez un adversaire pour le protéger. Vous et d\'autres pouvez l\'attaquer. Quand il est vaincu, exilez-le, puis lancez-le transformé.)');
+  }
+  if (mode[0] === 'room') {
+    const room = en ? '(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)'
+      : '(Vous pouvez lancer l\'une ou l\'autre moitié. Cette porte se déverrouille sur le champ de bataille. Comme un rituel, vous pouvez payer le coût de mana d\'une porte verrouillée pour la déverrouiller.)';
+    for (const lines of [a, b]) {
+      const i = lines.findIndex(l => l.startsWith('Oracle:'));
+      if (i >= 0) {
+        lines[i] = `Oracle:${room}${lines[i].slice(7) ? '\\n' + lines[i].slice(7) : ''}`;
+      } else {
+        lines.push(`Oracle:${room}`);
+      }
+    }
   }
   if (mode[0] === 'daynight') {
     a.splice(Math.max(1, oracleA), 0, 'K:Daybound');
@@ -4412,7 +4507,7 @@ function buildFace(form) {
   }
   const types = (f.types || []).filter(t => CARD_TYPES.some(c => c[0] === t));
   const sub = cardSubtypes(f);
-  lines.push(`Types:${[f.legendary ? 'Legendary' : '', ...types, ...sub].filter(Boolean).join(' ')}`);
+  lines.push(`Types:${[f.legendary ? 'Legendary' : '', f.world ? 'World' : '', ...types, ...sub].filter(Boolean).join(' ')}`);
   const cda = (f.abilities || []).some(a => a.when === 'static' && a.effect === 'cdaPT');
   if (needsPT(f) || types.includes('Creature')) {
     lines.push(cda ? 'PT:*/*' : `PT:${Number(f.power) || 0}/${Number(f.toughness) || 0}`);

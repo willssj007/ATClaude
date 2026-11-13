@@ -155,6 +155,32 @@ export const bridge = {
   },
 
   /**
+   * Partage un fichier préparé par le pont ({path, name, text | base64}) : « Partager » d'Android, feuille de partage
+   * d'iOS, ou téléchargement sur ordinateur.
+   */
+  shareFile(file, title = '', mime = 'application/json') {
+    if (android && window.AndroidBridge.shareFile) {
+      return window.AndroidBridge.shareFile(file.path, title) === 'shared';
+    }
+    if (ios && iosHandlers.atclaudeShare) {
+      iosHandlers.atclaudeShare.postMessage(file.path);
+      return true;
+    }
+    const blob = file.text !== undefined ? new Blob([file.text], {type: mime})
+      : new Blob([Uint8Array.from(atob(file.base64 || ''), c => c.charCodeAt(0))], {type: mime});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 2000);
+    return true;
+  },
+
+  /**
    * Orientation permise sur téléphone et tablette : 'landscape' (partout par défaut) ou 'any' (écrans des decks,
    * qu'on peut tenir en portrait). Sans effet sur ordinateur.
    */

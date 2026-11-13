@@ -80,6 +80,11 @@ final class GameSerializer {
         game.addProperty("commander", gv.isCommander());
         game.addProperty("career", gui.career());
         game.addProperty("mulligan", gv.isMulligan());
+        // Planechase : le prix du prochain lancer du dé planaire ce tour (le premier est gratuit).
+        if (gv.getGame() != null && gv.getGame().getRules().hasAppliedVariant(forge.game.GameType.Planechase)) {
+            game.addProperty("planechase", true);
+            game.addProperty("planarRolls", gv.getGame().getPhaseHandler().getPlanarDiceSpecialActionThisTurn());
+        }
         game.addProperty("gameOver", gv.isGameOver());
         game.addProperty("matchOver", gv.isMatchOver());
         if (gv.isGameOver()) {
@@ -143,6 +148,9 @@ final class GameSerializer {
             o.addProperty("team", gp.getTeam());
             o.addProperty("archenemy", gp.getTeam() == 0);
             o.addProperty("schemeDeck", p.getZoneSize(ZoneType.SchemeDeck));
+        }
+        if (gp != null && gv.getGame().getRules().hasAppliedVariant(forge.game.GameType.Planechase)) {
+            o.addProperty("planarDeck", p.getZoneSize(ZoneType.PlanarDeck));
         }
         o.addProperty("priority", p.getHasPriority());
         o.addProperty("avatar", p.getAvatarIndex());
@@ -303,10 +311,13 @@ final class GameSerializer {
         final boolean scheme = s.getType() != null && s.getType().isScheme();
         final boolean ongoing = s.getType() != null && s.getType().hasSupertype(forge.card.CardType.Supertype.Ongoing);
         // Le verso d'une carte perso à deux faces : la carte perso (son recto) donne le cadre, l'illustration du verso.
-        final String frontOfBack = CustomCards.frontOf(s.getName());
-        if (CustomCards.isCustom(s.getName()) || frontOfBack != null) {
+        // Une pièce perso en jeu porte le nom de ses deux portes (« Porte A // Porte B ») : la carte perso de la première.
+        final String doors = s.getName() != null && s.getName().contains(" // ") ? s.getName().substring(0, s.getName().indexOf(" // ")) : null;
+        final String room = doors != null && CustomCards.isCustom(doors) ? doors : null;
+        final String frontOfBack = room == null ? CustomCards.frontOf(s.getName()) : null;
+        if (CustomCards.isCustom(s.getName()) || frontOfBack != null || room != null) {
             // Carte perso : cadre dessiné avec son illustration, type en français.
-            final String card = frontOfBack != null ? frontOfBack : s.getName();
+            final String card = room != null ? room : frontOfBack != null ? frontOfBack : s.getName();
             o.addProperty("custom", true);
             o.addProperty("image", "");
             CustomCards.addDisplay(o, CustomCards.rules(card));
@@ -339,6 +350,22 @@ final class GameSerializer {
         }
         flag(o, "scheme", scheme);
         flag(o, "ongoing", ongoing);
+        // Planechase : les plans et phénomènes (cartes couchées), le dé planaire (effet de Forge, zone de commandement).
+        final boolean plane = s.getType() != null && s.getType().isPlane();
+        final boolean phenomenon = s.getType() != null && s.getType().isPhenomenon();
+        flag(o, "plane", plane);
+        flag(o, "phenomenon", phenomenon);
+        flag(o, "planarDie", "Planar Dice".equals(s.getName()));
+        if (plane || phenomenon) {
+            final java.util.List<String> where = new java.util.ArrayList<>();
+            s.getType().getSubtypes().forEach(where::add);
+            o.addProperty("typeLine", phenomenon ? "Phénomène" : "Plan" + (where.isEmpty() ? "" : " : " + String.join(" ", where).replace("Unknown Planet", "Planète inconnue")));
+            // Forge ajoute le propriétaire au texte des cartes de la zone de commandement.
+            if (o.has("text")) {
+                o.addProperty("text", o.get("text").getAsString().replaceAll("(?m)^\\s*(Owner|Propriétaire)\\s*:.*$", "")
+                        .replaceAll("\\n{3,}", "\n\n").trim());
+            }
+        }
         if (scheme) {
             // Le type des machinations est parfois resté en anglais dans Forge (« Scheme ») : son nom officiel.
             o.addProperty("typeLine", ongoing ? "Machination continue" : "Machination");

@@ -10,6 +10,7 @@ const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless:
 const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
 /** Machinations de l'Archenemy : 20 tirées au hasard dans un produit officiel, ou parmi toutes. */
 const SCHEME_SETS = [['all', 'Toutes'], ['OARC', 'Archenemy (2010)'], ['OE01', 'Nicol Bolas (2017)']];
+const PLANE_SETS = [['all', 'Tous'], ['HOP', 'Planechase (2009)'], ['PC2', 'Planechase 2012'], ['PCA', 'Anthology'], ['MOC', 'L\'invasion des machines']];
 
 function mulliganHelp(free, count) {
   if (free === null) {
@@ -38,9 +39,11 @@ export class Lobby {
     // Mulligans gratuits : absent = règle de Forge, -1 = illimités.
     this.mulligans = last && typeof last.mulligans === 'number' ? last.mulligans : null;
     // Variante Archenemy : la place de l'Archenemy (0 : moi), la série de machinations.
-    this.variant = last && typeof last.archenemy === 'number' ? 'archenemy' : 'none';
+    this.variant = last && typeof last.archenemy === 'number' ? 'archenemy' : last && last.planechase ? 'planechase' : 'none';
     this.archenemy = last && typeof last.archenemy === 'number' ? last.archenemy : 1;
     this.schemes = last && last.schemes || 'all';
+    // Planechase : la série de plans de chaque paquet planaire.
+    this.planes = last && last.planechase || 'all';
   }
 
   setProfiles(list) {
@@ -96,6 +99,7 @@ export class Lobby {
     this.seats.length = this.count;
     const profiles = this.profiles.length ? this.profiles : ['Default'];
     const arch = this.variant === 'archenemy';
+    const planar = this.variant === 'planechase';
     const seatHtml = this.seats.map((s, i) => `<div class="seat${arch && i === this.archenemy ? ' archenemy' : ''}" data-i="${i}">
       ${arch ? `<span class="seat-role">${i === this.archenemy ? `${icon('horns')} Archenemy` : `${icon('shield')} Équipe`}</span>` : ''}
       ${avatarHtml(s.name, i, 44, s.ai ? '' : ownPhotoUrl())}
@@ -120,12 +124,20 @@ export class Lobby {
           </div>
           <div class="field"><span>Variante</span>
             <div class="seg" data-seg="variant">
-              <button data-v="none" class="${arch ? '' : 'on'}">Aucune</button>
+              <button data-v="none" class="${arch || planar ? '' : 'on'}">Aucune</button>
               <button data-v="archenemy" class="${arch ? 'on' : ''}">${icon('horns')} Archenemy</button>
+              <button data-v="planechase" class="${planar ? 'on' : ''}">${icon('dice')} Planechase</button>
             </div>
             <div class="muted small">${arch ? `L'Archenemy (${this.format === 'commander' ? '60' : '40'} points de vie) joue en premier et met une machination à exécution au début de chacun de ses tours ; les trois autres font équipe contre lui et ne peuvent attaquer que lui.`
-              : 'Archenemy : un joueur contre une équipe de trois, avec ses machinations.'}</div>
+              : planar ? 'Chaque joueur a un paquet planaire de 10 plans (2 phénomènes au plus). Le plan ouvert change les règles pour tout le monde. Pendant ta phase principale, pile vide, tu peux lancer le dé planaire : gratuit la première fois du tour, puis {1} de plus à chaque lancer. Planeswalker : on change de plan ; chaos : l\'effet de chaos du plan se déclenche.'
+              : 'Archenemy : un joueur contre une équipe de trois, avec ses machinations. Planechase : on voyage de plan en plan avec le dé planaire.'}</div>
           </div>
+          ${planar ? `<div class="field"><span>Plans</span>
+            <div class="seg" data-seg="planes">
+              ${PLANE_SETS.map(([v, label]) => `<button data-v="${v}" class="${this.planes === v ? 'on' : ''}">${label}</button>`).join('')}
+            </div>
+            <div class="muted small">10 cartes différentes par joueur, mélangées, tirées ${this.planes === 'all' ? 'parmi tous les plans de Magic' : `de ${PLANE_SETS.find(x => x[0] === this.planes)[1]}`}.</div>
+          </div>` : ''}
           ${arch ? `<div class="field"><span>Archenemy</span>
             <div class="seg" data-seg="archenemy">
               ${this.seats.map((s, i) => `<button data-v="${i}" class="${i === this.archenemy ? 'on' : ''}">${esc(s.name || (s.ai ? 'IA ' + i : 'Moi'))}</button>`).join('')}
@@ -176,6 +188,8 @@ export class Lobby {
         this.archenemy = Number(b.dataset.v);
       } else if (seg.dataset.seg === 'schemes') {
         this.schemes = b.dataset.v;
+      } else if (seg.dataset.seg === 'planes') {
+        this.planes = b.dataset.v;
       } else {
         this.count = Number(b.dataset.v);
       }
@@ -256,6 +270,8 @@ export class Lobby {
     if (this.variant === 'archenemy') {
       setup.archenemy = Math.min(this.archenemy, setup.players.length - 1);
       setup.schemes = this.schemes;
+    } else if (this.variant === 'planechase') {
+      setup.planechase = this.planes || 'all';
     }
     const names = new Set(setup.players.map(p => p.name));
     if (names.size !== setup.players.length) {

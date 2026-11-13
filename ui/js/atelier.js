@@ -8,7 +8,8 @@ import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
-import {DFC_MODES, facePart, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
+import {icon} from './icons.js';
+import {DFC_MODES, facePart, scriptToForm, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
   effectsFor, eminenceOk, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
@@ -122,13 +123,29 @@ function simpleCost(text) {
 }
 
 export class Atelier {
-  constructor(root, {onChanged = () => {}} = {}) {
+  constructor(root, {onChanged = () => {}, onTry = null} = {}) {
     this.root = root;
     this.onChanged = onChanged;
+    // « Essayer en partie » : la carte enregistrée, une partie de la Sandbox commence avec elle en main.
+    this.onTry = onTry;
     this.data = null;
     // Appui long (ou clic droit) sur une carte : on l'inspecte en grand, comme ailleurs dans l'application ; le
     // toucher qui suit ne compte pas comme un clic.
     this.pressed = onLongPress(root, '.ate-tile, .ate-preview .mcard, .ate-frame', (node) => this.inspect(node));
+    // Ctrl+Z / Ctrl+Y (ou Ctrl+Maj+Z) dans l'éditeur, hors des champs de texte (qui gardent leur propre annulation).
+    document.addEventListener('keydown', (e) => {
+      if (!this.editing || !this.hist || !(e.ctrlKey || e.metaKey) || !root.closest('.screen.active')) {
+        return;
+      }
+      if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) {
+        return;
+      }
+      const k = e.key.toLowerCase();
+      if (k === 'z' || k === 'y') {
+        e.preventDefault();
+        this.stepHistory(k === 'y' || e.shiftKey ? 1 : -1);
+      }
+    });
   }
 
   inspect(node) {
@@ -238,6 +255,8 @@ export class Atelier {
     this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
       <div class="ate-top"><h1>Atelier</h1>${d.cards.length ? `<button class="btn" data-organize>${sel ? 'Terminé' : 'Organiser'}</button>` : ''}
         <button class="btn" data-reprint-new title="Une carte officielle (Sol Ring…) avec ton illustration, dans ton extension">＋ Réimpression</button>
+        <button class="btn" data-share title="Envoyer tes cartes, extensions et jetons dans un fichier (.atcards) à partager">${icon('scroll')} Partager…</button>
+        <button class="btn" data-import title="Ajouter les cartes d'un fichier .atcards reçu">Importer…</button>
         <button class="btn gold" data-new>＋ Nouvelle carte</button></div>
       <p class="muted small">Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles
         se trouvent dans la recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker). Une <b>réimpression</b> est
@@ -249,6 +268,7 @@ export class Atelier {
       ${sel ? `<div class="ate-selbar panel"><span><b>${sel.size}</b> choisie${sel.size > 1 ? 's' : ''} — touche les cartes à ranger</span>
         <button class="btn small gold" data-sput${sel.size ? '' : ' disabled'}>Mettre dans une extension…</button>
         <button class="btn small" data-rput${sel.size ? '' : ' disabled'}>Rareté…</button>
+        <button class="btn small" data-sshare${sel.size ? '' : ' disabled'}>Partager…</button>
         <button class="btn small" data-gall>${cards.length + tokens.length && [...cards, ...tokens].every(c => sel.has(c.name)) ? 'Aucune' : 'Toutes'}</button></div>` : ''}
       <div class="ate-cardgroups"></div>
       <div class="ate-top"><h2>Mes extensions</h2><button class="btn" data-newset>＋ Nouvelle extension</button></div>
@@ -349,6 +369,18 @@ export class Atelier {
       }
       if (e.target.closest('[data-newset]')) {
         this.editSet(null, () => this.renderList());
+        return;
+      }
+      if (e.target.closest('[data-share]')) {
+        this.askShare();
+        return;
+      }
+      if (e.target.closest('[data-sshare]')) {
+        this.share({names: [...this.selection], label: `${this.selection.size}-cartes`});
+        return;
+      }
+      if (e.target.closest('[data-import]')) {
+        this.importShared();
         return;
       }
       const es = e.target.closest('[data-editset]');
@@ -724,7 +756,7 @@ export class Atelier {
         <div class="ate-side panel">
           <div class="ate-preview"></div>
           <div class="ate-msg muted small"></div>
-          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button></div>
+          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
           <div class="ate-actions">
             <button class="btn gold" data-save>Enregistrer</button>
             ${rec ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
@@ -860,11 +892,15 @@ export class Atelier {
       Object.assign(this.form, readDisplay(entry.script));
     }
     this.lastCard = null;
+    // Annuler / rétablir : les états successifs de la carte (un par modification, après chaque vérification).
+    this.hist = [];
+    this.histPos = -1;
     this.root.onclick = null;
     this.root.innerHTML = `<div class="page atelier-edit">
       <div class="ate-top">
         <button class="btn small" data-back>← Retour</button>
         <h1>${entry ? (this.form.token ? 'Modifier le jeton' : 'Modifier la carte') : this.form.token ? 'Nouveau jeton' : 'Nouvelle carte'}</h1>
+        <div class="ate-undo"><button class="btn small" data-undo disabled title="Annuler (Ctrl+Z)">↶</button><button class="btn small" data-redo disabled title="Rétablir (Ctrl+Y)">↷</button></div>
         <div class="seg ate-mode"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button><button data-tab="look">Apparence</button></div>
       </div>
       <div class="ate-body">
@@ -872,16 +908,21 @@ export class Atelier {
         <div class="ate-side panel">
           <div class="ate-preview"></div>
           <div class="ate-msg muted small">Vérification par Forge…</div>
-          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button></div>
+          ${entry && !this.form.token ? '<div class="ate-cstats muted small"></div>' : ''}
+          <div class="ate-art"><button class="btn small" data-art>Illustration…</button><button class="btn small" data-noart>Retirer l'illustration</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
           ${entry && !this.form.token && entry.card ? '<button class="btn small" data-alt-art title="Une réimpression : la même carte avec une autre illustration, sans la renommer">↻ Autre illustration…</button>' : ''}
           <div class="ate-actions">
             <button class="btn gold" data-save>Enregistrer</button>
+            ${this.onTry && !this.form.token ? `<button class="btn" data-try title="Enregistrer la carte, puis lancer une partie contre l'IA avec elle en main">${icon('play')} Essayer en partie</button>` : ''}
             ${entry ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
           </div>
         </div>
       </div>
     </div>`;
     this.check = debounce(() => this.validate(), 350);
+    if (entry && !this.form.token) {
+      this.cardStats(entry.name);
+    }
     this.root.addEventListener('click', this.onEditClick = (e) => this.editClick(e));
     this.root.addEventListener('pointerdown', this.onEditDrag = (e) => {
       const handle = e.target.closest('.ate-drag');
@@ -921,8 +962,58 @@ export class Atelier {
     this.renderLeft();
   }
 
+  /** Note l'état de la carte s'il a changé depuis le dernier noté (une nouvelle modification efface ce qu'on pouvait rétablir). */
+  remember() {
+    if (!this.hist || this.restoring) {
+      return;
+    }
+    const snap = JSON.stringify({form: this.full(), mode: this.mode, script: this.mode === 'script' ? this.script : ''});
+    if (snap === this.hist[this.histPos]) {
+      return;
+    }
+    this.hist = this.hist.slice(0, this.histPos + 1);
+    this.hist.push(snap);
+    if (this.hist.length > 80) {
+      this.hist.shift();
+    }
+    this.histPos = this.hist.length - 1;
+    this.undoButtons();
+  }
+
+  undoButtons() {
+    const u = this.root.querySelector('[data-undo]');
+    const r = this.root.querySelector('[data-redo]');
+    if (u && r) {
+      u.disabled = this.histPos <= 0;
+      r.disabled = this.histPos >= this.hist.length - 1;
+    }
+  }
+
+  /** Revient d'un pas en arrière (-1) ou en avant (+1). */
+  stepHistory(dir) {
+    const pos = this.histPos + dir;
+    if (!this.hist || pos < 0 || pos >= this.hist.length) {
+      return;
+    }
+    this.histPos = pos;
+    const snap = JSON.parse(this.hist[pos]);
+    this.restoring = true;
+    this.form = Object.assign(NEW_CARD(), snap.form);
+    this.face = 'front';
+    this.front = null;
+    this.mode = snap.mode || 'form';
+    if (snap.mode === 'script') {
+      this.script = snap.script;
+    }
+    this.renderLeft();
+    this.restoring = false;
+    this.undoButtons();
+    this.check();
+  }
+
   close() {
     this.reprint = null;
+    this.hist = null;
     this.root.removeEventListener('click', this.onEditClick);
     this.root.removeEventListener('pointerdown', this.onEditDrag);
     this.root.removeEventListener('input', this.onEditInput);
@@ -979,14 +1070,26 @@ export class Atelier {
     }
     const f = this.form;
     f.dfc = value;
+    const spell = value === 'adventure' || value === 'prepare' || value === 'omen';
     if (value && !f.back) {
-      const spell = value === 'adventure' || value === 'prepare';
-      f.back = {name: '', cost: spell || value === 'modal' ? '' : undefined, types: spell ? ['Sorcery'] : ['Creature'], power: 2, toughness: 2,
-        keywords: [], kwValues: {}, abilities: [], colors: []};
+      f.back = {name: '', cost: spell || value === 'modal' || value === 'room' ? '' : undefined, types: spell ? ['Sorcery'] : value === 'room' ? ['Enchantment'] : ['Creature'],
+        power: 2, toughness: 2, keywords: [], kwValues: {}, abilities: [], colors: []};
     }
-    if (value === 'adventure' || value === 'prepare') {
+    if (spell) {
       const types = (f.back.types || []).filter(t => t === 'Instant' || t === 'Sorcery');
       f.back.types = types.length ? types : ['Sorcery'];
+    }
+    if (value === 'room') {
+      // Deux portes : deux enchantements « Pièce », chacun avec son coût.
+      for (const face of [f, f.back]) {
+        face.types = ['Enchantment'];
+        face.legendary = false;
+        const subs = String(face.subtypes || '').split(/\s+/).filter(t => t && !/^(Room|Pièce)$/i.test(t));
+        face.subtypes = [...subs, 'Pièce'].join(' ');
+        if (face.cost === undefined) {
+          face.cost = '';
+        }
+      }
     }
     this.renderLeft();
   }
@@ -1215,7 +1318,8 @@ export class Atelier {
       left.innerHTML = `<p class="muted small">Le script tel que Forge le lit (format des fichiers de cartes de Forge :
         <code>Name:</code>, <code>ManaCost:</code>, <code>Types:</code>, <code>PT:</code>, <code>K:</code>, <code>T:</code>,
         <code>A:</code>, <code>S:</code>, <code>SVar:</code>, <code>Oracle:</code>). Tout ce que Forge sait faire est possible ici.</p>
-        <textarea class="ate-script" spellcheck="false">${esc(this.script)}</textarea>`;
+        <textarea class="ate-script" spellcheck="false">${esc(this.script)}</textarea>
+        <div class="ate-ab-row"><button class="btn small" data-fromscript title="Remplir le formulaire avec ce script : nom, coût, types, force, mots-clés">↧ Reprendre ce script dans le formulaire</button></div>`;
       this.renderLook();
       this.check();
       return;
@@ -1230,8 +1334,9 @@ export class Atelier {
       <div class="ate-field"><span>Types</span><div class="ate-chips">
         ${this.face === 'back' || f.dfc ? '' : `<button class="chip ${f.token ? 'on' : ''}" data-tokenflag title="Un jeton : pas de coût, créé par les capacités">Jeton</button>`}
         <button class="chip ${f.legendary ? 'on' : ''}" data-legendary>Légendaire</button>
+        ${f.world || f.types.includes('Enchantment') ? `<button class="chip ${f.world ? 'on' : ''}" data-world title="Supertype Monde : règle du monde">Monde</button>` : ''}
         ${CARD_TYPES.map(([v, l]) => `<button class="chip ${f.types.includes(v) ? 'on' : ''}" data-type="${v}">${l}</button>`).join('')}
-      </div></div>
+      </div>${f.world ? `<div class="ate-sub muted small">Règle du monde : s'il y a plusieurs permanents « Monde » sur le champ de bataille, seul celui qui y est arrivé le plus récemment reste ; les autres sont mis au cimetière (ce n'est pas une destruction : la régénération et l'indestructible ne les sauvent pas).</div>` : ''}</div>
       <div class="ate-field"><span>Sous-types</span>${this.subtypesHtml(f)}</div>
       ${this.subtypeHtml(f)}
       ${needsPT(f) ? `<div class="ate-field ate-pt"><span>Force / endurance</span>
@@ -2202,8 +2307,13 @@ export class Atelier {
           }
         });
       }
+    } else if (b.dataset.fromscript !== undefined) {
+      this.formFromScript();
     } else if (b.dataset.legendary !== undefined) {
       f.legendary = !f.legendary;
+      this.renderLeft();
+    } else if (b.dataset.world !== undefined) {
+      f.world = !f.world;
       this.renderLeft();
     } else if (b.dataset.tokenflag !== undefined) {
       f.token = !f.token;
@@ -2318,6 +2428,14 @@ export class Atelier {
         this.close();
         this.editReprint(null, entry.card);
       }
+    } else if (b.dataset.png !== undefined) {
+      this.exportPng(b);
+    } else if (b.dataset.undo !== undefined) {
+      this.stepHistory(-1);
+    } else if (b.dataset.redo !== undefined) {
+      this.stepHistory(1);
+    } else if (b.dataset.try !== undefined) {
+      this.save(b, {andTry: true});
     } else if (b.dataset.save !== undefined) {
       if (this.reprint) {
         this.saveReprint(b);
@@ -2538,6 +2656,7 @@ export class Atelier {
     }
     const token = (this.vToken || 0) + 1;
     this.vToken = token;
+    this.remember();
     const msg = this.root.querySelector('.ate-msg');
     const preview = this.root.querySelector('.ate-preview');
     if (!msg) {
@@ -2573,7 +2692,140 @@ export class Atelier {
     }
   }
 
-  async save(button) {
+  /** La carte de l'aperçu en image PNG (grande : 744 pixels de large), partagée ou téléchargée. */
+  async exportPng(button) {
+    const node = this.root.querySelector('.ate-preview .mcard');
+    if (!node) {
+      return;
+    }
+    button.disabled = true;
+    try {
+      const {cardPng} = await import('./cardimage.js');
+      const png = await cardPng(node, 744);
+      const name = (node.title || (this.form && this.form.name) || 'carte').trim();
+      const r = await bridge.request('shareImage', {name: `${name}.png`, png});
+      bridge.shareFile(r, 'Image de la carte', 'image/png');
+    } catch (e) {
+      toast(/insecure|tainted|security/i.test(e.message) ? 'Cet appareil ne permet pas d\'enregistrer l\'image de la carte.' : e.message,
+        {title: 'Image impossible', error: true});
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  /** Script → formulaire : le principal de la carte repris ; les capacités en script sont à refaire au formulaire. */
+  async formFromScript() {
+    const ta = this.root.querySelector('.ate-script');
+    const script = ta ? ta.value : this.script;
+    const {form, skipped} = scriptToForm(script);
+    const abilities = skipped.filter(l => /^(A|T|S|R):/.test(l)).length;
+    if (!form.name) {
+      toast('Le script n\'a pas de ligne « Name: ».', {title: 'Atelier', error: true});
+      return;
+    }
+    if (!await confirmBox('Reprendre dans le formulaire ?', `Le formulaire reprend le nom, le coût, les types, la force et les mots-clés de ce script.${abilities
+      ? ` ${abilities} capacité${abilities > 1 ? 's' : ''} écrite${abilities > 1 ? 's' : ''} en script ne ${abilities > 1 ? 'sont' : 'est'} pas reprise${abilities > 1 ? 's' : ''} : à refaire avec « + Capacité ».` : ''}${skipped.includes('ALTERNATE') ? ' La seconde face aussi est à refaire.' : ''}`,
+    {yes: 'Reprendre'})) {
+      return;
+    }
+    const keep = lookOf(this.form);
+    this.form = Object.assign(NEW_CARD(), keep, form, readDisplay(script));
+    this.form.colors = this.form.colors || [];
+    this.face = 'front';
+    this.front = null;
+    this.mode = 'form';
+    this.formUsed = true;
+    this.renderLeft();
+    this.check();
+  }
+
+  /** Partager : tout l'Atelier, ou une extension entière (ses cartes, jetons, réimpressions et son logo). */
+  askShare() {
+    const d = this.data;
+    const sets = d.sets || [];
+    customBox('Partager des cartes perso', (body, footer, close) => {
+      body.innerHTML = `<p class="muted small">Un fichier .atcards : à envoyer à un ami (messagerie, mail…), qui l'ouvre avec
+        « Importer… » dans son Atelier. Il contient les cartes, leurs illustrations, les extensions avec leur logo et tes types perso.
+        Pour quelques cartes seulement : « Organiser », choisis-les, puis « Partager… ».</p>
+        <div class="ate-sharelist">
+          <button class="btn" data-sh="">Tout mon Atelier <span class="muted">(${d.cards.length} carte${d.cards.length > 1 ? 's' : ''} et jetons)</span></button>
+          ${sets.map(x => `<button class="btn" data-sh="${esc(x.id)}">${setLogoHtml(x)} ${esc(x.name)} <span class="muted">(${x.count} carte${x.count > 1 ? 's' : ''})</span></button>`).join('')}
+        </div>`;
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sh]');
+        if (!b) {
+          return;
+        }
+        close();
+        const set = sets.find(x => x.id === b.dataset.sh);
+        this.share(set ? {names: d.cards.filter(c => this.setOf(c) === set.id).map(c => c.name), sets: [set.id], label: set.code || set.name}
+          : {label: 'atelier'});
+      });
+      const cancel = el('<button class="btn">Annuler</button>');
+      cancel.addEventListener('click', close);
+      footer.appendChild(cancel);
+    }, {narrow: true});
+  }
+
+  async share({names = [], sets = [], label = ''}) {
+    try {
+      const r = await bridge.request('shareExport', {names, sets, label});
+      if (!r.count) {
+        toast('Rien à partager : aucune carte perso ici.', {title: 'Partager'});
+        return;
+      }
+      bridge.shareFile(r, 'Partager des cartes Arcane Table');
+      if (!bridge.android && !bridge.ios) {
+        toast(`${r.count} carte${r.count > 1 ? 's' : ''} dans « ${r.name} » (dossier des téléchargements).`, {title: 'Partager'});
+      }
+    } catch (e) {
+      toast(e.message, {title: 'Partage impossible', error: true});
+    }
+  }
+
+  /** Importer un fichier .atcards : ses cartes s'ajoutent (une carte du même nom est remplacée). */
+  importShared() {
+    const input = el('<input type="file" style="display:none">');
+    document.body.appendChild(input);
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) {
+        return;
+      }
+      try {
+        const text = await file.text();
+        const r = await bridge.request('shareImport', {data: text});
+        toast(`${r.cards} carte${r.cards > 1 ? 's' : ''} ajoutée${r.cards > 1 ? 's' : ''}${r.sets ? `, ${r.sets} extension${r.sets > 1 ? 's' : ''}` : ''}${r.types ? `, ${r.types} type${r.types > 1 ? 's' : ''} perso` : ''}.`, {title: 'Import terminé'});
+        this.onChanged();
+        this.show();
+      } catch (e) {
+        toast(/JSON|Unexpected|format/i.test(e.message) ? 'Ce fichier n\'est pas un partage de cartes d\'Arcane Table (.atcards).' : e.message, {title: 'Import impossible', error: true});
+      }
+    });
+    input.click();
+  }
+
+  /** Statistiques de la carte perso : parties où elle était dans mon deck, victoires, fois où je l'ai jouée. */
+  async cardStats(name) {
+    const box = this.root.querySelector('.ate-cstats');
+    const data = await bridge.request('stats').catch(() => null);
+    const games = ((data && data.games) || []).filter(g => (g.customDeck || []).includes(name) || (g.customPlayed && g.customPlayed[name]));
+    if (!box || !box.isConnected) {
+      return;
+    }
+    if (!games.length) {
+      box.textContent = 'Pas encore jouée en partie : ses statistiques s\'afficheront ici.';
+      return;
+    }
+    const wins = games.filter(g => g.result === 'win').length;
+    const played = games.reduce((n, g) => n + ((g.customPlayed && g.customPlayed[name]) || 0), 0);
+    const inGames = games.filter(g => g.customPlayed && g.customPlayed[name]).length;
+    box.innerHTML = `${icon('chalice')} <b>${games.length}</b> partie${games.length > 1 ? 's' : ''} avec elle dans le deck, <b>${wins}</b> victoire${wins > 1 ? 's' : ''} (${Math.round(100 * wins / games.length)} %)
+      · jouée <b>${played}</b> fois${inGames ? ` dans ${inGames} partie${inGames > 1 ? 's' : ''}` : ''}.`;
+  }
+
+  async save(button, {andTry = false} = {}) {
     button.disabled = true;
     try {
       const kept = this.formKept();
@@ -2589,10 +2841,17 @@ export class Atelier {
       } catch (err) {
         // mémoire du navigateur indisponible : l'artiste ne sera pas repris
       }
-      toast(this.form.token ? 'Jeton enregistré : tes cartes perso peuvent le créer, et la triche le propose en partie.'
-        : 'Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
+      if (!andTry) {
+        toast(this.form.token ? 'Jeton enregistré : tes cartes perso peuvent le créer, et la triche le propose en partie.'
+          : 'Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
+      }
+      const named = /^Name:(.*)$/m.exec(this.currentScript() || '');
+      const name = named ? named[1] : (this.face === 'back' ? this.front : this.form).name;
       this.onChanged();
       this.close();
+      if (andTry && this.onTry) {
+        this.onTry(String(name || '').trim());
+      }
     } catch (e) {
       toast(e.message, {title: 'Carte refusée', error: true, duration: 7000});
       button.disabled = false;

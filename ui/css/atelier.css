@@ -286,3 +286,6 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
 /* Cartes à deux faces : le choix des faces et la bascule recto / verso. */
 .ate-faces .seg { margin-top: 8px; display: inline-flex; flex-wrap: wrap; }
 .ate-faces .seg button { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ate-cstats { margin: 4px 0; line-height: 1.4; } .ate-cstats .ic { width: 14px; height: 14px; vertical-align: -2px; color: var(--gold-2); }
+.ate-undo { display: inline-flex; gap: 4px; } .ate-undo .btn { min-width: 38px; font-size: 16px; line-height: 1; }
+.ate-sharelist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; } .ate-sharelist .btn { justify-content: flex-start; text-align: left; gap: 6px; }

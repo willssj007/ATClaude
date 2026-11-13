@@ -12,8 +12,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 
 /**
- * Donne à l'installateur d'Android l'APK de la mise à jour téléchargée (dossier « updates » du cache de l'appli), en
- * lecture seule et seulement à qui l'appli le permet (l'intention d'installation). Rien d'autre n'est servi.
+ * Donne à l'installateur d'Android l'APK de la mise à jour téléchargée (dossier « updates » du cache de l'appli), et à
+ * l'appli choisie dans « Partager » un fichier de cartes perso (.atcards) ou l'image d'une carte (.png), en lecture
+ * seule et seulement à qui l'appli le permet. Rien d'autre n'est servi.
  */
 public class UpdateProvider extends ContentProvider {
 
@@ -25,7 +26,7 @@ public class UpdateProvider extends ContentProvider {
 
     private File file(final Uri uri) throws FileNotFoundException {
         final String name = uri.getLastPathSegment();
-        if (name == null || name.contains("/") || name.contains("..") || !name.endsWith(".apk")) {
+        if (name == null || name.contains("/") || name.contains("..") || mime(name) == null) {
             throw new FileNotFoundException(String.valueOf(uri));
         }
         final File f = new File(dir(getContext()), name);
@@ -47,7 +48,21 @@ public class UpdateProvider extends ContentProvider {
 
     @Override
     public String getType(final Uri uri) {
-        return MIME;
+        final String m = mime(String.valueOf(uri.getLastPathSegment()));
+        return m == null ? MIME : m;
+    }
+
+    static String mime(final String name) {
+        if (name.endsWith(".apk")) {
+            return MIME;
+        }
+        if (name.endsWith(".atcards")) {
+            return "application/json";
+        }
+        if (name.endsWith(".png")) {
+            return "image/png";
+        }
+        return null;
     }
 
     @Override

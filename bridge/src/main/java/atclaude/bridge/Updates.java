@@ -32,6 +32,11 @@ final class Updates {
     private Updates() { }
 
     /** Le serveur des versions (un faux GitHub pour les essais : -Datclaude.updatesApi=http://127.0.0.1:8799/). */
+    private static String base(final String property, final String fallback) {
+        final String b = System.getProperty(property, fallback);
+        return b.endsWith("/") ? b : b + "/";
+    }
+
     private static String api() {
         final String base = System.getProperty("atclaude.updatesApi", "https://api.github.com/");
         return base.endsWith("/") ? base : base + "/";
@@ -76,7 +81,14 @@ final class Updates {
      */
     static JsonObject check(final String current, final String channel, final boolean ios) throws IOException {
         final String tag = "test".equals(channel) ? "apk-test" : "apk-latest";
-        final JsonObject release = getJson(api() + "repos/" + REPO + "/releases/tags/" + tag);
+        JsonObject release;
+        try {
+            release = getJson(api() + "repos/" + REPO + "/releases/tags/" + tag);
+        } catch (final IOException e) {
+            // L'API de GitHub limite les appels par adresse (60 par heure, partagés sur un réseau mobile) : la page de la
+            // version, qui ne compte pas dans cette limite, donne le titre ; les fichiers ont une adresse connue.
+            release = fromPage(tag, ios);
+        }
         final String name = str(release, "name");
         final Matcher m = VERSION.matcher(name);
         final String latest = m.find() ? m.group() : "";
@@ -267,6 +279,75 @@ final class Updates {
         }
         try (java.util.stream.Stream<Path> walk = Files.walk(p)) {
             walk.sorted(java.util.Comparator.reverseOrder()).forEach(x -> x.toFile().delete());
+        }
+    }
+
+    /** La version publiée lue sur sa page (sans l'API) : son titre, ses fichiers (noms connus) et ses notes. */
+    private static JsonObject fromPage(final String tag, final boolean ios) throws IOException {
+        final String web = base("atclaude.updatesWeb", "https://github.com/");
+        final String html = getText(web + REPO + "/releases/tag/" + tag);
+        final Matcher t = Pattern.compile("(?:Arcane Table|AT TEST)[^<\"]*?(\\d+\\.\\d+\\.\\d+(?:-test\\.\\d+)?)[^<\"]*").matcher(html);
+        if (!t.find()) {
+            throw new IOException("version introuvable sur la page de GitHub");
+        }
+        final String version = t.group(1);
+        final boolean test = "apk-test".equals(tag);
+        final JsonObject o = new JsonObject();
+        o.addProperty("name", t.group().replaceAll("\\s+·.*$", "").trim());
+        o.addProperty("html_url", web + REPO + "/releases/tag/" + tag);
+        final JsonArray assets = new JsonArray();
+        final String base = web + REPO + "/releases/download/" + tag + "/";
+        for (final String n : test ? new String[] {"AT-TEST-" + version + ".apk"}
+                : new String[] {"ArcaneTable-" + version + ".apk", "ArcaneTable-Windows-" + version + ".zip", "ArcaneTable-iOS-" + version + ".ipa"}) {
+            final JsonObject a = new JsonObject();
+            a.addProperty("name", n);
+            a.addProperty("browser_download_url", base + n);
+            assets.add(a);
+        }
+        o.add("assets", assets);
+        // Les notes : la première section de PATCH-NOTES.md.
+        try {
+            final String md = getText(base("atclaude.updatesRaw", "https://raw.githubusercontent.com/") + REPO + "/" + (test ? "test" : "main") + "/PATCH-NOTES.md");
+            final int start = md.indexOf("\n## ");
+            final int end = start < 0 ? -1 : md.indexOf("\n## ", start + 4);
+            o.addProperty("body", start < 0 ? "" : md.substring(start + 1, end < 0 ? md.length() : end).trim());
+        } catch (final IOException e) {
+            o.addProperty("body", "");
+        }
+        return o;
+    }
+
+    private static String getText(final String url) throws IOException {
+        HttpURLConnection c = Net.open(url);
+        c.setConnectTimeout(15_000);
+        c.setReadTimeout(20_000);
+        c.setRequestProperty("User-Agent", "ArcaneTable");
+        try {
+            for (int hop = 0; hop < 4 && c.getResponseCode() / 100 == 3; hop++) {
+                final String next = c.getHeaderField("Location");
+                c.disconnect();
+                if (next == null) {
+                    break;
+                }
+                c = Net.open(next);
+                c.setConnectTimeout(15_000);
+                c.setReadTimeout(20_000);
+                c.setRequestProperty("User-Agent", "ArcaneTable");
+            }
+            if (c.getResponseCode() != 200) {
+                throw new IOException("GitHub répond " + c.getResponseCode());
+            }
+            try (InputStream in = c.getInputStream()) {
+                final java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+                final byte[] buf = new byte[16 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    all.write(buf, 0, n);
+                }
+                return new String(all.toByteArray(), StandardCharsets.UTF_8);
+            }
+        } finally {
+            c.disconnect();
         }
     }
 

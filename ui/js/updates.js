@@ -9,8 +9,16 @@ import {el, esc, prefs, toast} from './util.js';
 
 const LAST = 'at.update.lastCheck';
 const SKIP = 'at.update.skip';
-/** Au lancement, au plus une vérification toutes les six heures. */
-const EVERY = 6 * 3600 * 1000;
+/** « Plus tard » : la même version n'est pas reproposée avant six heures. */
+const LATER = 'at.update.later';
+const LATER_FOR = 6 * 3600 * 1000;
+/** Une vérification à la fois, et pas de seconde fenêtre si la première est encore ouverte. */
+let checking = false;
+/**
+ * À chaque ouverture de l'appli, et quand on y revient (un téléphone garde l'appli ouverte en arrière-plan, sans la
+ * relancer) : au plus une vérification toutes les vingt minutes.
+ */
+const EVERY = 20 * 60 * 1000;
 
 function store(key, value) {
   try {
@@ -25,7 +33,7 @@ function store(key, value) {
 }
 
 /** Les notes de version (titres, listes, gras) en HTML simple. */
-function notesHtml(md) {
+export function notesHtml(md) {
   const lines = String(md || '').split('\n');
   const out = [];
   let list = false;
@@ -59,12 +67,13 @@ function notesHtml(md) {
 }
 
 /**
- * Vérifie s'il y a une nouvelle version. auto : au lancement (selon le réglage, pas plus d'une fois toutes les six
- * heures, et pas pour une version mise de côté). Sinon (bouton des réglages), dit aussi quand l'appli est à jour.
+ * Vérifie s'il y a une nouvelle version. auto : au lancement et au retour dans l'appli (selon le réglage, pas plus
+ * d'une fois toutes les vingt minutes, et pas pour une version ignorée ou remise à plus tard). Sinon (bouton des
+ * réglages), dit aussi quand l'appli est à jour.
  */
 export async function checkUpdates({auto = false} = {}) {
   if (auto) {
-    if (!prefs.get('autoUpdate')) {
+    if (!prefs.get('autoUpdate') || checking || document.querySelector('.upd-notes, .modal-back')) {
       return;
     }
     const last = Number(store(LAST)) || 0;
@@ -73,6 +82,7 @@ export async function checkUpdates({auto = false} = {}) {
     }
   }
   let info;
+  checking = true;
   try {
     info = await bridge.request('updateCheck');
   } catch (e) {
@@ -80,6 +90,8 @@ export async function checkUpdates({auto = false} = {}) {
       toast(e.message, {title: 'Mises à jour', error: true});
     }
     return;
+  } finally {
+    checking = false;
   }
   store(LAST, String(Date.now()));
   if (!info.current) {
@@ -97,7 +109,23 @@ export async function checkUpdates({auto = false} = {}) {
   if (auto && store(SKIP) === info.latest) {
     return;
   }
+  const later = String(store(LATER) || '').split('|');
+  if (auto && later[0] === info.latest && Date.now() - (Number(later[1]) || 0) < LATER_FOR) {
+    return;
+  }
   showUpdate(info);
+}
+
+/** Quand on revient dans l'appli (téléphone en veille, autre appli), une vérification si la dernière date un peu. */
+export function watchUpdates(canCheck) {
+  const again = () => {
+    if (document.visibilityState !== 'hidden' && canCheck()) {
+      checkUpdates({auto: true});
+    }
+  };
+  document.addEventListener('visibilitychange', again);
+  // Android prévient aussi quand l'appli revient au premier plan.
+  window.addEventListener('at-resume', again);
 }
 
 /** La fenêtre « Nouvelle version » : ses nouveautés, puis mettre à jour, plus tard ou ignorer cette version. */
@@ -111,7 +139,10 @@ function showUpdate(info) {
       <div class="upd-bar hidden"><div class="upd-fill"></div><span class="upd-text muted small"></span></div>
       <details class="upd-notes" open><summary>Nouveautés</summary><div class="upd-md">${notesHtml(info.notes)}</div></details>`;
     const later = el('<button class="btn">Plus tard</button>');
-    later.addEventListener('click', close);
+    later.addEventListener('click', () => {
+      store(LATER, `${info.latest}|${Date.now()}`);
+      close();
+    });
     const skip = el('<button class="btn ghost">Ignorer cette version</button>');
     skip.addEventListener('click', () => {
       store(SKIP, info.latest);
@@ -175,4 +206,30 @@ async function install(info, body, failed) {
       off();
     }
   }
+}
+
+/**
+ * Premier lancement après une mise à jour : la fenêtre « Quoi de neuf » (les notes de la version installée). Au tout
+ * premier lancement de l'appli, rien : la version est seulement notée.
+ */
+export async function whatsNew(version) {
+  const SEEN = 'at.update.seen';
+  if (!version) {
+    return;
+  }
+  const seen = store(SEEN);
+  store(SEEN, version);
+  if (!seen || seen === version) {
+    return;
+  }
+  const r = await bridge.request('whatsNew').catch(() => null);
+  if (!r || !r.notes) {
+    return;
+  }
+  customBox(`Quoi de neuf dans la ${version}`, (body, footer, close) => {
+    body.innerHTML = `<div class="upd-md">${notesHtml(r.notes)}</div>`;
+    const ok = el('<button class="btn gold">Super !</button>');
+    ok.addEventListener('click', close);
+    footer.appendChild(ok);
+  });
 }

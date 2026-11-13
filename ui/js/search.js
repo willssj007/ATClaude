@@ -34,7 +34,7 @@ function creatureTypeOf(text, list) {
 
 const TYPES = [
   ['creature', 'Créature'], ['instant', 'Éphémère'], ['sorcery', 'Rituel'], ['artifact', 'Artefact'],
-  ['enchantment', 'Enchantement'], ['planeswalker', 'Planeswalker'], ['land', 'Terrain'], ['battle', 'Bataille'], ['legendary', 'Légendaire'],
+  ['enchantment', 'Enchantement'], ['planeswalker', 'Planeswalker'], ['land', 'Terrain'], ['battle', 'Bataille'], ['legendary', 'Légendaire'], ['world', 'Monde'],
 ];
 const PAGE = 60;
 const SET_TYPES = {CORE: 'Édition de base', EXPANSION: 'Extension', COMMANDER: 'Commander', DRAFT: 'Draft', REPRINT: 'Réédition',

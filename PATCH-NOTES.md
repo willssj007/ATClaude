@@ -2,6 +2,38 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.7.3 — Planechase, scellé et draft, énigmes, partage de cartes perso
+
+### Mises à jour
+- **Les mises à jour se proposent toutes seules sur téléphone** : la vérification se fait à l'ouverture de l'appli et à chaque retour dedans (un téléphone garde l'appli en arrière-plan sans la relancer), au plus toutes les vingt minutes. Si GitHub refuse de répondre (limite d'appels, fréquente sur un réseau mobile), l'appli lit la page de la version à la place.
+- « Plus tard » remet la proposition à six heures plus tard.
+- **Quoi de neuf** : au premier lancement après une mise à jour, une fenêtre montre les nouveautés de la version installée.
+
+### Sandbox
+- **Planechase**, à côté d'Archenemy dans « Variante » (2 à 4 joueurs) : chaque joueur a un paquet planaire de 10 plans différents, dont 2 phénomènes au plus, tirés de tous les plans ou d'un produit (Planechase 2009, 2012, Anthology, L'invasion des machines). Le plan en cours est affiché sur la ligne du milieu (touche pour le lire en grand) ; un nouveau plan s'annonce. Le bouton du **dé planaire** est à côté des outils : gratuit au premier lancer du tour, puis {1} de plus à chaque fois. Les résultats sont en français (changement de plan, chaos, rien). L'IA lance le dé aussi.
+- **Limité et énigmes** (nouvelle tuile de l'accueil) :
+  - **Scellé** : six boosters d'une extension de Magic, ou d'une de tes extensions perso, et un deck de 40 cartes contre l'IA, qui joue un deck construit par Forge avec ses propres boosters.
+  - **Draft** : huit joueurs dont sept IA, trois boosters chacun, on prend une carte et on passe le reste (à gauche, à droite, à gauche). Puis ton deck contre un des drafteurs IA.
+  - Construction du deck : touche une carte pour l'ajouter ou la retirer, terrains de base à volonté (ou « 17 auto »), et « Deck automatique » (le deck que Forge construirait avec tes cartes).
+  - **Énigmes** : les 376 énigmes de Forge (la plupart des « Possibility Storm »), avec leur objectif en français, leur difficulté et celles déjà résolues.
+- **Revenir en arrière** (menu de la partie) : la partie reprend au moment calme précédent (le début de la phase d'avant, à peu près). On peut revenir plusieurs fois de suite.
+- Une carte ajoutée par la triche sur le champ de bataille applique tout de suite les règles d'état (légende, monde, endurance 0).
+
+### Atelier
+- **Enchantements Monde** : une pastille « Monde » à côté de « Légendaire » (avec Enchantement). La règle du monde est appliquée par Forge : s'il y a plusieurs permanents « Monde », seul le plus récent reste, les autres vont au cimetière. Le type s'écrit « Enchantement mondial ».
+- **Pièces** (deux portes, chacune avec son coût, déverrouillées en la lançant ou en payant leur coût) et **Présages** (un sort qui retourne dans la bibliothèque) dans « Faces ». Nouveau déclencheur « Quand vous déverrouillez cette porte ».
+- **Essayer en partie** : enregistre la carte et lance une partie contre l'IA avec ton dernier deck ; la carte arrive dans ta main au début du premier tour.
+- **Partager** : tes cartes perso, jetons, extensions (avec leur logo) et types perso dans un fichier .atcards, à envoyer avec le menu « Partager » du téléphone (ou téléchargé sur PC). Tout l'Atelier, une extension, ou les cartes choisies avec « Organiser ». **Importer…** ajoute les cartes d'un fichier reçu.
+- **Image PNG** : la carte telle qu'elle s'affiche, en grande image, à partager.
+- **Annuler / Rétablir** (↶ ↷, ou Ctrl+Z / Ctrl+Y) dans l'éditeur.
+- **Reprendre un script dans le formulaire** : dans « Script Forge », le nom, le coût, les types, la force et les mots-clés d'un script passent dans le formulaire (les capacités écrites en script sont à refaire).
+- **Statistiques de chaque carte perso** dans l'éditeur : parties jouées avec elle dans le deck, victoires, fois où elle a été jouée.
+
+### Technique
+- **Chargement plus rapide** : l'Atelier et la boutique (près de la moitié du code de l'interface) ne sont plus lus au démarrage, mais préparés en tâche de fond.
+- **Tests de l'Atelier par Forge** à chaque build de test : chaque effet, déclencheur, mot-clé et sorte de carte (plus de 4 700 scripts) doit être accepté par le moteur.
+- **Build iPhone** : construit sur les Mac Intel de GitHub, il ne finit plus « en échec » à cause des Mac Apple Silicon saturés.
+
 ## 0.7.2 — X partout dans l'Atelier
 
 ### Atelier

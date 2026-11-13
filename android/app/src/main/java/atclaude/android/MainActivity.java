@@ -311,6 +311,29 @@ public class MainActivity extends Activity {
             return "installing";
         }
 
+        /** « Partager » d'Android pour un fichier préparé par le pont (cartes perso, image d'une carte). */
+        @JavascriptInterface
+        public String shareFile(final String path, final String title) {
+            final MainActivity activity = current;
+            final java.io.File file = new java.io.File(path == null ? "" : path);
+            final String mime = UpdateProvider.mime(file.getName());
+            if (activity == null || mime == null || !file.isFile() || !file.getParentFile().equals(UpdateProvider.dir(activity))) {
+                return "missing";
+            }
+            activity.ui.post(() -> {
+                final Uri uri = Uri.parse("content://" + activity.getPackageName() + ".updates/" + Uri.encode(file.getName()));
+                final Intent send = new Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                send.setClipData(android.content.ClipData.newRawUri(file.getName(), uri));
+                try {
+                    activity.startActivity(Intent.createChooser(send, title == null || title.isEmpty() ? file.getName() : title));
+                } catch (final ActivityNotFoundException e) {
+                    // aucune appli pour partager
+                }
+            });
+            return "shared";
+        }
+
         @JavascriptInterface
         public void openUrl(final String url) {
             final MainActivity activity = current;
@@ -436,6 +459,8 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         web.onResume();
+        // L'appli revient au premier plan sans être relancée : l'interface revérifie les mises à jour.
+        web.evaluateJavascript("window.dispatchEvent(new Event('at-resume'))", null);
         // Retour des réglages « installer des applis inconnues » : l'installation reprend si elle est permise.
         final java.io.File file = pendingUpdate;
         if (file != null && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || getPackageManager().canRequestPackageInstalls())) {

@@ -2,7 +2,6 @@
 // des decks gagnés.
 
 import {bridge} from './bridge.js';
-import {boosterSets} from './boosters.js';
 import {RARITY_FR, loadCareer, manaAmount, setCareer, wildcardHtml} from './career.js';
 import {customBox} from './dialogs.js';
 import {appearanceHtml, applyThemes, livePreviews} from './themes.js';
@@ -14,7 +13,7 @@ export async function openLedger() {
   let c;
   let sets = [];
   try {
-    [c, sets] = await Promise.all([loadCareer(true), boosterSets().catch(() => [])]);
+    [c, sets] = await Promise.all([loadCareer(true), import('./boosters.js').then(m => m.boosterSets()).catch(() => [])]);
   } catch (e) {
     toast(e.message, {error: true});
     return;
