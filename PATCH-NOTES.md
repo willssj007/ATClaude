@@ -2,6 +2,12 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.8.1 — Texte des cartes perso plus lisible
+
+- **Texte des cartes perso** : il pouvait rester tout petit dans son cadre (sur PC surtout, dans l'aperçu au survol), quand la première mesure de sa taille avait été faite trop tôt. Le texte reprend maintenant la plus grande taille qui tient dans le cadre.
+- **Gros texte** : l'aperçu d'une carte au survol (PC) est plus grand, son texte aussi.
+- **Carte perso en anglais** : ses mots-clés restent en anglais en partie (« First strike, haste, menace » au lieu de « Initiative, célérité, menace » au milieu de phrases anglaises).
+
 ## 0.8.0 — Niveaux de l'IA, 2 contre 2, cube, Gauntlet, test de main, vérification de tout le jeu
 
 ### Salon

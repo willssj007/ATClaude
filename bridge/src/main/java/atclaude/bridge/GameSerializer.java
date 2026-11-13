@@ -303,9 +303,11 @@ final class GameSerializer {
         if (ENGLISH_TYPE.matcher(o.get("typeLine").getAsString()).find() && s.getType() != null) {
             o.addProperty("typeLine", CustomCards.typeLine(s.getType()));
         }
+        // Texte tel que Forge l'écrit : une carte perso en anglais le garde (sans les mots-clés traduits plus bas).
+        final String forgeText = o.get("text").getAsString();
         if (inGame) {
-            o.addProperty("text", "Puzzle Goal".equals(s.getName()) ? Puzzles.goalCardText(o.get("text").getAsString())
-                    : EnglishLines.translate(engineNotes(o.get("text").getAsString())));
+            o.addProperty("text", "Puzzle Goal".equals(s.getName()) ? Puzzles.goalCardText(forgeText)
+                    : EnglishLines.translate(engineNotes(forgeText, true)));
         }
         o.addProperty("colors", colors(s.getColors()));
         o.addProperty("image", s.getImageKey());
@@ -336,7 +338,9 @@ final class GameSerializer {
             }
             final boolean english = "en".equals(o.get("lang").getAsString());
             o.addProperty("typeLine", CustomCards.typeLine(s.getType(), o.get("lang").getAsString()));
-            o.addProperty("text", customOrder(withoutEngineLines(o.get("text").getAsString()), s, english));
+            // Carte perso en anglais : tout le texte en anglais (« Haste », pas « Célérité » au milieu de phrases anglaises).
+            o.addProperty("text", customOrder(withoutEngineLines(english && inGame ? engineNotes(forgeText, false)
+                    : o.get("text").getAsString()), s, english));
             if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
             }
@@ -542,7 +546,8 @@ final class GameSerializer {
 
     private static final Pattern CHOSEN_TYPE = Pattern.compile("^\\(type (?:choisi|noté) : (.+)\\)$");
 
-    static String engineNotes(final String text) {
+    /** {@code translate} : les notes gardées sont traduites ; sinon seules celles que le plateau montre déjà sont retirées. */
+    static String engineNotes(final String text, final boolean translate) {
         if (text == null || text.isEmpty()) {
             return text;
         }
@@ -555,7 +560,7 @@ final class GameSerializer {
             for (final Object[] note : ENGINE_NOTES) {
                 final java.util.regex.Matcher m = ((Pattern) note[0]).matcher(t);
                 if (m.matches()) {
-                    kept = note[1] == null ? null : m.replaceFirst((String) note[1]);
+                    kept = note[1] == null ? null : translate ? m.replaceFirst((String) note[1]) : line;
                     break;
                 }
             }

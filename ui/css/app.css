@@ -1631,6 +1631,8 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 :root[data-bigtext] .choice-list button { font-size: 16px; }
 :root[data-bigtext] .choice-grid .pick .lbl { font-size: 14px; }
 :root[data-bigtext] #zoom .zoom-info { font-size: 17px; }
+/* Aperçu au survol (PC) : la carte elle-même plus grande, donc son texte aussi, sans dépasser la hauteur de l'écran. */
+:root[data-bigtext] .preview .mcard { --w: clamp(250px, min(25vw, calc(74vh * 63 / 88)), 380px); }
 :root[data-bigtext] #zoom .zoom-info .name { font-size: 26px; }
 :root[data-bigtext] .prompt { font-size: 15px; max-height: 8em; }
 :root[data-bigtext] .log-entry { font-size: 15px; }

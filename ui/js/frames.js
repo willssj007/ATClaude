@@ -142,18 +142,44 @@ function fitKey(style, name, type, text, cost) {
   return [style, name, type, cost || '', text].join('\u0001');
 }
 
-/** Réduit le nom, le type et le texte d'un cadre affiché jusqu'à ce qu'ils tiennent, et retient le résultat. */
+// Une mesure faite avant que les polices soient prêtes (symboles de mana, police du texte) est fausse : on l'oublie.
+if (typeof document !== 'undefined' && document.fonts && document.fonts.addEventListener) {
+  document.fonts.addEventListener('loadingdone', () => FITTED.clear());
+}
+
+/**
+ * Ajuste le nom, le type et le texte d'un cadre affiché : réduits jusqu'à ce qu'ils tiennent, puis agrandis tant qu'il
+ * reste de la place (jusqu'à la taille normale), et retient le résultat. Une taille déjà retenue n'est revérifiée que sur
+ * une grande carte (carte agrandie, aperçu au survol) : sur le plateau, elle sert telle quelle.
+ */
 export function fitFrame(frame) {
   const key = frame.dataset.fit;
+  // Taille déjà retenue et petite carte (ou cachée) : rien à refaire.
+  if (key && frame.dataset.known && frame.isConnected && frame.offsetWidth < 150) {
+    delete frame.dataset.fit;
+    delete frame.dataset.known;
+    return true;
+  }
   if (!key || !frame.isConnected || frame.offsetWidth < 20) {
     return false;
   }
   const shrink = (selector, prop, overflows) => {
     const el = frame.querySelector(selector);
+    const set = (x) => frame.style.setProperty(prop, String(x));
     let v = parseFloat(frame.style.getPropertyValue(prop)) || 1;
     for (let i = 0; el && i < 30 && v > 0.3 && overflows(el); i++) {
       v = Math.round((v - 0.04) * 100) / 100;
-      frame.style.setProperty(prop, String(v));
+      set(v);
+    }
+    // Place en trop (estimation prudente, mesure faite avant les polices) : on remonte tant que ça tient.
+    for (let i = 0; el && i < 30 && v < 1; i++) {
+      const up = Math.min(1, Math.round((v + 0.04) * 100) / 100);
+      set(up);
+      if (overflows(el)) {
+        set(v);
+        break;
+      }
+      v = up;
     }
     return v;
   };
@@ -163,6 +189,7 @@ export function fitFrame(frame) {
   const st = shrink('.cf-tl', '--st', wide);
   const sr = shrink('.cf-rules', '--sr', tall);
   delete frame.dataset.fit;
+  delete frame.dataset.known;
   // Une petite carte peut garder un texte plus grand que demandé (taille minimale du système) : on ne retient que
   // les mesures faites sur une carte assez grande.
   if (frame.offsetWidth >= 150) {
@@ -319,7 +346,7 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
   const textLines = text.split(/\n|\\n/);
   const chaptered = !pw && ((/saga/i.test(typeLine) && textLines.some(l => CHAPTER_LINE.test(l))) || (/class/i.test(typeLine) && textLines.some(l => LEVEL_LINE.test(l)))
     || textLines.some(l => STATION_LINE.test(l)));
-  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${pw ? ' cf-pw' : ''}${art ? '' : ' cf-noart'}${light}${grow ? ' cf-grow' : ''}${empty ? ' cf-notext' : ''}" style="${vars}"${known ? '' : ` data-fit="${esc(key)}"`}>
+  return `<div class="frame cf cf-${style}${legendary ? ' cf-legend' : ''}${pw ? ' cf-pw' : ''}${art ? '' : ' cf-noart'}${light}${grow ? ' cf-grow' : ''}${empty ? ' cf-notext' : ''}" style="${vars}" data-fit="${esc(key)}"${known ? ' data-known="1"' : ''}>
     <div class="cf-bg"></div>
     <div class="cf-art"${art}></div>
     ${overlay}
