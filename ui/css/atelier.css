@@ -236,6 +236,9 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
   .ate-msg { grid-area: msg; text-align: left; }
   .ate-art { grid-area: art; justify-content: flex-start; }
   .ate-actions { grid-area: act; justify-content: flex-start; }
+  /* Statistiques de la carte et « Autre illustration » : une ligne entière sous la carte (sinon la colonne de la carte
+     s'élargit à leur texte et pousse les boutons hors de l'écran). */
+  .ate-side > .ate-cstats, .ate-side > [data-alt-art] { grid-column: 1 / -1; justify-self: stretch; }
   .ate-grid { gap: 12px; justify-content: center; }
   .ate-tile .mcard { --w: 104px; }
   .ate-name { max-width: 104px; }

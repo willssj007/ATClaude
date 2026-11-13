@@ -1582,3 +1582,5 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 .lim-pn { display: flex; align-items: center; gap: 6px; font-weight: 700; }
 .lim-pn .ic { width: 16px; height: 16px; color: var(--gold-2); flex: none; }
 @media (max-width: 640px) { .lim-grid .mcard { --w: 104px; } .lim-mini .mcard { --w: 70px; } }
+/* Salon : une rangée de choix trop longue pour la colonne passe à la ligne au lieu de déborder. */
+.lobby .seg { flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }

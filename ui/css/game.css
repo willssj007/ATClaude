@@ -734,6 +734,7 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 .plane-reveal {
   --prh: min(250px, 30vw, 50vh);
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  width: max-content; max-height: calc(100% - 16px);
   grid-template-rows: auto 1fr; gap: 10px 16px; align-items: start; padding: 14px 18px 18px; border-radius: 16px; cursor: pointer; max-width: calc(100vw - 24px); box-sizing: border-box;
   background: radial-gradient(ellipse at center, rgb(40 24 90 / 0.94), rgb(8 6 18 / 0.94)); border: 1px solid rgb(150 120 255 / 0.6);
   box-shadow: 0 20px 60px rgb(0 0 0 / 0.6), 0 0 40px rgb(140 110 255 / 0.35);

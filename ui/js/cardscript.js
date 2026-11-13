@@ -4409,7 +4409,8 @@ export function facePart(f) {
 /** Le script complet d'une carte du formulaire (avec son verso, pour une carte à deux faces). */
 export function buildScript(form) {
   const mode = DFC_MODES.find(m => m[0] && m[0] === form.dfc);
-  if (!mode || !form.back || form.token) {
+  // Verso pas encore nommé : le recto seul, le temps de le remplir (l'enregistrement demande son nom).
+  if (!mode || !form.back || form.token || !String(form.back.name || '').trim()) {
     return buildFace(form);
   }
   const en = form.lang === 'en';

@@ -10,7 +10,9 @@ const PROFILE_LABELS = {Default: 'Équilibrée', Cautious: 'Prudente', Reckless:
 const MULLIGANS = [['null', 'Normal'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['-1', '∞']];
 /** Machinations de l'Archenemy : 20 tirées au hasard dans un produit officiel, ou parmi toutes. */
 const SCHEME_SETS = [['all', 'Toutes'], ['OARC', 'Archenemy (2010)'], ['OE01', 'Nicol Bolas (2017)']];
-const PLANE_SETS = [['all', 'Tous'], ['HOP', 'Planechase (2009)'], ['PC2', 'Planechase 2012'], ['PCA', 'Anthology'], ['MOC', 'L\'invasion des machines']];
+// Code, nom court (bouton), nom complet (aide).
+const PLANE_SETS = [['all', 'Tous', 'tous les plans de Magic'], ['HOP', '2009', 'Planechase (2009)'], ['PC2', '2012', 'Planechase 2012'],
+  ['PCA', 'Anthology', 'Planechase Anthology'], ['MOC', 'Machines', 'L\'invasion des machines Commander']];
 
 function mulliganHelp(free, count) {
   if (free === null) {
@@ -136,7 +138,7 @@ export class Lobby {
             <div class="seg" data-seg="planes">
               ${PLANE_SETS.map(([v, label]) => `<button data-v="${v}" class="${this.planes === v ? 'on' : ''}">${label}</button>`).join('')}
             </div>
-            <div class="muted small">10 cartes différentes par joueur, mélangées, tirées ${this.planes === 'all' ? 'parmi tous les plans de Magic' : `de ${PLANE_SETS.find(x => x[0] === this.planes)[1]}`}.</div>
+            <div class="muted small">10 cartes différentes par joueur, mélangées, tirées ${this.planes === 'all' ? 'parmi tous les plans de Magic' : `de ${(PLANE_SETS.find(x => x[0] === this.planes) || PLANE_SETS[0])[2]}`}.</div>
           </div>` : ''}
           ${arch ? `<div class="field"><span>Archenemy</span>
             <div class="seg" data-seg="archenemy">

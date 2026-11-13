@@ -2826,6 +2826,11 @@ export class Atelier {
   }
 
   async save(button, {andTry = false} = {}) {
+    const whole = this.full();
+    if (this.mode === 'form' && whole.dfc && !(whole.back && String(whole.back.name || '').trim())) {
+      toast('Le verso n\'a pas encore de nom : touche « Verso » en haut du formulaire pour le remplir.', {title: 'Carte à deux faces', error: true});
+      return;
+    }
     button.disabled = true;
     try {
       const kept = this.formKept();
