@@ -2,8 +2,10 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.8.1 — Texte des cartes perso plus lisible
+## 0.8.1 — « Ou » dans les déclencheurs de l'Atelier, texte des cartes perso plus lisible
 
+- **Atelier : déclencheur « ou »**. Sous « Quand elle agit », le menu **ou aussi** ajoute un deuxième moment pour la même capacité : « À chaque fois que cette créature arrive sur le champ de bataille ou attaque, piochez une carte. » La phrase se forme toute seule, en français comme en anglais (« Whenever … enters or attacks »), avec un effet simple ou un choix de modes. Forge reçoit deux déclencheurs qui lancent le même effet, et la carte n'écrit la phrase qu'une fois.
+- En partie, « que » devant le nom d'une carte qui commence par une voyelle devient « qu' » (« À chaque fois qu'Essai… »).
 - **Texte des cartes perso** : il pouvait rester tout petit dans son cadre (sur PC surtout, dans l'aperçu au survol), quand la première mesure de sa taille avait été faite trop tôt. Le texte reprend maintenant la plus grande taille qui tient dans le cadre.
 - **Gros texte** : l'aperçu d'une carte au survol (PC) est plus grand, son texte aussi.
 - **Atelier en paysage** : la page ne défile plus sur le côté (les listes cachées sous les menus « Extension » et « Type » prenaient toute la largeur de l'écran et décalaient l'affichage).

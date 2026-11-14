@@ -34,6 +34,7 @@ final class Texts {
     private static final Pattern SEARCH_YOUR = Pattern.compile("\\bRechercher vous (bibliothèque|main|cimetière|exil)");
     /** Forge traduit « from X's Deck » par « de la plate-forme de X ». */
     private static final Pattern PLATFORM = Pattern.compile(" de la plate-forme\\s+(?:de\\s+|d')?");
+    private static final Pattern QUE_VOWEL = Pattern.compile("\\b([Qq]u)e (?=[aeiouyàâäéèêëîïôöûüAEIOUYÀÂÄÉÈÊËÎÏÔÖÛÜ])");
     private static final Pattern YOUR_ZONE = Pattern.compile("\\b(de|dans|à|sur|depuis) vous (bibliothèque|main|cimetière|exil|zone de commandement|champ de bataille|réserve)");
     private static final int CACHE_SIZE = 800;
 
@@ -130,6 +131,8 @@ final class Texts {
         // Forge remplace « {player's} » par « vous » : « une carte de vous bibliothèque ».
         result = SEARCH_YOUR.matcher(result).replaceAll("Fouiller votre $1");
         result = YOUR_ZONE.matcher(result).replaceAll("$1 votre $2");
+        // Forge met le nom de la carte à la place de CARDNAME sans élision : « À chaque fois que Essai… » → « qu'Essai ».
+        result = QUE_VOWEL.matcher(result).replaceAll("$1'");
         // En-tête de Forge pour les effets qui ne viennent pas d'une capacité de la carte.
         if (result.contains("Non ability features")) {
             result = result.replaceAll("Non ability features:\\s*", "Effets en cours :\n");

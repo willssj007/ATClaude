@@ -3847,9 +3847,76 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
     const text = withWord(e.aw, `${head} ${desc}`);
     return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc} | StackDescription$ SpellDescription`, ...extra, ...(a.tapX && !tapCount(a) ? ['SVar:X:Count$xPaid'] : [])], text};
   }
-  const head = triggerHead(a, card);
+  const head = orTrigger(a, card, triggerHead(a, card));
   const text = withWord(e.aw, endDot(`${head[en ? 2 : 1]}, ${body}`));
-  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, `SVar:${id}:DB$ ${e.p}`, ...extra], text};
+  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, ...orLines(head, id, text), `SVar:${id}:DB$ ${e.p}`, ...extra], text};
+}
+
+/**
+ * « Ou » : un deuxième déclencheur pour la même capacité (« Quand cette créature arrive ou attaque »). Forge reçoit deux
+ * déclencheurs qui lancent le même effet ; le second est marqué Secondary$ pour que la carte n'écrive la phrase qu'une fois.
+ * Les déclencheurs qui ont leurs propres réglages (marqueur, type de sort, nombre) ne servent pas de second déclencheur.
+ */
+export function orTriggerFits(w) {
+  return !!w && w.kind === 'T' && !w.counterSel && !w.kinds && !w.nLabel && !w.nth;
+}
+
+function orTrigger(a, card, head) {
+  const w1 = WHEN.find(x => x.id === a.when);
+  const w2 = a.when2 && a.when2 !== a.when ? WHEN.find(x => x.id === a.when2) : null;
+  if (!head || !w1 || w1.kind !== 'T' || !orTriggerFits(w2)) {
+    return head;
+  }
+  const h2 = triggerTable({...a, when: a.when2}, card);
+  if (!h2) {
+    return head;
+  }
+  let forge2 = h2[0];
+  if (a.eminence && eminenceOk(a.when2)) {
+    forge2 = forge2.replace('TriggerZones$ Battlefield', 'TriggerZones$ Battlefield,Command');
+  }
+  const [fr, en] = orText([head[1], head[2]], [h2[1], h2[2]]);
+  return [head[0], fr, en, forge2];
+}
+
+function orLines(head, id, text) {
+  return head[3] ? [`T:${head[3]} | Execute$ ${id} | Secondary$ True | TriggerDescription$ ${text}`] : [];
+}
+
+/** Les deux débuts de phrase réunis : « Quand CARDNAME arrive sur le champ de bataille » + « Quand CARDNAME attaque »
+ *  → « À chaque fois que CARDNAME arrive sur le champ de bataille ou attaque » (« Whenever CARDNAME enters or attacks »). */
+function orText([fr1, en1], [fr2, en2]) {
+  // Un mot d'aptitude (« Toucheterre — ») reste devant le premier seulement.
+  const word = (t) => (t.match(/^[^—]+ — /) || [''])[0];
+  const wFr = word(fr1);
+  const wEn = word(en1);
+  const strip = (t) => t.replace(/^[^—]+ — /, '');
+  const EN = /^(Whenever|When) /;
+  const FR = /^(À chaque fois que |À chaque fois qu'|Quand |Lorsque )/;
+  const a1 = strip(en1).match(EN);
+  const a2 = strip(en2).match(EN);
+  const whenever = !a1 || !a2 || a1[1] === 'Whenever' || a2[1] === 'Whenever';
+  const join = (t1, t2, intro, re, or) => {
+    const m1 = t1.match(re);
+    const m2 = t2.match(re);
+    if (!m1 || !m2) {
+      return `${t1} ${or} ${t2.charAt(0).toLowerCase()}${t2.slice(1)}`;
+    }
+    const r1 = t1.slice(m1[0].length).split(' ');
+    const r2 = t2.slice(m2[0].length).split(' ');
+    let n = 0;
+    while (n < r1.length - 1 && n < r2.length - 1 && r1[n] === r2[n]) {
+      n++;
+    }
+    const rest = n ? `${r1.slice(0, n).join(' ')} ${r1.slice(n).join(' ')} ${or} ${r2.slice(n).join(' ')}`
+      : `${r1.join(' ')} ${or} ${m2[0].charAt(0).toLowerCase()}${m2[0].slice(1)}${r2.join(' ')}`;
+    // « À chaque fois que » devant une voyelle : « qu' ».
+    const lead = intro === 'À chaque fois que ' && /^[aeiouyhàâéèêîôûAEIOUYHÀÂÉÈÊÎÔÛ]/.test(rest) && !/^CARDNAME/.test(rest) ? 'À chaque fois qu\'' : intro;
+    return lead + rest;
+  };
+  const fr = wFr + join(strip(fr1), strip(fr2), whenever ? 'À chaque fois que ' : 'Quand ', FR, 'ou');
+  const en = wEn + join(strip(en1), strip(en2), whenever ? 'Whenever ' : 'When ', EN, 'or');
+  return [fr, en];
 }
 
 /** Déclencheurs qui marchent depuis le champ de bataille et peuvent aussi marcher depuis la zone de commandement. */
@@ -4104,9 +4171,9 @@ function modalLines(a, id, w, lang, card) {
     return {lines: [`A:AB$ ${charm} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${c.text}${en ? ':' : ' :'}`, ...modes, ...(a.tapX && !tapCount(a) ? ['SVar:X:Count$xPaid'] : [])],
       text: `${c.text}${en ? ':' : ' :'} ${capitalize(choose)}${bullets}${lim.text}`};
   }
-  const head = triggerHead(a, card);
-  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${head[en ? 2 : 1]}, ABILITY`, `SVar:${id}:DB$ ${charm}`, ...modes],
-    text: `${head[en ? 2 : 1]}, ${choose}${bullets}`};
+  const head = orTrigger(a, card, triggerHead(a, card));
+  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${head[en ? 2 : 1]}, ABILITY`, ...orLines(head, id, `${head[en ? 2 : 1]}, ABILITY`),
+    `SVar:${id}:DB$ ${charm}`, ...modes], text: `${head[en ? 2 : 1]}, ${choose}${bullets}`};
 }
 
 /** Lignes d'affichage du script (cadre, sa couleur, langue du texte) : Forge les garde sans s'en servir. */

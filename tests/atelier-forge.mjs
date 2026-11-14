@@ -74,6 +74,11 @@ for (const lang of ['fr', 'en']) {
   for (const w of WHEN.filter(x => x.kind === 'T' && !x.attach)) {
     await check(`quand ${w.id}`, card(ab({when: w.id, effect: 'draw', n: 1, whenCounter: 'CHARGE', whenN: 2}), lang));
   }
+  // « Ou » : deux déclencheurs pour le même effet (« Quand elle arrive ou attaque »), un effet simple et un modal.
+  for (const [w1, w2] of [['etb', 'attacks'], ['etb', 'dies'], ['attacks', 'blocks'], ['dies', 'leaves'], ['combatDamage', 'etb']]) {
+    await check(`quand ${w1} ou ${w2}`, card(ab({when: w1, when2: w2, effect: 'draw', n: 1}), lang));
+  }
+  await check('quand etb ou attacks (modal)', card(ab({when: 'etb', when2: 'attacks', effect: 'modal', modes: [newMode('draw'), newMode('gainLife')]}), lang));
   // Effets de joueur × choix « Joueur » × déclencheurs qui ont « ce joueur ».
   for (const effect of PLAYER_WHO) {
     for (const when of ['etb', 'attacks', 'combatDamage', 'oppCasts', 'oppDraws', 'attacksYou', 'unblocked', 'eachDraw', 'oppEnd', 'tapsForMana']) {
