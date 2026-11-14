@@ -5,7 +5,8 @@
 //   java -jar desktop/target/desktop-*.jar --assets <forge>/forge-gui --data <dossier> --ui ui --no-browser &
 //   node tests/atelier-forge.mjs [http://127.0.0.1:8765]
 // Sortie en erreur (code 1) si Forge refuse un seul script.
-import {buildScript, EFFECTS, WHEN, effectsFor, whoChoices, PLAYER_WHO, newMode, KEYWORDS, DFC_MODES} from '../ui/js/cardscript.js';
+import {buildScript, EFFECTS, WHEN, effectsFor, whoChoices, PLAYER_WHO, newMode, KEYWORDS, DFC_MODES, KW_ALL, AMOUNTS, CONDITIONS, SCOPES, cardTraits,
+  fitsCard, needOf} from '../ui/js/cardscript.js';
 const BASE = process.argv[2] || 'http://127.0.0.1:8765';
 const res = await fetch(BASE + '/api/events');
 const reader = res.body.getReader();
@@ -42,6 +43,33 @@ async function req(type, body = {}) {
 let ok = 0;
 let ko = 0;
 let n = 0;
+// Tri par type de carte : chaque besoin est un trait connu, et chaque choix va avec au moins une sorte de carte.
+{
+  const kinds = [{types: ['Creature']}, {types: ['Artifact'], subtypes: 'Vehicle', keywords: ['Crew']}, {types: ['Artifact'], subtypes: 'Equipment', keywords: ['Equip']},
+    {types: ['Enchantment'], subtypes: 'Aura', keywords: ['Enchant']}, {types: ['Enchantment'], subtypes: 'Saga'}, {types: ['Land']}, {types: ['Planeswalker']},
+    {types: ['Instant']}, {types: ['Sorcery'], keywords: ['Kicker']}, {types: ['Kindred', 'Instant']}, {types: ['Creature'], dfc: 'battle'},
+    {types: ['Enchantment'], dfc: 'room'}, {types: ['Creature'], dfc: 'transform'}, {types: ['Creature'], dfc: 'prepare', keywords: ['Hideaway']},
+    {types: ['Creature'], token: true}].map(k => ({subtypes: '', keywords: [], ...k}));
+  const known = new Set(Object.keys(cardTraits(kinds[0])));
+  const items = [...WHEN.map(w => ['when', w, w.id]), ...EFFECTS.map(e => ['effect', e, e.id]), ...KW_ALL.map(k => ['kw', k, k[0]]),
+    ...AMOUNTS.map(a => ['amount', a[0], a[0]]), ...CONDITIONS.map(c => ['cond', c[0], c[0]]), ...SCOPES.map(c => ['scope', c[0], c[0]])];
+  for (const [kind, item, id] of items) {
+    const unknown = needOf(kind, item).split(/[|&]/).filter(x => x && !x.startsWith('kw:') && !known.has(x));
+    if (unknown.length || !kinds.some(c => fitsCard(kind, item, c))) {
+      ko++;
+      console.log('✗ tri par type :', kind, id, unknown.length ? `besoin inconnu ${unknown.join(', ')}` : 'ne va avec aucune carte');
+    }
+  }
+  // Quelques cas : « elle attaque » et « elle gagne +X/+X » pas sur un équipement ; un éphémère : « sort » et « quand vous lancez ce sort ».
+  const [creature, , equip] = kinds;
+  const instant = kinds[7];
+  const expect = (label, got) => { if (!got) { ko++; console.log('✗ tri par type :', label); } };
+  expect('attaque : créature', fitsCard('when', WHEN.find(w => w.id === 'attacks'), creature));
+  expect('attaque : pas un équipement', !fitsCard('when', WHEN.find(w => w.id === 'attacks'), equip));
+  expect('+X/+X : pas un équipement', !effectsFor('etb', equip).some(e => e.id === 'pumpSelf'));
+  expect('X = sa force : pas un équipement', !fitsCard('amount', 'power', equip));
+  expect('éphémère : sort, lancer ce sort', WHEN.filter(w => fitsCard('when', w, instant)).map(w => w.id).sort().join() === 'castThis,spell,static');
+}
 const card = (a, lang, x = {}) => ({name: `Essai total ${++n}`, cost: '{2}{B}', types: ['Creature'], subtypes: 'Elf', power: 2, toughness: 2, keywords: [], kwValues: {},
   lang, abilities: [a], ...x});
 const ab = (x) => ({n: 2, cost: '{1}', tap: true, filter: {type: '', other: false}, token: 'w_1_1_soldier', keyword: 'Flying', mana: 'Any', counter: 'CHARGE', ...x});

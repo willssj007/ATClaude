@@ -7,11 +7,11 @@ import {bridge} from './bridge.js';
 import {cardElement, onLongPress, showZoom} from './cards.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
-import {debounce, el, esc, rulesHtml, symbol, toast} from './util.js';
+import {debounce, el, esc, prefs, rulesHtml, symbol, toast} from './util.js';
 import {icon} from './icons.js';
 import {DFC_MODES, facePart, scriptToForm, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
-  effectsFor, eminenceOk, orTriggerFits, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
+  cardTraits, effectsFor, eminenceOk, fitsCard, keywordNeed, needOf, needWords, setTypeFit, orTriggerFits, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './frames.js';
 
@@ -1108,6 +1108,14 @@ export class Atelier {
     return {...this.front, ...lookOf(this.form), back: facePart(this.form)};
   }
 
+  /** La face du formulaire, avec le mode recto verso de la carte : pour ne proposer que ce qui va avec elle. */
+  get fitCard() {
+    if (this.face === 'back' && this.front) {
+      return {...this.form, dfc: this.front.dfc, face: 'back'};
+    }
+    return this.form;
+  }
+
   /** Passe au recto ou au verso d'une carte à deux faces (le formulaire montre la face choisie). */
   switchFace(face) {
     if (face === this.face || this.mode !== 'form') {
@@ -1373,6 +1381,8 @@ export class Atelier {
   }
 
   renderLeft() {
+    // Réglage « Atelier : seulement ce qui va avec la carte » (activé par défaut).
+    setTypeFit(prefs.get('atelierFit') !== false);
     // Onglets : Formulaire et Script Forge (le contenu de la carte), Apparence (présentation et effets).
     this.root.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', this.tab !== 'look' && b.dataset.mode === this.mode));
     this.root.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', this.tab === 'look'));
@@ -1697,7 +1707,7 @@ export class Atelier {
 
   /** La condition « À résoudre — » d'une affaire : une des conditions avec un nombre (pas « votre tour », ni le kick). */
   caseHtml(f) {
-    const list = CONDITIONS.filter(([id]) => !['none', 'yourTurn', 'notYourTurn', 'kicked', 'tappedAtLeast'].includes(id));
+    const list = CONDITIONS.filter(([id]) => !['none', 'yourTurn', 'notYourTurn', 'kicked', 'tappedAtLeast'].includes(id) && (id === f.caseCond || fitsCard('cond', id, this.fitCard)));
     const c = f.caseCond || '';
     return `<select data-case="caseCond"><option value="">— choisir —</option>${list.map(([id, l]) => `<option value="${id}"${id === c ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${CONDITIONS_N.includes(c) ? `<input type="number" data-case="caseN" value="${esc(f.caseN ?? 3)}" min="0" max="99" style="width:64px" title="X">` : ''}
@@ -1742,12 +1752,24 @@ export class Atelier {
     const plain = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     const q = plain(this.kwQuery || '').trim();
     const chip = (k) => `<button class="chip ${f.keywords.includes(k[0]) ? 'on' : ''}" data-kw="${esc(k[0])}" title="${esc(k[2])}">${esc(k[1])}</button>`;
+    // Seulement ceux qui vont avec le type de la carte (réglage) ; ceux déjà choisis restent.
+    const card = this.fitCard;
+    const fits = (k) => f.keywords.includes(k[0]) || fitsCard('kw', k, card);
+    const hidden = KW_ALL.filter(k => !fits(k)).length;
+    const note = hidden ? `<p class="muted small ate-kwfit">${hidden} mots-clés ne vont pas avec ce type de carte et ne sont pas proposés (Réglages : « Atelier : seulement ce qui va avec la carte »).</p>` : '';
     if (q) {
       const hits = KW_ALL.filter(k => plain(k[1]).includes(q) || plain(k[2]).includes(q));
-      return hits.length ? `<div class="ate-chips ate-kwhits">${hits.map(chip).join('')}</div>` : '<p class="muted small">Aucun mot-clé ne correspond.</p>';
+      const ok = hits.filter(fits);
+      // Ceux qu'on cherche mais qui ne vont pas avec la carte : grisés, avec ce dont ils ont besoin.
+      const off = hits.filter(k => !fits(k)).map(k => `<button class="chip off" disabled title="${esc(`Va avec ${needWords(keywordNeed(k))}`)}">${esc(k[1])}
+        <span class="small">(${esc(needWords(keywordNeed(k)))})</span></button>`);
+      return hits.length ? `<div class="ate-chips ate-kwhits">${ok.map(chip).join('')}${off.join('')}</div>` : '<p class="muted small">Aucun mot-clé ne correspond.</p>';
     }
-    return `<div class="ate-kwgs">${KW_GROUPS.map(([g, label]) => {
-      const list = KW_ALL.filter(k => k[3] === g);
+    return `${note}<div class="ate-kwgs">${KW_GROUPS.map(([g, label]) => {
+      const list = KW_ALL.filter(k => k[3] === g && fits(k));
+      if (!list.length) {
+        return '';
+      }
       const on = list.filter(k => f.keywords.includes(k[0])).length;
       return `<details class="ate-kwg" data-kwg="${g}"${this.kwOpen.has(g) ? ' open' : ''}>
         <summary>${esc(label)}${on ? ` <b class="ate-kwn">${on}</b>` : ''}</summary>
@@ -1768,7 +1790,17 @@ export class Atelier {
     // Celles de ce que la carte équipe ou enchante d'abord (« La créature équipée a le contact mortel »), puis les autres.
     const at = attachOf(this.form);
     const own = attachTemplates(this.form).map(t => ({...t, group: at ? `Pour ${at.fr}` : ''}));
-    const list = onlyAttach ? own : [...own, ...templates(this.guessType()).map(t => ({...t, group: own.length ? 'Autres capacités' : ''}))];
+    const card = this.fitCard;
+    // Celles qui vont avec le type de la carte (réglage) : pas « elle attaque » sur un artefact, ni « la sacrifier » sur un sort.
+    const fits = (t) => {
+      const a = t.a || {};
+      const w = WHEN.find(x => x.id === a.when);
+      return (!w || (whenFits(w, this.form) && fitsCard('when', w, card))) && (!a.effect || effectsFor(a.when, card).some(x => x.id === a.effect))
+        && fitsCard('amount', a.amount, card) && fitsCard('cond', a.cond, card) && fitsCard('scope', a.scope, card)
+        // « Aura : la créature enchantée… », « Équipement : … » : seulement sur une aura, un équipement.
+        && !(cardTraits(card) && ['enchanted', 'equipped', 'fortified'].includes(a.scope) && !scopesFor(card, null).some(([id]) => id === a.scope));
+    };
+    const list = (onlyAttach ? own : [...own, ...templates(this.guessType()).map(t => ({...t, group: own.length ? 'Autres capacités' : ''}))]).filter(fits);
     const plain = (x) => String(x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     customBox(onlyAttach && at ? `Pour ${at.fr}` : 'Capacité toute prête', (body, footer, close) => {
       body.innerHTML = `<p class="muted small">Touche une phrase : elle s'ajoute aux capacités, et tu peux ensuite changer le type, le mot-clé ou le nombre.</p>
@@ -1944,11 +1976,22 @@ export class Atelier {
 
   abilityHtml(a, i) {
     const w = WHEN.find(x => x.id === a.when) || WHEN[0];
-    const effects = effectsFor(a.when, this.form);
+    const card = this.fitCard;
+    const effects = effectsFor(a.when, card, a.effect);
     const e = effects.find(x => x.id === a.effect) || effects[0];
+    // Une capacité faite avant de changer le type de la carte : on la garde, en disant ce qui ne va plus avec elle.
+    const amountDef = AMOUNTS.find(x => x[0] === a.amount);
+    const condDef = CONDITIONS.find(x => x[0] === a.cond);
+    const misfit = [!fitsCard('when', w, card) ? [whenLabel(w, this.form), needOf('when', w)] : null,
+      !fitsCard('effect', e, card) ? [e.label, needOf('effect', e)] : null,
+      amountDef && !fitsCard('amount', a.amount, card) ? [amountDef[1], needOf('amount', a.amount)] : null,
+      condDef && !fitsCard('cond', a.cond, card) ? [condDef[1], needOf('cond', a.cond)] : null].filter(Boolean);
     const isStatic = a.when === 'static';
     const sel = (attr, list, value, extra = '') => `<select data-a="${attr}"${extra}>${list.map(([v, l]) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
     const scope = a.scope || 'you';
+    if (isStatic && e.scope && !fitsCard('scope', scope, card)) {
+      misfit.push([(SCOPES.find(x => x[0] === scope) || [scope, scope])[1], needOf('scope', scope)]);
+    }
     const filterShown = isStatic ? e.scope && ['you', 'opp', 'all', 'tokens'].includes(scope) : (w.filter || e.filter);
     const otherShown = !isStatic || ['you', 'all'].includes(scope);
     const subs = cardSubtypes(this.form);
@@ -1962,13 +2005,14 @@ export class Atelier {
         <button class="ate-mv" data-mvab="${i}" data-dir="-1" title="Monter"${i === 0 ? ' disabled' : ''}>▲</button>
         <button class="ate-mv" data-mvab="${i}" data-dir="1" title="Descendre"${i === count - 1 ? ' disabled' : ''}>▼</button></div>` : ''}
       <div class="ate-ab-row"><select data-a="when" aria-label="Quand elle agit">${WHEN_GROUPS.map(([kind, label]) => `<optgroup label="${esc(label)}">${WHEN.filter(x => x.kind === kind
-          && (whenFits(x, this.form) || x.id === a.when))
+          && ((whenFits(x, this.form) && fitsCard('when', x, card)) || x.id === a.when))
         // Ceux de ce que la carte équipe ou enchante d'abord (« Quand la créature équipée attaque »).
         .sort((p, q) => Number(!!q.attach) - Number(!!p.attach))
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
+      ${misfit.map(([l, need]) => `<p class="ate-misfit small">⚠ « ${esc(l)} » ne va qu'avec ${esc(needWords(need))}.</p>`).join('')}
       ${w.kind === 'T' ? `<div class="ate-ab-row"><span class="muted small" title="Un deuxième moment où la capacité se déclenche, avec le même effet (« Quand elle arrive ou attaque »)">ou aussi</span>
-        <select data-a="when2" aria-label="Ou aussi quand">${[['', 'rien d\'autre'], ...WHEN.filter(x => x.id !== a.when && orTriggerFits(x) && (whenFits(x, this.form) || x.id === a.when2))
+        <select data-a="when2" aria-label="Ou aussi quand">${[['', 'rien d\'autre'], ...WHEN.filter(x => x.id !== a.when && orTriggerFits(x) && ((whenFits(x, this.form) && fitsCard('when', x, card)) || x.id === a.when2))
           .map(x => [x.id, whenLabel(x, this.form)])].map(([v, l]) => `<option value="${esc(v)}"${v === (a.when2 || '') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${w.counterSel ? `<div class="ate-ab-row"><span class="muted small">Marqueur</span>${counterSelect('a', 'whenCounter', a.whenCounter, 'CHARGE')}
         ${w.nth ? `<span class="muted small">X =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
@@ -2024,7 +2068,7 @@ export class Atelier {
         ${e.n && !(e.mana && a.mana === 'Symbols') ? (!isStatic && !e.modal && !e.mana && a.amount && a.amount !== 'fixed' ? '<b class="ate-xbadge" title="Nombre calculé">X</b>'
           : `<input type="number" data-a="n" value="${esc(a.n)}" min="0" max="99" style="width:70px" title="Nombre">`) : ''}</div>
       ${e.n && !e.mana && !e.modal && !isStatic ? this.amountRow(a, 'a', a) : ''}
-      ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', scopesFor(this.form, scope), scope)}</div>` : ''}
+      ${isStatic && e.scope ? `<div class="ate-ab-row"><span class="muted small">Qui</span>${sel('scope', scopesFor(card, scope), scope)}</div>` : ''}
       ${e.modal ? this.modesHtml(a) : ''}
       ${this.optionRows(a, e, 'a', i, a.when)}
       ${filterShown ? `<div class="ate-ab-row"><span class="muted small">Créatures</span>
@@ -2089,7 +2133,13 @@ export class Atelier {
         + (e.anim === 'static' ? '' : sel('animDur', [['eot', 'jusqu\'à la fin du tour'], ['perm', 'pour toujours']], h.animDur || 'eot')));
     }
     if (e.mechWho) {
-      out += row('Qui', sel('mechWho', MECH_WHO, MECH_WHO.some(w => w[0] === h.mechWho) ? h.mechWho : when === 'spell' ? 'target' : 'self'));
+      // « Elle » explore, complote, endure : seulement une créature ; sinon, une créature ciblée (gardé dans la capacité).
+      const self = fitsCard('scope', 'self', this.fitCard);
+      if (!self && !MECH_WHO.some(w => w[0] === h.mechWho)) {
+        h.mechWho = 'target';
+      }
+      out += row('Qui', sel('mechWho', MECH_WHO.filter(w => w[0] !== 'self' || self || h.mechWho === 'self'),
+        MECH_WHO.some(w => w[0] === h.mechWho) ? h.mechWho : when === 'spell' ? 'target' : 'self'));
     }
     if (e.manaKind) {
       out += row('Lesquels', sel('manaKind', MANA_KINDS.map(k => [k[0], k[1]]), h.manaKind || 'lands'));
@@ -2104,7 +2154,7 @@ export class Atelier {
     if (e.amountSel) {
       // +X/+X : par défaut, un marqueur sur elle ; la force et l'endurance (définies) : le nombre de créatures.
       const amount = h.amount && h.amount !== 'fixed' ? h.amount : e.id === 'anthemX' ? 'counters' : 'creatures';
-      out += row('X =', sel('amount', AMOUNTS.filter(([v]) => !['fixed', 'tapped', 'xPaid'].includes(v)).map(([v, l]) => [v, l.replace(/^X = /, '')]), amount)
+      out += row('X =', sel('amount', AMOUNTS.filter(([v]) => !['fixed', 'tapped', 'xPaid'].includes(v) && (v === amount || fitsCard('amount', v, this.fitCard))).map(([v, l]) => [v, l.replace(/^X = /, '')]), amount)
         + (amount === 'typeCount' ? `<input type="text" data-${attr}="amountType" data-typepick readonly value="${esc(h.amountType || '')}" placeholder="un type : Elf" style="width:120px">` : '')
         + (amount === 'counters' ? counterSelect(attr, 'amountCounter', h.amountCounter) : ''));
     }
@@ -2124,7 +2174,8 @@ export class Atelier {
   /** « Tant que … » d'un effet permanent : la condition, son nombre et son type. */
   staticCondHtml(a) {
     const repl = STATIC_REPLACEMENTS.has(a.effect);
-    const list = CONDITIONS.filter(([v]) => !['tappedAtLeast', 'kicked'].includes(v) && !(repl && ['yourTurn', 'notYourTurn'].includes(v)));
+    const list = CONDITIONS.filter(([v]) => !['tappedAtLeast', 'kicked'].includes(v) && !(repl && ['yourTurn', 'notYourTurn'].includes(v))
+      && (v === a.cond || fitsCard('cond', v, this.fitCard)));
     const cond = a.cond || 'none';
     return `<div class="ate-ab-row"><span class="muted small">Tant que</span>
       <select data-a="cond">${list.map(([v, l]) => `<option value="${v}"${v === cond ? ' selected' : ''}>${esc(v === 'none' ? 'Toujours' : l.replace(/^Si /, '').replace(/^S'il /, 'Il '))}</option>`).join('')}</select>
@@ -2196,7 +2247,7 @@ export class Atelier {
 
   /** Un effet dans un encadré : un mode de « Choisissez l'un — » (sub « modes ») ou un effet enchaîné (sub « then »). */
   subEffectHtml(a, m, k, sub, title, canDelete) {
-    const effects = modeEffectsFor(a.when, this.form);
+    const effects = modeEffectsFor(a.when, this.fitCard, m.effect);
     const e = effects.find(x => x.id === m.effect) || effects[0];
     const f = m.filter || {type: '', other: false};
     return `<div class="ate-mode" data-sub="${sub}" data-si="${k}">
@@ -2224,7 +2275,7 @@ export class Atelier {
     const tapped = a.when === 'activated' && a.tapX;
     const cond = CONDITIONS_N.includes(m.cond);
     return `<div class="ate-ab-row"><span class="muted small">Seulement</span>
-      <select data-sf="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      <select data-sf="cond">${CONDITIONS.filter(([v]) => (v !== 'tappedAtLeast' || tapped) && (v === m.cond || fitsCard('cond', v, this.fitCard))).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
       ${m.cond === 'control' ? `<input type="text" data-sf="condType" data-typepick readonly value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
       ${m.cond === 'countersAtLeast' ? counterSelect('sf', 'condCounter', m.condCounter, 'CHARGE') : ''}</div>`;
@@ -2249,7 +2300,8 @@ export class Atelier {
    */
   amountRow(m, key, parent, chained = false) {
     const tapped = parent.when === 'activated' && parent.tapX;
-    const list = AMOUNTS.filter(([v]) => v !== 'tapped' || tapped).map(([v, l]) => [v, v === 'fixed' ? 'Le nombre tapé (un chiffre)' : l]);
+    const list = AMOUNTS.filter(([v]) => (v !== 'tapped' || tapped) && (v === m.amount || fitsCard('amount', v, this.fitCard)))
+      .map(([v, l]) => [v, v === 'fixed' ? 'Le nombre tapé (un chiffre)' : l]);
     if (chained) {
       list.splice(1, 0, ['same', 'X = le même X que l\'effet principal'], ['prev', 'X = le nombre de permanents créés, détruits, exilés ou sacrifiés juste avant']);
     }
@@ -2273,7 +2325,7 @@ export class Atelier {
     return `<details class="ate-more" data-more="${i}"${open ? ' open' : ''}>
       <summary>Effet perso${used ? ' <b class="ate-kwn">✓</b>' : ''} <span class="muted small">— condition, « et puis »</span></summary>
       <div class="ate-ab-row"><span class="muted small">Seulement</span>
-        <select data-a="cond">${CONDITIONS.filter(([v]) => v !== 'tappedAtLeast' || tapped).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <select data-a="cond">${CONDITIONS.filter(([v]) => (v !== 'tappedAtLeast' || tapped) && (v === a.cond || fitsCard('cond', v, this.fitCard))).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
         ${a.cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
         ${a.cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>
@@ -2696,8 +2748,8 @@ export class Atelier {
       a.manaSymbols = '{G}{U}';
     }
     if (e.type === 'change' && ['when', 'chapter', 'effect', 'amount', 'cond', 'tapX', 'tapXN', 'tapXWhat', 'pick', 'mana', 'scope', 'spellType', 'addCost', 'zone', 'emblem'].includes(k)) {
-      if (k === 'when' && !effectsFor(a.when, this.form).some(x => x.id === a.effect)) {
-        a.effect = effectsFor(a.when, this.form)[0].id;
+      if (k === 'when' && !effectsFor(a.when, this.fitCard).some(x => x.id === a.effect)) {
+        a.effect = effectsFor(a.when, this.fitCard)[0].id;
       }
       if (a.effect === 'modal') {
         // Deux modes pour commencer ; ceux qui ne vont pas avec ce « quand » (un sort ne se régénère pas) changent.

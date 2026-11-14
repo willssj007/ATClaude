@@ -515,6 +515,8 @@ function settingsScreen() {
         ${row('holdPriority', 'Garder la priorité par défaut', 'Après avoir lancé un sort, s\'arrêter pour pouvoir y répondre soi-même.')}
         ${row('autoPass', 'Passer automatiquement', 'Ne pas s\'arrêter sur le tour adverse quand aucune action n\'est possible.')}
         ${bridge.android || bridge.ios ? '' : row('discordPresence', 'Montrer ma partie sur Discord', 'Si Discord est ouvert sur cet ordinateur, ton profil affiche ton mode, ton deck, tes points de vie et le tour.')}
+        <h2 style="margin-top:26px">Atelier</h2>
+        ${row('atelierFit', 'Seulement ce qui va avec la carte', 'L\'Atelier ne propose que les déclencheurs, effets, nombres X, conditions et mots-clés qui s\'appliquent au type de la carte (pas « X est la force de cette carte » sur un équipement, ni « quand elle attaque » sur un enchantement). Décoche pour tout voir.')}
         <h2 style="margin-top:26px">Lisibilité</h2>
         ${row('bigText', 'Gros texte', 'Agrandit les textes à lire : cartes agrandies, journal, pile, consignes de la partie, fenêtres, menus et notes.')}
         <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>

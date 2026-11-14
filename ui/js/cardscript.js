@@ -598,6 +598,8 @@ export const EFFECTS = [
   {id: 'gainLife', group: 'life', label: 'Gagner des points de vie', n: true},
   {id: 'loseLifeYou', group: 'life', label: 'Vous perdez des points de vie', n: true},
   {id: 'drain', group: 'life', label: 'Chaque adversaire perd des PV, vous les gagnez', n: true},
+  {id: 'oppNoLifeTurn', group: 'life', label: 'Vos adversaires ne peuvent pas gagner de points de vie ce tour-ci'},
+  {id: 'playersNoLifeTurn', group: 'life', label: 'Les joueurs ne peuvent pas gagner de points de vie ce tour-ci'},
   {id: 'fog', group: 'life', label: 'Prévenir toutes les blessures de combat ce tour-ci (brouillard)'},
   {id: 'preventDamage', group: 'life', label: 'Prévenir les X prochaines blessures infligées à une cible ce tour-ci', n: true},
   {id: 'poison', group: 'life', label: 'Chaque adversaire reçoit des marqueurs poison', n: true},
@@ -991,8 +993,8 @@ export const EMBLEMS = [
 export const PICKS = [['one', 'Choisissez l\'un —'], ['two', 'Choisissez deux — (trois modes)'], ['oneOrMore', 'Choisissez un ou plusieurs —']];
 
 /** Effets possibles pour un mode de « Choisissez l'un — » (pas un autre choix de modes). */
-export function modeEffectsFor(when, card = null) {
-  return effectsFor(when, card).filter(e => !e.modal);
+export function modeEffectsFor(when, card = null, keep = null) {
+  return effectsFor(when, card, keep).filter(e => !e.modal);
 }
 
 /** Nombre d'un effet : celui indiqué, ou X calculé pendant la partie. */
@@ -1390,7 +1392,8 @@ export function scopesFor(card, current) {
     if (id === 'commanders') {
       return subs.includes('Background');
     }
-    return true;
+    // « Cette carte (elle-même) » : seulement une créature (ou un véhicule).
+    return fitsCard('scope', id, card);
   }).map(([id, label]) => {
     if (at && at.scope === id) {
       return [id, at.kind === 'player' ? 'Les créatures que contrôle le joueur enchanté (malédiction)' : capitalize(at.fr)];
@@ -2012,12 +2015,190 @@ export function templates(type) {
   ];
 }
 
-/** Effets proposés pour un « quand » donné. */
-export function effectsFor(when, card = null) {
+/** Effets proposés pour un « quand » donné (keep : l'effet déjà choisi, gardé même s'il ne va pas avec la carte). */
+export function effectsFor(when, card = null, keep = null) {
   // Un effet sur la carte attachée (« la créature équipée ») : seulement pour un équipement ou une aura de créature.
   const at = card ? attachOf(card) : null;
+  const t = card ? cardTraits(card) : null;
   return EFFECTS.filter(e => (e.only ? e.only.includes(when) : when !== 'static') && !(e.self && when === 'spell')
-    && !(e.attach && (when === 'spell' || (card && (!at || at.kind !== e.attach)))));
+    && !(e.attach && (when === 'spell' || (card && (!at || at.kind !== e.attach)))) && (!t || e.id === keep || meets(effectNeed(e), t)));
+}
+
+/*
+ * Ce qui va avec le type de la carte. Chaque déclencheur, effet, nombre X, condition, portée et mot-clé dit ce dont il a
+ * besoin ; l'Atelier ne propose que ce qui s'applique à la face de carte du formulaire (réglage, activé par défaut).
+ * Besoins : pt (force et endurance : créature, véhicule, vaisseau), creature, permanent, spell (éphémère ou rituel),
+ * saga, cast (une carte qu'on lance : ni terrain ni jeton), kindred (de clan), card (pas un jeton), damageable (créature, planeswalker ou
+ * bataille), animate (permanent non-créature), flash (lancée, pas un éphémère), commander (créature ou planeswalker),
+ * artifact, enchantment, land, planeswalker, room, transform, prepare, auraCreature, kw:Mot-clé. « | » : l'un ou
+ * l'autre ; « & » : les deux.
+ */
+let TYPE_FIT = true;
+
+/** Le réglage « Atelier : seulement ce qui va avec la carte » (les tests de Forge, sans carte, voient toujours tout). */
+export function setTypeFit(on) {
+  TYPE_FIT = on !== false;
+}
+
+const SPELL_ONLY = ['Instant', 'Sorcery', 'Kindred'];
+
+/**
+ * Ce qu'est la face de carte du formulaire. card.dfc : le mode recto verso ; card.face : 'back' pour le verso.
+ * Null (tout est proposé) quand le réglage est coupé ou que la carte n'a pas encore de type.
+ */
+export function cardTraits(card) {
+  if (!TYPE_FIT || !card) {
+    return null;
+  }
+  const types = card.types || [];
+  const back = card.face === 'back';
+  const battle = card.dfc === 'battle' && !back;
+  if (!battle && !types.length) {
+    return null;
+  }
+  const spell = !battle && types.some(t => t === 'Instant' || t === 'Sorcery') && types.every(t => SPELL_ONLY.includes(t));
+  const creature = !battle && types.includes('Creature');
+  const pt = !battle && !spell && needsPT(card);
+  const planeswalker = !battle && types.includes('Planeswalker');
+  const land = types.includes('Land');
+  const at = attachOf(card);
+  const subs = forgeSubtypes(card.subtypes);
+  return {
+    spell, permanent: !spell, creature, pt, planeswalker, land,
+    artifact: types.includes('Artifact'), enchantment: types.includes('Enchantment'), kindred: types.includes('Kindred'),
+    damageable: pt || planeswalker || battle, animate: !spell && !creature,
+    cast: !land && !card.token, card: !card.token, flash: !land && !card.token && !types.includes('Instant'),
+    commander: creature || planeswalker,
+    // Une saga : un enchantement qui n'est ni une pièce, ni une classe, ni une affaire, ni une aura.
+    saga: types.includes('Enchantment') && card.dfc !== 'room' && !['Class', 'Case', 'Aura', 'Room'].some(x => subs.includes(x)),
+    room: card.dfc === 'room', transform: card.dfc === 'transform', prepare: card.dfc === 'prepare' && !back,
+    auraCreature: !!at && at.scope === 'enchanted' && at.kind === 'creature',
+    keywords: card.keywords || [],
+  };
+}
+
+/** La carte a-t-elle ce dont le choix a besoin ? */
+export function meets(need, t) {
+  if (!need || !t) {
+    return true;
+  }
+  return need.split('|').some(any => any.split('&').every(n => (n.startsWith('kw:') ? t.keywords.includes(n.slice(3)) : !!t[n])));
+}
+
+const NEED_WORDS = {
+  pt: 'une créature ou un véhicule', creature: 'une créature', permanent: 'un permanent', spell: 'un éphémère ou un rituel',
+  cast: 'une carte qu\'on lance (pas un terrain ni un jeton)', card: 'une carte (pas un jeton)', damageable: 'une créature, un planeswalker ou une bataille',
+  animate: 'un permanent non-créature', flash: 'une carte qu\'on lance, qui n\'est pas un éphémère', commander: 'une créature ou un planeswalker',
+  artifact: 'un artefact', enchantment: 'un enchantement', kindred: 'une carte de clan', land: 'un terrain', planeswalker: 'un planeswalker', saga: 'une saga (un enchantement)', room: 'une pièce',
+  transform: 'une carte recto verso qui se transforme', prepare: 'une carte préparée (son recto)', auraCreature: 'une aura de créature',
+};
+
+/** « Va avec une créature ou un véhicule » : pour expliquer pourquoi un choix n'est pas proposé. */
+export function needWords(need) {
+  return String(need || '').split('|').map(any => any.split('&').map(n => (n.startsWith('kw:') ? `le mot-clé ${keywordName(n.slice(3), 'fr')}`
+    : NEED_WORDS[n] || n)).join(' et ')).join(', ou ');
+}
+
+/** Déclencheurs : ceux d'une créature qui combat, d'un planeswalker, d'une saga, d'une pièce… */
+const WHEN_NEEDS = {
+  attacks: 'pt', blocks: 'pt', blocked: 'pt', unblocked: 'pt', blocksCreature: 'pt', combatDamage: 'pt', dies: 'pt',
+  enrage: 'damageable', turnedUp: 'creature', unlockDoor: 'room', castThis: 'cast', loyalty: 'planeswalker', spell: 'spell',
+  chapter: 'saga', static: '',
+};
+
+/** Ce dont un déclencheur a besoin : un permanent pour tous ceux qui marchent depuis le champ de bataille. */
+export function whenNeed(w) {
+  if (w.id in WHEN_NEEDS) {
+    return WHEN_NEEDS[w.id];
+  }
+  return w.kind === 'T' || w.kind === 'A' ? 'permanent' : '';
+}
+
+/** Effets qui parlent de la carte elle-même (« elle gagne +X/+X », « la sacrifier ») ou d'un mot-clé de la carte. */
+const EFFECT_NEEDS = {
+  damageBlocker: 'pt', countersSelf: 'permanent', removeCountersSelf: 'permanent', moveCounters: 'permanent', animateSelf: 'animate',
+  mustBlock: 'pt', pumpSelf: 'pt', regenerate: 'pt', monstrosity: 'pt', adapt: 'pt', fight: 'pt', suspectSelf: 'pt',
+  exchangeControlSelf: 'permanent', exileUntilLeaves: 'permanent', transform: 'transform', prepareSelf: 'prepare', playHideaway: 'kw:Hideaway',
+  controlEnchanted: 'auraCreature', cdaPT: 'pt', uncounterable: 'cast', selfCostReduction: 'cast', kwMustBeBlocked: 'pt', kwLure: 'pt',
+  kwCantAttackBlockAlone: 'pt', kwCantAttackAlone: 'pt', kwPreventAll: 'damageable', kwPreventCombat: 'damageable',
+  kwCanBeCommander: 'permanent&card', kwAnyNumber: 'card',
+};
+
+/** Ce dont un effet a besoin ; un effet permanent (« les créatures que vous contrôlez… ») ne marche que sur un permanent. */
+export function effectNeed(e) {
+  if (e.id in EFFECT_NEEDS) {
+    return EFFECT_NEEDS[e.id];
+  }
+  return e.self || (e.only && e.only.every(w => w === 'static')) ? 'permanent' : '';
+}
+
+/** X = sa force, son endurance, ses marqueurs ; « si elle a au moins X marqueurs », « si le kick a été payé ». */
+const AMOUNT_NEEDS = {power: 'pt', toughness: 'pt', counters: 'permanent'};
+const COND_NEEDS = {countersAtLeast: 'permanent', kicked: 'kw:Kicker|kw:Multikicker'};
+/** « Qui » d'un effet permanent ou d'une mécanique (explorer, comploter, endurer) : « elle », une créature. */
+const SCOPE_NEEDS = {self: 'pt'};
+
+/** Mots-clés : par groupe (combat : une créature ; protection : un permanent ; sorts : une carte qu'on lance), puis un par un. */
+const KW_GROUP_NEEDS = {combat: 'pt', protect: 'permanent', cycling: 'card', spell: 'cast', multi: 'commander'};
+const KW_NEEDS = {
+  // Une source de blessures : une créature, un sort, un artefact… (pas un terrain).
+  Lifelink: 'pt|cast', Deathtouch: 'pt|cast', Infect: 'pt|cast', Wither: 'pt|cast',
+  Ascend: '', 'Battle cry': 'pt', Cascade: 'cast', Champion: 'pt', Changeling: 'creature|kindred', Compleated: 'planeswalker', Decayed: 'pt', Dethrone: 'pt',
+  Devoid: 'cast', Evolve: 'pt', Exalted: 'permanent', Exploit: 'pt', Extort: 'permanent', Flash: 'flash', Increment: 'pt', Ingest: 'pt',
+  Melee: 'pt', Mentor: 'pt', Myriad: 'pt', Outlast: 'pt', Persist: 'pt', Prowess: 'pt', 'Read ahead': 'saga', Riot: 'pt',
+  Soulbond: 'pt', Sunburst: 'permanent&cast', Training: 'pt', Undying: 'pt', Unleash: 'pt',
+  Afterlife: 'pt', Amplify: 'creature', Annihilator: 'pt', Bloodthirst: 'pt', Bushido: 'pt', Devour: 'creature', 'Devour Artifact': 'creature',
+  'Devour Food': 'creature', 'Devour Land': 'creature', Dredge: 'card', Fabricate: 'pt', Fading: 'permanent', Firebending: 'pt', Graft: 'pt',
+  Hideaway: 'permanent', Mobilize: 'pt', Modular: 'pt', Rampage: 'pt', Renown: 'pt', Soulshift: 'pt', Toxic: 'pt', Vanishing: 'permanent',
+  // Ceux qui font le type de la carte (Équipement : un artefact) se proposent aussi sur une créature : les choisir la change.
+  Bestow: 'creature', Crew: 'artifact|creature', Enchant: 'enchantment|creature', Equip: 'artifact|creature', 'For Mirrodin': 'artifact|creature',
+  Fortify: 'artifact|creature', 'Job select': 'artifact|creature', 'Living Weapon': 'artifact|creature', 'Living metal': 'artifact',
+  Reconfigure: 'artifact|creature', Saddle: 'creature', Station: 'artifact|land|creature', 'Umbra armor': 'enchantment|creature',
+  Awaken: 'spell', Blitz: 'creature', Buyback: 'spell', 'Cumulative upkeep': 'permanent', Dash: 'creature', Disguise: 'creature',
+  Echo: 'permanent&cast', Emerge: 'creature', Entwine: 'spell', Escalate: 'spell', Evoke: 'creature', Foretell: 'cast', Freerunning: 'cast',
+  Impending: 'creature', Kicker: 'cast', Madness: 'cast', Megamorph: 'creature', Miracle: 'cast', Morph: 'creature', Multikicker: 'cast',
+  Mutate: 'creature', Ninjutsu: 'creature', Offering: 'cast', Offspring: 'creature', Overload: 'spell', Plot: 'cast', Prowl: 'cast',
+  Reinforce: 'creature', Replicate: 'spell', Sneak: 'cast', Spectacle: 'cast', Squad: 'creature', Strive: 'spell', Surge: 'cast',
+  Suspend: 'cast', Transfigure: 'creature', Transmute: 'card', Warp: 'permanent&cast', 'Web-slinging': 'cast',
+  Embalm: 'creature', Encore: 'creature', Escape: 'cast', Eternalize: 'creature', Flashback: 'spell', Harmonize: 'cast', 'Jump-start': 'spell',
+  Mayhem: 'cast', Recover: 'card', Retrace: 'spell', Scavenge: 'creature', Unearth: 'creature',
+  Cipher: 'spell', Conspire: 'spell', Demonstrate: 'spell', Epic: 'spell', Gravestorm: 'spell', Paradigm: 'spell', Rebound: 'spell',
+  'Splice:Arcane': 'spell', Storm: 'spell', Assist: 'cast', 'Choose a Background': 'creature', 'Doctor\'s companion': 'creature',
+};
+
+/** Ce dont un mot-clé a besoin (« Vol » : une créature ou un véhicule ; « Flashback » : un éphémère ou un rituel). */
+export function keywordNeed(k) {
+  const key = k[0];
+  if (key in KW_NEEDS) {
+    return KW_NEEDS[key];
+  }
+  const head = key.split(':')[0];
+  if (head in KW_NEEDS) {
+    return KW_NEEDS[head];
+  }
+  return KW_GROUP_NEEDS[k[3]] || '';
+}
+
+/**
+ * Le choix va-t-il avec la carte ? kind : when (un déclencheur de WHEN), effect (un effet d'EFFECTS), amount, cond,
+ * scope (« Qui »), kw (un mot-clé de KW_ALL).
+ */
+export function fitsCard(kind, item, card) {
+  const t = cardTraits(card);
+  return !t || meets(needOf(kind, item), t);
+}
+
+/** Ce dont un choix a besoin (« pt », « kw:Kicker », '' : rien). */
+export function needOf(kind, item) {
+  switch (kind) {
+    case 'when': return whenNeed(item);
+    case 'effect': return effectNeed(item);
+    case 'amount': return AMOUNT_NEEDS[item] || '';
+    case 'cond': return COND_NEEDS[item] || '';
+    case 'scope': return SCOPE_NEEDS[item] || '';
+    case 'kw': return keywordNeed(item);
+    default: return '';
+  }
 }
 
 const KW_FR = Object.fromEntries(KW_ALL.map(k => [k[0], k[1]]));
@@ -2845,6 +3026,12 @@ function effectBase(a, id) {
         en: 'target player skips their next turn'};
     case 'targetLoseGame':
       return {p: `LosesGame | ${target({v: 'Player', prompt: 'Choisissez un joueur ciblé'})}`, fr: 'un joueur ciblé perd la partie', en: 'target player loses the game'};
+    case 'oppNoLifeTurn':
+      return {p: `Effect | StaticAbilities$ ${id}NoGain`, aux: [`SVar:${id}NoGain:Mode$ CantGainLife | ValidPlayer$ Player.Opponent | Description$ Vos adversaires ne peuvent pas gagner de points de vie.`],
+        fr: 'vos adversaires ne peuvent pas gagner de points de vie ce tour-ci', en: 'your opponents can\'t gain life this turn'};
+    case 'playersNoLifeTurn':
+      return {p: `Effect | StaticAbilities$ ${id}NoGain`, aux: [`SVar:${id}NoGain:Mode$ CantGainLife | ValidPlayer$ Player | Description$ Les joueurs ne peuvent pas gagner de points de vie.`],
+        fr: 'les joueurs ne peuvent pas gagner de points de vie ce tour-ci', en: 'players can\'t gain life this turn'};
     case 'silence':
       return {p: `Effect | StaticAbilities$ ${id}Silence`, aux: [`SVar:${id}Silence:Mode$ CantBeCast | ValidCard$ Card | Caster$ Opponent | Description$ Vos adversaires ne peuvent pas lancer de sorts.`],
         fr: 'vos adversaires ne peuvent pas lancer de sorts ce tour-ci', en: 'your opponents can\'t cast spells this turn'};

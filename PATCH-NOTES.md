@@ -2,6 +2,18 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.8.2 — L'Atelier ne propose que ce qui va avec la carte
+
+- **Atelier : seulement ce qui va avec le type de la carte**. Les déclencheurs, effets, nombres X, conditions, portées « Qui », mots-clés et capacités toutes prêtes qui ne s'appliquent pas à la carte ne sont plus proposés. Quelques exemples :
+  - un équipement n'a plus « X est la force de cette carte », ni « elle gagne +X/+X », ni « quand elle attaque » ou « quand elle meurt » (il garde « quand la créature équipée attaque ») ;
+  - un éphémère ou un rituel n'a que « Effet du sort », « Quand vous lancez ce sort » et ses effets permanents de sort (« ne peut pas être contrecarré », « coûte {X} de moins ») ; plus de « la sacrifier » ni de marqueurs sur elle ;
+  - un terrain n'a plus « quand vous lancez ce sort », ni les mots-clés de combat, ni Kick, Flash ou Convocation ;
+  - les mots-clés de combat (vol, piétinement, célérité…) vont avec une créature ou un véhicule ; Flashback, Déluge, Rebond, Surcharge avec un éphémère ou un rituel ; Mue, Exhumation, Précipitation avec une créature ; « Capacité de loyauté » avec un planeswalker ; « Chapitre » avec une saga ; « Quand vous déverrouillez cette porte » avec une pièce ; « La transformer » avec une carte recto verso qui se transforme ;
+  - la condition « si le kick a été payé » n'apparaît qu'avec le mot-clé Kick, « jouer la carte exilée par Cachette » qu'avec Cachette.
+- Ce qui était déjà choisi reste : une capacité faite avant de changer le type de la carte est gardée, avec un avertissement (« ⚠ « Elle gagne +X/+X » ne va qu'avec une créature ou un véhicule »). Dans la recherche de mots-clés, ceux qui ne vont pas avec la carte sont grisés, avec ce qu'il leur faut.
+- Nouveau réglage **Atelier : Seulement ce qui va avec la carte** (coché par défaut) : décoche-le pour tout voir.
+- **Nouveaux effets** : « Vos adversaires ne peuvent pas gagner de points de vie ce tour-ci » et « Les joueurs ne peuvent pas gagner de points de vie ce tour-ci » (comme Skullcrack), sur un sort, un déclencheur ou une capacité activée. L'effet permanent « Vos adversaires ne peuvent pas gagner de points de vie » existait déjà dans les effets permanents.
+
 ## 0.8.1 — « Ou » dans les déclencheurs de l'Atelier, texte des cartes perso plus lisible
 
 - **Atelier : déclencheur « ou »**. Sous « Quand elle agit », le menu **ou aussi** ajoute un deuxième moment pour la même capacité : « À chaque fois que cette créature arrive sur le champ de bataille ou attaque, piochez une carte. » La phrase se forme toute seule, en français comme en anglais (« Whenever … enters or attacks »), avec un effet simple ou un choix de modes. Forge reçoit deux déclencheurs qui lancent le même effet, et la carte n'écrit la phrase qu'une fois.

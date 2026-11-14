@@ -96,6 +96,10 @@
 .ate-kw { display: flex; flex-direction: column; gap: 8px; }
 .ate-kwq { width: 100%; }
 .ate-kwhits { padding: 4px 2px; }
+/* Mots-clés qui ne vont pas avec le type de la carte : grisés dans la recherche ; capacité qui ne va plus avec la carte. */
+.ate-kwhits .chip.off { opacity: .45; cursor: not-allowed; border-style: dashed; }
+.ate-kwfit { margin: 0 0 6px; }
+.ate-misfit { margin: 2px 0 4px; color: #ffd27a; line-height: 1.4; }
 .ate-costs > summary { font-size: 13px; }
 
 /* Sous-types en pastilles, et le sélecteur de types (français ou anglais). */
