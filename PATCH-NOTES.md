@@ -6,6 +6,7 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 
 - **Texte des cartes perso** : il pouvait rester tout petit dans son cadre (sur PC surtout, dans l'aperçu au survol), quand la première mesure de sa taille avait été faite trop tôt. Le texte reprend maintenant la plus grande taille qui tient dans le cadre.
 - **Gros texte** : l'aperçu d'une carte au survol (PC) est plus grand, son texte aussi.
+- **Atelier en paysage** : la page ne défile plus sur le côté (les listes cachées sous les menus « Extension » et « Type » prenaient toute la largeur de l'écran et décalaient l'affichage).
 - **Carte perso en anglais** : ses mots-clés restent en anglais en partie (« First strike, haste, menace » au lieu de « Initiative, célérité, menace » au milieu de phrases anglaises).
 
 ## 0.8.0 — Niveaux de l'IA, 2 contre 2, cube, Gauntlet, test de main, vérification de tout le jeu

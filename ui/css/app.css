@@ -108,7 +108,10 @@ input[type=text], input[type=number], input[type=search], select, textarea {
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.25); }
 /* Listes déroulantes (select.js) : le <select> reste là, invisible, et un bouton ouvre une liste stylée. */
-select.csel-native { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+/* La liste d'origine, gardée cachée sous le menu : 1 px quoi qu'en disent les règles d'un écran (« select { width: 100% } »
+   de l'Atelier la rendait aussi large que l'écran, à partir de sa place : la page défilait alors sur le côté). */
+select.csel-native { position: absolute; width: 1px !important; max-width: 1px !important; height: 1px !important; min-height: 0; padding: 0; border: 0;
+  opacity: 0; pointer-events: none; overflow: hidden; }
 .csel {
   display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 8px 10px 8px 12px; max-width: 100%;
   background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line-strong); border-radius: 9px; cursor: pointer; text-align: left;
