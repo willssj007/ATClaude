@@ -672,6 +672,10 @@ export const EFFECTS = [
   {id: 'regenerate', group: 'creatures', label: 'Régénération (la régénérer)', self: true},
   {id: 'token', group: 'creatures', label: 'Créer des jetons', n: true, token: true},
   {id: 'cloneToken', group: 'creatures', label: 'Créer un jeton copie d\'une créature ciblée'},
+  {id: 'cloneSelf', group: 'creatures', label: 'Créer un jeton qui est une copie d\'elle (cette carte, celle qui a la capacité)', self: true},
+  {id: 'cloneThat', group: 'creatures', label: 'Créer un jeton copie de cette créature (celle du déclencheur : qui arrive, meurt, attaque…)',
+    only: ['ally', 'anyEnters', 'tokenEnters', 'oppCreatureEnters', 'entersPower', 'entersMv', 'allyDies', 'anyDies', 'oppCreatureDies', 'nontokenDies',
+      'artifactDies', 'attacksAlly', 'attacksYou', 'combatDamageAlly']},
   {id: 'populate', group: 'creatures', label: 'Peupler (copier un jeton de créature)'},
   {id: 'monstrosity', group: 'creatures', label: 'Monstruosité X', n: true, self: true},
   {id: 'adapt', group: 'creatures', label: 'Adapter X', n: true, self: true},
@@ -970,7 +974,7 @@ export const SAC_KINDS = [
   ['enchantment', 'Enchantment', 'un enchantement', 'an enchantment'], ['land', 'Land', 'un terrain', 'a land'],
   ['nonland', 'Permanent.nonLand', 'un permanent non-terrain', 'a nonland permanent'], ['planeswalker', 'Planeswalker', 'un planeswalker', 'a planeswalker'],
   ['artEnch', 'Artifact,Enchantment', 'un artefact ou un enchantement', 'an artifact or enchantment'], ['permanent', 'Permanent', 'un permanent', 'a permanent'],
-  ['nontokenCreature', 'Creature.nonToken', 'une créature non-jeton', 'a nontoken creature'],
+  ['nontokenCreature', 'Creature.!token', 'une créature non-jeton', 'a nontoken creature'],
 ];
 
 /** Types de sorts (coûts réduits, flash…) : [id, pour Forge, « les sorts … », « … spells »]. */
@@ -2717,6 +2721,18 @@ function effectBase(a, id) {
     case 'cloneToken':
       return {p: `CopyPermanent | ${target(creature)}`, fr: 'créez un jeton qui est une copie d\'une créature ciblée',
         en: 'create a token that\'s a copy of target creature'};
+    case 'cloneSelf':
+      // « Quand elle meurt / quitte le champ de bataille » : la copie de ce qu'elle était juste avant.
+      return {p: `CopyPermanent | Defined$ ${['dies', 'leaves'].includes(a.when) ? 'TriggeredCardLKICopy' : 'Self'}`,
+        fr: 'créez un jeton qui est une copie de CARDNAME', en: 'create a token that\'s a copy of CARDNAME'};
+    case 'cloneThat': {
+      // La créature (ou le permanent) dont parle le déclencheur : celle qui arrive, qui meurt, qui attaque, qui inflige les blessures.
+      const which = /Dies$/.test(a.when) ? 'TriggeredCardLKICopy' : ['attacksAlly', 'attacksYou'].includes(a.when) ? 'TriggeredAttackerLKICopy'
+        : a.when === 'combatDamageAlly' ? 'TriggeredSourceLKICopy' : 'TriggeredCardLKICopy';
+      const perm = ['tokenEnters', 'entersMv', 'artifactDies'].includes(a.when);
+      return {p: `CopyPermanent | Defined$ ${which}`, fr: `créez un jeton qui est une copie de ${perm ? 'ce permanent' : 'cette créature'}`,
+        en: `create a token that's a copy of ${perm ? 'that permanent' : 'that creature'}`};
+    }
     case 'destroyArtEnch':
       return {p: `Destroy | ${target({v: 'Artifact,Enchantment', prompt: 'Choisissez un artefact ou un enchantement ciblé'})}`,
         fr: 'détruisez un artefact ou un enchantement ciblé', en: 'destroy target artifact or enchantment'};
@@ -4211,7 +4227,7 @@ function triggerTable(a, card = null) {
       'À chaque fois qu\'une créature vous attaque ou attaque un planeswalker que vous contrôlez', 'Whenever a creature attacks you or a planeswalker you control'],
     anyEnters: [enters('Creature.Other'), 'À chaque fois qu\'une autre créature arrive sur le champ de bataille', 'Whenever another creature enters'],
     tokenEnters: [enters('Card.token+YouCtrl'), 'À chaque fois qu\'un jeton arrive sur le champ de bataille sous votre contrôle', 'Whenever a token you control enters'],
-    nontokenDies: [dies('Creature.nonToken+YouCtrl'), 'À chaque fois qu\'une créature non-jeton que vous contrôlez meurt', 'Whenever a nontoken creature you control dies'],
+    nontokenDies: [dies('Creature.!token+YouCtrl'), 'À chaque fois qu\'une créature non-jeton que vous contrôlez meurt', 'Whenever a nontoken creature you control dies'],
     artifactDies: [dies('Artifact.YouCtrl'), 'À chaque fois qu\'un artefact que vous contrôlez est mis dans un cimetière depuis le champ de bataille',
       'Whenever an artifact you control is put into a graveyard from the battlefield'],
     oppLandfall: [enters('Land.OppCtrl'), 'À chaque fois qu\'un terrain arrive sur le champ de bataille sous le contrôle d\'un adversaire',

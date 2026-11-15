@@ -85,7 +85,8 @@ async function check(label, f) {
 for (const lang of ['fr', 'en']) {
   // Effets : déclencheur, capacité activée, sort.
   for (const e of EFFECTS.filter(x => !(x.only && x.only.includes('static') && x.only.length === 1) && !x.modal && !x.emblem)) {
-    for (const when of ['etb', 'activated', 'spell']) {
+    // Et chaque déclencheur dont il a besoin (« copie de cette créature » : quand une créature arrive, meurt, attaque…).
+    for (const when of [...new Set(['etb', 'activated', 'spell', ...(e.only || []).filter(w => w !== 'loyalty')])]) {
       if (!effectsFor(when).some(x => x.id === e.id)) continue;
       const types = when === 'spell' ? ['Sorcery'] : e.attach ? ['Artifact'] : ['Creature'];
       const x = e.attach ? {subtypes: 'Equipment', kwValues: {Equip: '{1}'}, keywords: ['Equip']} : {};

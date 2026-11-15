@@ -110,6 +110,17 @@ final class CustomCards {
         artDir().mkdirs();
         frameDir().mkdirs();
         formsDir().mkdirs();
+        // Cartes faites avant la 0.8.3 : « Creature.nonToken » n'est pas un filtre de Forge (il laissait passer les jetons,
+        // et « une créature non-jeton meurt → copie » tournait en boucle) ; le bon filtre est « Creature.!token ».
+        for (final File dir : new File[] {cardsDir(), tokensDir()}) {
+            final File[] files = dir.listFiles((d, n) -> n.endsWith(".txt"));
+            for (final File f : files == null ? new File[0] : files) {
+                final String text = read(f);
+                if (text.contains("Creature.nonToken")) {
+                    write(f, text.replace("Creature.nonToken", "Creature.!token"));
+                }
+            }
+        }
     }
 
     /** Après le chargement de Forge : les types perso dans sa liste, l'index des fichiers. */

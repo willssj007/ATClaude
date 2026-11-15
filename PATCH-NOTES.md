@@ -2,10 +2,15 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.8.3 — Réimpressions en anglais, langue des nouvelles cartes
+## 0.8.3 — Réimpressions en anglais, langue des nouvelles cartes, jetons copies
 
 - **Réimpressions en anglais**. Une réimpression d'une carte officielle a maintenant le choix **Français / English** (en haut de son éditeur) : en anglais, elle prend le nom, le type et le texte anglais de la carte, comme sur son impression anglaise (« Llanowar Elves — Creature — Elf Druid — {T}: Add {G}. »). Partout : aperçu de l'Atelier, recherche, deck builder et en partie, verso des cartes recto verso et sort d'aventure compris. Les terrains de base en anglais ont leur rappel « ({T}: Add {G}.) ». Une réimpression d'une carte perso garde la langue de la carte.
 - **Réglages → Atelier → Langue des nouvelles cartes** (Français par défaut) : la langue d'une carte perso, d'un jeton ou d'une réimpression qu'on crée dans l'Atelier. Chaque carte peut ensuite changer la sienne.
+- **Atelier : jetons copies**. Deux nouveaux effets dans « Créatures » :
+  - « Créer un jeton qui est une copie d'elle » : la carte qui a la capacité (« À chaque fois qu'une autre créature meurt, créez un jeton qui est une copie d'Essai Copieur »). Sur « Quand elle meurt », la copie reprend la carte telle qu'elle était.
+  - « Créer un jeton copie de cette créature » : celle dont parle le déclencheur (celle qui arrive, qui meurt, qui attaque ou qui inflige des blessures), proposé seulement avec ces déclencheurs.
+- **Correction** : « Quand une créature non-jeton que vous contrôlez meurt » et le choix « une créature non-jeton » comptaient aussi les jetons (le filtre écrit pour Forge n'existait pas). Une copie qui meurt pouvait relancer la capacité sans fin. Les cartes perso déjà enregistrées sont corrigées au lancement.
+- En partie, « de » devant le nom d'une carte qui commence par une voyelle devient « d' » (« une copie d'Essai… »).
 - Le type de 85 versos de cartes officielles s'écrivait « Créature : - humain et insecte » (un tiret en trop dans les traductions de Forge) : c'est corrigé.
 
 ## 0.8.2 — L'Atelier ne propose que ce qui va avec la carte
