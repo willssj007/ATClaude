@@ -45,6 +45,8 @@ const NEW_CARD = () => ({
   name: '', cost: '', legendary: false, types: ['Creature'], subtypes: '', power: 2, toughness: 2, loyaltyStart: 3,
   keywords: [], kwValues: {}, abilities: [], frame: 'modern', frameColor: 'auto', lang: 'fr', fx: 'none', set: '', rarity: '', artist: '',
 });
+/** Langue des nouvelles cartes, jetons et réimpressions de l'Atelier (Réglages : « Langue des nouvelles cartes »). */
+const defaultLang = () => (prefs.get('atelierLang') === 'en' ? 'en' : 'fr');
 /** Catégories de la liste de l'Atelier : [types de Forge (une expression), libellé]. */
 const CARD_KIND_FILTERS = [['', 'Tous les types'], ['Creature', 'Créatures'], ['Artifact', 'Artefacts'], ['Enchantment', 'Enchantements'],
   ['Land', 'Terrains'], ['Planeswalker', 'Planeswalkers'], ['Instant|Sorcery', 'Éphémères et rituels'], ['Battle', 'Batailles']];
@@ -241,7 +243,7 @@ export class Atelier {
     const isKind = (c, k) => !k || new RegExp(`\\b(${k})\\b`).test(typeOf(c));
     const inSet = (c) => (!setFilter || (setFilter === '-' ? !this.setOf(c) : this.setOf(c) === setFilter)) && isKind(c, kindFilter);
     // Réimpressions (cartes officielles avec une illustration perso) : rangées avec les cartes de leur extension.
-    const reprints = (d.reprints || []).map(r => ({name: r.nameFr || r.name, card: r.card, reprint: r, set: sets.some(x => x.id === r.set) ? r.set : ''}));
+    const reprints = (d.reprints || []).map(r => ({name: r.lang === 'en' ? r.name : r.nameFr || r.name, card: r.card, reprint: r, set: sets.some(x => x.id === r.set) ? r.set : ''}));
     const cards = [...d.cards.filter(c => !c.token && inSet(c)), ...reprints.filter(inSet)];
     const tokens = d.cards.filter(c => c.token && inSet(c));
     const everything = [...d.cards, ...reprints];
@@ -801,7 +803,7 @@ export class Atelier {
     this.frameUrl = '';
     const rarityOf = {COMMON: 'C', UNCOMMON: 'U', RARE: 'R', MYTHIC_RARE: 'M', MythicRare: 'M', Common: 'C', Uncommon: 'U', Rare: 'R'};
     this.form = {...NEW_CARD(), frame: (rec && rec.frame) || 'modern', frameColor: (rec && rec.frameColor) || 'auto', frameText: (rec && rec.frameText) || 'dark',
-      fx: (rec && rec.fx) || 'none', lang: 'fr', set: rec ? rec.set || '' : (this.setFilter && this.setFilter !== '-' ? this.setFilter : ''),
+      fx: (rec && rec.fx) || 'none', lang: rec ? (rec.lang === 'en' ? 'en' : 'fr') : defaultLang(), set: rec ? rec.set || '' : (this.setFilter && this.setFilter !== '-' ? this.setFilter : ''),
       rarity: rec ? rec.rarity || '' : base.crarity || rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : base.artist || lastArtist(),
       landText: rec ? rec.landText || '' : '', flavor: rec ? rec.flavor || '' : ''};
     this.mode = 'form';
@@ -842,7 +844,11 @@ export class Atelier {
   reprintTextHtml() {
     const basic = /^\(\{T\}\s?: (?:Add|Ajoutez) (?:\{[WUBRGCS]\})+(?: à votre réserve)?\.\)$/.test(String(this.reprint.base.text || '').trim());
     const lt = this.form.landText || '';
-    return `${basic ? `<div class="ate-field"><span>Texte du terrain</span>
+    // Une carte officielle : son nom, son type et son texte en français ou en anglais (une carte perso garde sa langue).
+    const langRow = this.reprint.base.custom ? '' : `<div class="ate-field"><span>Langue de la carte</span>
+      <div class="chips ate-rplang">${LANGS.map(([v, l]) => `<button class="chip${v === (this.form.lang || 'fr') ? ' on' : ''}" data-rlang="${v}">${esc(l)}</button>`).join('')}</div>
+      <p class="muted small">Le nom, le type et le texte de la carte officielle, comme sur son impression dans cette langue.</p></div>`;
+    return `${langRow}${basic ? `<div class="ate-field"><span>Texte du terrain</span>
       <div class="chips ate-landtext">${[['', 'Rappel « {T} : Ajoutez… »'], ['symbol', 'Grand symbole de mana'], ['none', 'Pas de texte']].map(([v, l]) =>
         `<button class="chip${v === lt ? ' on' : ''}" data-rland="${v}">${esc(l)}</button>`).join('')}</div>
       <p class="muted small">Sans texte et avec le cadre « Illustration pleine » ou « Sans bord », l'illustration occupe toute la carte (full art).</p></div>` : ''}
@@ -859,9 +865,15 @@ export class Atelier {
     const keepNumber = this.reprint.id && base.cset && set && base.cset.id === set.id;
     // Terrain de base : rappel de mana en français, grand symbole ou rien (comme le pont le fera en partie).
     const basicText = String(base.text || '').trim().match(/^\(\{T\}\s?: (?:Add|Ajoutez) ((?:\{[WUBRGCS]\})+)(?: à votre réserve)?\.\)$/);
+    // Carte officielle en anglais : son nom, son type et son texte anglais (comme le pont le fera partout).
+    const en = !base.custom && this.form.lang === 'en';
+    const english = (face) => (face && face.textEn !== undefined ? {...face, nameFr: face.name, typeLine: String(face.typeEn || face.typeLine || '').replace(' - ', ' — '),
+      text: String(face.textEn || '').replace(/^(.+? — [A-Z][\w ]*?) - ([A-Z].*)$/m, '$1 — $2')} : face);
+    const shownBase = en ? {...english(base), back: base.back ? english(base.back) : base.back} : base;
     const land = basicText ? (this.form.landText === 'symbol' ? {text: '', landSymbol: basicText[1]} : this.form.landText === 'none' ? {text: ''}
-      : {text: `({T} : Ajoutez ${basicText[1]}.)`}) : {};
-    const card = {...base, ...land, flavor: this.form.flavor ? this.form.flavor : base.flavor, custom: true, reprint: true, image: '', frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, lang: 'fr',
+      : {text: en ? `({T}: Add ${basicText[1]}.)` : `({T} : Ajoutez ${basicText[1]}.)`}) : {};
+    const card = {...shownBase, ...land, flavor: this.form.flavor ? this.form.flavor : base.flavor, custom: true, reprint: true, image: '', frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx,
+      lang: base.custom ? base.lang || 'fr' : en ? 'en' : 'fr',
       crarity: look.rarity || undefined, artist: cleanArtist(look.artist) || undefined,
       cset: set ? {id: set.id, code: set.code, name: set.name, tint: !!set.tint, logo: set.logo, ...(keepNumber ? {n: base.cset.n, total: base.cset.total} : {})} : undefined};
     this.lastCard = card;
@@ -876,7 +888,11 @@ export class Atelier {
     const msg = this.root.querySelector('.ate-msg');
     if (msg) {
       msg.className = 'ate-msg small ok';
-      msg.textContent = `« ${this.reprint.nameFr} » garde son nom et ses règles : seule l'apparence change.`;
+      msg.textContent = `« ${en ? base.name : this.reprint.nameFr} » garde son nom et ses règles : seule l'apparence change.`;
+    }
+    const title = this.root.querySelector('.ate-top h1');
+    if (title) {
+      title.textContent = `Réimpression — ${en ? base.name : this.reprint.nameFr}`;
     }
   }
 
@@ -884,7 +900,8 @@ export class Atelier {
     button.disabled = true;
     const look = this.look();
     const req = {id: this.reprint.id, name: this.reprint.name, set: look.set || '', rarity: look.rarity || '', artist: cleanArtist(look.artist),
-      frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, landText: this.form.landText || '', flavor: (this.form.flavor || '').trim()};
+      frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, landText: this.form.landText || '', flavor: (this.form.flavor || '').trim(),
+      lang: !this.reprint.base.custom && this.form.lang === 'en' ? 'en' : ''};
     if (this.art !== null) {
       req.art = this.art;
     }
@@ -929,7 +946,7 @@ export class Atelier {
     // Cadre importé : PNG à envoyer (null : garder celui de la carte, "" : le retirer) et son adresse à l'écran.
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
-    this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : token ? NEW_TOKEN() : NEW_CARD();
+    this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : {...(token ? NEW_TOKEN() : NEW_CARD()), lang: defaultLang()};
     // Carte à deux faces : on modifie le recto ou le verso (this.front garde le recto pendant qu'on modifie le verso).
     this.face = 'front';
     this.front = null;
@@ -2545,6 +2562,10 @@ export class Atelier {
       this.check();
     } else if (b.dataset.face) {
       this.switchFace(b.dataset.face);
+    } else if (b.dataset.rlang !== undefined) {
+      this.form.lang = b.dataset.rlang === 'en' ? 'en' : 'fr';
+      this.root.querySelectorAll('[data-rlang]').forEach(x => x.classList.toggle('on', x === b));
+      this.check();
     } else if (b.dataset.rland !== undefined) {
       this.form.landText = b.dataset.rland;
       this.root.querySelectorAll('[data-rland]').forEach(x => x.classList.toggle('on', x === b));

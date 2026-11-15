@@ -517,6 +517,8 @@ function settingsScreen() {
         ${bridge.android || bridge.ios ? '' : row('discordPresence', 'Montrer ma partie sur Discord', 'Si Discord est ouvert sur cet ordinateur, ton profil affiche ton mode, ton deck, tes points de vie et le tour.')}
         <h2 style="margin-top:26px">Atelier</h2>
         ${row('atelierFit', 'Seulement ce qui va avec la carte', 'L\'Atelier ne propose que les déclencheurs, effets, nombres X, conditions et mots-clés qui s\'appliquent au type de la carte (pas « X est la force de cette carte » sur un équipement, ni « quand elle attaque » sur un enchantement). Décoche pour tout voir.')}
+        <div class="row"><div><b>Langue des nouvelles cartes</b><p class="muted small">La langue d'une carte perso, d'un jeton ou d'une réimpression qu'on crée dans l'Atelier (chaque carte peut ensuite changer la sienne).</p></div>
+          <select data-pref-select="atelierLang" aria-label="Langue des nouvelles cartes de l'Atelier"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         <h2 style="margin-top:26px">Lisibilité</h2>
         ${row('bigText', 'Gros texte', 'Agrandit les textes à lire : cartes agrandies, journal, pile, consignes de la partie, fenêtres, menus et notes.')}
         <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>
@@ -532,7 +534,9 @@ function settingsScreen() {
         sel.value = prefs.get(sel.dataset.prefSelect);
         sel.addEventListener('change', () => {
           prefs.set(sel.dataset.prefSelect, sel.value);
-          reloadImages();
+          if (sel.dataset.prefSelect === 'imageLang') {
+            reloadImages();
+          }
         });
       });
       root.querySelectorAll('[data-pref-range]').forEach(r => {

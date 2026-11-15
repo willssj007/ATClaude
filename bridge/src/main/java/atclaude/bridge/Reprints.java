@@ -300,14 +300,21 @@ final class Reprints {
 
     /**
      * Présentation d'une réimpression, ajoutée à la carte (catalogue, partie) : cadre dessiné avec son illustration,
-     * extension perso, rareté, artiste. Le nom, le type et le texte restent ceux de la carte officielle, en français.
+     * extension perso, rareté, artiste. Le nom, le type et le texte restent ceux de la carte officielle, en français (ou en
+     * anglais : réimpression « en »).
      */
     static void addDisplay(final JsonObject o, final JsonObject r) {
-        if (!o.has("custom")) {
+        final boolean official = !o.has("custom");
+        // Réimpression en anglais d'une carte officielle : son nom, son type et son texte anglais, comme imprimée.
+        final boolean english = official && "en".equals(str(r, "lang"));
+        if (official) {
             // Carte officielle : le cadre dessiné de l'Atelier, texte en français. Une carte perso a déjà le sien.
             o.addProperty("custom", true);
             o.addProperty("image", "");
             o.addProperty("lang", "fr");
+        }
+        if (english) {
+            english(o, official(str(r, "name")));
         }
         o.addProperty("reprint", true);
         o.addProperty("reprintId", str(r, "id"));
@@ -331,7 +338,7 @@ final class Reprints {
             o.addProperty("flavor", flavor);
         }
         // Classe, affaire : les lignes que Forge écrit en anglais (rappel, « Level 2 », « Solved »), en français.
-        if (o.has("text") && !o.get("text").isJsonNull() && !"en".equals(str(r, "lang"))) {
+        if (o.has("text") && !o.get("text").isJsonNull() && !english && !"en".equals(str(o, "lang"))) {
             o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
         }
         // Terrain de base : le rappel de mana en français, un grand symbole de mana, ou rien. En partie, Forge ne donne pas
@@ -346,7 +353,7 @@ final class Reprints {
                     o.addProperty("landSymbol", mana);
                 }
                 case "none" -> o.addProperty("text", "");
-                default -> o.addProperty("text", "({T} : Ajoutez " + mana + ".)");
+                default -> o.addProperty("text", english ? "({T}: Add " + mana + ".)" : "({T} : Ajoutez " + mana + ".)");
             }
         }
         final JsonObject cs = CustomCards.csetJson(str(r, "set"), indexKey(r));
@@ -359,6 +366,62 @@ final class Reprints {
         if (art != null) {
             o.addProperty("customArt", art);
         }
+    }
+
+    /** « Stomp {1}{R} — Instant - Adventure » : le tiret de Forge devient le tiret long des cartes. */
+    private static final Pattern ADVENTURE_HEAD = Pattern.compile("(?m)^(.+? — [A-Z][\\w ]*?) - ([A-Z].*)$");
+
+    /**
+     * Le nom, le type et le texte anglais de la carte. Catalogue : ceux que la carte donne déjà (nom, typeEn, textEn,
+     * verso compris). En partie : ceux de la face visible (le verso d'une carte transformée).
+     */
+    private static void english(final JsonObject o, final CardRules rules) {
+        if (rules == null) {
+            return;
+        }
+        o.addProperty("lang", "en");
+        if (o.has("textEn")) {
+            englishCatalog(o);
+            if (o.has("back") && o.get("back").isJsonObject()) {
+                englishCatalog(o.getAsJsonObject("back"));
+            }
+            return;
+        }
+        final forge.card.ICardFace main = rules.getMainPart();
+        final forge.card.ICardFace other = rules.getOtherPart();
+        final forge.card.ICardFace face = other != null && str(o, "oracleName").equals(other.getName()) ? other : main;
+        if (face == null) {
+            return;
+        }
+        o.addProperty("name", face.getName());
+        o.addProperty("nameFr", face.getName());
+        o.addProperty("typeLine", CustomCards.typeLine(face.getType(), "en"));
+        String text = face.getOracleText() == null ? "" : face.getOracleText();
+        if (face == main && other != null && rules.getSplitType() == forge.card.CardSplitType.Adventure) {
+            // Aventure : le sort imprimé sous le texte de la créature.
+            final String cost = other.getManaCost() == null || other.getManaCost().isNoCost() ? "" : " " + other.getManaCost();
+            text = (text.trim().isEmpty() ? "" : text + "\n\n") + other.getName() + cost + " — " + CustomCards.typeLine(other.getType(), "en")
+                    + "\n" + (other.getOracleText() == null ? "" : other.getOracleText());
+        }
+        o.addProperty("text", text.replace("\\n", "\n").trim());
+    }
+
+    /** En partie, l'autre face d'une réimpression en anglais (verso transformable, sort d'aventure) : en anglais aussi. */
+    static void englishBack(final JsonObject back, final String reprintId) {
+        final JsonObject r = byId(reprintId);
+        if (r != null && "en".equals(str(r, "lang"))) {
+            english(back, official(str(r, "name")));
+        }
+    }
+
+    private static void englishCatalog(final JsonObject o) {
+        if (o.has("name")) {
+            o.addProperty("nameFr", str(o, "name"));
+        }
+        if (o.has("typeEn")) {
+            o.addProperty("typeLine", str(o, "typeEn").replace(" - ", " — "));
+        }
+        o.addProperty("text", ADVENTURE_HEAD.matcher(str(o, "textEn")).replaceAll("$1 — $2"));
     }
 
     private static String value(final JsonObject r, final String key, final String def) {
@@ -431,6 +494,8 @@ final class Reprints {
         }
         // Terrain de base : rappel de mana (par défaut), grand symbole ou rien ; texte d'ambiance (240 caractères au plus).
         r.addProperty("landText", str(m, "landText").matches("symbol|none") ? str(m, "landText") : "");
+        // Langue du nom, du type et du texte d'une carte officielle réimprimée (« en » ; sinon le français).
+        r.addProperty("lang", "en".equals(str(m, "lang")) ? "en" : "");
         final String flavor = str(m, "flavor").replace("\r", "").replace("|", "/").trim();
         r.addProperty("flavor", flavor.length() > 240 ? flavor.substring(0, 240) : flavor);
         r.addProperty("at", System.currentTimeMillis());

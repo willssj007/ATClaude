@@ -2,6 +2,12 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.8.3 — Réimpressions en anglais, langue des nouvelles cartes
+
+- **Réimpressions en anglais**. Une réimpression d'une carte officielle a maintenant le choix **Français / English** (en haut de son éditeur) : en anglais, elle prend le nom, le type et le texte anglais de la carte, comme sur son impression anglaise (« Llanowar Elves — Creature — Elf Druid — {T}: Add {G}. »). Partout : aperçu de l'Atelier, recherche, deck builder et en partie, verso des cartes recto verso et sort d'aventure compris. Les terrains de base en anglais ont leur rappel « ({T}: Add {G}.) ». Une réimpression d'une carte perso garde la langue de la carte.
+- **Réglages → Atelier → Langue des nouvelles cartes** (Français par défaut) : la langue d'une carte perso, d'un jeton ou d'une réimpression qu'on crée dans l'Atelier. Chaque carte peut ensuite changer la sienne.
+- Le type de 85 versos de cartes officielles s'écrivait « Créature : - humain et insecte » (un tiret en trop dans les traductions de Forge) : c'est corrigé.
+
 ## 0.8.2 — L'Atelier ne propose que ce qui va avec la carte
 
 - **Atelier : seulement ce qui va avec le type de la carte**. Les déclencheurs, effets, nombres X, conditions, portées « Qui », mots-clés et capacités toutes prêtes qui ne s'appliquent pas à la carte ne sont plus proposés. Quelques exemples :

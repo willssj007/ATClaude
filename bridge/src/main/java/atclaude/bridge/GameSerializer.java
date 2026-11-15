@@ -242,6 +242,9 @@ final class GameSerializer {
         if (c.hasAlternateState() && c.getAlternateState() != null) {
             final JsonObject back = new JsonObject();
             describe(back, c.getAlternateState(), gv, true);
+            if (o.has("reprintId") && o.has("lang") && "en".equals(o.get("lang").getAsString())) {
+                Reprints.englishBack(back, o.get("reprintId").getAsString());
+            }
             o.add("back", back);
         }
         final GameEntityView attachedTo = c.getEntityAttachedTo();

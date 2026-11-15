@@ -126,6 +126,8 @@ const DEFAULTS = {
   frenchCards: true,
   // Atelier : ne proposer que les déclencheurs, effets et mots-clés qui vont avec le type de la carte.
   atelierFit: true,
+  // Langue des nouvelles cartes, jetons et réimpressions de l'Atelier ('fr' ou 'en').
+  atelierLang: 'fr',
   showEnglish: false,
   lastSetup: null,
   menuTheme: 'arcane',
@@ -186,7 +188,7 @@ export const prefs = {
   },
 };
 
-const SYNCED = ['images', 'imageLang', 'bigText', 'frenchCards', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'atelierFit', 'lastSetup', 'menuTheme', 'boardTheme', 'cardBack'];
+const SYNCED = ['images', 'imageLang', 'bigText', 'frenchCards', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'atelierFit', 'atelierLang', 'lastSetup', 'menuTheme', 'boardTheme', 'cardBack'];
 
 export const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
 

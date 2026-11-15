@@ -99,6 +99,10 @@ final class FrenchCards {
         if (names == null || types == null || oracles == null) {
             return;
         }
+        // « Créature : - humain et insecte » : un tiret en trop dans 85 types des traductions de Forge (des versos surtout).
+        synchronized (names) {
+            types.replaceAll((k, v) -> v == null ? null : v.replace(" : - ", " : "));
+        }
         try (java.io.InputStream in = FrenchCards.class.getResourceAsStream("schemes-fr.txt")) {
             if (in == null) {
                 return;
