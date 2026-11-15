@@ -3,9 +3,13 @@
 .ate-top h1 { margin: 0; flex: 1; }
 .ate-top h2 { margin: 18px 0 0; flex: 1; }
 .ate-tcolors .muted { margin-left: 4px; }
-.ate-grid { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 26px; }
-.ate-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
-.ate-tile .mcard { --w: 150px; transition: transform 0.15s; }
+/* Des colonnes de la largeur d'une carte : chaque ligne s'aligne sur la précédente, la dernière aussi (pas recentrée). */
+.ate-grid, .ate-tile { --tw: 150px; }
+.ate-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--tw)); gap: 16px; margin: 14px 0 26px; }
+.ate-grid > :not(.ate-tile) { grid-column: 1 / -1; }
+.ate-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; width: var(--tw); }
+/* La vignette a la largeur de sa carte : un nom long est coupé (…) au lieu d'élargir sa colonne et de décaler la grille. */
+.ate-tile .mcard { --w: var(--tw); transition: transform 0.15s; }
 .ate-tile:hover .mcard { transform: translateY(-3px); }
 /* Groupes : un onglet par groupe, puis un bloc par groupe ; « Organiser » choisit des cartes à ranger. */
 .ate-groups { margin: 10px 0 2px; align-items: center; }
@@ -21,7 +25,11 @@
 .ate-tile.picked .mcard { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 10px; }
 .ate-selecting .ate-tile .mcard { transform: none; }
 .ate-gpick { margin: 4px 0 12px; }
-.ate-name { font-size: 12.5px; font-weight: 600; max-width: 150px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ate-name { font-size: 12.5px; font-weight: 600; max-width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Réimpression : le nom coupé (…) et le petit ↻ toujours visible à sa droite. */
+.ate-rpname { display: flex; justify-content: center; align-items: center; gap: 2px; }
+.ate-rpname > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ate-rpname .ate-rpbadge { flex: 0 0 auto; }
 .ate-types { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ate-type { display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 12px; border-radius: 999px; background: rgb(var(--accent-rgb) / 0.2);
   border: 1px solid rgb(var(--accent-rgb) / 0.5); font-weight: 600; }
@@ -217,7 +225,7 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
   .ate-body { grid-template-columns: minmax(0, 1fr) 220px; gap: 12px; }
   .ate-preview .mcard { --w: 170px; }
   .ate-side { padding: 10px; gap: 8px; }
-  .ate-tile .mcard { --w: 120px; }
+  .ate-grid, .ate-tile { --tw: 120px; }
   .ate-frame .mcard { --w: 70px; }
   .ate-script { min-height: 240px; }
 }
@@ -244,8 +252,7 @@ input[data-typepick] { cursor: pointer; caret-color: transparent; }
      s'élargit à leur texte et pousse les boutons hors de l'écran). */
   .ate-side > .ate-cstats, .ate-side > [data-alt-art] { grid-column: 1 / -1; justify-self: stretch; }
   .ate-grid { gap: 12px; justify-content: center; }
-  .ate-tile .mcard { --w: 104px; }
-  .ate-name { max-width: 104px; }
+  .ate-grid, .ate-tile { --tw: 104px; }
   .ate-addtype input { width: 150px; }
   .ate-frame .mcard { --w: 64px; }
   .ate-script { min-height: 300px; font-size: 12px; }

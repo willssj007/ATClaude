@@ -320,7 +320,7 @@ export class Atelier {
       if (c.reprint) {
         const tile = el(`<div class="ate-tile ate-rptile" data-reprint="${esc(c.reprint.id)}"></div>`);
         tile.appendChild(cardElement(c.card));
-        tile.appendChild(el(`<div class="ate-name">${esc(c.name)} <span class="ate-rpbadge" title="Réimpression d'une carte officielle">↻</span></div>`));
+        tile.appendChild(el(`<div class="ate-name ate-rpname"><span>${esc(c.name)}</span><span class="ate-rpbadge" title="Réimpression d'une carte officielle">↻</span></div>`));
         return tile;
       }
       const tile = el(`<div class="ate-tile${sel && sel.has(c.name) ? ' picked' : ''}" data-name="${esc(c.name)}"></div>`);
@@ -386,7 +386,9 @@ export class Atelier {
         if (!this.selection) {
           const r = (d.reprints || []).find(x => x.id === rpt.dataset.reprint);
           if (r) {
-            this.editReprint(r, r.card);
+            // La carte telle que la donne le catalogue (nom, type et texte en français et en anglais, carte officielle ou
+            // perso), avec l'illustration et l'extension de la réimpression.
+            this.editReprint(r, r.base ? {...r.base, customArt: r.card.customArt, cset: r.card.cset} : r.card);
           }
         }
         return;

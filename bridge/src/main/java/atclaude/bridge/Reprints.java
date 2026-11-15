@@ -212,6 +212,16 @@ final class Reprints {
         }
     }
 
+    /** Une impression de la carte qui n'est pas une réimpression de l'Atelier (null s'il n'y en a pas). */
+    private static PaperCard plain(final String name) {
+        for (final PaperCard pc : FModel.getMagicDb().getCommonCards().getAllCards(name)) {
+            if (!EDITION.equals(pc.getEdition())) {
+                return pc;
+            }
+        }
+        return null;
+    }
+
     /** L'impression Forge d'une réimpression (null si la carte n'existe plus). */
     static PaperCard paper(final JsonObject r) {
         final CardRules rules = official(str(r, "name"));
@@ -440,6 +450,12 @@ final class Reprints {
             final JsonObject o = r.deepCopy();
             o.add("card", Catalog.paperJson(pc));
             o.addProperty("nameFr", French.cardName(pc.getName()));
+            // La carte telle que la donne le catalogue (une impression qui n'est pas une réimpression) : son nom, son type
+            // et son texte en français et en anglais, pour changer la langue d'une réimpression déjà enregistrée.
+            final PaperCard plain = plain(pc.getName());
+            if (plain != null) {
+                o.add("base", Catalog.paperJson(plain));
+            }
             out.add(o);
         }
         return out;

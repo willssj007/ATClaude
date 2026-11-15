@@ -2,6 +2,11 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.8.4 — Atelier : grille alignée, langue des anciennes réimpressions
+
+- **Atelier en portrait** : les cartes ne se décalent plus d'une ligne à l'autre. Une carte au nom long (« Wolverine, Clawed Mutant ») élargissait sa colonne ; chaque vignette a maintenant la largeur de sa carte, le nom trop long est coupé (…) et le ↻ des réimpressions reste visible.
+- **Réimpressions enregistrées avant la 0.8.3** : le choix **Français / English** apparaît aussi sur elles (il n'apparaissait que sur les nouvelles).
+
 ## 0.8.3 — Réimpressions en anglais, langue des nouvelles cartes, jetons copies
 
 - **Réimpressions en anglais**. Une réimpression d'une carte officielle a maintenant le choix **Français / English** (en haut de son éditeur) : en anglais, elle prend le nom, le type et le texte anglais de la carte, comme sur son impression anglaise (« Llanowar Elves — Creature — Elf Druid — {T}: Add {G}. »). Partout : aperçu de l'Atelier, recherche, deck builder et en partie, verso des cartes recto verso et sort d'aventure compris. Les terrains de base en anglais ont leur rappel « ({T}: Add {G}.) ». Une réimpression d'une carte perso garde la langue de la carte.
