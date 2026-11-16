@@ -1,0 +1,15 @@
+# Textes de l'interface de Forge mal traduits en français (fr-FR.properties) : clé|texte corrigé.
+# « Discard » traduit par « Supprimer » ou « Rejeter », « tap » par « appuyer »… Les {0} et %d restent comme dans Forge.
+lblDiscardNCards|Défaussez-vous de %d carte(s)
+lblDiscardUpToNCards|Défaussez-vous de %d carte(s) au plus
+lblDiscarded|Défaussée(s)
+lbldiscard|défausser.
+lblDiscardError|Défausse
+lblSelectOneSameNameCardToDiscardAlreadyChosen|Choisissez une des cartes du même nom à défausser. Déjà choisie(s) : 
+lblSelectNMoreTargetTypeCardToDiscard|Choisissez encore {0} {1} à défausser.
+lblTapOrUntapTarget|Engager ou dégager {0} ?
+lblTapPermanent|Engager des permanents
+lblEnoughValidCardNotToPayTheCost|Il ne reste pas assez de cartes valides à engager pour payer le coût.
+lblSelectATargetToTap|Choisissez un(e) {0} à engager ({1} restant(s))
+lblUntapped|Dégagé(e)
+lblDoYouWantExileAllCardYouGraveyard|Voulez-vous exiler toutes les cartes de votre cimetière ?

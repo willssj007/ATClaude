@@ -35,6 +35,34 @@ final class Texts {
     /** Forge traduit « from X's Deck » par « de la plate-forme de X ». */
     private static final Pattern PLATFORM = Pattern.compile(" de la plate-forme\\s+(?:de\\s+|d')?");
     private static final Pattern QUE_VOWEL = Pattern.compile("\\b([Qq]u)e (?=[aeiouyàâäéèêëîïôöûüAEIOUYÀÂÄÉÈÊËÎÏÔÖÛÜ])");
+    /** « … [Changeur de zone: Essai Gain Vie, Joueur: Moi] » : la note que Forge ajoute à la fin d'un déclencheur. */
+    private static final Pattern ENGINE_NOTE = Pattern.compile("\\s*\\[([^\\[\\]]*?[^\\s\\[\\]]:\\s[^\\[\\]]*)\\]\\s*$");
+    /** Une étiquette de la note (« Changeur de zone: », « , Joueur: ») : un mot ou quelques mots avant deux-points. */
+    private static final Pattern NOTE_LABEL = Pattern.compile("(?:^|,\\s*)[^,:\\[\\]]{1,40}:\\s+");
+
+    /**
+     * La note de Forge en fin de déclencheur, en jargon du moteur (« [Changeur de zone: Essai] ») : ce qu'elle nomme
+     * déjà dans la phrase disparaît ; ce qu'elle apprend en plus (la créature qui est morte, le joueur) reste, entre
+     * parenthèses (« (Grizzlis) »). Les nombres (« Montant: 3 ») et les valeurs vides disparaissent.
+     */
+    static String withoutEngineNote(final String text) {
+        final Matcher m = ENGINE_NOTE.matcher(text);
+        if (!m.find()) {
+            return text;
+        }
+        final String head = text.substring(0, m.start());
+        final String lower = head.toLowerCase(java.util.Locale.ROOT);
+        final java.util.List<String> kept = new java.util.ArrayList<>();
+        for (final String part : NOTE_LABEL.split(m.group(1))) {
+            final String v = part.trim();
+            if (v.isEmpty() || "null".equals(v) || v.matches("[-+]?\\d+") || lower.contains(v.toLowerCase(java.util.Locale.ROOT)) || kept.contains(v)) {
+                continue;
+            }
+            kept.add(v);
+        }
+        return kept.isEmpty() ? head : head + " (" + String.join(", ", kept) + ")";
+    }
+
     /** « une copie de Essai… » : « de » devant un nom (majuscule) qui commence par une voyelle devient « d' ». */
     private static final Pattern DE_VOWEL = Pattern.compile("\\b([Dd])e (?=[AEIOUÀÂÄÉÈÊËÎÏÔÖÛÜ])");
     private static final Pattern YOUR_ZONE = Pattern.compile("\\b(de|dans|à|sur|depuis) vous (bibliothèque|main|cimetière|exil|zone de commandement|champ de bataille|réserve)");
@@ -128,6 +156,7 @@ final class Texts {
         final boolean[] unresolved = {false};
         String result = text.indexOf('(') < 0 ? text : replaceIds(text, unresolved);
         result = HIDDEN.matcher(result).replaceAll(FACE_DOWN);
+        result = withoutEngineNote(result);
         result = translateEnglish(result);
         result = LINE_START.matcher(result).replaceAll("Carte face cachée");
         // Forge remplace « {player's} » par « vous » : « une carte de vous bibliothèque ».

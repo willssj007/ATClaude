@@ -103,6 +103,9 @@ function sendPresence() {
 }
 
 /** Mode de jeu : navigation, mana affiché, écrans. */
+/** Bords estompés de la barre d'écrans quand des icônes dépassent (prêt après le démarrage). */
+let navHint = () => {};
+
 function applyMode() {
   const pw = isPlaneswalker();
   document.body.classList.toggle('mode-pw', pw);
@@ -115,6 +118,7 @@ function applyMode() {
   if (pw && ready) {
     loadCareer().catch(() => {});
   }
+  setTimeout(() => navHint(), 50);
 }
 
 function setMode(mode) {
@@ -335,11 +339,18 @@ function homeScreen() {
   return {
     async show() {
       const pw = isPlaneswalker();
-      const [decks, saved, c] = await Promise.all([
+      const [decks, saved, c, profile] = await Promise.all([
         ready && !pw ? getDecks() : {decks: [], precons: []},
         ready && !inMatch ? bridge.request('savedGame').catch(() => null) : null,
         ready && pw ? loadCareer(true).catch(() => null) : null,
+        ready ? loadProfile().catch(() => null) : null,
       ]);
+      // Premier pas : tant que le compte n'est pas relié (et que le conseil n'a pas été écarté), dire à quoi il sert.
+      const tip = profile && !profile.linked && !prefs.get('tipAccountDone') ? `<div class="panel home-tip">
+          ${icon('portrait', 'tile-ic')}<div><b>Retrouve tes decks sur tous tes appareils</b>
+          <p class="muted small">Relie ton compte GitHub (deux minutes, une seule fois) : tes decks, tes trophées, tes cartes perso et ta partie en cours te suivent du téléphone à l'ordinateur, et sont sauvegardés si tu changes d'appareil.</p>
+          <div class="actions"><button class="btn small gold" data-go="account">Relier mon compte</button><button class="btn small" data-tip-done>Plus tard</button></div></div>
+        </div>` : '';
       const modes = `<div class="mode-pick" role="radiogroup" aria-label="Mode de jeu">
           <button class="mode-card${pw ? '' : ' on'}" data-mode="sandbox" role="radio" aria-checked="${!pw}">${icon('chest', 'mode-ic')}
             <span><b>Sandbox</b><span class="muted small">Tout est ouvert : toutes les cartes et les préconstruits, salons, mulligans à régler, triche.</span></span></button>
@@ -372,6 +383,7 @@ function homeScreen() {
           <div class="tile panel" data-go="limited">${icon('booster', 'tile-ic')}<h3>Limité et défis</h3><p class="muted">Scellé et draft contre l'IA (extensions, cubes ou les tiennes), Gauntlet en cinq manches et énigmes.</p></div>`;
       root.innerHTML = `<div class="page">
         ${saved ? savedGameHtml(saved) : ''}
+        ${tip}
         <div class="hero">
           <span class="glow" aria-hidden="true"></span>
           <h1>Arcane Table</h1>
@@ -387,6 +399,11 @@ function homeScreen() {
         </div>
       </div>`;
       root.onclick = (e) => {
+        if (e.target.closest('[data-tip-done]')) {
+          prefs.set('tipAccountDone', true);
+          root.querySelector('.home-tip')?.remove();
+          return;
+        }
         const mode = e.target.closest('[data-mode]');
         if (mode) {
           setMode(mode.dataset.mode);
@@ -749,6 +766,16 @@ function init() {
     b.title = b.textContent;
   }
   applyMode();
+  // Barre d'écrans plus large que l'écran (téléphone en portrait) : bords estompés tant qu'il reste des icônes à voir.
+  const nav = $('#nav');
+  navHint = () => {
+    const more = nav.scrollWidth - nav.clientWidth;
+    nav.classList.toggle('more-left', more > 2 && nav.scrollLeft > 2);
+    nav.classList.toggle('more-right', more > 2 && nav.scrollLeft < more - 2);
+  };
+  nav.addEventListener('scroll', navHint, {passive: true});
+  window.addEventListener('resize', navHint);
+  setTimeout(navHint, 300);
   $('#nav').addEventListener('click', (e) => {
     const b = e.target.closest('[data-screen]');
     if (b && ready) {

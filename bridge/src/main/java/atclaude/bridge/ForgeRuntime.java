@@ -136,6 +136,8 @@ public final class ForgeRuntime {
         FModel.getPreferences().setPref(FPref.UI_ENABLE_AI_CHEATS, String.valueOf(AiLevels.ready()));
         // Textes français des cartes récentes (impressions françaises de Scryfall gardées en cache).
         FrenchCards.init();
+        // Textes de l'interface de Forge mal traduits (« Supprimer 2 carte(s) » pour une défausse).
+        UiFrench.apply();
         French.prebuildVariantMappings();
         System.out.println("Démarrage : Forge " + (forgeDone - started) / 1_000_000 + " ms, traductions "
                 + (System.nanoTime() - forgeDone) / 1_000_000 + " ms");

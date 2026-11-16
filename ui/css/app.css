@@ -400,7 +400,18 @@ label.check { display: inline-flex; align-items: center; gap: 8px; cursor: point
 #nav button.active .ic { color: var(--gold); opacity: 1; }
 /* Écran étroit : les icônes seules (le nom de l'écran reste en info-bulle). */
 @media (max-width: 1180px) { #nav button { padding: 8px 10px; } #nav button span { display: none; } #nav button.active span { display: inline; } }
-@media (max-width: 560px) { #nav button.active span { display: none; } }
+@media (max-width: 560px) {
+  #nav button.active span { display: none; }
+  /* Téléphone en portrait : des boutons plus serrés, pour que les dernières icônes (Trophées, Réglages) tiennent. */
+  #topbar { gap: 8px; }
+  #nav { gap: 0; scrollbar-width: none; }
+  #nav::-webkit-scrollbar { display: none; }
+  #nav button { padding: 8px 7px; }
+}
+/* S'il reste des icônes cachées à droite (ou à gauche), le bord s'estompe : on voit que la barre défile. */
+#nav.more-right { -webkit-mask-image: linear-gradient(to right, #000 82%, transparent); mask-image: linear-gradient(to right, #000 82%, transparent); }
+#nav.more-left { -webkit-mask-image: linear-gradient(to left, #000 82%, transparent); mask-image: linear-gradient(to left, #000 82%, transparent); }
+#nav.more-left.more-right { -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); }
 body.in-game #topbar, body.in-replay #topbar { display: none; }
 #screens { flex: 1; position: relative; overflow: hidden; }
 .screen { position: absolute; inset: 0; overflow: auto; padding: 20px calc(20px + var(--safe-right)) 20px calc(20px + var(--safe-left)); display: none; }
@@ -1649,3 +1660,9 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 @media (max-width: 640px) {
   :root[data-bigtext] .prompt { font-size: 13.5px; }
 }
+
+/* Accueil : conseil de premier lancement (relier son compte), écartable. */
+.home-tip { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin-bottom: 14px; border-color: rgb(var(--gold-rgb) / 0.45); }
+.home-tip .tile-ic { flex: 0 0 auto; width: 28px; height: 28px; color: var(--gold); }
+.home-tip p { margin: 4px 0 8px; }
+.home-tip .actions { display: flex; flex-wrap: wrap; gap: 8px; }
