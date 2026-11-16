@@ -130,7 +130,7 @@ export class SearchPanel {
     // Les filtres se replient sur les écrans bas ; le bouton dit combien sont actifs.
     this.root.innerHTML = `<div class="search-head">
         <div class="search-bar main">
-          <label class="sh-q">${icon('search')}<input type="search" class="q" placeholder="Nom de carte (français ou anglais)…"><span class="total"></span></label>
+          <label class="sh-q">${icon('search')}<input type="search" class="q" placeholder="Nom ou mots du texte (français ou anglais)…" enterkeyhint="search"><span class="total"></span></label>
           <button class="sh-pill filters-btn" title="Afficher ou masquer les filtres">${icon('filter')}<span>Filtres</span><b class="n"></b></button>
           ${this.owned ? '<label class="tchip missing-toggle" title="Montrer aussi les cartes que tu n\'as pas, à acheter avec un jeton de leur rareté"><input type="checkbox" class="missing"><i></i><span>Manquantes</span></label>' : ''}
         </div>
@@ -167,8 +167,9 @@ export class SearchPanel {
             </select>
           </div>
         </div>
+        <div class="sh-active"></div>
       </div>
-      <div class="results"><div class="card-grid"></div><div class="more muted small" style="text-align:center;padding:14px"></div></div>`;
+      <div class="results"><div class="sh-status muted small"></div><div class="card-grid"></div><div class="more muted small" style="text-align:center;padding:14px"></div></div>`;
     const r = this.root;
     const head = r.querySelector('.search-head');
     const short = window.matchMedia('(max-height: 620px), (max-width: 640px)');
@@ -273,6 +274,22 @@ export class SearchPanel {
       this.query.types = [...r.querySelectorAll('[data-type].on')].map(x => x.dataset.type);
       run();
     });
+    // Les filtres actifs, en pastilles qu'on retire d'un toucher (même filtres repliés).
+    r.querySelector('.sh-active').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-clear]');
+      if (b) {
+        this.clearFilter(b.dataset.clear, b.dataset.v);
+        this.countFilters();
+        this.search(true);
+      }
+    });
+    r.querySelector('.sh-status').addEventListener('click', (e) => {
+      if (e.target.closest('[data-clear-all]')) {
+        this.clearFilter('all');
+        this.countFilters();
+        this.search(true);
+      }
+    });
     const results = r.querySelector('.results');
     results.addEventListener('scroll', () => {
       if (results.scrollTop + results.clientHeight > results.scrollHeight - 300) {
@@ -346,7 +363,16 @@ export class SearchPanel {
       const total = this.root.querySelector('.total');
       total.textContent = `${result.total.toLocaleString('fr-FR')} carte${result.total > 1 ? 's' : ''}`;
       total.title = this.owned ? 'Cartes de ta collection qui correspondent' : 'Cartes qui correspondent';
-      this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : (result.total ? '' : 'Aucune carte ne correspond.');
+      // Faute de frappe : les noms les plus proches ; rien du tout : quoi essayer.
+      const status = this.root.querySelector('.sh-status');
+      const filters = this.activeFilters().length;
+      const typed = esc(String(this.query.text || '').trim());
+      status.innerHTML = result.fuzzy ? `Aucune carte ne s'appelle « ${typed} » : voici les noms les plus proches.`
+        : !result.total ? `Aucune carte ne correspond${typed ? ` à « ${typed} »` : ''}. Essaie un autre mot, en français ou en anglais${filters
+          ? `, ou retire un filtre. <button class="btn small" data-clear-all>Retirer les filtres</button>` : '.'}`
+          : `${result.total.toLocaleString('fr-FR')} carte${result.total > 1 ? 's' : ''}`;
+      status.classList.toggle('sh-note', !!result.fuzzy || !result.total);
+      this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : '';
       this.refreshCounts();
     } catch (e) {
       this.root.querySelector('.more').textContent = e.message;
@@ -402,6 +428,81 @@ export class SearchPanel {
     const n = (q.colors.length ? 1 : 0) + q.types.length + (q.cmcMin !== undefined ? 1 : 0) + (q.cmcMax !== undefined ? 1 : 0)
       + (q.commanderLegal ? 1 : 0) + (q.commandersOnly ? 1 : 0) + (q.custom ? 1 : 0) + (q.set ? 1 : 0) + (q.creatureType ? 1 : 0);
     this.root.querySelector('.filters-btn .n').textContent = n ? String(n) : '';
+    const list = this.activeFilters();
+    this.root.querySelector('.sh-active').innerHTML = list.length
+      ? list.map(([key, v, label]) => `<button class="sh-chip" data-clear="${key}" data-v="${esc(v)}" title="Retirer ce filtre">${esc(label)}<b>✕</b></button>`).join('')
+        + (list.length > 1 ? '<button class="sh-chip sh-chip-all" data-clear="all">Tout effacer</button>' : '') : '';
+  }
+
+  /** Les filtres en cours : [clé, valeur, libellé] (les couleurs, chaque type, la valeur de mana, l'extension…). */
+  activeFilters() {
+    const q = this.query;
+    const out = [];
+    const modes = {any: '', identity: ' (identité)', exact: ' (exactement)'};
+    if (q.colors.length) {
+      out.push(['colors', '', `${q.colors.map(c => COLOR_NAMES[c]).join(', ')}${modes[q.colorMode] || ''}`]);
+    }
+    for (const t of q.types) {
+      out.push(['type', t, (TYPES.find(x => x[0] === t) || [t, t])[1]]);
+    }
+    if (q.cmcMin !== undefined || q.cmcMax !== undefined) {
+      out.push(['cmc', '', q.cmcMin !== undefined && q.cmcMax !== undefined ? `VM ${q.cmcMin}–${q.cmcMax}` : q.cmcMin !== undefined ? `VM ${q.cmcMin} ou plus` : `VM ${q.cmcMax} ou moins`]);
+    }
+    if (q.set) {
+      out.push(['set', '', this.edition ? this.edition.name : q.set]);
+    }
+    if (q.creatureType) {
+      out.push(['ctype', '', this.root.querySelector('.ctype').value || q.creatureType]);
+    }
+    if (q.commanderLegal) {
+      out.push(['legal', '', 'Légales en Commander']);
+    }
+    if (q.commandersOnly) {
+      out.push(['cmdonly', '', 'Peuvent être commandant']);
+    }
+    if (q.custom) {
+      out.push(['custom', '', 'Cartes perso']);
+    }
+    return out;
+  }
+
+  /** Retire un filtre (ou tous, « all ») et remet son réglage à zéro dans le panneau des filtres. */
+  clearFilter(key, v) {
+    const r = this.root;
+    const q = this.query;
+    const all = key === 'all';
+    if (all || key === 'colors') {
+      q.colors = [];
+      r.querySelectorAll('[data-color].on').forEach(x => x.classList.remove('on'));
+    }
+    if (all || key === 'type') {
+      q.types = all ? [] : q.types.filter(t => t !== v);
+      r.querySelectorAll('[data-type]').forEach(x => x.classList.toggle('on', q.types.includes(x.dataset.type)));
+    }
+    if (all || key === 'cmc') {
+      q.cmcMin = undefined;
+      q.cmcMax = undefined;
+      r.querySelector('.cmin').value = '';
+      r.querySelector('.cmax').value = '';
+    }
+    if (all || key === 'set') {
+      q.set = undefined;
+      this.edition = null;
+      const b = r.querySelector('.set-btn');
+      b.querySelector('span').textContent = 'Extension : toutes';
+      b.title = 'N\'afficher que les cartes d\'une extension';
+      b.classList.remove('on');
+    }
+    if (all || key === 'ctype') {
+      q.creatureType = undefined;
+      r.querySelector('.ctype').value = '';
+    }
+    for (const [k, cls, prop] of [['legal', '.legal', 'commanderLegal'], ['cmdonly', '.cmdonly', 'commandersOnly'], ['custom', '.customonly', 'custom']]) {
+      if ((all || key === k) && r.querySelector(cls)) {
+        q[prop] = false;
+        r.querySelector(cls).checked = false;
+      }
+    }
   }
 
   refreshCounts() {

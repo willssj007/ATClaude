@@ -159,6 +159,13 @@ export function reloadImages() {
 
 // Une image d'abord servie en anglais (la version française était en cours de téléchargement) est prête.
 bridge.on('imageReady', ({key}) => {
+  // Plus « introuvable » : les cartes affichées plus tard (une carte qui change de zone) la chargent aussi.
+  const tag = 'key=' + encodeURIComponent(key) + '&';
+  for (const url of missing) {
+    if (url.includes(tag)) {
+      missing.delete(url);
+    }
+  }
   document.querySelectorAll('img.art').forEach(img => {
     const node = img.closest('.mcard');
     if (node && img.dataset.key === key) {
@@ -173,7 +180,7 @@ export function cardElement(card, extraClass = '') {
     return el(`<div class="mcard back ${extraClass}"><div class="face"></div></div>`);
   }
   // Chargement à la demande : dans une longue grille, les cartes visibles passent devant les autres.
-  const node = el(`<div class="mcard ${extraClass}"><div class="face"><img class="art" alt="" draggable="false" loading="lazy">${frameHtml(card)}</div></div>`);
+  const node = el(`<div class="mcard ${extraClass}"><div class="face"><img class="art" alt="" draggable="false" loading="lazy" decoding="async">${frameHtml(card)}</div></div>`);
   node.title = card.nameFr || card.name || '';
   if (card.exactArt) {
     node.dataset.exact = '1';

@@ -76,7 +76,7 @@ final class LocalScheme extends WKURLSchemeHandlerAdapter {
         try {
             if ("/cardimg".equals(path)) {
                 final Map<String, String> q = query(url.getQuery());
-                final ImageService.Served img = ImageService.image(q.get("key"), q.get("lang"), 15_000, "1".equals(q.get("exact")));
+                final ImageService.Served img = ImageService.image(q.get("key"), q.get("lang"), ImageService.IMAGE_WAIT_MS, "1".equals(q.get("exact")));
                 if (img == null) {
                     respond(task, url, 404, "text/plain", new byte[0], "no-store");
                     return;

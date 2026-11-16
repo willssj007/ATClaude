@@ -172,6 +172,11 @@ final class Catalog {
         final String text = normalize(str(q, "text"));
         final boolean inText = bool(q, "inText");
         final String[] words = text.isEmpty() ? new String[0] : text.trim().split("\\s+");
+        // « piocher » trouve « piochez », « créatures » trouve « créature » (la fin des mots tapés ne compte pas).
+        final String[] stems = new String[words.length];
+        for (int i = 0; i < words.length; i++) {
+            stems[i] = stem(words[i]);
+        }
         final String colors = upper(q, "colors");
         final String colorMode = str(q, "colorMode").isEmpty() ? "any" : str(q, "colorMode");
         final List<String> types = new ArrayList<>();
@@ -203,27 +208,13 @@ final class Catalog {
         final Map<String, Integer> owned = onlyOwned || bool(q, "ownedInfo") ? Career.owned() : null;
 
         final List<Entry> matches = new ArrayList<>();
+        // Les cartes qui passent les filtres mais pas le texte : on y cherche les noms approchants (faute de frappe).
+        final List<Entry> others = new ArrayList<>();
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
             if (customSet != null && !customSet.equals(CustomCards.setOf(e.nameEn())) && Reprints.inSet(customSet, e.nameEn()) == null) continue;
             if (onlyOwned && !owned.containsKey(e.nameEn()) && !Career.isBasic(e.card())) continue;
             if (owned != null && e.card().getRules().isCustom()) continue; // cartes perso : Sandbox seulement
-            if (!text.isEmpty()) {
-                // Le nom contient ce qui est tapé ; sinon (« Dans le texte »), chaque mot est dans le nom ou le texte de la carte.
-                boolean hit = e.searchName().contains(text);
-                if (!hit && inText) {
-                    hit = true;
-                    for (final String w : words) {
-                        if (!e.searchName().contains(w) && !e.searchText().contains(w)) {
-                            hit = false;
-                            break;
-                        }
-                    }
-                }
-                if (!hit) {
-                    continue;
-                }
-            }
             if (commanderLegal && !e.commanderLegal()) continue;
             if (commandersOnly && !e.canBeCommander()) continue;
             if (customOnly && !e.card().getRules().isCustom()) continue;
@@ -232,22 +223,53 @@ final class Catalog {
             if (cmcMax >= 0 && e.cmc() > cmcMax) continue;
             if (!types.isEmpty() && !typesMatch(e.typeEn(), types, typeMode)) continue;
             if (!colors.isEmpty() && !colorsMatch(e.identity(), colors, colorMode)) continue;
+            if (!text.isEmpty()) {
+                // Le nom contient ce qui est tapé, ou chaque mot est dans un nom (dans n'importe quel ordre) ; avec « Dans le
+                // texte », chaque mot peut aussi être dans le texte de la carte.
+                boolean hit = e.searchName().contains(text);
+                if (!hit) {
+                    hit = true;
+                    for (final String w : stems) {
+                        if (!e.searchName().contains(w) && !(inText && e.searchText().contains(w))) {
+                            hit = false;
+                            break;
+                        }
+                    }
+                }
+                if (!hit) {
+                    others.add(e);
+                    continue;
+                }
+            }
             matches.add(e);
+        }
+        // Rien trouvé : les noms les plus proches de ce qui est tapé (« lightnig bolt » → Lightning Bolt).
+        final boolean fuzzy = matches.isEmpty() && text.replaceAll("[^\\p{L}]", "").length() >= 3;
+        final Map<Entry, Integer> distance = fuzzy ? nearNames(others, words) : null;
+        if (fuzzy) {
+            matches.addAll(distance.keySet());
         }
         // Ordre « les plus jouées » : les cartes des préconstruits Commander (les staples) d'abord ; avec un texte, les noms
         // qui commencent par lui restent devant.
         final Map<String, Integer> pop = bool(q, "popular") && customSet == null ? Precons.popularity() : null;
-        if (customSet != null && text.isEmpty()) {
+        if (fuzzy) {
+            final Comparator<Entry> byDistance = Comparator.comparingInt(distance::get);
+            matches.sort(pop == null ? byDistance.thenComparing(Entry::nameFr, String.CASE_INSENSITIVE_ORDER)
+                    : byDistance.thenComparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0)));
+        } else if (customSet != null && text.isEmpty()) {
             matches.sort(Comparator.comparingInt((Entry e) -> CustomCards.numberIn(customSet, e.nameEn())));
         } else if (pop != null) {
             final Comparator<Entry> byPop = Comparator.comparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0));
-            matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text)).thenComparing(byPop));
+            matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text, stems)).thenComparing(byPop));
         } else if (!text.isEmpty()) {
-            // Les noms qui commencent par le texte cherché passent devant.
-            matches.sort(Comparator.comparingInt((Entry e) -> rank(e, text)));
+            // Les noms qui commencent par le texte cherché passent devant, puis ceux qui ont tous les mots, puis le texte.
+            matches.sort(Comparator.comparingInt((Entry e) -> rank(e, text, stems)));
         }
         final JsonObject result = new JsonObject();
         result.addProperty("total", matches.size());
+        if (fuzzy && !matches.isEmpty()) {
+            result.addProperty("fuzzy", true);
+        }
         final JsonArray cards = new JsonArray();
         for (int i = offset; i < Math.min(matches.size(), offset + limit); i++) {
             PaperCard pc = matches.get(i).card();
@@ -287,13 +309,125 @@ final class Catalog {
         });
     }
 
-    private static int rank(final Entry e, final String text) {
+    /**
+     * Pertinence d'une carte trouvée : le nom exact, le nom qui commence par le texte, un mot du nom qui commence par lui,
+     * le nom qui le contient, tous les mots dans le nom (dans n'importe quel ordre), puis le texte de la carte.
+     */
+    private static int rank(final Entry e, final String text, final String[] stems) {
         final String en = normalize(e.nameEn());
         final String fr = normalize(e.nameFr());
         if (en.equals(text) || fr.equals(text)) return 0;
         if (en.startsWith(text) || fr.startsWith(text)) return 1;
-        if (e.searchName().contains(text)) return 2;
-        return 3;
+        if (wordStarts(e.searchName(), text)) return 2;
+        if (e.searchName().contains(text)) return 3;
+        for (final String w : stems) {
+            if (!e.searchName().contains(w)) {
+                return 5;
+            }
+        }
+        return 4;
+    }
+
+    /** Un mot de ces noms commence-t-il par ce texte (« ring » dans « sol ring ») ? */
+    private static boolean wordStarts(final String names, final String text) {
+        for (int i = names.indexOf(text); i >= 0; i = names.indexOf(text, i + 1)) {
+            if (i == 0 || !Character.isLetterOrDigit(names.charAt(i - 1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** La fin d'un mot tapé (≥ 5 lettres) : « piocher » → « pioch », « créatures » → « creatur », « cartes » → « cart ». */
+    static String stem(final String w) {
+        if (w.length() < 5) {
+            return w;
+        }
+        String s = w.replaceAll("[sx]$", "");
+        s = s.replaceAll("(ent|er|ez|ee|es|e)$", "");
+        return s.length() >= 4 ? s : w;
+    }
+
+    /**
+     * Les cartes dont un nom ressemble à ce qui est tapé : chaque mot tapé (3 lettres ou plus) est un mot du nom à une ou
+     * deux fautes près (lettre en trop, en moins, changée ou inversée), ou le début d'un mot du nom. Carte → total des fautes.
+     */
+    private static Map<Entry, Integer> nearNames(final List<Entry> pool, final String[] words) {
+        final List<String> typed = new ArrayList<>();
+        for (final String w : words) {
+            final String clean = w.replaceAll("[^\\p{L}\\p{N}]", "");
+            if (clean.length() >= 3) {
+                typed.add(clean);
+            }
+        }
+        final Map<Entry, Integer> out = new java.util.LinkedHashMap<>();
+        if (typed.isEmpty()) {
+            return out;
+        }
+        for (final Entry e : pool) {
+            int best = Integer.MAX_VALUE;
+            for (final String name : e.searchName().split("\n")) {
+                final String[] nameWords = name.split("[^\\p{L}\\p{N}]+");
+                int total = 0;
+                for (final String w : typed) {
+                    final int allowed = w.length() <= 3 ? 0 : w.length() <= 5 ? 1 : 2;
+                    int min = Integer.MAX_VALUE;
+                    for (final String nw : nameWords) {
+                        if (nw.isEmpty() || Math.abs(nw.length() - w.length()) > allowed && !nw.startsWith(w)) {
+                            continue;
+                        }
+                        final int d = nw.startsWith(w) ? 0 : typos(w, nw, allowed);
+                        min = Math.min(min, d);
+                        if (min == 0) {
+                            break;
+                        }
+                    }
+                    if (min > allowed) {
+                        total = Integer.MAX_VALUE;
+                        break;
+                    }
+                    total += min;
+                }
+                best = Math.min(best, total);
+            }
+            if (best != Integer.MAX_VALUE) {
+                out.put(e, best);
+            }
+        }
+        return out;
+    }
+
+    /** Nombre de fautes entre deux mots (lettre en trop, en moins, changée, deux lettres inversées), au plus max + 1. */
+    static int typos(final String a, final String b, final int max) {
+        final int n = a.length();
+        final int m = b.length();
+        int[] prev2 = new int[m + 1];
+        int[] prev = new int[m + 1];
+        int[] cur = new int[m + 1];
+        for (int j = 0; j <= m; j++) {
+            prev[j] = j;
+        }
+        for (int i = 1; i <= n; i++) {
+            cur[0] = i;
+            int rowMin = cur[0];
+            for (int j = 1; j <= m; j++) {
+                final int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                int v = Math.min(Math.min(prev[j] + 1, cur[j - 1] + 1), prev[j - 1] + cost);
+                if (i > 1 && j > 1 && a.charAt(i - 1) == b.charAt(j - 2) && a.charAt(i - 2) == b.charAt(j - 1)) {
+                    v = Math.min(v, prev2[j - 2] + 1);
+                }
+                cur[j] = v;
+                rowMin = Math.min(rowMin, v);
+            }
+            if (rowMin > max) {
+                return max + 1;
+            }
+            final int[] t = prev2;
+            prev2 = prev;
+            prev = cur;
+            cur = t;
+        }
+        return Math.min(prev[m], max + 1);
     }
 
     /** Types de carte (pas les supertypes comme « légendaire ») : ceux que « exactement ces types » compare. */

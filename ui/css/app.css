@@ -526,6 +526,20 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 .filters-btn .n:not(:empty) { display: inline-flex; }
 .search-head:not(.folded) .filters-btn { border-color: var(--gold); color: var(--gold-2); background: rgb(var(--gold-rgb) / 0.1); }
 .search-head.folded .search-filters { display: none; }
+/* Filtres actifs : des pastilles qu'on retire d'un toucher, visibles même quand le panneau des filtres est replié. */
+.sh-active { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.sh-active:empty { display: none; }
+.search-head .sh-active { margin-top: 2px; margin-bottom: 6px; }
+.sh-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 14px; font-size: 12.5px;
+  border: 1px solid rgb(var(--gold-rgb) / 0.55); background: rgb(var(--gold-rgb) / 0.12); color: var(--text); cursor: pointer; }
+.sh-chip b { font-weight: 600; font-size: 11px; color: var(--gold-2); }
+.sh-chip:hover { background: rgb(var(--gold-rgb) / 0.22); }
+.sh-chip-all { border-style: dashed; background: none; color: var(--muted); }
+/* Nombre de cartes trouvées (caché dans la barre sur téléphone), noms approchants, ou quoi essayer. */
+.sh-status { text-align: center; padding: 0 6px 8px; }
+.sh-status.sh-note { color: var(--text); padding: 6px 10px 12px; line-height: 1.45; }
+.sh-status .btn { margin-left: 6px; vertical-align: middle; }
+@media (min-width: 521px) { .sh-status:not(.sh-note) { display: none; } }
 .search-filters {
   display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 22px;
   background: rgb(255 255 255 / 0.035); border: 1px solid var(--line); box-shadow: 0 10px 28px rgb(0 0 0 / 0.28);

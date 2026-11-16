@@ -25,6 +25,13 @@ import java.util.function.Consumer;
  */
 public final class ImageService {
 
+    /**
+     * Attente maximale d'une image demandée par l'écran. Au-delà, la demande se termine (l'écran garde le cadre dessiné)
+     * et l'image est annoncée quand elle arrive : une image à télécharger ne bloque plus celles qui sont déjà prêtes
+     * (le navigateur ne fait que quelques demandes à la fois).
+     */
+    public static final long IMAGE_WAIT_MS = 4_000;
+
     /** Après un échec, on ne redemande pas l'image avant ce délai. */
     private static final long RETRY_AFTER_MS = 5 * 60_000;
 
@@ -193,8 +200,18 @@ public final class ImageService {
             }
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
-        } catch (final java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+        } catch (final java.util.concurrent.ExecutionException e) {
             // pas encore là
+        } catch (final java.util.concurrent.TimeoutException e) {
+            // Pas encore là : la demande de l'écran se termine (elle ne bloque pas les images déjà prêtes derrière
+            // elle), et l'écran est prévenu dès que le téléchargement aboutit (il recharge alors cette image).
+            download.thenRun(() -> {
+                ImageKeys.clearMissingCards();
+                if (cached(imageKey) != null) {
+                    FAILED.remove(imageKey);
+                    onLateImage.accept(imageKey);
+                }
+            });
         }
         // Forge garde en mémoire les images manquantes : on oublie cette liste après un téléchargement.
         ImageKeys.clearMissingCards();

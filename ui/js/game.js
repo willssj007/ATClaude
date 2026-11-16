@@ -376,6 +376,22 @@ export class Game {
       }
     });
     table.querySelectorAll('.me-half, .opp-field, .plates').forEach(h => this.halfObserver.observe(h));
+    // La largeur de la main, suivie de même (fanHand ne la relit pas à chaque mise à jour).
+    this.handObserver && this.handObserver.disconnect();
+    this.handObserver = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        e.target._size = {w: e.target.clientWidth};
+      }
+      this.handSlotW = {};
+      const h = table.querySelector('.hand');
+      if (h && this.state) {
+        this.fanHand(h, h.querySelectorAll(':scope > .slot').length);
+      }
+    });
+    const handNode = table.querySelector('.hand');
+    if (handNode) {
+      this.handObserver.observe(handNode);
+    }
     this.cardMax = 0;
     this.stackPanel = new StackPanel(table, {
       anchor: this.board,
@@ -778,6 +794,7 @@ export class Game {
   /** Après un changement de taille du plateau : resserre les rangées et redessine les flèches. */
   afterResize() {
     this.cardMax = 0;
+    this.handSlotW = {};
     this.fitRows();
     const hand = this.table.querySelector('.hand');
     this.fanHand(hand, hand.querySelectorAll(':scope > .slot').length);
@@ -789,6 +806,7 @@ export class Game {
 
   destroy() {
     this.halfObserver && this.halfObserver.disconnect();
+    this.handObserver && this.handObserver.disconnect();
     document.removeEventListener('keydown', this.keyHandler);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('cutout', this.onCutout);
@@ -1719,8 +1737,26 @@ export class Game {
    */
   fanHand(hand, n) {
     const slots = [...hand.querySelectorAll(':scope > .slot')];
-    const width = slots[0] ? slots[0].offsetWidth || 80 : 80;
-    const avail = hand.clientWidth || 600;
+    const open = hand.classList.contains('open');
+    // Largeur d'une carte de la main (repliée ou dépliée) et de la main : gardées, remesurées seulement quand l'écran
+    // change de taille. Les relire à chaque photo de la partie, juste après avoir changé le plateau, forçait un calcul
+    // complet de la mise en page (des dizaines de millisecondes par mise à jour en combat, sur téléphone).
+    this.handSlotW = this.handSlotW || {};
+    let width = this.handSlotW[open ? 1 : 0];
+    if (!width && slots[0]) {
+      width = slots[0].offsetWidth;
+      if (width) {
+        this.handSlotW[open ? 1 : 0] = width;
+      }
+    }
+    width = width || 80;
+    const avail = (hand._size && hand._size.w) || hand.clientWidth || 600;
+    // Rien de changé (mêmes cartes, même place) : l'éventail en place est bon.
+    const sig = `${n}|${open}|${width}|${avail}|${slots.map(x => x.dataset.key).join(',')}`;
+    if (sig === hand._fanSig) {
+      return;
+    }
+    hand._fanSig = sig;
     const natural = width * n;
     const scroll = n > 1 && hand.classList.contains('open') && (avail - natural) / (n - 1) < -width * 0.45;
     if (scroll !== hand.classList.contains('scroll')) {
@@ -1778,7 +1814,15 @@ export class Game {
     }
     const hiddenOpp = (h) => table.dataset.oppview === 'focus' && h.classList.contains('opp-field') && !h.classList.contains('focused');
     const slotsOf = (row) => row ? [...row.children].filter(x => x.classList.contains('slot')) : [];
-    const sizeOf = (half) => half._size || {w: half.clientWidth, h: half.clientHeight};
+    // Taille d'une moitié : celle que l'observateur a relevée ; avant sa première mesure, lue une seule fois et gardée
+    // (l'observateur la remplacera), plutôt qu'à chaque mise à jour.
+    const sizeOf = (half) => {
+      if (!half._size) {
+        half._size = {w: half.clientWidth, h: half.clientHeight};
+        this.halfObserver && this.halfObserver.observe(half);
+      }
+      return half._size;
+    };
     // Place prise par les plaques posées sur cette moitié (mesurée par l'observateur ; estimée avant la 1re mesure).
     const platesOf = (half) => {
       const box = half.querySelector('.plates');
@@ -2066,9 +2110,9 @@ export class Game {
       this.table.appendChild(f);
       setTimeout(() => f.remove(), 1400);
       if (delta < 0) {
+        // Rejouer la secousse sans forcer de calcul de mise en page (l'ancien « void offsetWidth ») : à l'image suivante.
         hit.classList.remove('shake');
-        void hit.offsetWidth;
-        hit.classList.add('shake');
+        requestAnimationFrame(() => hit.classList.add('shake'));
       }
     }
   }

@@ -391,7 +391,7 @@ public class MainActivity extends Activity {
     }
 
     private static WebResourceResponse cardImage(final String key, final String lang, final boolean exact) {
-        final ImageService.Served img = ImageService.image(key, lang, 15_000, exact);
+        final ImageService.Served img = ImageService.image(key, lang, ImageService.IMAGE_WAIT_MS, exact);
         if (img == null) {
             return notFound();
         }
