@@ -2,6 +2,10 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.1 — Cartes perso en anglais vraiment en anglais
+
+- **Cartes perso en anglais, en partie** : une ligne pouvait passer en français avec le texte de rappel d'une carte officielle (« Défenseur (Cette créature ne peut pas attaquer.) » au-dessus d'une capacité en anglais). Forge garde en mémoire les lignes déjà traduites pendant la partie : dès qu'une carte officielle avec le même mot-clé (un Mur avec Défenseur, par exemple) était passée, il réutilisait sa traduction pour les cartes qui n'en ont pas, dont les cartes perso. Une carte perso, un jeton perso ou un emblème perso en anglais reste maintenant entièrement en anglais.
+
 ## 0.9.0 — Emblèmes perso, coût zéro, « si vous contrôlez X permanents »
 
 - **Atelier : emblèmes perso**. Un nouvel onglet **Emblèmes** (à côté de Jetons) crée tes propres emblèmes : un nom, des capacités, une illustration et un cadre comme pour un jeton. Un emblème reste dans la zone de commandement jusqu'à la fin de la partie, et rien ne peut le retirer.

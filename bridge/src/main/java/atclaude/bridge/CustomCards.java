@@ -147,6 +147,7 @@ final class CustomCards {
                 if (name != null) {
                     FILES.put(name, f);
                     registerBack(name, text);
+                    keepEnglish(text);
                 }
             }
         }
@@ -159,6 +160,7 @@ final class CustomCards {
                     FILES.put(name, f);
                     TOKENS.add(name);
                     registerToken(base(f), text);
+                    keepEnglish(text);
                 }
             }
         }
@@ -172,6 +174,7 @@ final class CustomCards {
                         EMBLEMS.put(name, new CardRules.Reader().readCard(Arrays.asList(text.replace("\r", "").split("\n")), base(f)));
                         FILES.put(name, f);
                         TOKENS.add(name);
+                        keepEnglish(text);
                     } catch (final RuntimeException e) {
                         System.err.println("Emblème perso illisible (" + f.getName() + ") : " + e.getMessage());
                     }
@@ -179,6 +182,56 @@ final class CustomCards {
             }
         }
     }
+
+    /**
+     * Carte perso en anglais : Forge ne lui prête plus les traductions des autres cartes. Sans traduction à elle, il
+     * reprenait celle qu'une carte officielle avait déjà eue pour la même ligne (« Defender » devenait « Défenseur
+     * (Cette créature ne peut pas attaquer.) » dès qu'un Mur était passé dans la partie). Une liste de correspondances
+     * vide lui dit qu'il n'y a rien à traduire ; une carte repassée en français la perd.
+     */
+    @SuppressWarnings("unchecked")
+    private static void keepEnglish(final String script) {
+        if (script == null) {
+            return;
+        }
+        final boolean english = Pattern.compile("(?m)^SVar:AtelierLang:en\\s*$").matcher(script).find();
+        final List<String> keys = new ArrayList<>();
+        final java.util.regex.Matcher m = Pattern.compile("(?m)^Name:(.+)$").matcher(script);
+        while (m.find()) {
+            keys.add(m.group(1).trim());
+        }
+        if (isEmblemScript(script) && !keys.isEmpty()) {
+            keys.add("Emblem — " + keys.get(0)); // l'effet de Forge qui le représente en partie
+        }
+        try {
+            final java.lang.reflect.Field mf = forge.util.CardTranslation.class.getDeclaredField("oracleMappings");
+            final java.lang.reflect.Field cf = forge.util.CardTranslation.class.getDeclaredField("translatedCaches");
+            mf.setAccessible(true);
+            cf.setAccessible(true);
+            final Map<String, Object> mappings = (Map<String, Object>) mf.get(null);
+            final Map<String, Object> caches = (Map<String, Object>) cf.get(null);
+            if (mappings == null) {
+                return; // Forge en anglais : rien n'est traduit
+            }
+            synchronized (mappings) {
+                for (final String key : keys) {
+                    if (english && !mappings.containsKey(key)) {
+                        mappings.put(key, NO_TRANSLATION);
+                    } else if (!english && mappings.get(key) == NO_TRANSLATION) {
+                        mappings.remove(key);
+                    }
+                    if (caches != null) {
+                        caches.remove(key);
+                    }
+                }
+            }
+        } catch (final ReflectiveOperationException | RuntimeException e) {
+            System.err.println("Cartes perso en anglais : traductions de Forge non écartées (" + e.getMessage() + ")");
+        }
+    }
+
+    /** Marque « rien à traduire » (liste vide de Forge) posée sur les cartes perso en anglais. */
+    private static final List<Object> NO_TRANSLATION = java.util.Collections.unmodifiableList(new ArrayList<>());
 
     /** Emblème perso (onglet Emblèmes de l'Atelier) ? */
     static boolean isEmblem(final String name) {
@@ -912,6 +965,7 @@ final class CustomCards {
         write(file, script.replace("\r", "").trim() + "\n");
         FILES.put(name, file);
         registerBack(name, script);
+        keepEnglish(script);
         if (previous != null && !previous.equals(name)) {
             BACKS.values().removeIf(previous::equals);
         }
