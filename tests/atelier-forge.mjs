@@ -5,7 +5,7 @@
 //   java -jar desktop/target/desktop-*.jar --assets <forge>/forge-gui --data <dossier> --ui ui --no-browser &
 //   node tests/atelier-forge.mjs [http://127.0.0.1:8765]
 // Sortie en erreur (code 1) si Forge refuse un seul script.
-import {buildScript, EFFECTS, WHEN, effectsFor, whoChoices, PLAYER_WHO, newMode, KEYWORDS, DFC_MODES, KW_ALL, AMOUNTS, CONDITIONS, SCOPES, cardTraits,
+import {buildScript, EFFECTS, WHEN, effectsFor, whoChoices, PLAYER_WHO, newMode, KEYWORDS, DFC_MODES, KW_ALL, AMOUNTS, CONDITIONS, COND_KINDS, SCOPES, cardTraits,
   fitsCard, needOf} from '../ui/js/cardscript.js';
 const BASE = process.argv[2] || 'http://127.0.0.1:8765';
 const res = await fetch(BASE + '/api/events');
@@ -129,6 +129,13 @@ for (const lang of ['fr', 'en']) {
   // Saga à trois chapitres, enchantement Monde.
   await check('saga', card({}, lang, {types: ['Enchantment'], subtypes: 'Saga', abilities: [ab({when: 'chapter', chapter: 1, chapterTo: 2, effect: 'draw'}), ab({when: 'chapter', chapter: 3, effect: 'token'})]}));
   await check('monde', card({}, lang, {types: ['Enchantment'], world: true, abilities: []}));
+  // « Si vous contrôlez au moins X permanents d'un type » : chaque sorte, sans type et avec un sous-type ; coût {0}.
+  for (const [k] of COND_KINDS) {
+    for (const t of ['', 'Equipment']) {
+      await check(`condition ${k}/${t}`, card(ab({when: 'etb', effect: 'draw', cond: 'controlPerm', condKind: k, condType: t, condN: 2}), lang));
+    }
+  }
+  await check('coût {0}', card(ab({when: 'activated', effect: 'gainLife', cost: '{0}', tap: false}), lang, {cost: '{0}', types: ['Artifact'], subtypes: ''}));
   // Pile ou face avec ses deux issues.
   await check('pile ou face', card(ab({when: 'etb', effect: 'flipCoin', then: [{...newMode('draw'), n: 2}, {...newMode('loseLifeYou'), n: 2}]}), lang));
 }

@@ -9,7 +9,7 @@ import {confirmBox, customBox} from './dialogs.js';
 import {pickPhoto} from './account.js';
 import {debounce, el, esc, prefs, rulesHtml, symbol, toast} from './util.js';
 import {icon} from './icons.js';
-import {DFC_MODES, facePart, scriptToForm, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
+import {DFC_MODES, facePart, scriptToForm, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, COND_KINDS, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
   cardTraits, effectsFor, eminenceOk, fitsCard, keywordNeed, needOf, needWords, setTypeFit, orTriggerFits, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
@@ -25,6 +25,12 @@ const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scop
 /** Les types de marqueurs d'une liste déroulante (« charge », « temps », +1/+1…). */
 const COUNTER_OPTIONS = COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]);
 /** Une liste des types de marqueurs : attr « a » (capacité) ou « sf » (mode, effet enchaîné). */
+/** « Si vous contrôlez au moins X … » : la sorte de permanents et leur type (n'importe quel sous-type, types perso compris). */
+function condKindHtml(attr, h) {
+  return `<select data-${attr}="condKind" aria-label="Quels permanents">${COND_KINDS.map(k => `<option value="${k[0]}"${k[0] === (h.condKind || 'permanent') ? ' selected' : ''}>${esc(k[3])}</option>`).join('')}</select>
+    <input type="text" data-${attr}="condType" data-typepick data-typeall readonly value="${esc(h.condType || '')}" placeholder="de tout type, ou un type : Équipement, Elfe…" style="width:190px">`;
+}
+
 function counterSelect(attr, key, value, def = 'P1P1') {
   const v = COUNTER_OPTIONS.some(c => c[0] === value) ? value : def;
   return `<select data-${attr}="${key}">${COUNTER_OPTIONS.map(([id, l]) => `<option value="${esc(id)}"${id === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
@@ -1588,7 +1594,7 @@ export class Atelier {
    * multi (les sous-types de la carte) ou un seul type (un filtre « chaque Elfe… », « toutes » permis). onDone(types en
    * anglais, langue choisie).
    */
-  pickTypes({multi = false, current = [], title = 'Sous-types', allowAll = false, onDone}) {
+  pickTypes({multi = false, current = [], title = 'Sous-types', allowAll = false, allSubtypes = false, onDone}) {
     const f = this.form;
     let lang = this.subLang(f);
     const chosen = new Set(current);
@@ -1601,7 +1607,9 @@ export class Atelier {
       ['Types perso', custom.map(t => ({en: t, fr: t}))],
       ['Types de créature', creature.map(t => ({en: t.en, fr: t.fr || t.en}))],
       ['Autres sous-types', SUBTYPES.filter(st => st[0] !== 'Mount' && !fits(st)).map(st => ({en: st[0], fr: st[1], no: !!st[3].no}))],
-    ] : [['Types perso', custom.map(t => ({en: t, fr: t}))], ['Types de créature', creature.map(t => ({en: t.en, fr: t.fr || t.en}))]];
+    ] : [['Types perso', custom.map(t => ({en: t, fr: t}))], ['Types de créature', creature.map(t => ({en: t.en, fr: t.fr || t.en}))],
+      // « Permanents d'un type » : aussi les sous-types d'artefact, d'enchantement, de terrain… (Équipement, Aura, Forêt).
+      ...(allSubtypes ? [['Autres sous-types', SUBTYPES.filter(st => st[0] !== 'Mount').map(st => ({en: st[0], fr: st[1]}))]] : [])];
     const plain = (x) => String(x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     customBox(title, (body, footer, close) => {
       body.innerHTML = `<div class="ate-tp-head"><div class="ate-tp-top">
@@ -1738,7 +1746,7 @@ export class Atelier {
 
   /** La condition « À résoudre — » d'une affaire : une des conditions avec un nombre (pas « votre tour », ni le kick). */
   caseHtml(f) {
-    const list = CONDITIONS.filter(([id]) => !['none', 'yourTurn', 'notYourTurn', 'kicked', 'tappedAtLeast'].includes(id) && (id === f.caseCond || fitsCard('cond', id, this.fitCard)));
+    const list = CONDITIONS.filter(([id]) => !['none', 'yourTurn', 'notYourTurn', 'kicked', 'tappedAtLeast', 'controlPerm'].includes(id) && (id === f.caseCond || fitsCard('cond', id, this.fitCard)));
     const c = f.caseCond || '';
     return `<select data-case="caseCond"><option value="">— choisir —</option>${list.map(([id, l]) => `<option value="${id}"${id === c ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${CONDITIONS_N.includes(c) ? `<input type="number" data-case="caseN" value="${esc(f.caseN ?? 3)}" min="0" max="99" style="width:64px" title="X">` : ''}
@@ -1936,6 +1944,8 @@ export class Atelier {
     }).join('')
       + `<span class="ate-gen" title="Mana générique"><button data-gen="-1" title="Un de moins"${generic ? '' : ' disabled'}>−</button>${symbol(String(generic))}`
       + `<button data-gen="1" title="Un de plus"${generic < GENERIC_MAX ? '' : ' disabled'}>+</button></span>`
+      // Coût de zéro ({0}, comme un Mox) : différent de « pas de coût », qui ne se lance pas.
+      + (/^(form|ab:|kw:)/.test(target) ? `<button class="chip ate-hyb${costParts(value).join() === '0' ? ' on' : ''}" data-zero title="Un coût de zéro mana, comme les Mox : la carte se lance gratuitement (« pas de coût » ne se lance pas)">${symbol('0')} Coût zéro</button>` : '')
       + `<button class="chip ate-hyb${hyb ? ' on' : ''}" data-hybrid title="Symbole à deux couleurs">Hybride</button>`
       + `<button class="chip ate-hyb${phy ? ' on' : ''}" data-phyrexian title="Mana phyrexian : payable avec 2 points de vie">Phyrexian ϕ</button>`
       + (phy ? '<span class="muted small ate-hyb-hint">Touche une couleur.</span>' : '')
@@ -1949,7 +1959,11 @@ export class Atelier {
     const m = costModel(value);
     const hyb = this.hyb && this.hyb.target === target ? this.hyb : null;
     let next = value;
-    if (b.dataset.hybrid !== undefined) {
+    if (b.dataset.zero !== undefined) {
+      next = costParts(value).join() === '0' ? '' : '{0}';
+      this.hyb = null;
+      this.phy = null;
+    } else if (b.dataset.hybrid !== undefined) {
       this.hyb = hyb ? null : {target, first: ''};
       this.phy = null;
     } else if (b.dataset.phyrexian !== undefined) {
@@ -2212,6 +2226,7 @@ export class Atelier {
       <select data-a="cond">${list.map(([v, l]) => `<option value="${v}"${v === cond ? ' selected' : ''}>${esc(v === 'none' ? 'Toujours' : l.replace(/^Si /, '').replace(/^S'il /, 'Il '))}</option>`).join('')}</select>
       ${CONDITIONS_N.includes(cond) ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
       ${cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
+      ${cond === 'controlPerm' ? condKindHtml('a', a) : ''}
       ${cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>`;
   }
 
@@ -2309,6 +2324,7 @@ export class Atelier {
       <select data-sf="cond">${CONDITIONS.filter(([v]) => (v !== 'tappedAtLeast' || tapped) && (v === m.cond || fitsCard('cond', v, this.fitCard))).map(([v, l]) => `<option value="${v}"${v === (m.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${cond ? `<input type="number" data-sf="condN" value="${esc(m.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
       ${m.cond === 'control' ? `<input type="text" data-sf="condType" data-typepick readonly value="${esc(m.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
+      ${m.cond === 'controlPerm' ? condKindHtml('sf', m) : ''}
       ${m.cond === 'countersAtLeast' ? counterSelect('sf', 'condCounter', m.condCounter, 'CHARGE') : ''}</div>`;
   }
 
@@ -2359,6 +2375,7 @@ export class Atelier {
         <select data-a="cond">${CONDITIONS.filter(([v]) => (v !== 'tappedAtLeast' || tapped) && (v === a.cond || fitsCard('cond', v, this.fitCard))).map(([v, l]) => `<option value="${v}"${v === (a.cond || 'none') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         ${cond ? `<input type="number" data-a="condN" value="${esc(a.condN ?? 3)}" min="0" max="99" style="width:70px" title="X">` : ''}
         ${a.cond === 'control' ? `<input type="text" data-a="condType" data-typepick readonly value="${esc(a.condType || '')}" placeholder="toutes, ou un type" style="width:140px">` : ''}
+        ${a.cond === 'controlPerm' ? condKindHtml('a', a) : ''}
         ${a.cond === 'countersAtLeast' ? counterSelect('a', 'condCounter', a.condCounter, 'CHARGE') : ''}</div>
       <div class="ate-modes">${then.map((m, k) => this.subEffectHtml(a, m, k, 'then', 'Et puis', true)).join('')}
         ${then.length < 2 ? '<button class="btn small" data-addsub="then">＋ Et puis… (un autre effet)</button>' : ''}</div>
@@ -2373,8 +2390,9 @@ export class Atelier {
     const tp = e.target.closest('input[data-typepick]');
     if (tp) {
       e.preventDefault();
-      this.pickTypes({title: tp.dataset.kwv !== undefined ? 'Type de créature' : 'Créatures d\'un type', current: tp.value ? forgeSubtypes(tp.value) : [],
-        allowAll: tp.dataset.kwv === undefined, onDone: (list, lang) => {
+      const all = tp.dataset.typeall !== undefined;
+      this.pickTypes({title: tp.dataset.kwv !== undefined ? 'Type de créature' : all ? 'Permanents d\'un type' : 'Créatures d\'un type', current: tp.value ? forgeSubtypes(tp.value) : [],
+        allowAll: tp.dataset.kwv === undefined, allSubtypes: all, onDone: (list, lang) => {
           tp.value = list.length ? typeLabel(list[0], lang) : '';
           tp.dispatchEvent(new Event('input', {bubbles: true}));
           tp.dispatchEvent(new Event('change', {bubbles: true}));

@@ -1064,6 +1064,7 @@ function tapWhat(a) {
 export const CONDITIONS = [
   ['none', 'Toujours'],
   ['control', 'Si vous contrôlez au moins X créatures (d\'un type, au choix)'],
+  ['controlPerm', 'Si vous contrôlez au moins X permanents d\'un type (artefacts, terrains, Équipements, un type perso…)'],
   ['lifeAtLeast', 'Si vous avez au moins X points de vie'],
   ['lifeAtMost', 'Si vous avez X points de vie ou moins'],
   ['handAtLeast', 'Si vous avez au moins X cartes en main'],
@@ -1093,8 +1094,14 @@ export const CONDITIONS = [
   ['energyAtLeast', 'Si vous avez au moins X {E} (énergie)'],
 ];
 
+/** « Si vous contrôlez au moins X … » : la sorte de permanents comptés [id, pour Forge, un, plusieurs, en anglais]. */
+export const COND_KINDS = [['permanent', 'Permanent', 'permanent', 'permanents', 'permanents'], ['creature', 'Creature', 'créature', 'créatures', 'creatures'],
+  ['artifact', 'Artifact', 'artefact', 'artefacts', 'artifacts'], ['enchantment', 'Enchantment', 'enchantement', 'enchantements', 'enchantments'],
+  ['land', 'Land', 'terrain', 'terrains', 'lands'], ['planeswalker', 'Planeswalker', 'planeswalker', 'planeswalkers', 'planeswalkers'],
+  ['token', 'Card.token', 'jeton', 'jetons', 'tokens'], ['nontoken', 'Permanent.!token', 'permanent non-jeton', 'permanents non-jetons', 'nontoken permanents']];
+
 /** Conditions qui demandent un nombre N. */
-export const CONDITIONS_N = ['control', 'oppLostLifeN', 'lifeAtLeast', 'lifeAtMost', 'handAtLeast', 'graveyardAtLeast', 'tappedAtLeast', 'countersAtLeast',
+export const CONDITIONS_N = ['control', 'controlPerm', 'oppLostLifeN', 'lifeAtLeast', 'lifeAtMost', 'handAtLeast', 'graveyardAtLeast', 'tappedAtLeast', 'countersAtLeast',
   'experienceAtLeast', 'energyAtLeast'];
 
 /** Types de créature, en français et en anglais (posés par l'Atelier d'après la liste du pont). */
@@ -1572,6 +1579,15 @@ function conditionOf(a) {
     case 'control': return c(t ? `Count$Valid Creature.${t}+YouCtrl` : 'Count$Valid Creature.YouCtrl', `GE${n}`,
       `si vous contrôlez au moins ${many('une', word(n, 'fr'))} ${many('créature', 'créatures')}${t ? ' de type ' + frType(a.condType) : ''}`,
       `if you control ${word(n, 'en')} or more ${t ? t + ' ' : ''}${many('creature', 'creatures')}`);
+    case 'controlPerm': {
+      // « Artifact.Equipment+YouCtrl », « Card.token+Elf+YouCtrl », « Permanent.YouCtrl » : la sorte, le type (perso compris).
+      const k = COND_KINDS.find(x => x[0] === a.condKind) || COND_KINDS[0];
+      const [base, ...props] = k[1].split('.');
+      const valid = `${base}.${[...props, ...(t ? [t] : []), 'YouCtrl'].join('+')}`;
+      return c(`Count$Valid ${valid}`, `GE${n}`,
+        `si vous contrôlez au moins ${many('un', word(n, 'fr'))} ${many(k[2], k[3])}${t ? ' de type ' + frType(a.condType) : ''}`.replace(/au moins un (créature|jeton)\b/, (m0, w) => (w === 'créature' ? 'au moins une créature' : m0)),
+        `if you control ${word(n, 'en')} or more ${t ? t + ' ' : ''}${n === 1 ? k[4].replace(/s$/, '') : k[4]}`);
+    }
     case 'lifeAtLeast': return c('Count$YourLifeTotal', `GE${n}`, `si vous avez au moins ${n} points de vie`, `if you have ${n} or more life`);
     case 'lifeAtMost': return c('Count$YourLifeTotal', `LE${n}`, `si vous avez ${n} ${plural(n, 'point', 'points')} de vie ou moins`, `if you have ${n} or less life`);
     case 'handAtLeast': return c('Count$CardsInYourHand', `GE${n}`, `si vous avez au moins ${many('une carte', word(n, 'fr') + ' cartes')} en main`,
@@ -2335,6 +2351,10 @@ export function forgeCost(text) {
     } else {
       out.push(p.replace('/', ''));
     }
+  }
+  // « {0} » tout seul : un coût de zéro (Mox, Ornithopter), à ne pas confondre avec « pas de coût » (terrain).
+  if (!out.length && !generic && parts.length) {
+    return '0';
   }
   // Dans l'ordre des cartes : X, puis le générique, puis les symboles de couleur.
   return [...out.filter(p => p === 'X'), generic ? String(generic) : '', ...out.filter(p => p !== 'X')].filter(Boolean).join(' ');
@@ -4517,7 +4537,7 @@ function mergeStatics(abilities) {
       return;
     }
     const f = a.filter || {};
-    const key = JSON.stringify([a.scope || 'you', f.type || '', !!f.other, a.cond || 'none', a.condN ?? 3, a.condType || '', !!a.eminence,
+    const key = JSON.stringify([a.scope || 'you', f.type || '', !!f.other, a.cond || 'none', a.condN ?? 3, a.condType || '', a.condKind || '', !!a.eminence,
       Number(a.level) || 1, !!a.solved, cleanModeName(a.flavor)]);
     const g = groups.get(key);
     const pt = (x) => x.effect !== 'grantKeyword';
