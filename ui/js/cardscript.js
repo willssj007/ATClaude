@@ -576,6 +576,59 @@ export function allTokens() {
   return [...TOKENS, ...customTokens];
 }
 
+/** Emblèmes perso de l'Atelier : [{name, script}] (leur script porte « SVar:AtelierEmblem:True »). */
+let customEmblems = [];
+
+export function setCustomEmblems(list) {
+  customEmblems = (list || []).filter(e => e && e.name && e.script).map(e => ({name: e.name, script: e.script}));
+}
+
+/** Les emblèmes proposés par « Obtenir un emblème » : ceux tout prêts, puis les emblèmes perso (« custom:Nom »). */
+export function emblemChoices() {
+  return [...EMBLEMS, ...customEmblems.map(e => [`custom:${e.name}`, `${e.name} (emblème perso)`])];
+}
+
+/** Le script est-il celui d'un emblème perso ? */
+export function isEmblemScript(script) {
+  return /^SVar:AtelierEmblem:True\s*$/m.test(String(script || ''));
+}
+
+/**
+ * Un emblème perso dans l'effet d'une carte : ses capacités (S:, T:, R:) deviennent des SVar de la carte, renommées
+ * (« Atelier1… » → « <id>Q1… ») pour ne pas se mêler aux siennes ; le texte de l'emblème est cité sur la carte.
+ */
+function customEmblemEffect(name, id) {
+  const em = customEmblems.find(e => e.name === name);
+  const lines = em ? em.script.replace(/\r/g, '').split('\n') : [];
+  const lang = lines.includes('SVar:AtelierLang:en') ? 'en' : 'fr';
+  const rename = (s) => s.replace(/\bAtelier(?=\d)/g, `${id}Q`);
+  const params = {StaticAbilities: [], Triggers: [], ReplacementEffects: []};
+  const aux = [];
+  let k = 0;
+  let oracle = '';
+  for (const raw of lines) {
+    const l = raw.trim();
+    const m = /^(S|T|R):(.*)$/.exec(l);
+    if (m) {
+      const sv = `${id}QM${++k}`;
+      params[{S: 'StaticAbilities', T: 'Triggers', R: 'ReplacementEffects'}[m[1]]].push(sv);
+      // Depuis la zone de commandement (Forge y met la capacité de l'emblème) : pas « sur le champ de bataille ».
+      const body = rename(m[2]).split(' | ').filter(x => !x.startsWith('TriggerZones$')).join(' | ');
+      aux.push(`SVar:${sv}:${emblemNamed(body, lang)}`);
+    } else if (/^SVar:Atelier\d/.test(l)) {
+      aux.push(rename(l));
+    } else if (l.startsWith('Oracle:')) {
+      oracle = l.slice(7).trim();
+    }
+  }
+  const parts = Object.entries(params).filter(([, v]) => v.length).map(([p, v]) => ` | ${p}$ ${v.join(',')}`).join('');
+  // Le texte de l'emblème, chaque capacité entre guillemets (« … » et « … »), comme sur les vraies cartes.
+  const abilities = oracle.split('\\n').map(s => s.trim().replace(/\.$/, '')).filter(Boolean);
+  const fr = abilities.length ? `vous gagnez un emblème avec ${abilities.map(s => `« ${s}. »`).join(' et ')}` : `vous gagnez l'emblème ${name}`;
+  const en = abilities.length ? `you get an emblem with ${abilities.map(s => `"${s}."`).join(' and ')}` : `you get the ${name} emblem`;
+  return {p: `Effect | Name$ Emblem — ${name}${parts} | Duration$ Permanent | AILogic$ Always`, aux, fr, en};
+}
+
 /** Couleurs d'un jeton (il n'a pas de coût) : « W », « U »… → la ligne « Colors: » de Forge. */
 const COLOR_WORDS = {W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green'};
 
@@ -2067,6 +2120,10 @@ const SPELL_ONLY = ['Instant', 'Sorcery', 'Kindred'];
  * Null (tout est proposé) quand le réglage est coupé ou que la carte n'a pas encore de type.
  */
 export function cardTraits(card) {
+  if (card && card.emblem) {
+    // Un emblème (zone de commandement) : ses effets permanents et ses déclencheurs marchent, pas ce qui parle d'elle.
+    return EMBLEM_TRAITS;
+  }
   if (!TYPE_FIT || !card) {
     return null;
   }
@@ -2093,9 +2150,12 @@ export function cardTraits(card) {
     saga: types.includes('Enchantment') && card.dfc !== 'room' && !['Class', 'Case', 'Aura', 'Room'].some(x => subs.includes(x)),
     room: card.dfc === 'room', transform: card.dfc === 'transform', prepare: card.dfc === 'prepare' && !back,
     auraCreature: !!at && at.scope === 'enchanted' && at.kind === 'creature',
-    keywords: card.keywords || [],
+    own: true, keywords: card.keywords || [],
   };
 }
+
+/** Un emblème : « permanent » (il reste en jeu), mais rien qui parle d'une carte (ni force, ni marqueurs, ni coût). */
+const EMBLEM_TRAITS = Object.freeze({permanent: true, emblem: true, keywords: []});
 
 /** La carte a-t-elle ce dont le choix a besoin ? */
 export function meets(need, t) {
@@ -2124,6 +2184,10 @@ const WHEN_NEEDS = {
   attacks: 'pt', blocks: 'pt', blocked: 'pt', unblocked: 'pt', blocksCreature: 'pt', combatDamage: 'pt', dies: 'pt',
   enrage: 'damageable', turnedUp: 'creature', unlockDoor: 'room', castThis: 'cast', loyalty: 'planeswalker', spell: 'spell',
   chapter: 'saga', static: '',
+  // Ceux qui parlent d'elle (« quand elle arrive », « quand elle s'engage ») : pas sur un emblème (own : une vraie carte en jeu).
+  etb: 'permanent&own', becomesTarget: 'permanent&own', becomesTargetOpp: 'permanent&own', untaps: 'permanent&own', dealsDamage: 'permanent&own',
+  leaves: 'permanent&own', tapped: 'permanent&own', heroic: 'permanent&own', counterPutSelf: 'permanent&own', counterNth: 'permanent&own',
+  lastCounterRemoved: 'permanent&own', activated: 'permanent&own',
 };
 
 /** Ce dont un déclencheur a besoin : un permanent pour tous ceux qui marchent depuis le champ de bataille. */
@@ -2136,12 +2200,13 @@ export function whenNeed(w) {
 
 /** Effets qui parlent de la carte elle-même (« elle gagne +X/+X », « la sacrifier ») ou d'un mot-clé de la carte. */
 const EFFECT_NEEDS = {
-  damageBlocker: 'pt', countersSelf: 'permanent', removeCountersSelf: 'permanent', moveCounters: 'permanent', animateSelf: 'animate',
+  damageBlocker: 'pt', countersSelf: 'permanent&own', removeCountersSelf: 'permanent&own', moveCounters: 'permanent&own', animateSelf: 'animate',
   mustBlock: 'pt', pumpSelf: 'pt', regenerate: 'pt', monstrosity: 'pt', adapt: 'pt', fight: 'pt', suspectSelf: 'pt',
-  exchangeControlSelf: 'permanent', exileUntilLeaves: 'permanent', transform: 'transform', prepareSelf: 'prepare', playHideaway: 'kw:Hideaway',
+  exchangeControlSelf: 'permanent&own', exileUntilLeaves: 'permanent&own', transform: 'transform', prepareSelf: 'prepare', playHideaway: 'kw:Hideaway',
   controlEnchanted: 'auraCreature', cdaPT: 'pt', uncounterable: 'cast', selfCostReduction: 'cast', kwMustBeBlocked: 'pt', kwLure: 'pt',
   kwCantAttackBlockAlone: 'pt', kwCantAttackAlone: 'pt', kwPreventAll: 'damageable', kwPreventCombat: 'damageable',
   kwCanBeCommander: 'permanent&card', kwAnyNumber: 'card',
+  entersTapped: 'permanent&own', etbCounters: 'permanent&own', cloneEtb: 'permanent&own', kwMayNotUntap: 'permanent&own',
 };
 
 /** Ce dont un effet a besoin ; un effet permanent (« les créatures que vous contrôlez… ») ne marche que sur un permanent. */
@@ -2149,12 +2214,12 @@ export function effectNeed(e) {
   if (e.id in EFFECT_NEEDS) {
     return EFFECT_NEEDS[e.id];
   }
-  return e.self || (e.only && e.only.every(w => w === 'static')) ? 'permanent' : '';
+  return e.self ? 'permanent&own' : e.only && e.only.every(w => w === 'static') ? 'permanent' : '';
 }
 
 /** X = sa force, son endurance, ses marqueurs ; « si elle a au moins X marqueurs », « si le kick a été payé ». */
-const AMOUNT_NEEDS = {power: 'pt', toughness: 'pt', counters: 'permanent'};
-const COND_NEEDS = {countersAtLeast: 'permanent', kicked: 'kw:Kicker|kw:Multikicker'};
+const AMOUNT_NEEDS = {power: 'pt', toughness: 'pt', counters: 'permanent&own'};
+const COND_NEEDS = {countersAtLeast: 'permanent&own', kicked: 'kw:Kicker|kw:Multikicker'};
 /** « Qui » d'un effet permanent ou d'une mécanique (explorer, comploter, endurer) : « elle », une créature. */
 const SCOPE_NEEDS = {self: 'pt'};
 
@@ -3343,6 +3408,9 @@ function effectBase(a, id) {
         fr: 'copiez un sort d\'éphémère ou de rituel ciblé. Vous pouvez choisir de nouvelles cibles pour la copie',
         en: 'copy target instant or sorcery spell. You may choose new targets for the copy'};
     case 'emblem': {
+      if (String(a.emblem || '').startsWith('custom:')) {
+        return customEmblemEffect(a.emblem.slice(7), id);
+      }
       const st = staticCore({...a, effect: a.emblem || 'anthem', scope: 'you', filter: {type: '', other: false}, cond: 'none'}, `${id}E`, 'fr');
       const stEn = staticCore({...a, effect: a.emblem || 'anthem', scope: 'you', filter: {type: '', other: false}, cond: 'none'}, `${id}E`, 'en');
       if (!st || !st.s) {
@@ -4513,6 +4581,12 @@ function auraLogic(f) {
 }
 
 /** Le nom de la carte dans son texte : « de Ilona » devient « d'Ilona », « que Ilona » « qu'Ilona ». */
+/** Sur un emblème, « CARDNAME » est « cet emblème » (« this emblem »), comme sur les vrais. */
+function emblemNamed(text, lang) {
+  const self = lang === 'en' ? 'this emblem' : 'cet emblème';
+  return String(text).replace(/(^|\. |\n)CARDNAME/g, (m, p) => p + self.charAt(0).toUpperCase() + self.slice(1)).replace(/CARDNAME/g, self);
+}
+
 function named(text, name) {
   const vowel = /^[aeiouyhàâéèêîôûAEIOUYHÀÂÉÈÊÎÔÛ]/.test(name);
   return String(text).replace(/\b(de|que) CARDNAME/g, (m, w) => (vowel ? `${w === 'que' ? 'qu' : 'd'}'${name}` : `${w} ${name}`)).replace(/CARDNAME/g, name);
@@ -4700,7 +4774,7 @@ export function facePart(f) {
 export function buildScript(form) {
   const mode = DFC_MODES.find(m => m[0] && m[0] === form.dfc);
   // Verso pas encore nommé : le recto seul, le temps de le remplir (l'enregistrement demande son nom).
-  if (!mode || !form.back || form.token || !String(form.back.name || '').trim()) {
+  if (!mode || !form.back || form.token || form.emblem || !String(form.back.name || '').trim()) {
     return buildFace(form);
   }
   const en = form.lang === 'en';
@@ -4783,6 +4857,10 @@ export function buildScript(form) {
 function buildFace(form) {
   // Les sous-types marchent comme dans le jeu : le mot-clé qui les fait marcher, le type de carte qu'ils demandent.
   const f = {...form, types: [...(form.types || [])], keywords: [...(form.keywords || [])], kwValues: {...(form.kwValues || {})}};
+  if (f.emblem) {
+    // Un emblème : ni coût, ni type, ni couleur, ni mot-clé ; seulement ses capacités (effets permanents, déclencheurs).
+    Object.assign(f, {types: [], keywords: [], kwValues: {}, subtypes: '', legendary: false, world: false, token: false, cost: '', colors: []});
+  }
   linkSubtypes(f, {keepTypes: true});
   const lang = f.lang === 'en' ? 'en' : 'fr';
   const en = lang === 'en';
@@ -4790,9 +4868,9 @@ function buildFace(form) {
   const name = String(f.name || '').trim();
   lines.push(`Name:${name}`);
   // Un jeton n'a pas de coût : ses couleurs sont dites à part.
-  const cost = f.token ? '' : forgeCost(f.cost);
+  const cost = f.token || f.emblem ? '' : forgeCost(f.cost);
   lines.push(`ManaCost:${cost || 'no cost'}`);
-  if (f.token) {
+  if (f.token || f.emblem) {
     const colors = [...'WUBRG'].filter(c => (f.colors || []).includes(c)).map(c => COLOR_WORDS[c]);
     lines.push(`Colors:${colors.join(',') || 'colorless'}`);
   }
@@ -4861,7 +4939,7 @@ function buildFace(form) {
       }
       return;
     }
-    const t = named(r.text, name);
+    const t = f.emblem ? emblemNamed(r.text, lang) : named(r.text, name);
     if (stationN && a.station) {
       // Une capacité « à STATION N+ » : une SVar que l'effet permanent de la station ajoute (AddAbility$, AddTrigger$…).
       r.lines.forEach((l, k) => {
@@ -4943,7 +5021,7 @@ function buildFace(form) {
     if (SUBTYPE_ABILITIES[t] && !(f.subOff || []).includes(t)) {
       const r = subtypeAbilityLines(t, `AtelierSub${t.replace(/\W/g, '')}`, lang);
       lines.push(...r.lines);
-      text.push(named(r.text, name));
+      text.push(f.emblem ? emblemNamed(r.text, lang) : named(r.text, name));
     }
   }
   // Comme sur les cartes imprimées : « Équipement {1} », « Pilotage 2 »… en dernier, après les capacités.
@@ -5021,6 +5099,9 @@ function buildFace(form) {
   }
   if (f.token) {
     lines.push('SVar:AtelierToken:True');
+  }
+  if (f.emblem) {
+    lines.push('SVar:AtelierEmblem:True');
   }
   // Plusieurs capacités « Effet du sort » : un seul sort qui les fait toutes, l'une après l'autre (chacune avec sa propre
   // condition), et pas plusieurs façons de lancer la carte au choix.

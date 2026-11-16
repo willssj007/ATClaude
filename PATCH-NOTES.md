@@ -2,6 +2,24 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.0 — Emblèmes perso, coût zéro, « si vous contrôlez X permanents »
+
+- **Atelier : emblèmes perso**. Un nouvel onglet **Emblèmes** (à côté de Jetons) crée tes propres emblèmes : un nom, des capacités, une illustration et un cadre comme pour un jeton. Un emblème reste dans la zone de commandement jusqu'à la fin de la partie, et rien ne peut le retirer.
+  - Il prend des effets permanents (« Les créatures que vous contrôlez gagnent +1/+1 », « Vos sorts coûtent {1} de moins »…) et des déclencheurs qui ne parlent pas d'une carte (« Au début de votre entretien », « À chaque fois qu'une créature que vous contrôlez meurt », « À chaque fois que vous jouez un terrain »…). Ce qui n'a pas de sens sur un emblème (« quand elle arrive », « elle arrive engagée », une capacité activée) n'est pas proposé. Sur l'emblème, « cette carte » s'écrit « cet emblème » (« … cet emblème inflige 2 blessures à chaque adversaire »).
+  - Tes cartes le donnent avec l'effet **Obtenir un emblème** : tes emblèmes sont proposés après ceux tout prêts (une capacité de loyauté de planeswalker, « quand elle arrive », un sort…). La carte cite le texte de l'emblème, comme les vraies : « vous gagnez un emblème avec « … » ».
+  - En partie, l'emblème s'affiche dans la zone de commandement avec son nom, son illustration et son cadre, et le type « Emblème ».
+  - Modifier ou renommer un emblème met à jour les cartes qui le donnent. Le partager, le synchroniser et le sauvegarder marchent comme pour les cartes.
+- **Atelier : coût zéro**. Le pavé de mana a une pastille **Coût zéro** ({0}, comme les Mox) : la carte se lance gratuitement. Ce n'est pas la même chose que « pas de coût », qui ne se lance pas. La pastille existe aussi pour le coût des capacités.
+- **Atelier : condition « Si vous contrôlez au moins X permanents »**. On choisit la sorte (permanents, créatures, artefacts, enchantements, terrains, planeswalkers, jetons, permanents non-jetons) et, au choix, un type : Équipement, Elfe, Forêt, ou un type perso. Exemple : « Tant que vous contrôlez au moins trois Équipements, les créatures que vous contrôlez gagnent +1/+1. » La condition marche sur les effets permanents, les déclencheurs, les capacités activées et chaque effet « Et puis ».
+- **Partager** des cartes envoie aussi les jetons perso qu'elles créent et les emblèmes perso qu'elles donnent : la personne qui les reçoit peut les jouer et les modifier.
+- **Atelier** : la liste de tes cartes ne remonte plus toute seule en haut quand on fait défiler (sur téléphone surtout).
+- **Textes en partie** :
+  - des messages de Forge mal traduits sont corrigés (« Défaussez-vous de 2 carte(s) » au lieu de « Supprimer 2 carte(s) », « engager » au lieu d'« appuyer », « Dégagé(e) » au lieu d'« Inexploité ») ;
+  - les notes du moteur en fin de phrase dans le journal (« [Changeur de zone: …] ») disparaissent, ou deviennent une simple parenthèse quand elles disent quelque chose de plus.
+- **Téléphone en portrait** : la barre des écrans est plus serrée (Trophées et Réglages restent visibles), et ses bords s'estompent quand d'autres icônes sont cachées.
+- **Accueil** : tant que ton compte n'est pas relié, un conseil propose de le relier pour sauvegarder ta progression.
+- **Fiabilité** : chaque effet ponctuel de l'Atelier a été joué en partie par un test automatique, qui vérifie qu'il fait ce que dit la carte (points de vie, main, cimetière, jetons, marqueurs…).
+
 ## 0.8.4 — Atelier : grille alignée, langue des anciennes réimpressions
 
 - **Atelier en portrait** : les cartes ne se décalent plus d'une ligne à l'autre. Une carte au nom long (« Wolverine, Clawed Mutant ») élargissait sa colonne ; chaque vignette a maintenant la largeur de sa carte, le nom trop long est coupé (…) et le ↻ des réimpressions reste visible.

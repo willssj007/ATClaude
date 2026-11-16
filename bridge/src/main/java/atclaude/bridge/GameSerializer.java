@@ -330,9 +330,11 @@ final class GameSerializer {
         final String doors = s.getName() != null && s.getName().contains(" // ") ? s.getName().substring(0, s.getName().indexOf(" // ")) : null;
         final String room = doors != null && CustomCards.isCustom(doors) ? doors : null;
         final String frontOfBack = room == null ? CustomCards.frontOf(s.getName()) : null;
-        if (CustomCards.isCustom(s.getName()) || frontOfBack != null || room != null) {
+        // Un emblème perso en zone de commandement (« Emblem — Nom ») : dessiné comme dans l'Atelier.
+        final String emblem = room == null && frontOfBack == null ? CustomCards.emblemOf(s.getName()) : null;
+        if (CustomCards.isCustom(s.getName()) || frontOfBack != null || room != null || emblem != null) {
             // Carte perso : cadre dessiné avec son illustration, type en français.
-            final String card = room != null ? room : frontOfBack != null ? frontOfBack : s.getName();
+            final String card = room != null ? room : frontOfBack != null ? frontOfBack : emblem != null ? emblem : s.getName();
             o.addProperty("custom", true);
             o.addProperty("image", "");
             CustomCards.addDisplay(o, CustomCards.rules(card));
@@ -341,11 +343,20 @@ final class GameSerializer {
             }
             final boolean english = "en".equals(o.get("lang").getAsString());
             o.addProperty("typeLine", CustomCards.typeLine(s.getType(), o.get("lang").getAsString()));
+            if (emblem != null) {
+                o.addProperty("name", emblem);
+                o.addProperty("typeLine", english ? "Emblem" : "Emblème");
+                o.addProperty("emblem", true);
+            }
             // Carte perso en anglais : tout le texte en anglais (« Haste », pas « Célérité » au milieu de phrases anglaises).
             o.addProperty("text", customOrder(withoutEngineLines(english && inGame ? engineNotes(forgeText, false)
                     : o.get("text").getAsString()), s, english));
             if (inGame && !english) {
                 o.addProperty("text", CustomCards.frenchText(o.get("text").getAsString()));
+            }
+            if (emblem != null) {
+                // Forge écrit « Emblem » en tête du texte d'un emblème : le cadre le dit déjà.
+                o.addProperty("text", o.get("text").getAsString().replaceFirst("^Emblem\\s*(\\n|$)", ""));
             }
             if (CustomCards.isToken(s.getName())) {
                 // Jeton perso : le cadre dit déjà « Jeton », pas de ligne « Token » en tête du texte.

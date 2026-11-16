@@ -5,7 +5,7 @@
 //   java -jar desktop/target/desktop-*.jar --assets <forge>/forge-gui --data <dossier> --ui ui --no-browser &
 //   node tests/atelier-forge.mjs [http://127.0.0.1:8765]
 // Sortie en erreur (code 1) si Forge refuse un seul script.
-import {buildScript, EFFECTS, WHEN, effectsFor, whoChoices, PLAYER_WHO, newMode, KEYWORDS, DFC_MODES, KW_ALL, AMOUNTS, CONDITIONS, COND_KINDS, SCOPES, cardTraits,
+import {buildScript, setCustomEmblems, EFFECTS, WHEN, effectsFor, whoChoices, PLAYER_WHO, newMode, KEYWORDS, DFC_MODES, KW_ALL, AMOUNTS, CONDITIONS, COND_KINDS, SCOPES, cardTraits,
   fitsCard, needOf} from '../ui/js/cardscript.js';
 const BASE = process.argv[2] || 'http://127.0.0.1:8765';
 const res = await fetch(BASE + '/api/events');
@@ -136,6 +136,28 @@ for (const lang of ['fr', 'en']) {
     }
   }
   await check('coût {0}', card(ab({when: 'activated', effect: 'gainLife', cost: '{0}', tap: false}), lang, {cost: '{0}', types: ['Artifact'], subtypes: ''}));
+  // Emblèmes perso : chaque effet permanent et chaque déclencheur qui va sur un emblème (par paquets de 8), puis une carte
+  // qui donne chaque emblème (ses capacités recopiées dans l'effet « Obtenir un emblème »).
+  const emblemOf = (k, abilities) => ({name: `Emblème essai ${lang} ${k}`, emblem: true, cost: '', types: [], subtypes: '', keywords: [], kwValues: {},
+    lang, frame: 'token', frameColor: 'C', abilities});
+  const probe = emblemOf(0, []);
+  const expect = (label, got) => { if (!got) { ko++; console.log('✗ tri par type :', label); } };
+  expect('emblème : pas « quand elle arrive »', !fitsCard('when', WHEN.find(w => w.id === 'etb'), probe));
+  expect('emblème : « au début de votre entretien »', fitsCard('when', WHEN.find(w => w.id === 'upkeep'), probe));
+  expect('emblème : pas « elle arrive engagée »', !fitsCard('effect', EFFECTS.find(e => e.id === 'entersTapped'), probe));
+  const emblemAbilities = [
+    ...EFFECTS.filter(x => x.only && x.only.includes('static') && fitsCard('effect', x, probe)).map(e => ab({when: 'static', effect: e.id, scope: 'you', amount: e.amountSel ? 'creatures' : undefined})),
+    ...WHEN.filter(w => w.kind === 'T' && !w.attach && fitsCard('when', w, probe)).map(w => ab({when: w.id, effect: 'draw', n: 1, whenCounter: 'CHARGE', whenN: 2})),
+  ];
+  const emblems = [];
+  for (let k = 0; k < emblemAbilities.length; k += 8) {
+    emblems.push(emblemOf(k / 8 + 1, emblemAbilities.slice(k, k + 8)));
+  }
+  setCustomEmblems(emblems.map(e => ({name: e.name, script: buildScript(e)})));
+  for (const e of emblems) {
+    await check(`emblème ${e.name}`, e);
+    await check(`carte qui donne ${e.name}`, card(ab({when: 'etb', effect: 'emblem', emblem: `custom:${e.name}`}), lang));
+  }
   // Pile ou face avec ses deux issues.
   await check('pile ou face', card(ab({when: 'etb', effect: 'flipCoin', then: [{...newMode('draw'), n: 2}, {...newMode('loseLifeYou'), n: 2}]}), lang));
 }

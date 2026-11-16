@@ -11,7 +11,7 @@ import {debounce, el, esc, prefs, rulesHtml, symbol, toast} from './util.js';
 import {icon} from './icons.js';
 import {DFC_MODES, facePart, scriptToForm, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, COND_KINDS, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
-  cardTraits, effectsFor, eminenceOk, fitsCard, keywordNeed, needOf, needWords, setTypeFit, orTriggerFits, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomTokens, setTypeNames, templates, withDisplay,
+  cardTraits, effectsFor, eminenceOk, fitsCard, keywordNeed, needOf, needWords, setTypeFit, orTriggerFits, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomEmblems, setCustomTokens, setTypeNames, emblemChoices, templates, withDisplay,
   PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './frames.js';
 
@@ -24,6 +24,8 @@ const SELECT_TITLES = {when: 'Quand elle agit', effect: 'Ce qu\'elle fait', scop
 
 /** Les types de marqueurs d'une liste déroulante (« charge », « temps », +1/+1…). */
 const COUNTER_OPTIONS = COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, '').trim()]);
+/** Le script est-il celui d'un emblème perso ? */
+const isEmblemScriptText = (script) => /^SVar:AtelierEmblem:True\s*$/m.test(String(script || ''));
 /** Une liste des types de marqueurs : attr « a » (capacité) ou « sf » (mode, effet enchaîné). */
 /** « Si vous contrôlez au moins X … » : la sorte de permanents et leur type (n'importe quel sous-type, types perso compris). */
 function condKindHtml(attr, h) {
@@ -88,6 +90,9 @@ function codeFromName(name) {
 }
 /** Nouveau jeton : une créature 1/1 verte sans coût, au cadre de jeton. */
 const NEW_TOKEN = () => ({...NEW_CARD(), token: true, colors: ['G'], power: 1, toughness: 1, frame: 'token'});
+/** Nouvel emblème : sans coût ni type, au cadre de jeton incolore ; il commence par un effet permanent. */
+const NEW_EMBLEM = () => ({...NEW_CARD(), emblem: true, types: [], subtypes: '', colors: [], frame: 'token', frameColor: 'C',
+  abilities: [{...NEW_ABILITY(), when: 'static', effect: 'anthem', n: 1}]});
 const TOKEN_COLORS = [['W', 'Blanc'], ['U', 'Bleu'], ['B', 'Noir'], ['R', 'Rouge'], ['G', 'Vert']];
 const NEW_ABILITY = () => ({when: 'etb', effect: 'draw', n: 1, filter: {type: '', other: false}, token: TOKENS[0][0],
   keyword: 'Flying', cost: '', tap: true, sac: false, loyalty: 1, mana: 'Any'});
@@ -210,7 +215,8 @@ export class Atelier {
         return list;
       }).catch(() => []);
     }
-    setCustomTokens((data.cards || []).filter(c => c.token && c.tokenScript).map(c => ({script: c.tokenScript, name: c.name})));
+    setCustomTokens((data.cards || []).filter(c => c.token && !c.emblem && c.tokenScript).map(c => ({script: c.tokenScript, name: c.name})));
+    setCustomEmblems((data.cards || []).filter(c => c.emblem).map(c => ({name: c.name, script: c.script})));
   }
 
   // ------------------------------------------------------------------ liste
@@ -272,21 +278,23 @@ export class Atelier {
         tab = 'cards';
       }
     }
-    if (!['cards', 'tokens', 'sets', 'types'].includes(tab)) {
+    if (!['cards', 'tokens', 'emblems', 'sets', 'types'].includes(tab)) {
       tab = 'cards';
     }
     this.listTab = tab;
-    const allTokens = d.cards.filter(c => c.token);
-    const cardCount = d.cards.length - allTokens.length + reprints.length;
+    const allTokens = d.cards.filter(c => c.token && !c.emblem);
+    const allEmblems = d.cards.filter(c => c.emblem);
+    const cardCount = d.cards.filter(c => !c.token).length + reprints.length;
     const tabBtn = (v, ic, label, n) => `<button data-ltab="${v}" class="${tab === v ? 'on' : ''}">${icon(ic)} ${label}${n !== undefined ? ` <span class="ate-gn">${n}</span>` : ''}</button>`;
     const help = (text) => `<details class="ate-help"><summary>Comment ça marche ?</summary><p class="muted small">${text}</p></details>`;
     const primary = tab === 'cards' ? '<button class="btn gold" data-new>＋ Nouvelle carte</button>'
       : tab === 'tokens' ? '<button class="btn gold" data-new-token>＋ Nouveau jeton</button>'
+        : tab === 'emblems' ? '<button class="btn gold" data-new-emblem>＋ Nouvel emblème</button>'
         : tab === 'sets' ? '<button class="btn gold" data-newset>＋ Nouvelle extension</button>' : '';
     const setOpt = (v, label, count) => `<option value="${esc(v)}"${setFilter === v ? ' selected' : ''}>${esc(label)} (${count})</option>`;
     this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
       <div class="ate-top"><h1>Atelier</h1>${primary}</div>
-      <div class="seg ate-tabs">${tabBtn('cards', 'cards', 'Cartes', cardCount)}${tabBtn('tokens', 'shield', 'Jetons', allTokens.length)}${tabBtn('sets', 'book', 'Extensions', sets.length)}${tabBtn('types', 'scroll', 'Types', d.types.length)}</div>
+      <div class="seg ate-tabs">${tabBtn('cards', 'cards', 'Cartes', cardCount)}${tabBtn('tokens', 'shield', 'Jetons', allTokens.length)}${tabBtn('emblems', 'spark', 'Emblèmes', allEmblems.length)}${tabBtn('sets', 'book', 'Extensions', sets.length)}${tabBtn('types', 'scroll', 'Types', d.types.length)}</div>
       ${tab === 'cards' ? `
       ${help(`Tes propres cartes, avec leurs effets : Forge les joue comme les vraies (pile, règles, IA). Elles se trouvent dans la
         recherche et le deck builder, et se jouent en Sandbox (pas en Planeswalker). Une <b>réimpression</b> est une carte officielle
@@ -300,7 +308,7 @@ export class Atelier {
         <button class="btn small" data-import title="Ajouter les cartes d'un fichier .atcards reçu">Importer…</button>
       </div>
       ${sets.length || kinds.length > 2 ? `<div class="ate-filters">
-        ${sets.length ? `<label class="field"><span>Extension</span><select data-sfilter-sel>${setOpt('', 'Toutes les extensions', d.cards.length - allTokens.length + reprints.length)}${sets.map(x => setOpt(x.id, x.name, d.cards.filter(c => !c.token && this.setOf(c) === x.id).length + reprints.filter(r => r.set === x.id).length)).join('')}
+        ${sets.length ? `<label class="field"><span>Extension</span><select data-sfilter-sel>${setOpt('', 'Toutes les extensions', cardCount)}${sets.map(x => setOpt(x.id, x.name, d.cards.filter(c => !c.token && this.setOf(c) === x.id).length + reprints.filter(r => r.set === x.id).length)).join('')}
           ${noSet ? setOpt('-', 'Sans extension', noSet) : ''}</select></label>` : ''}
         ${kinds.length > 2 ? `<label class="field"><span>Type</span><select data-kfilter-sel>${kinds.map(([v, label]) => `<option value="${esc(v)}"${kindFilter === v ? ' selected' : ''}>${esc(label)} (${everything.filter(c => !c.token && isKind(c, v)).length})</option>`).join('')}</select></label>` : ''}
       </div>` : ''}
@@ -322,6 +330,12 @@ export class Atelier {
       ${help(`Des jetons à toi (couleurs, types, force, mots-clés, capacités, illustration) : tes cartes perso les créent (effet
         « Créer des jetons »), et la triche « Ajouter un jeton » les propose en partie.`)}
       <div class="ate-grid ate-tokens">${allTokens.length ? '' : '<p class="muted">Aucun jeton perso pour l\'instant.</p>'}</div>` : ''}
+      ${tab === 'emblems' ? `
+      ${help(`Un emblème reste dans ta zone de commandement jusqu'à la fin de la partie : rien ne peut le détruire, et ses effets
+        permanents (« les créatures que vous contrôlez gagnent +1/+1 ») et ses déclencheurs (« au début de votre entretien… »)
+        marchent tant que la partie dure. Tes cartes le donnent avec l'effet « Obtenir un emblème » (une capacité de loyauté de
+        planeswalker, par exemple) ; modifier un emblème met à jour les cartes qui le donnent.`)}
+      <div class="ate-grid ate-emblems">${allEmblems.length ? '' : '<p class="muted">Aucun emblème perso pour l\'instant.</p>'}</div>` : ''}
       ${tab === 'types' ? `
       ${help(`Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et un effet qui cite un
         type inconnu (« chaque créature de ce type que vous contrôlez ») ne trouverait aucune créature.`)}
@@ -366,6 +380,10 @@ export class Atelier {
     const tgrid = this.root.querySelector('.ate-tokens');
     if (tgrid) {
       allTokens.forEach(c => tgrid.appendChild(tileOf(c)));
+    }
+    const egrid = this.root.querySelector('.ate-emblems');
+    if (egrid) {
+      allEmblems.forEach(c => egrid.appendChild(tileOf(c)));
     }
     const remember = (key, value) => {
       try {
@@ -495,6 +513,8 @@ export class Atelier {
         this.edit(null);
       } else if (e.target.closest('[data-new-token]')) {
         this.edit(null, {token: true});
+      } else if (e.target.closest('[data-new-emblem]')) {
+        this.edit(null, {emblem: true});
       } else if (tile) {
         this.edit(d.cards.find(c => c.name === tile.dataset.name));
       } else if (e.target.closest('[data-untype]')) {
@@ -954,7 +974,7 @@ export class Atelier {
     }
   }
 
-  edit(entry, {token = false} = {}) {
+  edit(entry, {token = false, emblem = false} = {}) {
     this.reprint = null;
     this.editing = true;
     // La position dans la liste, retrouvée en revenant de l'éditeur.
@@ -965,7 +985,7 @@ export class Atelier {
     // Cadre importé : PNG à envoyer (null : garder celui de la carte, "" : le retirer) et son adresse à l'écran.
     this.frameImg = null;
     this.frameUrl = entry && entry.card && entry.card.customFrame ? bridge.imageUrl(entry.card.customFrame) : '';
-    this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : {...(token ? NEW_TOKEN() : NEW_CARD()), lang: defaultLang()};
+    this.form = entry && entry.form ? Object.assign(NEW_CARD(), entry.form) : {...(emblem ? NEW_EMBLEM() : token ? NEW_TOKEN() : NEW_CARD()), lang: defaultLang()};
     // Carte à deux faces : on modifie le recto ou le verso (this.front garde le recto pendant qu'on modifie le verso).
     this.face = 'front';
     this.front = null;
@@ -977,7 +997,10 @@ export class Atelier {
     // Les groupes (avant la 0.6.6) ont laissé la place aux extensions.
     delete this.form.group;
     this.subNotes = [];
-    this.form.token = !!(this.form.token || (entry && entry.token));
+    // Un emblème est rangé avec les jetons (pas une carte de deck), mais son formulaire est le sien.
+    this.form.emblem = !!(this.form.emblem || (entry && entry.emblem));
+    this.form.token = !this.form.emblem && !!(this.form.token || (entry && entry.token));
+    const kind = this.form.emblem ? 'emblem' : this.form.token ? 'token' : 'card';
     this.form.colors = this.form.colors || [];
     this.form.kwValues = this.form.kwValues || {};
     this.kwOpen = new Set(KW_ALL.filter(k => this.form.keywords.includes(k[0])).map(k => k[3]));
@@ -1000,7 +1023,7 @@ export class Atelier {
     this.root.innerHTML = `<div class="page atelier-edit">
       <div class="ate-top">
         <button class="btn small" data-back>← Retour</button>
-        <h1>${entry ? (this.form.token ? 'Modifier le jeton' : 'Modifier la carte') : this.form.token ? 'Nouveau jeton' : 'Nouvelle carte'}</h1>
+        <h1>${{emblem: entry ? 'Modifier l\'emblème' : 'Nouvel emblème', token: entry ? 'Modifier le jeton' : 'Nouveau jeton', card: entry ? 'Modifier la carte' : 'Nouvelle carte'}[kind]}</h1>
         <div class="ate-undo"><button class="btn small" data-undo disabled title="Annuler (Ctrl+Z)">↶</button><button class="btn small" data-redo disabled title="Rétablir (Ctrl+Y)">↷</button></div>
         <div class="seg ate-modetabs"><button data-mode="form">Formulaire</button><button data-mode="script">Script Forge</button><button data-tab="look">Apparence</button></div>
       </div>
@@ -1009,24 +1032,24 @@ export class Atelier {
         <div class="ate-side panel">
           <div class="ate-preview"></div>
           <div class="ate-msg muted small">Vérification par Forge…</div>
-          ${entry && !this.form.token ? '<div class="ate-cstats muted small"></div>' : ''}
+          ${entry && kind === 'card' ? '<div class="ate-cstats muted small"></div>' : ''}
           <div class="ate-art"><button class="btn small" data-art>${icon('brush')} Illustration…</button><button class="btn small" data-noart title="Retirer l'illustration">Retirer</button><button class="btn small" data-png title="La carte telle qu'elle s'affiche, en image (PNG), à partager">Image PNG</button></div>
-          ${entry && !this.form.token && entry.card ? '<button class="btn small" data-alt-art title="Une réimpression : la même carte avec une autre illustration, sans la renommer">↻ Autre illustration…</button>' : ''}
+          ${entry && kind === 'card' && entry.card ? '<button class="btn small" data-alt-art title="Une réimpression : la même carte avec une autre illustration, sans la renommer">↻ Autre illustration…</button>' : ''}
           <div class="ate-actions">
             <button class="btn gold" data-save>Enregistrer</button>
-            ${this.onTry && !this.form.token ? `<button class="btn" data-try title="Enregistrer la carte, puis lancer une partie contre l'IA avec elle en main">${icon('play')} Essayer en partie</button>` : ''}
+            ${this.onTry && kind === 'card' ? `<button class="btn" data-try title="Enregistrer la carte, puis lancer une partie contre l'IA avec elle en main">${icon('play')} Essayer en partie</button>` : ''}
             ${entry ? '<button class="btn danger" data-delete>Supprimer</button>' : ''}
           </div>
         </div>
       </div>
       <div class="ate-dock">
         <button class="btn small" data-undo disabled title="Annuler">↶</button><button class="btn small" data-redo disabled title="Rétablir">↷</button>
-        ${this.onTry && !this.form.token ? `<button class="btn" data-try title="Enregistrer la carte, puis lancer une partie contre l'IA avec elle en main">${icon('play')} Essayer</button>` : ''}
+        ${this.onTry && kind === 'card' ? `<button class="btn" data-try title="Enregistrer la carte, puis lancer une partie contre l'IA avec elle en main">${icon('play')} Essayer</button>` : ''}
         <button class="btn gold" data-save>Enregistrer</button>
       </div>
     </div>`;
     this.check = debounce(() => this.validate(), 350);
-    if (entry && !this.form.token) {
+    if (entry && kind === 'card') {
       this.cardStats(entry.name);
     }
     this.root.addEventListener('click', this.onEditClick = (e) => this.editClick(e));
@@ -1355,7 +1378,9 @@ export class Atelier {
   /** La carte telle qu'elle sera : l'illustration et le cadre importé choisis ici, pas encore enregistrés. */
   shown(card) {
     const art = this.face === 'back' ? this.backArtUrl || this.artUrl : this.artUrl;
-    return {...card, customArt: null, customArtUrl: art, customFrame: null, customFrameUrl: this.frameUrl};
+    // Un emblème n'a pas de type de carte : « Emblème » sur la ligne de type, comme les vrais.
+    const emblem = this.form && this.form.emblem ? {typeLine: this.form.lang === 'en' ? 'Emblem' : 'Emblème'} : {};
+    return {...card, ...emblem, customArt: null, customArtUrl: art, customFrame: null, customFrameUrl: this.frameUrl};
   }
 
   /** Cadre importé : une image PNG ramenée au format de la carte (504 × 704), transparence gardée. */
@@ -1442,6 +1467,23 @@ export class Atelier {
       return;
     }
     const f = this.form;
+    if (f.emblem) {
+      // Un emblème : un nom et des capacités (effets permanents, déclencheurs), rien d'autre.
+      left.innerHTML = `<label class="ate-field"><span>Nom de l'emblème</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Flamme éternelle" maxlength="60"></label>
+        <p class="muted small ate-emhelp">Il reste dans la zone de commandement jusqu'à la fin de la partie. Seuls les effets permanents
+          et les déclencheurs qui ne parlent pas d'une carte (« au début de votre entretien », « à chaque fois qu'une créature que vous
+          contrôlez meurt »…) vont sur un emblème. Une carte le donne avec l'effet « Obtenir un emblème ».</p>
+        <div class="ate-field"><span>Capacités</span><div class="ate-abilities">${f.abilities.map((a, i) => this.abilityHtml(a, i)).join('')}</div>
+          <div class="ate-add"><button class="btn small gold" data-template>＋ Capacité toute prête…</button>
+          <button class="btn small" data-addab>＋ Capacité vide</button>
+          <button class="btn small" data-addcustom title="Une capacité avec ses options ouvertes : nombre X, condition, « et puis »">＋ Effet perso</button></div></div>
+        <label class="ate-field"><span>Texte d'ambiance <span class="muted small">(facultatif)</span></span>
+          <textarea data-k="flavor" rows="2" maxlength="240" placeholder="« Sa flamme brûle encore. »">${esc(f.flavor || '')}</textarea></label>`;
+      this.renderLook();
+      this.check();
+      labelSelects(left);
+      return;
+    }
     const colorsOnly = f.token || this.backNoCost();
     left.innerHTML = `${this.facesHtml()}
       <label class="ate-field"><span>Nom${this.face === 'back' ? ' du verso' : ''}</span><input type="text" data-k="name" value="${esc(f.name)}" placeholder="Gardienne des marées" maxlength="60"></label>
@@ -2205,7 +2247,12 @@ export class Atelier {
     }
     if (e.emblem) {
       const em = h.emblem || 'anthem';
-      out += row('L\'emblème', sel('emblem', EMBLEMS, em));
+      // Les emblèmes tout prêts, puis les emblèmes perso (onglet Emblèmes de l'Atelier).
+      const choices = emblemChoices();
+      out += row('L\'emblème', sel('emblem', choices.some(c => c[0] === em) ? choices : [...choices, [em, `${em.replace(/^custom:/, '')} (emblème supprimé)`]], em));
+      if (!choices.some(c => c[0].startsWith('custom:'))) {
+        out += row('', '<span class="muted small">Tes propres emblèmes se créent dans l\'onglet « Emblèmes » de l\'Atelier.</span>');
+      }
       if (['anthem', 'extraLand', 'reduceCost'].includes(em)) {
         out += row('X', `<input type="number" data-${attr}="n" value="${esc(h.n ?? 1)}" min="1" max="20" style="width:70px">`);
       }
@@ -2522,8 +2569,8 @@ export class Atelier {
     } else if (b.dataset.templateAttach !== undefined) {
       this.pickTemplate(true);
     } else if (b.dataset.addcustom !== undefined) {
-      // Une capacité vide, ses options d'effet perso ouvertes.
-      f.abilities.push(NEW_ABILITY());
+      // Une capacité vide, ses options d'effet perso ouvertes (sur un emblème : au début de votre entretien).
+      f.abilities.push(f.emblem ? {...NEW_ABILITY(), when: 'upkeep'} : NEW_ABILITY());
       this.moreOpen.add(f.abilities.length - 1);
       this.renderLeft();
       const box = this.root.querySelector(`[data-ab="${f.abilities.length - 1}"]`);
@@ -2532,7 +2579,9 @@ export class Atelier {
       }
     } else if (b.dataset.addab !== undefined) {
       const a = NEW_ABILITY();
-      if (f.types.includes('Instant') || f.types.includes('Sorcery')) {
+      if (f.emblem) {
+        Object.assign(a, {when: 'static', effect: 'anthem', n: 1});
+      } else if (f.types.includes('Instant') || f.types.includes('Sorcery')) {
         a.when = 'spell';
       } else if (f.types.includes('Planeswalker')) {
         a.when = 'loyalty';
@@ -3028,11 +3077,16 @@ export class Atelier {
         // mémoire du navigateur indisponible : l'artiste ne sera pas repris
       }
       if (!andTry) {
-        toast(this.form.token ? 'Jeton enregistré : tes cartes perso peuvent le créer, et la triche le propose en partie.'
-          : 'Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
+        toast(this.form.emblem ? 'Emblème enregistré : tes cartes le donnent avec l\'effet « Obtenir un emblème ».'
+          : this.form.token ? 'Jeton enregistré : tes cartes perso peuvent le créer, et la triche le propose en partie.'
+            : 'Carte enregistrée : elle est dans la recherche et le deck builder.', {title: 'Atelier'});
       }
       const named = /^Name:(.*)$/m.exec(this.currentScript() || '');
       const name = named ? named[1] : (this.face === 'back' ? this.front : this.form).name;
+      if (isEmblemScriptText(this.currentScript())) {
+        // Les cartes qui donnent cet emblème recopient ses capacités : elles suivent (et son nouveau nom).
+        await this.refreshEmblemUsers(this.previous || String(name || '').trim(), String(name || '').trim(), this.currentScript());
+      }
       this.onChanged();
       this.close();
       if (andTry && this.onTry) {
@@ -3044,7 +3098,52 @@ export class Atelier {
     }
   }
 
+  /**
+   * Un emblème perso modifié (ou renommé) : chaque carte faite au formulaire qui le donne est refaite avec ses nouvelles
+   * capacités, et enregistrée.
+   */
+  async refreshEmblemUsers(oldName, newName, script) {
+    const list = (this.data.cards || []).filter(c => c.emblem && c.name !== oldName && c.name !== newName).map(c => ({name: c.name, script: c.script}));
+    setCustomEmblems([...list, {name: newName, script}]);
+    const from = JSON.stringify(`custom:${oldName}`);
+    const to = JSON.stringify(`custom:${newName}`);
+    let done = 0;
+    for (const c of this.data.cards || []) {
+      if (!c.form || c.emblem || !JSON.stringify(c.form).includes(from)) {
+        continue;
+      }
+      try {
+        const form = JSON.parse(JSON.stringify(c.form).split(from).join(to));
+        const next = withDisplay(buildScript(form), readDisplay(c.script));
+        if (next !== c.script) {
+          await bridge.request('customSave', {script: next, previous: c.name, art: null, form});
+          done++;
+        }
+      } catch (e) {
+        toast(`${c.name} : ${e.message}`, {title: 'Carte non mise à jour', error: true, duration: 7000});
+      }
+    }
+    if (done) {
+      toast(`${done} carte${done > 1 ? 's' : ''} mise${done > 1 ? 's' : ''} à jour avec cet emblème.`, {title: 'Atelier'});
+    }
+  }
+
   async remove() {
+    if (this.form.emblem) {
+      const users = (this.data.cards || []).filter(c => c.form && !c.emblem && JSON.stringify(c.form).includes(JSON.stringify(`custom:${this.previous}`))).map(c => c.name);
+      if (!await confirmBox('Supprimer l\'emblème ?', `« ${this.previous} » disparaîtra de l'Atelier.${users.length ? ` Les cartes qui le donnent (${users.slice(0, 5).join(', ')}${users.length > 5 ? '…' : ''}) gardent ses capacités, mais tu ne pourras plus le choisir.` : ''}`,
+        {yes: 'Supprimer', danger: true})) {
+        return;
+      }
+      try {
+        await bridge.request('customDelete', {name: this.previous});
+        this.onChanged();
+        this.close();
+      } catch (e) {
+        toast(e.message, {error: true});
+      }
+      return;
+    }
     if (!await confirmBox(this.form.token ? 'Supprimer le jeton ?' : 'Supprimer la carte ?', this.form.token
       ? `« ${this.previous} » disparaîtra de l'Atelier. Les cartes qui le créent ne pourront plus être enregistrées sans changer de jeton.`
       : `« ${this.previous} » disparaîtra de l'Atelier et des recherches. Les decks qui la contiennent la perdront au prochain lancement.`,

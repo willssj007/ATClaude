@@ -59,6 +59,12 @@ final class CustomCards {
     private static final Set<String> TOKENS = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     /** Marque d'un jeton perso dans son script. */
     private static final Pattern TOKEN_MARK = Pattern.compile("(?m)^SVar:AtelierToken:True\\s*$");
+    /** Marque d'un emblème perso : rangé avec les jetons (pas une carte), mais hors de la base des jetons de Forge. */
+    private static final Pattern EMBLEM_MARK = Pattern.compile("(?m)^SVar:AtelierEmblem:True\\s*$");
+    /** « Name$ Emblem — Nom » : l'emblème perso qu'une carte donne. */
+    private static final Pattern EMBLEM_NAME = Pattern.compile("\\bName\\$ Emblem — ([^|]+)");
+    /** Emblèmes perso (nom → règles) : les cartes qui en donnent un recopient ses capacités dans leur script. */
+    private static final Map<String, CardRules> EMBLEMS = new ConcurrentHashMap<>();
     /** Jeton créé par une capacité (« TokenScript$ w_1_1_soldier ») : il doit exister dans la base des jetons. */
     private static final Pattern TOKEN_SCRIPT = Pattern.compile("\\bTokenScript\\$\\s*([A-Za-z0-9_]+)");
     /** Types ajoutés à la liste de Forge par l'application (les seuls qu'on puisse en retirer). */
@@ -85,6 +91,11 @@ final class CustomCards {
         return new File(ForgeConstants.USER_CUSTOM_TOKENS_DIR);
     }
 
+    /** Emblèmes perso : un dossier que Forge ne lit pas (ce ne sont ni des cartes ni des jetons). */
+    private static File emblemsDir() {
+        return new File(ForgeConstants.USER_CUSTOM_DIR, "emblems");
+    }
+
     private static File artDir() {
         return new File(ForgeConstants.USER_CUSTOM_DIR, "art");
     }
@@ -107,12 +118,13 @@ final class CustomCards {
     static void prepare() {
         cardsDir().mkdirs();
         tokensDir().mkdirs();
+        emblemsDir().mkdirs();
         artDir().mkdirs();
         frameDir().mkdirs();
         formsDir().mkdirs();
         // Cartes faites avant la 0.8.3 : « Creature.nonToken » n'est pas un filtre de Forge (il laissait passer les jetons,
         // et « une créature non-jeton meurt → copie » tournait en boucle) ; le bon filtre est « Creature.!token ».
-        for (final File dir : new File[] {cardsDir(), tokensDir()}) {
+        for (final File dir : new File[] {cardsDir(), tokensDir(), emblemsDir()}) {
             final File[] files = dir.listFiles((d, n) -> n.endsWith(".txt"));
             for (final File f : files == null ? new File[0] : files) {
                 final String text = read(f);
@@ -150,6 +162,40 @@ final class CustomCards {
                 }
             }
         }
+        final File[] emblems = emblemsDir().listFiles((d, n) -> n.endsWith(".txt"));
+        if (emblems != null) {
+            for (final File f : emblems) {
+                final String text = read(f);
+                final String name = nameOf(text);
+                if (name != null && !FILES.containsKey(name)) {
+                    try {
+                        EMBLEMS.put(name, new CardRules.Reader().readCard(Arrays.asList(text.replace("\r", "").split("\n")), base(f)));
+                        FILES.put(name, f);
+                        TOKENS.add(name);
+                    } catch (final RuntimeException e) {
+                        System.err.println("Emblème perso illisible (" + f.getName() + ") : " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    /** Emblème perso (onglet Emblèmes de l'Atelier) ? */
+    static boolean isEmblem(final String name) {
+        return name != null && EMBLEMS.containsKey(name) && isCustom(name);
+    }
+
+    /** « Emblem — Nom » (l'effet de Forge en zone de commandement) : le nom de l'emblème perso, sinon null. */
+    static String emblemOf(final String effectName) {
+        if (effectName == null || !effectName.startsWith("Emblem — ")) {
+            return null;
+        }
+        final String name = effectName.substring("Emblem — ".length());
+        return isEmblem(name) ? name : null;
+    }
+
+    static boolean isEmblemScript(final String script) {
+        return script != null && EMBLEM_MARK.matcher(script).find();
     }
 
     /** Jeton perso dans la base des jetons de Forge (déjà fait au démarrage par Forge, sinon tout de suite). */
@@ -166,7 +212,7 @@ final class CustomCards {
     }
 
     static boolean isTokenScript(final String script) {
-        return script != null && TOKEN_MARK.matcher(script).find();
+        return script != null && (TOKEN_MARK.matcher(script).find() || EMBLEM_MARK.matcher(script).find());
     }
 
     /** Jeton perso (créé par les capacités, pas une carte qu'on met dans un deck). */
@@ -176,7 +222,7 @@ final class CustomCards {
 
     /** Nom du jeton perso pour Forge (« TokenScript$ atelier_… »), ou null. */
     static String tokenScript(final String name) {
-        final File f = isToken(name) ? FILES.get(name) : null;
+        final File f = isToken(name) && !EMBLEMS.containsKey(name) ? FILES.get(name) : null;
         return f == null ? null : base(f);
     }
 
@@ -638,6 +684,16 @@ final class CustomCards {
                 // formulaire illisible : la carte s'ouvre dans l'éditeur de script
             }
         }
+        final CardRules emblem = EMBLEMS.get(name);
+        if (emblem != null) {
+            // Emblème perso : rangé avec les jetons (pas dans les decks), montré dans l'onglet Emblèmes.
+            o.addProperty("token", true);
+            o.addProperty("emblem", true);
+            final JsonObject card = Catalog.paperJson(new PaperCard(emblem, "USER", CardRarity.Special));
+            card.addProperty("typeLine", "en".equals(svar(emblem, "AtelierLang")) ? "Emblem" : "Emblème");
+            o.add("card", card);
+            return o;
+        }
         if (TOKENS.contains(name)) {
             o.addProperty("token", true);
             o.addProperty("tokenScript", base(file));
@@ -822,8 +878,9 @@ final class CustomCards {
         final CardRules rules = parse(script, previous);
         final String name = rules.getName();
         // Carte ou jeton : chacun son dossier (Forge lit les cartes dans sa base des cartes, les jetons dans celle des jetons).
+        final boolean emblem = isEmblemScript(script);
         final boolean token = isTokenScript(script);
-        final File dir = token ? tokensDir() : cardsDir();
+        final File dir = emblem ? emblemsDir() : token ? tokensDir() : cardsDir();
         File file = FILES.get(name);
         File oldArt = null;
         File oldFrame = null;
@@ -839,7 +896,7 @@ final class CustomCards {
         }
         if (file == null || DELETED.contains(name)) {
             dir.mkdirs();
-            file = new File(dir, unusedBase(name, token) + ".txt");
+            file = new File(dir, unusedBase(name, token, dir) + ".txt");
         }
         if (previous != null && !previous.equals(name) && FILES.containsKey(previous)) {
             // Renommée : l'ancienne carte disparaît (de la base de Forge au prochain lancement), son illustration suit.
@@ -925,6 +982,14 @@ final class CustomCards {
                 throw new IllegalStateException("Cadre non enregistré : " + e.getMessage());
             }
         }
+        if (emblem) {
+            // Emblème : ni dans les cartes ni dans les jetons de Forge ; ses règles servent à l'afficher.
+            TOKENS.add(name);
+            EMBLEMS.put(name, rules);
+            changed();
+            return entry(name, file);
+        }
+        EMBLEMS.remove(name);
         if (token) {
             // Jeton : dans la base des jetons de Forge, sous le nom de son fichier ; jamais dans les cartes.
             TOKENS.add(name);
@@ -970,6 +1035,7 @@ final class CustomCards {
         BACKS.values().removeIf(name::equals);
         DELETED.add(name);
         TOKENS.remove(name);
+        EMBLEMS.remove(name);
         changed();
         return true;
     }
@@ -1457,6 +1523,10 @@ final class CustomCards {
     }
 
     static CardRules rules(final String name) {
+        final CardRules emblem = name == null ? null : EMBLEMS.get(name);
+        if (emblem != null) {
+            return emblem;
+        }
         final String token = tokenScript(name);
         if (token != null) {
             return FModel.getMagicDb().getAllTokens().getRules().get(token);
@@ -1744,6 +1814,33 @@ final class CustomCards {
                 final java.util.regex.Matcher m = SET_LINE.matcher(str(c, "script"));
                 if (m.find()) {
                     usedSets.add(m.group(1));
+                }
+            }
+        }
+        // Les jetons et les emblèmes perso que ces cartes créent ou donnent partent avec elles (sans eux, la carte reçue
+        // serait refusée, ou ne se modifierait plus au formulaire).
+        final List<String> queue = new ArrayList<>(cards.keySet());
+        for (int i = 0; i < queue.size(); i++) {
+            final String script = str(allCards.getAsJsonObject(queue.get(i)), "script");
+            final List<String> needed = new ArrayList<>();
+            final java.util.regex.Matcher t = TOKEN_SCRIPT.matcher(script);
+            while (t.find()) {
+                for (final Map.Entry<String, File> f : FILES.entrySet()) {
+                    if (TOKENS.contains(f.getKey()) && base(f.getValue()).equals(t.group(1))) {
+                        needed.add(f.getKey());
+                    }
+                }
+            }
+            final java.util.regex.Matcher e = EMBLEM_NAME.matcher(script);
+            while (e.find()) {
+                if (isEmblem(e.group(1).trim())) {
+                    needed.add(e.group(1).trim());
+                }
+            }
+            for (final String n : needed) {
+                if (!cards.has(n) && allCards.has(n)) {
+                    cards.add(n, allCards.getAsJsonObject(n));
+                    queue.add(n);
                 }
             }
         }
@@ -2101,9 +2198,8 @@ final class CustomCards {
     }
 
     /** Nom de fichier libre : celui de la carte (« gardienne_des_runes »), « atelier_… » pour un jeton (son nom pour Forge). */
-    private static String unusedBase(final String name, final boolean token) {
+    private static String unusedBase(final String name, final boolean token, final File dir) {
         final String b = token ? "atelier_" + base(name) : base(name);
-        final File dir = token ? tokensDir() : cardsDir();
         String candidate = b;
         for (int i = 2; new File(dir, candidate + ".txt").exists(); i++) {
             candidate = b + "_" + i;
