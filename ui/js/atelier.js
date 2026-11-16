@@ -168,7 +168,13 @@ export class Atelier {
     if (this.editing) {
       return;
     }
-    this.root.innerHTML = '<div class="page"><h1>Atelier</h1><p class="muted">Chargement…</p></div>';
+    // La liste déjà affichée reste à l'écran pendant le chargement, à la même hauteur : on ne remonte pas en haut.
+    const scroller = this.root;
+    const y = this.restoreScroll ?? scroller.scrollTop;
+    this.restoreScroll = null;
+    if (!this.data) {
+      this.root.innerHTML = '<div class="page"><h1>Atelier</h1><p class="muted">Chargement…</p></div>';
+    }
     try {
       this.useData(await bridge.request('customCards'));
     } catch (e) {
@@ -180,6 +186,7 @@ export class Atelier {
       return;
     }
     this.renderList();
+    scroller.scrollTop = y;
   }
 
   /** Cartes et jetons perso ; les jetons deviennent des choix de « Créer des jetons ». */
@@ -797,6 +804,8 @@ export class Atelier {
    */
   editReprint(rec, base) {
     this.editing = true;
+    // La position dans la liste, retrouvée en revenant de l'éditeur.
+    this.listScroll = this.root.scrollTop;
     this.reprint = {id: rec ? rec.id : '', name: rec ? rec.name : base.name, base, nameFr: (rec && rec.nameFr) || base.nameFr || base.name};
     this.previous = null;
     this.art = null;
@@ -942,6 +951,8 @@ export class Atelier {
   edit(entry, {token = false} = {}) {
     this.reprint = null;
     this.editing = true;
+    // La position dans la liste, retrouvée en revenant de l'éditeur.
+    this.listScroll = this.root.scrollTop;
     this.previous = entry ? entry.name : null;
     this.art = null;
     this.artUrl = entry && entry.card && entry.card.customArt ? bridge.imageUrl(entry.card.customArt) : '';
@@ -1109,6 +1120,7 @@ export class Atelier {
     this.root.removeEventListener('change', this.onEditInput);
     this.root.removeEventListener('toggle', this.onEditToggle, true);
     this.editing = false;
+    this.restoreScroll = this.listScroll || 0;
     this.show();
   }
 

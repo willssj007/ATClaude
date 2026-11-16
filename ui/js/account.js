@@ -180,6 +180,7 @@ export async function syncNow({auto = false, onDone} = {}) {
     const r = await bridge.request('sync', {prefs: values, prefsAt: at});
     if (r.prefs && r.prefsAt > at) {
       prefs.applySynced(r.prefs, r.prefsAt);
+      r.prefsChanged = true;
     }
     setProfile(r.profile);
     const bits = [];

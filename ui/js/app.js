@@ -636,7 +636,10 @@ function afterSync(r) {
   refreshAudio();
   applyThemes();
   applyBigText();
-  if (current !== 'game' && current !== 'account' && screens[current] && screens[current].show) {
+  // L'écran ouvert ne se redessine que si la synchro a apporté quelque chose (sinon une liste qu'on fait défiler
+  // remonterait toute seule en haut, à chaque synchro automatique).
+  const changed = r && (r.decksAdded || r.decksRemoved || r.customChanged || r.saveImported || r.statsChange || r.prefsChanged);
+  if (changed && current !== 'game' && current !== 'account' && screens[current] && screens[current].show) {
     screens[current].show();
   }
 }
