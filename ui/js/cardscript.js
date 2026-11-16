@@ -344,6 +344,8 @@ export const WHEN = [
   {id: 'artifactEnters', kind: 'T', label: 'Quand un artefact arrive sous votre contrôle'},
   {id: 'entersPower', kind: 'T', label: 'Quand une créature de force X ou plus arrive sous votre contrôle', nLabel: 'Force au moins'},
   {id: 'entersMv', kind: 'T', label: 'Quand une créature, un artefact… de valeur de mana X ou plus arrive sous votre contrôle', kinds: 'perm', nLabel: 'Valeur de mana au moins'},
+  {id: 'controlCount', kind: 'T', label: 'La première fois que vous contrôlez au moins X permanents (d\'un type) — une fois par carte',
+    nLabel: 'Au moins', control: true},
   {id: 'counterAdded', kind: 'T', label: 'Quand des marqueurs +1/+1 sont mis sur une de vos créatures'},
   {id: 'counterPutSelf', kind: 'T', label: 'Quand des marqueurs (d\'un type) sont mis sur elle', counterSel: true},
   {id: 'counterNth', kind: 'T', label: 'Quand le Nième marqueur (d\'un type) est mis sur elle (« le troisième marqueur « charge »… »)', counterSel: true, nth: true},
@@ -597,7 +599,7 @@ export function isEmblemScript(script) {
  * Un emblème perso dans l'effet d'une carte : ses capacités (S:, T:, R:) deviennent des SVar de la carte, renommées
  * (« Atelier1… » → « <id>Q1… ») pour ne pas se mêler aux siennes ; le texte de l'emblème est cité sur la carte.
  */
-function customEmblemEffect(name, id) {
+function customEmblemEffect(name, id, unique = false) {
   const em = customEmblems.find(e => e.name === name);
   const lines = em ? em.script.replace(/\r/g, '').split('\n') : [];
   const lang = lines.includes('SVar:AtelierLang:en') ? 'en' : 'fr';
@@ -624,9 +626,14 @@ function customEmblemEffect(name, id) {
   const parts = Object.entries(params).filter(([, v]) => v.length).map(([p, v]) => ` | ${p}$ ${v.join(',')}`).join('');
   // Le texte de l'emblème, chaque capacité entre guillemets (« … » et « … »), comme sur les vraies cartes.
   const abilities = oracle.split('\\n').map(s => s.trim().replace(/\.$/, '')).filter(Boolean);
-  const fr = abilities.length ? `vous gagnez un emblème avec ${abilities.map(s => `« ${s}. »`).join(' et ')}` : `vous gagnez l'emblème ${name}`;
-  const en = abilities.length ? `you get an emblem with ${abilities.map(s => `"${s}."`).join(' and ')}` : `you get the ${name} emblem`;
-  return {p: `Effect | Name$ Emblem — ${name}${parts} | Duration$ Permanent | AILogic$ Always`, aux, fr, en};
+  // Un emblème gagné « la première fois que vous contrôlez… » : un seul par joueur, même si plusieurs cartes le donnent.
+  const quoted = abilities.map(s => `« ${s}. »`).join(' et ');
+  const quotedEn = abilities.map(s => `"${s}."`).join(' and ');
+  const fr = unique ? `vous gagnez l'emblème ${name} (un seul par joueur)${abilities.length ? ` : ${quoted}` : ''}`
+    : abilities.length ? `vous gagnez un emblème avec ${quoted}` : `vous gagnez l'emblème ${name}`;
+  const en = unique ? `you get the ${name} emblem (one per player)${abilities.length ? `: ${quotedEn}` : ''}`
+    : abilities.length ? `you get an emblem with ${quotedEn}` : `you get the ${name} emblem`;
+  return {p: `Effect | Name$ Emblem — ${name}${parts}${unique ? ' | Unique$ True' : ''} | Duration$ Permanent | AILogic$ Always`, aux, fr, en};
 }
 
 /** Couleurs d'un jeton (il n'a pas de coût) : « W », « U »… → la ligne « Colors: » de Forge. */
@@ -1620,6 +1627,23 @@ function amountOf(a) {
 }
 
 /**
+ * « Au moins trois artefacts de type Équipement » : une sorte de permanents (COND_KINDS), un type au choix (perso
+ * compris) et leur nombre. valid : le filtre de Forge (« Artifact.Equipment+YouCtrl », « Card.token+Elf+YouCtrl »).
+ */
+function controlCount(kindId, typeRaw, n) {
+  const k = COND_KINDS.find(x => x[0] === kindId) || COND_KINDS[0];
+  const t = typeName(typeRaw);
+  const [base, ...props] = k[1].split('.');
+  const valid = `${base}.${[...props, ...(t ? [t] : []), 'YouCtrl'].join('+')}`;
+  const fr = `au moins ${n === 1 ? 'un' : word(n, 'fr')} ${n === 1 ? k[2] : k[3]}${t ? ' de type ' + frType(typeRaw) : ''}`
+    .replace(/au moins un (créature|jeton)\b/, (m0, w) => (w === 'créature' ? 'au moins une créature' : m0));
+  // Un seul : « an Elf creature », « a nontoken permanent » ; plusieurs : « three or more Elf creatures ».
+  const one = `${t ? t + ' ' : ''}${k[4].replace(/s$/, '')}`;
+  const en = n === 1 ? `${/^[aeiou]/i.test(one) ? 'an' : 'a'} ${one}` : `${word(n, 'en')} or more ${t ? t + ' ' : ''}${k[4]}`;
+  return {valid, fr, en};
+}
+
+/**
  * Condition d'une capacité : {count, cmp} (un compte de Forge et sa comparaison) ou {turn} (votre tour ou pas), avec
  * « si … » / « if … » et le mot d'aptitude de la carte (« Seuil — »). null : toujours.
  */
@@ -1633,13 +1657,8 @@ function conditionOf(a) {
       `si vous contrôlez au moins ${many('une', word(n, 'fr'))} ${many('créature', 'créatures')}${t ? ' de type ' + frType(a.condType) : ''}`,
       `if you control ${word(n, 'en')} or more ${t ? t + ' ' : ''}${many('creature', 'creatures')}`);
     case 'controlPerm': {
-      // « Artifact.Equipment+YouCtrl », « Card.token+Elf+YouCtrl », « Permanent.YouCtrl » : la sorte, le type (perso compris).
-      const k = COND_KINDS.find(x => x[0] === a.condKind) || COND_KINDS[0];
-      const [base, ...props] = k[1].split('.');
-      const valid = `${base}.${[...props, ...(t ? [t] : []), 'YouCtrl'].join('+')}`;
-      return c(`Count$Valid ${valid}`, `GE${n}`,
-        `si vous contrôlez au moins ${many('un', word(n, 'fr'))} ${many(k[2], k[3])}${t ? ' de type ' + frType(a.condType) : ''}`.replace(/au moins un (créature|jeton)\b/, (m0, w) => (w === 'créature' ? 'au moins une créature' : m0)),
-        `if you control ${word(n, 'en')} or more ${t ? t + ' ' : ''}${n === 1 ? k[4].replace(/s$/, '') : k[4]}`);
+      const cc = controlCount(a.condKind, a.condType, n);
+      return c(`Count$Valid ${cc.valid}`, `GE${n}`, `si vous contrôlez ${cc.fr}`, `if you control ${cc.en}`);
     }
     case 'lifeAtLeast': return c('Count$YourLifeTotal', `GE${n}`, `si vous avez au moins ${n} points de vie`, `if you have ${n} or more life`);
     case 'lifeAtMost': return c('Count$YourLifeTotal', `LE${n}`, `si vous avez ${n} ${plural(n, 'point', 'points')} de vie ou moins`, `if you have ${n} or less life`);
@@ -2011,6 +2030,10 @@ export function templates(type) {
       a: {...base, when: 'activated', effect: 'token', token: 'b_2_2_zombie', cost: '{2}{B}', tap: false, zone: 'Graveyard', exileSelf: true, filter: {type: '', other: false}}},
     {label: 'Planeswalker [−7] : vous gagnez un emblème avec « Les créatures que vous contrôlez gagnent +2/+2 »',
       a: {...base, n: 2, when: 'loyalty', loyalty: -7, effect: 'emblem', emblem: 'anthem', filter: {type: '', other: false}}},
+    // Sur plusieurs cartes à la fois : l'emblème (perso de préférence) ne se gagne qu'une fois.
+    {label: 'La première fois que vous contrôlez au moins trois artefacts, vous gagnez un emblème (un emblème perso : un seul, même avec plusieurs cartes)',
+      a: {...base, when: 'controlCount', whenN: 3, whenCtlKind: 'artifact', whenCtlType: '', effect: 'emblem',
+        emblem: customEmblems.length ? `custom:${customEmblems[0].name}` : 'anthem', n: 1, filter: {type: '', other: false}}},
     {label: 'Saga, chapitre I : créez un jeton Soldat 1/1', a: {...base, when: 'chapter', chapter: 1, effect: 'token', token: 'w_1_1_soldier', filter: {type: '', other: false}}},
     {label: 'Sort : en tant que coût supplémentaire, sacrifiez une créature. Détruisez une créature ciblée',
       a: {...base, when: 'spell', effect: 'destroy', addCost: 'sacCreature', filter: {type: '', other: false}}},
@@ -3409,7 +3432,7 @@ function effectBase(a, id) {
         en: 'copy target instant or sorcery spell. You may choose new targets for the copy'};
     case 'emblem': {
       if (String(a.emblem || '').startsWith('custom:')) {
-        return customEmblemEffect(a.emblem.slice(7), id);
+        return customEmblemEffect(a.emblem.slice(7), id, a.when === 'controlCount');
       }
       const st = staticCore({...a, effect: a.emblem || 'anthem', scope: 'you', filter: {type: '', other: false}, cond: 'none'}, `${id}E`, 'fr');
       const stEn = staticCore({...a, effect: a.emblem || 'anthem', scope: 'you', filter: {type: '', other: false}, cond: 'none'}, `${id}E`, 'en');
@@ -4155,7 +4178,7 @@ export function orTriggerFits(w) {
 function orTrigger(a, card, head) {
   const w1 = WHEN.find(x => x.id === a.when);
   const w2 = a.when2 && a.when2 !== a.when ? WHEN.find(x => x.id === a.when2) : null;
-  if (!head || !w1 || w1.kind !== 'T' || !orTriggerFits(w2)) {
+  if (!head || !w1 || w1.kind !== 'T' || w1.control || !orTriggerFits(w2)) {
     return head;
   }
   const h2 = triggerTable({...a, when: a.when2}, card);
@@ -4261,7 +4284,15 @@ function triggerTable(a, card = null) {
   const ck = whenKindOf({kinds: 'cast'}, a.whenKind);
   const pk = whenKindOf({kinds: 'perm'}, a.whenKind);
   const bk = whenKindOf({kinds: 'bend'}, a.whenKind);
+  // « La première fois que vous contrôlez au moins trois Équipements » : un déclencheur d'état, une fois par carte. Pour
+  // un emblème perso, il ne se déclenche pas si on a déjà l'emblème (une autre carte l'a donné).
+  const cc = controlCount(a.whenCtlKind, a.whenCtlType, wn);
+  const emblemName = a.effect === 'emblem' && String(a.emblem || '').startsWith('custom:') ? a.emblem.slice(7) : '';
+  const owned = emblemName && !/[+|_,]/.test(emblemName)
+    ? ` | IsPresent2$ Card.namedEmblem — ${emblemName.replace(/ /g, '_')}+YouOwn | PresentZone2$ Command | PresentCompare2$ EQ0` : '';
   return {
+    controlCount: [`Mode$ Always | IsPresent$ ${cc.valid} | PresentCompare$ GE${wn}${owned} | GameActivationLimit$ 1 | TriggerZones$ Battlefield`,
+      `La première fois que vous contrôlez ${cc.fr}`, `The first time you control ${cc.en}`],
     etb: ['Mode$ ChangesZone | Origin$ Any | Destination$ Battlefield | ValidCard$ Card.Self', 'Quand CARDNAME arrive sur le champ de bataille', 'When CARDNAME enters'],
     ally: [enters(valid(f)), `Quand ${oneFr(f)} arrive sur le champ de bataille sous votre contrôle`, `Whenever ${oneEn(f)} you control enters`],
     attacks: ['Mode$ Attacks | ValidCard$ Card.Self', 'Quand CARDNAME attaque', 'Whenever CARDNAME attacks'],

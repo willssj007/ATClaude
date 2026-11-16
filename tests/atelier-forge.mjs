@@ -158,6 +158,14 @@ for (const lang of ['fr', 'en']) {
     await check(`emblème ${e.name}`, e);
     await check(`carte qui donne ${e.name}`, card(ab({when: 'etb', effect: 'emblem', emblem: `custom:${e.name}`}), lang));
   }
+  // « La première fois que vous contrôlez au moins X permanents (d'un type) » : chaque sorte, avec un emblème perso
+  // (gagné une seule fois) ou un autre effet.
+  for (const [k] of COND_KINDS) {
+    for (const t of ['', 'Equipment']) {
+      await check(`première fois ${k}/${t} → emblème`, card(ab({when: 'controlCount', whenN: 3, whenCtlKind: k, whenCtlType: t, effect: 'emblem', emblem: `custom:${emblems[0].name}`}), lang));
+      await check(`première fois ${k}/${t} → pioche`, card(ab({when: 'controlCount', whenN: 1, whenCtlKind: k, whenCtlType: t, effect: 'draw', n: 1}), lang));
+    }
+  }
   // Pile ou face avec ses deux issues.
   await check('pile ou face', card(ab({when: 'etb', effect: 'flipCoin', then: [{...newMode('draw'), n: 2}, {...newMode('loseLifeYou'), n: 2}]}), lang));
 }

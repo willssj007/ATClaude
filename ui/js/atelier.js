@@ -28,9 +28,9 @@ const COUNTER_OPTIONS = COUNTER_TYPES.map(c => [c[0], c[1].replace(/[«»]/g, ''
 const isEmblemScriptText = (script) => /^SVar:AtelierEmblem:True\s*$/m.test(String(script || ''));
 /** Une liste des types de marqueurs : attr « a » (capacité) ou « sf » (mode, effet enchaîné). */
 /** « Si vous contrôlez au moins X … » : la sorte de permanents et leur type (n'importe quel sous-type, types perso compris). */
-function condKindHtml(attr, h) {
-  return `<select data-${attr}="condKind" aria-label="Quels permanents">${COND_KINDS.map(k => `<option value="${k[0]}"${k[0] === (h.condKind || 'permanent') ? ' selected' : ''}>${esc(k[3])}</option>`).join('')}</select>
-    <input type="text" data-${attr}="condType" data-typepick data-typeall readonly value="${esc(h.condType || '')}" placeholder="de tout type, ou un type : Équipement, Elfe…" style="width:190px">`;
+function condKindHtml(attr, h, kindKey = 'condKind', typeKey = 'condType') {
+  return `<select data-${attr}="${kindKey}" aria-label="Quels permanents">${COND_KINDS.map(k => `<option value="${k[0]}"${k[0] === (h[kindKey] || 'permanent') ? ' selected' : ''}>${esc(k[3])}</option>`).join('')}</select>
+    <input type="text" data-${attr}="${typeKey}" data-typepick data-typeall readonly value="${esc(h[typeKey] || '')}" placeholder="de tout type, ou un type : Équipement, Elfe…" style="width:190px">`;
 }
 
 function counterSelect(attr, key, value, def = 'P1P1') {
@@ -2098,13 +2098,15 @@ export class Atelier {
         .map(x => `<option value="${x.id}"${x.id === a.when ? ' selected' : ''}>${esc(whenLabel(x, this.form))}</option>`).join('')}</optgroup>`).join('')}</select>
         <button class="ate-x" data-delab="${i}" title="Retirer cette capacité">✕</button></div>
       ${misfit.map(([l, need]) => `<p class="ate-misfit small">⚠ « ${esc(l)} » ne va qu'avec ${esc(needWords(need))}.</p>`).join('')}
-      ${w.kind === 'T' ? `<div class="ate-ab-row"><span class="muted small" title="Un deuxième moment où la capacité se déclenche, avec le même effet (« Quand elle arrive ou attaque »)">ou aussi</span>
+      ${w.kind === 'T' && !w.control ? `<div class="ate-ab-row"><span class="muted small" title="Un deuxième moment où la capacité se déclenche, avec le même effet (« Quand elle arrive ou attaque »)">ou aussi</span>
         <select data-a="when2" aria-label="Ou aussi quand">${[['', 'rien d\'autre'], ...WHEN.filter(x => x.id !== a.when && orTriggerFits(x) && ((whenFits(x, this.form) && fitsCard('when', x, card)) || x.id === a.when2))
           .map(x => [x.id, whenLabel(x, this.form)])].map(([v, l]) => `<option value="${esc(v)}"${v === (a.when2 || '') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
       ${w.counterSel ? `<div class="ate-ab-row"><span class="muted small">Marqueur</span>${counterSelect('a', 'whenCounter', a.whenCounter, 'CHARGE')}
         ${w.nth ? `<span class="muted small">X =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       ${w.kinds || w.nLabel ? `<div class="ate-ab-row">${w.kinds ? `${sel('whenKind', WHEN_KINDS[w.kinds].map(k => [k[0], k[1]]), whenKindOf(w, a.whenKind)[0])}` : ''}
-        ${w.nLabel ? `<span class="muted small">${esc(w.nLabel)}</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
+        ${w.nLabel ? `<span class="muted small">${esc(w.nLabel)}</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}
+        ${w.control ? condKindHtml('a', a, 'whenCtlKind', 'whenCtlType') : ''}</div>` : ''}
+      ${w.control ? `<p class="muted small ate-ab-note">Elle se déclenche une fois par carte, dès que le compte y est. Avec un emblème perso, l'emblème ne se gagne qu'une fois par joueur : la même capacité peut aller sur plusieurs cartes.</p>` : ''}
       <div class="ate-ab-row"><input type="text" class="ate-abname" data-a="flavor" value="${esc(a.flavor || '')}" maxlength="40"
         placeholder="Nom de la capacité (facultatif)"></div>
       ${this.form.keywords.includes('Station') ? `<div class="ate-ab-row"><label class="ate-check" title="Elle ne marche qu'à partir de X marqueurs charge (Station)">
