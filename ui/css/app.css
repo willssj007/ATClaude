@@ -1680,3 +1680,12 @@ body.channel-test #topbar .brand::after { content: "TEST"; margin-left: 6px; pad
 .home-tip .tile-ic { flex: 0 0 auto; width: 28px; height: 28px; color: var(--gold); }
 .home-tip p { margin: 4px 0 8px; }
 .home-tip .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Mode économie (voir perf.js) ----------
+   Décors immobiles (comme Animations décoché, posé par le script), et plus de flou derrière les fenêtres et la barre
+   du haut : un fond un peu plus sombre le remplace. */
+:root[data-eco="on"] .modal-back, :root[data-eco="on"] #zoom, :root[data-eco="on"] .game-over { backdrop-filter: none; }
+:root[data-eco="on"] .modal-back { background: rgba(5, 6, 12, 0.74); }
+:root[data-eco="on"] #zoom { background: rgba(5, 6, 12, 0.82); }
+:root[data-eco="on"] .game-over { background: rgba(5, 6, 12, 0.85); }
+:root[data-eco="on"] #topbar { backdrop-filter: none; background: var(--bg); }

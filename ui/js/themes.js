@@ -2,6 +2,7 @@
 // Certaines se débloquent en jouant : parties jouées ou gagnées (sans triche, comme les trophées de Forge),
 // record de blessures infligées, trophées obtenus, et défis (exploits en partie, carrière Planeswalker).
 
+import {applyEco} from './perf.js';
 import {bridge} from './bridge.js';
 import {confirmBox} from './dialogs.js';
 import {icon} from './icons.js';
@@ -204,6 +205,8 @@ export function applyThemes() {
     root.dataset[kind.attr] = find(kind.list, prefs.get(kind.pref)).key;
   }
   root.dataset.motion = prefs.get('animations') ? 'on' : 'off';
+  // Mode économie : décors immobiles aussi (voir perf.js).
+  applyEco();
   menuEffects(root.dataset.menuTheme);
 }
 

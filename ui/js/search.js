@@ -3,7 +3,8 @@
 import {bridge} from './bridge.js';
 import {addFlipButton, cardElement, onLongPress, showZoom} from './cards.js';
 import {customBox} from './dialogs.js';
-import {esc, el, debounce, toast} from './util.js';
+import {esc, el, debounce, prefs, toast} from './util.js';
+import {ecoOn} from './perf.js';
 import {icon} from './icons.js';
 import {RARITY_FR, rarityKey, setCareer, wildcardHtml} from './career.js';
 
@@ -337,16 +338,12 @@ export class SearchPanel {
       this.offset = 0;
     }
     this.loading = true;
-    const query = {...this.query, offset: this.offset, limit: PAGE, owned: (this.owned && !this.showMissing) || undefined,
-      ownedInfo: this.owned || undefined};
-    const lock = this.identityLock();
-    if (lock !== null && lock !== undefined) {
-      query.colors = (lock || 'C').split('');
-      query.colorMode = 'identity';
-      query.commanderLegal = true;
-    }
+    const query = this.pageQuery(this.offset);
     try {
-      const result = await bridge.request('searchCards', {query});
+      // La page suivante a pu être demandée d'avance (voir prefetchNext) : elle s'affiche tout de suite.
+      const ahead = !fresh && this.ahead && this.ahead.key === JSON.stringify(query) ? this.ahead.result : null;
+      this.ahead = null;
+      const result = await (ahead || bridge.request('searchCards', {query}));
       if (seq !== this.seq && fresh) {
         return;
       }
@@ -374,6 +371,7 @@ export class SearchPanel {
       status.classList.toggle('sh-note', !!result.fuzzy || !result.total);
       this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : '';
       this.refreshCounts();
+      this.prefetchNext(seq);
     } catch (e) {
       this.root.querySelector('.more').textContent = e.message;
     } finally {
@@ -381,10 +379,62 @@ export class SearchPanel {
     }
   }
 
+  /** La requête d'une page de résultats (filtres, collection, identité du commandant). */
+  pageQuery(offset) {
+    const query = {...this.query, offset, limit: PAGE, owned: (this.owned && !this.showMissing) || undefined,
+      ownedInfo: this.owned || undefined};
+    const lock = this.identityLock();
+    if (lock !== null && lock !== undefined) {
+      query.colors = (lock || 'C').split('');
+      query.colorMode = 'identity';
+      query.commanderLegal = true;
+    }
+    return query;
+  }
+
+  /**
+   * Quand le moteur n'a rien d'autre à faire : la page suivante des résultats, et les images de ses premières cartes
+   * (le moteur les télécharge et les garde) : en faisant défiler, elles arrivent sans attente.
+   */
+  prefetchNext(seq) {
+    if (this.offset >= this.total) {
+      return;
+    }
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 300));
+    idle(() => {
+      if (seq !== this.seq || this.loading || this.offset >= this.total) {
+        return;
+      }
+      const query = this.pageQuery(this.offset);
+      const key = JSON.stringify(query);
+      const result = bridge.request('searchCards', {query});
+      this.ahead = {key, result};
+      result.then((r) => {
+        if (!prefs.get('images') || !this.ahead || this.ahead.key !== key) {
+          return;
+        }
+        const lang = prefs.get('imageLang');
+        for (const card of r.cards.slice(0, 24)) {
+          if (card.image) {
+            const img = new Image();
+            img.fetchPriority = 'low';
+            img.decoding = 'async';
+            img.src = bridge.imageUrl(card.image, lang) + (ecoOn() ? '&size=s' : '');
+          }
+        }
+      }, () => {
+        if (this.ahead && this.ahead.key === key) {
+          this.ahead = null;
+        }
+      });
+    }, {timeout: 1500});
+  }
+
   cell(card) {
     const cell = el(`<div class="cell${card.owned === 0 ? ' unowned' : ''}"></div>`);
     cell._card = card;
-    cell.appendChild(cardElement(card));
+    // Mode économie : petites images dans la grille aussi (l'agrandissement montre toujours l'image entière).
+    cell.appendChild(cardElement(card, '', {small: ecoOn()}));
     addFlipButton(cell, card);
     if (card.owned > 0) {
       cell.appendChild(el(`<div class="owned-n" title="Exemplaires dans ta collection">${icon('book')}${card.owned}</div>`));

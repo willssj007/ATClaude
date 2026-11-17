@@ -57,6 +57,7 @@ public final class ForgeRuntime {
             return;
         }
         final long started = System.nanoTime();
+        Perf.step("Démarrage de Forge");
         final String assets = Paths.withSlash(paths.assetsDir());
         final String user = Paths.withSlash(paths.userDir());
         final String cache = Paths.withSlash(paths.cacheDir());
@@ -78,7 +79,11 @@ public final class ForgeRuntime {
 
         final IProgressBar progress = new IProgressBar() {
             private int maximum = 1000;
-            @Override public void setDescription(final String s) { status = s; sendProgress(bridge, s, -1); }
+            @Override public void setDescription(final String s) {
+                status = s;
+                Perf.step(s);
+                sendProgress(bridge, s, -1);
+            }
             @Override public void setValue(final int value) { sendProgress(bridge, status, maximum <= 0 ? -1 : value * 100 / maximum); }
             @Override public void reset() { }
             @Override public void setShowETA(final boolean b) { }
@@ -129,12 +134,15 @@ public final class ForgeRuntime {
             return null;
         });
         final long forgeDone = System.nanoTime();
+        Perf.step("Cartes perso et réimpressions");
         CustomCards.init();
         Reprints.init();
+        Perf.step("Niveaux de l'IA");
         // Niveaux de l'IA : copies « justes » des personnalités ; la pioche lissée ne sert qu'aux IA Difficile et Expert.
         AiLevels.install();
         FModel.getPreferences().setPref(FPref.UI_ENABLE_AI_CHEATS, String.valueOf(AiLevels.ready()));
         // Textes français des cartes récentes (impressions françaises de Scryfall gardées en cache).
+        Perf.step("Textes français");
         FrenchCards.init();
         // Textes de l'interface de Forge mal traduits (« Supprimer 2 carte(s) » pour une défausse).
         UiFrench.apply();
@@ -143,6 +151,7 @@ public final class ForgeRuntime {
                 + (System.nanoTime() - forgeDone) / 1_000_000 + " ms");
         ImageService.onLateImage = key -> bridge.sendEvent("imageReady", m -> m.addProperty("key", key));
         status = "Prêt";
+        Perf.step("Prêt");
         ready = true;
         bridge.sendEvent("ready", m -> m.addProperty("version", version()));
         bridge.warmUp();

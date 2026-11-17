@@ -6,11 +6,13 @@
 // position vers la nouvelle : la carte vole de la main à la pile, puis au champ de bataille.
 
 import {bridge} from './bridge.js';
-import {cardElement, hoverCard, onLongPress, showZoom} from './cards.js';
+import {cardElement, hoverCard, onLongPress, setImageSize, showZoom} from './cards.js';
 import {fillRewardCards, rewardHtml} from './career.js';
 import {confirmBox, customBox} from './dialogs.js';
 import {StackPanel} from './stackpanel.js';
 import {boardFx} from './themes.js';
+import {BoardZoom, layoutRect, zoomOf} from './boardzoom.js';
+import {ecoOn, stats as perfStats, stopFrames, watchFrames} from './perf.js';
 import {icon} from './icons.js';
 import {esc, el, manaHtml, avatarHtml, ownPhotoUrl, cutoutRects, PHASES, prefs, rulesHtml, toast, debounce, translatePrompt} from './util.js';
 
@@ -240,6 +242,29 @@ export class Game {
     this.showWaiting(text);
   }
 
+  /**
+   * L'IA réfléchit (moteur, au-delà de 0,7 s pour une décision) : bulle « … » sur la plaque de ce joueur, jusqu'à
+   * ce qu'il ait décidé (pid -1).
+   */
+  aiThinking(m) {
+    this.thinkingPid = m.pid;
+    this.showThinking();
+  }
+
+  showThinking() {
+    if (!this.table) {
+      return;
+    }
+    for (const plate of this.table.querySelectorAll('.plate.opp')) {
+      const on = Number(plate.dataset.pid) === this.thinkingPid;
+      plate.classList.toggle('thinking', on);
+      const bubble = plate.querySelector('.think');
+      if (bubble) {
+        bubble.title = on ? `${plate.querySelector('.player-name')?.textContent || 'L\'IA'} réfléchit…` : '';
+      }
+    }
+  }
+
   resumed() {
     this.paused = false;
     if (this.lastState) {
@@ -345,7 +370,7 @@ export class Game {
         <div class="row front"></div>
       </div>`);
       const plate = el(`<div class="plate opp" data-pid="${p.id}">
-        <div class="player-hit" data-pid="${p.id}">${avatarHtml(p.name, i + 1, 34)}<div class="life"></div></div>
+        <div class="player-hit" data-pid="${p.id}">${avatarHtml(p.name, i + 1, 34)}<div class="life"></div><div class="think" aria-hidden="true"><i></i><i></i><i></i></div></div>
         <div class="info"><div class="player-name">${esc(p.name)}</div><div class="stats"></div></div>
       </div>`);
       field.querySelector('.plates').appendChild(plate);
@@ -374,6 +399,7 @@ export class Game {
       if (this.state) {
         this.fitRows();
       }
+      this.zoom && this.zoom.refit();
     });
     table.querySelectorAll('.me-half, .opp-field, .plates').forEach(h => this.halfObserver.observe(h));
     // La largeur de la main, suivie de même (fanHand ne la relit pas à chaque mise à jour).
@@ -397,7 +423,16 @@ export class Game {
       anchor: this.board,
       pillHost: table.querySelector('.pill-host'),
     });
+    // Zoom à deux doigts des moitiés du plateau (refait avec lui : un nouveau plateau commence à plat).
+    this.zoom = new BoardZoom(table, () => this.state && this.drawArrows(this.state));
+    if (!prefs.get('tipPinch') && matchMedia('(pointer: coarse)').matches) {
+      prefs.set('tipPinch', true);
+      setTimeout(() => toast('Pincez le plateau à deux doigts pour zoomer, ou touchez deux fois une zone vide.', {title: 'Astuce', duration: 6500}), 2500);
+    }
     this.bindEvents(table);
+    // Fluidité suivie pendant la partie (relevé, mode économie automatique) ; le plateau qu'on vient de bâtir ne compte pas.
+    watchFrames();
+    this.showThinking();
     if (this.onBuild) {
       this.onBuild(table);
     }
@@ -487,6 +522,9 @@ export class Game {
 
   bindEvents(table) {
     const consumed = onLongPress(table, '.slot, .stack-item', (node) => {
+      if (this.zoom && this.zoom.busy()) {
+        return;
+      }
       const slot = node.classList.contains('slot') ? node : node.querySelector('.slot');
       const card = slot && this.cards.get(slot.dataset.key);
       if (card && !card.hidden) {
@@ -805,6 +843,7 @@ export class Game {
   }
 
   destroy() {
+    stopFrames();
     this.halfObserver && this.halfObserver.disconnect();
     this.handObserver && this.handObserver.disconnect();
     document.removeEventListener('keydown', this.keyHandler);
@@ -834,6 +873,15 @@ export class Game {
   }
 
   render(state, force = false) {
+    const t0 = performance.now();
+    try {
+      return this.renderNow(state, force);
+    } finally {
+      perfStats.render.add(performance.now() - t0);
+    }
+  }
+
+  renderNow(state, force) {
     const prev = this.state;
     this.state = state;
     if (!state.players || !state.players.length) {
@@ -856,7 +904,10 @@ export class Game {
     }
     this.table.querySelector('[data-open="cheat"]').classList.toggle('hidden', this.career);
     const table = this.table;
-    const animate = prefs.get('animations') && !force;
+    // Mode économie : les cartes vont directement à leur place (le glissement relit toutes les positions).
+    const eco = ecoOn();
+    const animate = prefs.get('animations') && !force && !eco;
+    this.smallImages = bridge.android || eco;
     const before = new Map();
     if (animate) {
       for (const [k, slot] of this.slots) {
@@ -1134,13 +1185,17 @@ export class Game {
       this.slots.set(key, slot);
       slot._sig = null;
     }
+    // Petites images (Android, mode économie) pour les cartes posées ; celles de la main restent entières (plus
+    // grandes à l'écran), et l'agrandissement d'une carte prend toujours l'image entière.
+    const small = this.smallImages && card.zone !== 'hand';
     if (slot._sig !== sig) {
-      const inner = cardElement(card);
+      const inner = cardElement(card, '', {small});
       inner.appendChild(el('<div class="badges"></div>'));
       slot.replaceChildren(inner);
       slot._sig = sig;
     }
     const mcard = slot.firstElementChild;
+    setImageSize(mcard, small);
     slot.classList.toggle('tapped', !!card.tapped);
     slot.classList.toggle('blocking', !!card.blocking);
     mcard.classList.toggle('sick', !!card.sick && card.zone === 'battlefield' && card.creature);
@@ -2010,8 +2065,8 @@ export class Game {
     const t = this.table;
     const middle = window.innerWidth / 2;
     for (const b of t.querySelectorAll('.opp-half, .me-half, .divider, .hand-band, .actions')) {
-      // Décalages horizontaux seulement : la position verticale des bandes n'en dépend pas.
-      const r = b.getBoundingClientRect();
+      // Décalages horizontaux seulement : la position verticale des bandes n'en dépend pas (ni leur zoom).
+      const r = b.classList.contains('half') ? layoutRect(b) : b.getBoundingClientRect();
       let left = 0;
       let right = 0;
       for (const h of holes) {
@@ -2049,9 +2104,11 @@ export class Game {
       // Une carte qui sort d'un plateau masqué apparaît simplement à sa nouvelle place.
       const seen = before.get(k);
       const old = seen && seen.width ? seen : null;
+      // Dans une moitié zoomée, le déplacement se compte dans son repère agrandi.
+      const z = zoomOf(slot);
       if (old) {
-        const dx = old.left + old.width / 2 - (now.left + now.width / 2);
-        const dy = old.top + old.height / 2 - (now.top + now.height / 2);
+        const dx = (old.left + old.width / 2 - (now.left + now.width / 2)) / z;
+        const dy = (old.top + old.height / 2 - (now.top + now.height / 2)) / z;
         const scale = old.width && now.width ? old.width / now.width : 1;
         if (Math.abs(dx) > 2 || Math.abs(dy) > 2 || Math.abs(scale - 1) > 0.05) {
           // Au-dessus des autres pendant le trajet (classe plutôt qu'un z-index animé, qui n'est pas composité).
@@ -2063,8 +2120,8 @@ export class Game {
         // Nouvelle carte : depuis la bibliothèque pour ma main, sinon apparition.
         const card = this.cards.get(k);
         if (card && card.zone === 'hand' && card.owner === me.id && libRect) {
-          const dx = libRect.left + libRect.width / 2 - (now.left + now.width / 2);
-          const dy = libRect.top + libRect.height / 2 - (now.top + now.height / 2);
+          const dx = (libRect.left + libRect.width / 2 - (now.left + now.width / 2)) / z;
+          const dy = (libRect.top + libRect.height / 2 - (now.top + now.height / 2)) / z;
           slot.animate([{transform: `translate(${dx}px, ${dy}px) scale(0.5)`, opacity: 0.4}, {transform: 'none', opacity: 1}],
             {duration: 480, easing: 'cubic-bezier(.2,.75,.25,1)'});
         } else {
@@ -2079,7 +2136,10 @@ export class Game {
     const ghost = slot.cloneNode(true);
     ghost.classList.add('fly-ghost');
     // Hors de sa rangée (ou de la pile), la carte garderait la taille par défaut : on lui laisse la sienne.
-    ghost.style.setProperty('--w', getComputedStyle(slot).getPropertyValue('--w').trim());
+    const w = getComputedStyle(slot).getPropertyValue('--w').trim();
+    const z = zoomOf(slot);
+    // Carte d'une moitié zoomée : le fantôme garde la taille qu'on voyait.
+    ghost.style.setProperty('--w', z !== 1 && w.endsWith('px') ? parseFloat(w) * z + 'px' : w);
     Object.assign(ghost.style, {left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: 0});
     document.body.appendChild(ghost);
     slot.remove();

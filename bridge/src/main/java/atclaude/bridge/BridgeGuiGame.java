@@ -142,6 +142,78 @@ final class BridgeGuiGame extends AbstractGuiGame {
     private volatile long lastFlushAt;
     private volatile int lastSize;
 
+    /**
+     * Photos différentielles : une carte qui n'a pas changé depuis la photo précédente part comme {"$": id} (l'écran
+     * reprend celle qu'il a déjà). Chaque photo porte son numéro (seq) et celui de la précédente (base) ; une photo
+     * complète n'a pas de base. Utilisé seulement sur le fil d'envoi (flush).
+     */
+    private final java.util.Map<Integer, String> sentCards = new java.util.HashMap<>();
+    private int seq;
+    private volatile boolean fullNext = true;
+
+    /** La prochaine photo sera complète (interface rechargée, ou qui a perdu le fil des photos). */
+    void requestFull() {
+        fullNext = true;
+        markDirty();
+    }
+
+    /** Copie de la photo où les cartes déjà envoyées à l'identique sont remplacées par leur seul numéro. */
+    private JsonObject diffed(final JsonObject state) {
+        final boolean full = fullNext;
+        fullNext = false;
+        final int base = seq;
+        seq++;
+        final java.util.Map<Integer, String> now = new java.util.HashMap<>();
+        final JsonObject out = new JsonObject();
+        for (final java.util.Map.Entry<String, com.google.gson.JsonElement> e : state.entrySet()) {
+            out.add(e.getKey(), e.getValue());
+        }
+        if (state.has("players")) {
+            final com.google.gson.JsonArray players = new com.google.gson.JsonArray();
+            for (final com.google.gson.JsonElement pe : state.getAsJsonArray("players")) {
+                final JsonObject p = pe.getAsJsonObject();
+                final JsonObject pc = new JsonObject();
+                for (final java.util.Map.Entry<String, com.google.gson.JsonElement> e : p.entrySet()) {
+                    pc.add(e.getKey(), e.getValue());
+                }
+                if (p.has("zones")) {
+                    final JsonObject zones = new JsonObject();
+                    for (final java.util.Map.Entry<String, com.google.gson.JsonElement> z : p.getAsJsonObject("zones").entrySet()) {
+                        final com.google.gson.JsonArray cards = new com.google.gson.JsonArray();
+                        for (final com.google.gson.JsonElement ce : z.getValue().getAsJsonArray()) {
+                            final JsonObject c = ce.getAsJsonObject();
+                            if (!c.has("id")) {
+                                cards.add(c);
+                                continue;
+                            }
+                            final int id = c.get("id").getAsInt();
+                            final String json = Bridge.GSON.toJson(c);
+                            now.put(id, json);
+                            if (!full && json.equals(sentCards.get(id))) {
+                                final JsonObject ref = new JsonObject();
+                                ref.addProperty("$", id);
+                                cards.add(ref);
+                            } else {
+                                cards.add(c);
+                            }
+                        }
+                        zones.add(z.getKey(), cards);
+                    }
+                    pc.add("zones", zones);
+                }
+                players.add(pc);
+            }
+            out.add("players", players);
+        }
+        out.addProperty("seq", seq);
+        if (!full) {
+            out.addProperty("base", base);
+        }
+        sentCards.clear();
+        sentCards.putAll(now);
+        return out;
+    }
+
     void markDirty() {
         if (flushScheduled.compareAndSet(false, true)) {
             try {
@@ -163,18 +235,21 @@ final class BridgeGuiGame extends AbstractGuiGame {
             return;
         }
         try {
-            final long t0 = PROFILE ? System.nanoTime() : 0;
+            final long t0 = System.nanoTime();
             final JsonObject state = new GameSerializer(this).snapshot();
+            final long built = (System.nanoTime() - t0) / 1_000_000;
+            Perf.SNAPSHOT_MS.add(built);
             if (PROFILE) {
-                System.out.println("[profil] photo " + (System.nanoTime() - t0) / 1_000_000 + " ms, précédente " + lastSize / 1024 + " Ko");
+                System.out.println("[profil] photo " + built + " ms, précédente " + lastSize / 1024 + " Ko");
             }
             state.add("prompt", prompt());
             final MatchSession s = session;
             if (s != null) {
                 state.add("settings", s.settingsJson());
             }
-            final String json = Bridge.GSON.toJson(state);
+            final String json = Bridge.GSON.toJson(diffed(state));
             lastSize = json.length();
+            Perf.SNAPSHOT_KB.add(lastSize / 1024);
             lastFlushAt = System.currentTimeMillis();
             bridge.sendJson(json);
             if (s != null) {

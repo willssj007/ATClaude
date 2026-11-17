@@ -6,7 +6,7 @@ import {bridge} from './bridge.js';
 import {hideZoom, reloadImages, showZoom} from './cards.js';
 import {DuelScreen, forgetCareer, isPlaneswalker, loadCareer, manaAmount, onCareer, wildcardsHtml} from './career.js';
 import {Decks} from './decks.js';
-import {closeAllForgeDialogs, closeForgeDialog, confirmBox, handleForgeDialog} from './dialogs.js';
+import {closeAllForgeDialogs, closeForgeDialog, confirmBox, customBox, handleForgeDialog} from './dialogs.js';
 import {Game} from './game.js';
 import * as gauntlet from './gauntlet.js';
 import {Lobby} from './lobby.js';
@@ -17,9 +17,11 @@ import {icon} from './icons.js';
 import {ReplayScreen} from './replay.js';
 import {StatsScreen} from './stats.js';
 import {openLedger} from './ledger.js';
+import {deviceInfo, detectDevice, ecoOn, forgetSlow, mark, reportText} from './perf.js';
+import {rehydrate} from './statediff.js';
 import {announceUnlocks, appearanceHtml, applyThemes, livePreviews, themeClicked} from './themes.js';
 import {announceTrophy, Trophies} from './trophies.js';
-import {$, $$, avatarHtml, debounce, esc, prefs, toast} from './util.js';
+import {$, $$, avatarHtml, debounce, el, esc, prefs, toast} from './util.js';
 
 const screens = {};
 let current = 'home';
@@ -157,7 +159,7 @@ async function startMatch(setup) {
   showScreen('game');
   try {
     await bridge.request('startMatch', {setup});
-    bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
+    bridge.send('settings', {settings: matchSettings()});
     prefetchImages();
   } catch (e) {
     inMatch = false;
@@ -263,7 +265,7 @@ async function rewindMatch() {
   showScreen('game');
   try {
     await bridge.request('rewind');
-    bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
+    bridge.send('settings', {settings: matchSettings()});
   } catch (e) {
     toast(e.message, {title: 'Retour en arrière', error: true, duration: 6000});
     // La partie en cours continue : on la réaffiche.
@@ -284,7 +286,7 @@ async function resumeSaved() {
   showScreen('game');
   try {
     await bridge.request('resumeSaved');
-    bridge.send('settings', {settings: {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass')}});
+    bridge.send('settings', {settings: matchSettings()});
     prefetchImages();
   } catch (e) {
     inMatch = false;
@@ -538,6 +540,13 @@ function settingsScreen() {
           <select data-pref-select="atelierLang" aria-label="Langue des nouvelles cartes de l'Atelier"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         <h2 style="margin-top:26px">Lisibilité</h2>
         ${row('bigText', 'Gros texte', 'Agrandit les textes à lire : cartes agrandies, journal, pile, consignes de la partie, fenêtres, menus et notes.')}
+        <h2 style="margin-top:26px">Performance</h2>
+        <div class="row"><div><b>Mode économie</b><p class="muted small">Coupe les décors animés, les flous derrière les fenêtres, les halos qui clignotent et le glissement des cartes d'une place à l'autre, pour garder le jeu fluide. En automatique, il s'active sur un appareil lent. <span class="eco-status"></span></p></div>
+          <select data-pref-select="eco" aria-label="Mode économie"><option value="auto">Automatique</option><option value="on">Toujours</option><option value="off">Jamais</option></select></div>
+        <div class="row"><div><b>Réflexion de l'IA</b><p class="muted small">Le temps maximal que l'IA prend pour chaque décision. Plus court, la partie avance plus vite ; plus long, elle joue un peu mieux sur les plateaux compliqués. Le nom de l'adversaire indique « réfléchit… » pendant ce temps.</p></div>
+          <select data-pref-select="aiTimeout" aria-label="Réflexion de l'IA"><option value="2">Rapide (2 s)</option><option value="4">Normale (4 s)</option><option value="8">Longue (8 s)</option></select></div>
+        <div class="row"><div><b>Relevé de performance</b><p class="muted small">Le démarrage étape par étape, la fluidité de la dernière partie et le temps de chargement des images : à copier dans un message si quelque chose rame.</p></div>
+          <button class="btn small" data-perf-report>Voir le relevé</button></div>
         <h2 style="margin-top:26px"><span data-a>À</span> propos</h2>
         <p class="muted">Arcane Table utilise le moteur <b>Forge</b> (règles, IA, base de cartes et traductions françaises), sous licence GPL-3.0. Images de cartes : Scryfall. Musiques, bruitages, icônes et illustrations des apparences : composés, synthétisés et dessinés pour Arcane Table.</p>
         <p class="muted small">Arcane Table n'est ni produit ni approuvé par Wizards of the Coast. Magic: The Gathering est une marque de Wizards of the Coast LLC.</p>
@@ -554,8 +563,26 @@ function settingsScreen() {
           if (sel.dataset.prefSelect === 'imageLang') {
             reloadImages();
           }
+          if (sel.dataset.prefSelect === 'aiTimeout' && inMatch) {
+            bridge.send('settings', {settings: {aiTimeout: Number(sel.value)}});
+          }
+          if (sel.dataset.prefSelect === 'eco') {
+            if (sel.value === 'auto') {
+              forgetSlow();
+            }
+            applyThemes();
+            ecoStatus();
+          }
         });
       });
+      const ecoStatus = () => {
+        const node = root.querySelector('.eco-status');
+        const d = deviceInfo();
+        if (node) {
+          node.textContent = `Actuellement ${ecoOn() ? 'actif' : 'inactif'}${prefs.get('eco') === 'auto' ? (d.slow ? ' : appareil lent détecté.' : ' : appareil assez rapide.') : '.'}`;
+        }
+      };
+      ecoStatus();
       root.querySelectorAll('[data-pref-range]').forEach(r => {
         r.value = Math.round(Number(prefs.get(r.dataset.prefRange)) * 100);
         r.addEventListener('input', () => {
@@ -606,6 +633,10 @@ function settingsScreen() {
           refreshFrenchCards(true).then(frStatus);
           return;
         }
+        if (e.target.closest('[data-perf-report]')) {
+          perfReport();
+          return;
+        }
         if (e.target.closest('[data-a]') && isPlaneswalker()) {
           openLedger();
           return;
@@ -614,6 +645,35 @@ function settingsScreen() {
       };
     },
   };
+}
+
+/** Réglages de la partie envoyés au moteur à chaque début de partie. */
+function matchSettings() {
+  return {holdPriority: prefs.get('holdPriority'), autoPass: prefs.get('autoPass'), aiTimeout: Number(prefs.get('aiTimeout')) || 4};
+}
+
+/** Relevé de performance (Réglages) : le texte, et un bouton pour le copier. */
+async function perfReport() {
+  const text = await reportText();
+  customBox('Relevé de performance', (body, footer, close) => {
+    const area = el('<textarea rows="18" readonly class="perf-report"></textarea>');
+    area.value = text;
+    body.appendChild(el('<p class="muted small">Rien de personnel dedans : seulement l\'appareil, la version et les mesures. Copie-le et colle-le dans ton message.</p>'));
+    body.appendChild(area);
+    const copy = el('<button class="btn gold">Copier</button>');
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (e) {
+        area.select();
+        document.execCommand('copy');
+      }
+      toast('Relevé copié.');
+    });
+    const done = el('<button class="btn">Fermer</button>');
+    done.addEventListener('click', close);
+    footer.append(done, copy);
+  });
 }
 
 // ------------------------------------------------------------------ démarrage
@@ -649,6 +709,9 @@ function onReady(hello) {
     return;
   }
   ready = true;
+  mark('Moteur prêt, accueil affiché');
+  // Appareil lent ? Mesuré une fois l'accueil affiché (mode économie automatique).
+  detectDevice(applyThemes);
   applyMode();
   loadProfile().then(() => syncNow({auto: true, onDone: afterSync}));
   // Une nouvelle version publiée ? Un peu après le lancement, pour ne pas ralentir l'arrivée sur l'accueil.
@@ -709,6 +772,7 @@ const autotest = /[?&]autotest=1\b/.test(location.search) ? import('./autotest.j
 }) : null;
 
 function init() {
+  mark('Interface chargée');
   if (bridge.ios) {
     // iPhone : règles propres à iOS (appui long, voir app.css). Une sélection qui démarre hors d'un champ de saisie
     // (doigt encore posé quand la carte s'agrandit) est annulée.
@@ -809,8 +873,18 @@ function init() {
   bridge.on('loading', (m) => setLoading(m.text || 'Chargement…', m.percent));
   bridge.on('ready', () => hello());
   bridge.on('fatal', (m) => setLoading(m.message, -1));
-  bridge.on('state', (s) => {
+  let fullAskedAt = 0;
+  bridge.on('state', (raw) => {
     if (!inMatch) {
+      return;
+    }
+    // Les cartes inchangées arrivent par leur seul numéro ; une photo manquée : on demande une photo complète.
+    const s = rehydrate(raw);
+    if (!s) {
+      if (Date.now() - fullAskedAt > 400) {
+        fullAskedAt = Date.now();
+        bridge.send('state', {full: true});
+      }
       return;
     }
     if (game) {
@@ -856,6 +930,7 @@ function init() {
     }
   });
   bridge.on('resumed', () => game && game.resumed());
+  bridge.on('aiThinking', (m) => game && game.aiThinking(m));
   bridge.on('openUrl', (m) => bridge.openUrl(m.url));
   bridge.on('incorrectAction', () => {
     const p = document.querySelector('.table .actions');

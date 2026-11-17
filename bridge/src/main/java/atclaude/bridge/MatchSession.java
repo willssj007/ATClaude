@@ -116,6 +116,69 @@ final class MatchSession {
         this.match = match;
         myStops.addAll(DEFAULT_MY_STOPS);
         theirStops.addAll(DEFAULT_THEIR_STOPS);
+        timer.scheduleWithFixedDelay(this::watchAi, 1000, 200, TimeUnit.MILLISECONDS);
+    }
+
+    // ------------------------------------------------------------------ réflexion de l'IA
+
+    /** Temps de réflexion maximal de l'IA par décision, en secondes (Réglages → Performance) ; 0 : celui de Forge. */
+    private volatile int aiTimeout;
+    /** Joueur IA qui réfléchit (id → début, en ms), et s'il a été annoncé à l'écran. */
+    private final java.util.Map<Integer, Long> aiSince = new java.util.HashMap<>();
+    private int aiShown = -1;
+
+    /**
+     * Toutes les 200 ms : quelle IA réfléchit (Forge ouvre une « séance » par décision, bornée par son temps maximal).
+     * Au-delà de 0,7 s, l'écran l'annonce (« … réfléchit ») ; la durée de chaque séance va au relevé de performance.
+     */
+    private void watchAi() {
+        try {
+            final Game game = game();
+            if (game == null) {
+                return;
+            }
+            final int limit = aiTimeout;
+            if (limit > 0 && game.AI_TIMEOUT != limit) {
+                game.AI_TIMEOUT = limit;
+            }
+            final long now = System.currentTimeMillis();
+            int thinking = -1;
+            String name = "";
+            for (final Player p : game.getPlayers()) {
+                if (p.getController() instanceof PlayerControllerHuman) {
+                    continue;
+                }
+                final boolean active = !game.isGameOver()
+                        && forge.util.AITimeoutTracker.isActive(forge.util.AITimeoutTracker.key(game.getId(), p.getId()));
+                final Long since = aiSince.get(p.getId());
+                if (active && since == null) {
+                    aiSince.put(p.getId(), now);
+                } else if (!active && since != null) {
+                    aiSince.remove(p.getId());
+                    final long took = now - since;
+                    Perf.AI_MS.add(took);
+                    if (took >= game.getAITimeout() * 1000L - 250) {
+                        Perf.AI_CUT.incrementAndGet();
+                    }
+                }
+                if (active && since != null && now - since >= 700 && thinking < 0) {
+                    thinking = p.getId();
+                    name = p.getName();
+                }
+            }
+            if (thinking != aiShown) {
+                aiShown = thinking;
+                final int pid = thinking;
+                final String who = name;
+                bridge.sendEvent("aiThinking", m -> {
+                    m.addProperty("pid", pid);
+                    m.addProperty("name", who);
+                    m.addProperty("limit", game.getAITimeout());
+                });
+            }
+        } catch (final RuntimeException e) {
+            // une prochaine fois
+        }
     }
 
     static MatchSession start(final Bridge bridge, final Catalog catalog, final JsonObject setup) {
@@ -557,7 +620,7 @@ final class MatchSession {
     }
 
     void requestFullState() {
-        gui.markDirty();
+        gui.requestFull();
     }
 
     // ------------------------------------------------------------------ actions de l'interface
@@ -607,15 +670,21 @@ final class MatchSession {
             case "settings" -> updateSettings(m.getAsJsonObject("settings"));
             case "prefetchImages" -> prefetchImages(str(m, "lang"));
             case "cheat" -> cheat(c, m);
-            case "state" -> gui.markDirty();
+            case "state" -> {
+                if (m.has("full")) {
+                    gui.requestFull();
+                } else {
+                    gui.markDirty();
+                }
+            }
             default -> throw new IllegalArgumentException("Action inconnue : " + type);
         }
         return null;
     }
 
     /**
-     * Images à télécharger d'avance : tout le deck du joueur (commandant d'abord), puis les commandants adverses.
-     * Les cartes adverses arrivent au fil de la partie, une par une : l'écran les demande quand elles sont jouées.
+     * Images à télécharger d'avance : tout le deck du joueur (commandant d'abord), les commandants adverses, puis le
+     * reste des decks adverses. Les images demandées par l'écran passent toujours devant.
      */
     private void prefetchImages(final String lang) {
         final Game game = game();
@@ -633,6 +702,16 @@ final class MatchSession {
             final Deck d = p == me ? null : p.getRegisteredPlayer().getDeck();
             if (d != null && d.has(forge.deck.DeckSection.Commander)) {
                 d.get(forge.deck.DeckSection.Commander).toFlatList().forEach(pc -> keys.add(pc.getImageKey(false)));
+            }
+        }
+        // Puis les cartes des adversaires (sauf leurs terrains de base, souvent déjà là) : chacune a son image prête
+        // quand elle est jouée, au lieu de la télécharger à ce moment-là. Toujours après les miennes, une à la fois.
+        for (final Player p : game.getRegisteredPlayers()) {
+            final Deck d = p == me ? null : p.getRegisteredPlayer().getDeck();
+            if (d != null) {
+                d.getMain().toFlatList().stream()
+                        .filter(pc -> !pc.getRules().getType().isBasicLand())
+                        .forEach(pc -> keys.add(pc.getImageKey(false)));
             }
         }
         ImageService.prefetch(new ArrayList<>(keys), lang.isEmpty() ? null : lang);
@@ -773,6 +852,9 @@ final class MatchSession {
         }
         if (s.has("autoPass")) {
             autoPassNoActions = s.get("autoPass").getAsBoolean();
+        }
+        if (s.has("aiTimeout")) {
+            aiTimeout = Math.max(0, Math.min(30, s.get("aiTimeout").getAsInt()));
         }
         if (s.has("myStops")) {
             myStops.clear();

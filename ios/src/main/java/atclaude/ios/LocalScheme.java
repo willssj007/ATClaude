@@ -76,7 +76,11 @@ final class LocalScheme extends WKURLSchemeHandlerAdapter {
         try {
             if ("/cardimg".equals(path)) {
                 final Map<String, String> q = query(url.getQuery());
-                final ImageService.Served img = ImageService.image(q.get("key"), q.get("lang"), ImageService.IMAGE_WAIT_MS, "1".equals(q.get("exact")));
+                ImageService.Served img = ImageService.image(q.get("key"), q.get("lang"), ImageService.IMAGE_WAIT_MS, "1".equals(q.get("exact")));
+                if ("s".equals(q.get("size"))) {
+                    // Pas de réduction sur iPhone (aucun outil d'image côté Java) : l'image entière revient.
+                    img = ImageService.small(q.get("key"), img);
+                }
                 if (img == null) {
                     respond(task, url, 404, "text/plain", new byte[0], "no-store");
                     return;

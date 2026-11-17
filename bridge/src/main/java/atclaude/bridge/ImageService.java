@@ -7,6 +7,7 @@ import forge.item.PaperToken;
 import forge.util.ImageUtil;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +45,57 @@ public final class ImageService {
     });
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
 
+    // ------------------------------------------------------------------ petites images
+
+    /**
+     * Fabrique une petite version d'une image (la plateforme sait décoder et réduire : Android, ordinateur). Renvoie
+     * faux si elle ne sait pas faire ; l'image entière est alors servie.
+     */
+    public interface Thumbnailer {
+        boolean write(File source, File target, int width) throws IOException;
+    }
+
+    /** Null : pas de petites images (iPhone), l'image entière sert partout. */
+    public static volatile Thumbnailer thumbnailer;
+
+    /** Largeur des petites images : la moitié d'une image Scryfall (488 px), assez pour une carte du plateau. */
+    public static final int SMALL_WIDTH = 244;
+
+    /**
+     * La petite version de l'image servie (cartes et jetons du plateau), fabriquée une fois puis gardée dans le cache :
+     * quatre fois moins de pixels à décoder et à garder en mémoire pour chaque carte affichée. L'agrandissement d'une
+     * carte demande toujours l'image entière.
+     */
+    public static Served small(final String imageKey, final Served full) {
+        final Thumbnailer t = thumbnailer;
+        if (t == null || full == null || imageKey == null
+                || !(imageKey.startsWith(ImageKeys.CARD_PREFIX) || imageKey.startsWith(ImageKeys.TOKEN_PREFIX))) {
+            return full;
+        }
+        final File src = full.file();
+        // Déjà petite (jeton généré, image basse définition) : rien à gagner.
+        if (src.length() < 30_000) {
+            return full;
+        }
+        try {
+            final File dir = new File(forge.localinstance.properties.ForgeConstants.CACHE_DIR, "thumbs");
+            final String name = Integer.toHexString(src.getAbsolutePath().hashCode()) + "-" + Long.toHexString(src.length())
+                    + "-" + Long.toHexString(src.lastModified() / 1000) + ".jpg";
+            final File small = new File(dir, name);
+            if (!small.isFile() || small.length() == 0) {
+                dir.mkdirs();
+                final File tmp = new File(dir, name + "." + Thread.currentThread().getId() + ".tmp");
+                if (!t.write(src, tmp, SMALL_WIDTH) || !tmp.renameTo(small)) {
+                    tmp.delete();
+                    return full;
+                }
+            }
+            return new Served(small, full.lang(), full.cacheable());
+        } catch (final IOException | RuntimeException | OutOfMemoryError e) {
+            return full;
+        }
+    }
+
     /** Prévient l'interface qu'une image d'abord servie en anglais existe maintenant dans sa langue. */
     static volatile Consumer<String> onLateImage = key -> { };
 
@@ -65,6 +117,18 @@ public final class ImageService {
 
     /** {@code exact} : cette impression précise (choix d'illustration), jamais une autre impression traduite. */
     public static Served image(final String imageKey, final String lang, final long timeoutMs, final boolean exact) {
+        final long t0 = System.nanoTime();
+        final Served served = serve(imageKey, lang, timeoutMs, exact);
+        if (imageKey != null && (imageKey.startsWith(ImageKeys.CARD_PREFIX) || imageKey.startsWith(ImageKeys.TOKEN_PREFIX))) {
+            Perf.IMAGE_MS.add((System.nanoTime() - t0) / 1_000_000);
+            if (served == null) {
+                Perf.IMAGE_MISSING.incrementAndGet();
+            }
+        }
+        return served;
+    }
+
+    private static Served serve(final String imageKey, final String lang, final long timeoutMs, final boolean exact) {
         if (!ForgeRuntime.isReady() || imageKey == null || imageKey.isEmpty() || ImageKeys.HIDDEN_CARD.equals(imageKey)) {
             return null;
         }

@@ -70,6 +70,7 @@ public final class DesktopMain {
             System.exit(1);
         }
 
+        installThumbnailer();
         final Bridge bridge = new Bridge(json -> {
             for (final Client c : CLIENTS) {
                 c.queue.offer(json);
@@ -158,9 +159,42 @@ public final class DesktopMain {
         reply(exchange, 204, "text/plain", null);
     }
 
+    /**
+     * Petites images du plateau (demandées en mode économie) : réduites par ImageIO, gardées en JPEG dans le cache.
+     */
+    private static void installThumbnailer() {
+        ImageService.thumbnailer = (source, target, width) -> {
+            final java.awt.image.BufferedImage in = javax.imageio.ImageIO.read(source);
+            if (in == null || in.getWidth() < width * 2) {
+                return false;
+            }
+            final int height = Math.round(in.getHeight() * (float) width / in.getWidth());
+            final java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            final java.awt.Graphics2D g = out.createGraphics();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(in, 0, 0, width, height, null);
+            g.dispose();
+            final javax.imageio.ImageWriter writer = javax.imageio.ImageIO.getImageWritersByFormatName("jpg").next();
+            final javax.imageio.ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(javax.imageio.ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(0.85f);
+            try (javax.imageio.stream.ImageOutputStream stream = javax.imageio.ImageIO.createImageOutputStream(target)) {
+                writer.setOutput(stream);
+                writer.write(null, new javax.imageio.IIOImage(out, null, null), param);
+            } finally {
+                writer.dispose();
+            }
+            return true;
+        };
+    }
+
     private static void cardImage(final HttpExchange exchange) throws IOException {
         final String key = query(exchange.getRequestURI(), "key");
-        final ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), ImageService.IMAGE_WAIT_MS, "1".equals(query(exchange.getRequestURI(), "exact")));
+        ImageService.Served img = ImageService.image(key, query(exchange.getRequestURI(), "lang"), ImageService.IMAGE_WAIT_MS, "1".equals(query(exchange.getRequestURI(), "exact")));
+        if ("s".equals(query(exchange.getRequestURI(), "size"))) {
+            img = ImageService.small(key, img);
+        }
         if (img == null) {
             reply(exchange, 404, "text/plain", new byte[0]);
             return;

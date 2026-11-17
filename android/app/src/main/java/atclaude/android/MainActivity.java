@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -36,6 +38,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -147,6 +150,7 @@ public class MainActivity extends Activity {
         hideSystemBars();
 
         if (bridge == null) {
+            installThumbnailer();
             bridge = new Bridge(MainActivity::deliver);
             try {
                 Bridge.setAppVersion(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
@@ -159,6 +163,36 @@ public class MainActivity extends Activity {
             started = true;
             startForge();
         }
+    }
+
+    /**
+     * Petites images du plateau : l'image est décodée directement à la moitié (ou au quart) de sa taille par
+     * BitmapFactory (rapide, peu de mémoire), puis gardée en JPEG dans le cache.
+     */
+    private static void installThumbnailer() {
+        ImageService.thumbnailer = (source, target, width) -> {
+            final BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(source.getPath(), bounds);
+            if (bounds.outWidth <= 0 || bounds.outWidth < width * 2) {
+                return false;
+            }
+            int sample = 2;
+            while (bounds.outWidth / (sample * 2) >= width) {
+                sample *= 2;
+            }
+            final BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            final Bitmap bitmap = BitmapFactory.decodeFile(source.getPath(), opts);
+            if (bitmap == null) {
+                return false;
+            }
+            try (FileOutputStream out = new FileOutputStream(target)) {
+                return bitmap.compress(Bitmap.CompressFormat.JPEG, 84, out);
+            } finally {
+                bitmap.recycle();
+            }
+        };
     }
 
     /** Installe les ressources puis démarre Forge, en arrière-plan : cela prend de quelques secondes à une minute. */
@@ -354,7 +388,8 @@ public class MainActivity extends Activity {
             }
             final String path = url.getPath() == null || url.getPath().equals("/") ? "/index.html" : url.getPath();
             if (path.equals("/cardimg")) {
-                return cardImage(url.getQueryParameter("key"), url.getQueryParameter("lang"), "1".equals(url.getQueryParameter("exact")));
+                return cardImage(url.getQueryParameter("key"), url.getQueryParameter("lang"), "1".equals(url.getQueryParameter("exact")),
+                        "s".equals(url.getQueryParameter("size")));
             }
             try {
                 final InputStream in = getAssets().open("ui" + path);
@@ -390,8 +425,12 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static WebResourceResponse cardImage(final String key, final String lang, final boolean exact) {
-        final ImageService.Served img = ImageService.image(key, lang, ImageService.IMAGE_WAIT_MS, exact);
+    private static WebResourceResponse cardImage(final String key, final String lang, final boolean exact, final boolean small) {
+        ImageService.Served img = ImageService.image(key, lang, ImageService.IMAGE_WAIT_MS, exact);
+        if (small) {
+            // Carte du plateau : la petite image (voir installThumbnailer).
+            img = ImageService.small(key, img);
+        }
         if (img == null) {
             return notFound();
         }

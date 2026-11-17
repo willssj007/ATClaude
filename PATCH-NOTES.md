@@ -2,6 +2,26 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.2 — Zoom à deux doigts, mode économie, partie plus légère
+
+- **Zoom à deux doigts sur le plateau** (téléphone) : pince ta moitié du plateau ou celle d'un adversaire pour l'agrandir jusqu'à ×3, autour de tes doigts, et lire les cartes sans les ouvrir une à une.
+  - Une fois zoomée, un doigt fait glisser la vue ; deux touchers sur une zone vide zooment (×2) ou remettent à plat ; refermer les doigts jusqu'au bout aussi.
+  - Le bouton « 100 % ⟲ » en haut de la moitié zoomée la remet à sa taille.
+  - Chaque moitié se zoome à part : la ligne du milieu (phase, outils), la main et les boutons ne bougent pas. Les cartes zoomées se touchent normalement (jouer, cibler, appui long pour les agrandir), et les flèches d'attaque suivent.
+  - Sur ordinateur : Ctrl + molette (ou pincer le pavé tactile), et la molette fait glisser la vue zoomée.
+- **Mode économie** (Réglages → Performance) : Automatique, Toujours ou Jamais.
+  - Il coupe ce qui coûte sans rien apprendre au joueur : décors animés des fonds mythiques, flou derrière les fenêtres et la barre du haut, halos et contours qui clignotent, glissement des cartes d'une place à l'autre. Les cartes posées prennent de petites images.
+  - En automatique, il s'active sur un appareil lent : un petit calcul chronométré au lancement, ou une partie qui manque de fluidité (beaucoup d'images trop longues à dessiner). Un message le signale.
+- **Petites images pour les cartes posées** (Android, et partout en mode économie) : une image deux fois plus petite dans chaque sens, fabriquée une fois puis gardée sur l'appareil. Quatre fois moins de pixels à décoder et à garder en mémoire par carte : un plateau chargé reste fluide sur les téléphones modestes. La main et l'agrandissement d'une carte gardent l'image entière.
+- **Partie plus légère** : à chaque mise à jour, le moteur n'envoie plus que les cartes qui ont changé ; les autres partent par leur seul numéro et l'écran reprend celles qu'il a déjà. Sur un combat avec 24 créatures, une mise à jour pèse en moyenne 3 Ko au lieu de 8 à 11 Ko, à transmettre et à lire. Si une mise à jour se perd, l'écran redemande tout de lui-même.
+- **L'IA réfléchit…** : quand l'IA prend plus d'une demi-seconde pour décider, une bulle « ••• » s'affiche au-dessus de son portrait jusqu'à ce qu'elle joue.
+- **Temps de réflexion de l'IA** (Réglages → Performance) : Rapide (2 s), Normale (4 s) ou Longue (8 s) au plus par décision. Plus court, la partie avance plus vite ; plus long, elle joue un peu mieux sur les plateaux compliqués.
+- **Relevé de performance** (Réglages → Performance) : le démarrage étape par étape, la fluidité de la partie, le temps de dessin du plateau, le poids des mises à jour, la réflexion de l'IA et le chargement des images. Un bouton le copie pour le coller dans un message si quelque chose rame. Rien de personnel dedans : l'appareil, la version et les mesures.
+- **Préchargement** :
+  - en partie, les images des decks adverses se téléchargent en fond après celles de ton deck : une carte adverse jouée s'affiche tout de suite ;
+  - dans la recherche de cartes, la page suivante et ses images se préparent pendant que tu regardes la première : en faisant défiler, elles arrivent sans attente.
+- **Démarrage** : l'analyse des decks préconstruits se fait à part, en fond, sur Android aussi (comme sur iPhone) ; le profil, les decks et les statistiques de l'accueil ne l'attendent plus.
+
 ## 0.9.1 — Cartes perso en anglais vraiment en anglais
 
 - **Cartes perso en anglais, en partie** : une ligne pouvait passer en français avec le texte de rappel d'une carte officielle (« Défenseur (Cette créature ne peut pas attaquer.) » au-dessus d'une capacité en anglais). Forge garde en mémoire les lignes déjà traduites pendant la partie : dès qu'une carte officielle avec le même mot-clé (un Mur avec Défenseur, par exemple) était passée, il réutilisait sa traduction pour les cartes qui n'en ont pas, dont les cartes perso. Une carte perso, un jeton perso ou un emblème perso en anglais reste maintenant entièrement en anglais.

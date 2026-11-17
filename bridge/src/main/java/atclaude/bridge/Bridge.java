@@ -68,6 +68,7 @@ public final class Bridge {
     private volatile MatchSession session;
 
     public Bridge(final Transport transport) {
+        Perf.step("Pont créé");
         this.transport = transport;
         this.edt = Executors.newSingleThreadExecutor(r -> {
             final Thread t = new Thread(r, "atclaude-edt");
@@ -167,6 +168,7 @@ public final class Bridge {
 
     /** Progression affichée par l'écran de chargement de l'interface (pourcentage de 0 à 100, ou -1). */
     public void notifyLoading(final String text, final int percent) {
+        Perf.step(text);
         sendEvent("loading", m -> {
             m.addProperty("text", text);
             m.addProperty("percent", percent);
@@ -284,33 +286,27 @@ public final class Bridge {
      * une demande de l'interface passe entre deux étapes, et chaque écran s'ouvre ensuite sans attendre.
      */
     void warmUp() {
-        if (ios) {
-            // iPhone : l'analyse des préconstruits dure plus d'une minute ; sur le fil du catalogue, le profil, les
-            // decks et les statistiques du menu attendaient derrière. Elle se fait donc sur un fil à elle.
-            warmStep(java.util.List.of(
-                    () -> catalog.search(new JsonObject()),
-                    catalog::listDecks,
-                    Career::boosterSets,
-                    () -> catalog.refillRandomPool(0)), 0);
-            final Thread precons = new Thread(() -> {
-                try {
-                    Precons.all();
-                } catch (final RuntimeException e) {
-                    // simple préparation : le premier écran qui en a besoin refera l'analyse
-                }
-            }, "atclaude-precons");
-            precons.setDaemon(true);
-            precons.setPriority(Thread.MIN_PRIORITY);
-            precons.start();
-            return;
-        }
-        final java.util.List<Runnable> steps = java.util.List.of(
+        // L'index de la recherche d'abord (premier écran Cartes instantané), puis les decks, les boosters et la réserve
+        // des decks aléatoires, sur le fil du catalogue, en priorité basse.
+        warmStep(java.util.List.of(
                 () -> catalog.search(new JsonObject()),
                 catalog::listDecks,
-                Precons::all,
                 Career::boosterSets,
-                () -> catalog.refillRandomPool(0));
-        warmStep(steps, 0);
+                () -> catalog.refillRandomPool(0)), 0);
+        // L'analyse des préconstruits (plus d'une minute sur iPhone, longue aussi sur les téléphones Android modestes) a
+        // son propre fil : le profil, les decks et les statistiques du menu n'attendent plus derrière elle.
+        final Thread precons = new Thread(() -> {
+            final long started = System.nanoTime();
+            try {
+                Precons.all();
+            } catch (final RuntimeException e) {
+                // simple préparation : le premier écran qui en a besoin refera l'analyse
+            }
+            Perf.step("Préconstruits analysés en arrière-plan (" + (System.nanoTime() - started) / 1_000_000 + " ms)");
+        }, "atclaude-precons");
+        precons.setDaemon(true);
+        precons.setPriority(Thread.MIN_PRIORITY);
+        precons.start();
     }
 
     private void warmStep(final java.util.List<Runnable> steps, final int i) {
@@ -327,7 +323,9 @@ public final class Bridge {
                 // simple préparation : l'écran refera le calcul et montrera l'erreur s'il y en a une
             } finally {
                 t.setPriority(Thread.NORM_PRIORITY);
-                System.out.println("Préparation " + (i + 1) + "/" + steps.size() + " : " + (System.nanoTime() - started) / 1_000_000 + " ms");
+                final long ms = (System.nanoTime() - started) / 1_000_000;
+                System.out.println("Préparation " + (i + 1) + "/" + steps.size() + " : " + ms + " ms");
+                Perf.step("Préparation en arrière-plan " + (i + 1) + "/" + steps.size() + " finie (" + ms + " ms)");
             }
             warmStep(steps, i + 1);
         });
@@ -456,6 +454,12 @@ public final class Bridge {
                 return ImageService.directUrls(m.has("key") ? m.get("key").getAsString() : null, m.has("lang") ? m.get("lang").getAsString() : null);
             case "hello":
                 return hello();
+            case "perfReport": {
+                final JsonObject report = Perf.report();
+                report.addProperty("appVersion", appVersion);
+                report.addProperty("channel", System.getProperty("atclaude.channel", ""));
+                return report;
+            }
             case "whatsNew":
                 return whatsNew();
             case "searchCards":

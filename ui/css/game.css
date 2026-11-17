@@ -139,6 +139,13 @@
 /* Devant l'encoche de la caméra : la bande s'en écarte (--dodge-*, posés par le script). */
 .opp-half, .me-half { padding-left: var(--dodge-l, 0px); padding-right: var(--dodge-r, 0px); }
 .half { position: relative; min-height: 0; min-width: 0; }
+/* Zoom à deux doigts (voir boardzoom.js) : la moitié est agrandie depuis son coin puis découpée à sa place. Rien à y
+   faire défiler : les gestes du doigt sont tous pour le plateau. */
+.half { transform-origin: 0 0; touch-action: none; }
+.half.zoom-anim { transition: transform 0.2s ease-out, clip-path 0.2s ease-out; }
+.zoom-reset { position: absolute; z-index: 13; padding: 4px 9px; border-radius: 999px; font: inherit; font-size: 11.5px; font-weight: 700;
+  color: var(--gold, #ffd26e); background: rgb(10 11 20 / 0.82); border: 1px solid rgb(var(--gold-rgb, 255 210 110) / 0.5);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.4); cursor: pointer; white-space: nowrap; }
 /* Taille des cartes : deux rangées par moitié, plafonnée pour que cinq cartes tiennent en largeur. */
 /* Taille des cartes, rangée par rangée (voir fitRows dans game.js) : --bf-base, la taille de base tirée de la part
    de hauteur de la rangée, et --fit, sa réduction quand elle est trop pleine. La répartition de la hauteur entre les
@@ -759,3 +766,19 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 }
 .div-start:has(.plane-host:not(:empty)) { display: flex; align-items: center; overflow: hidden; }
 .die-tool .tool-label { font-size: 10.5px; font-weight: 700; }
+
+/* Mode économie (voir perf.js) : les halos et contours qui pulsent restent allumés, immobiles (chacun repeint sa
+   zone à chaque image), et les flèches d'attaque ne défilent plus. */
+:root[data-eco="on"] .mcard.selectable::after, :root[data-eco="on"] .player-hit.selectable, :root[data-eco="on"] .plate.atk-current,
+:root[data-eco="on"] .die-tool.ready, :root[data-eco="on"] .stat.pc.danger, :root[data-eco="on"] svg.arrows .atk { animation: none; }
+
+/* L'IA réfléchit (voir aiThinking dans game.js) : une bulle « … » au-dessus de son portrait. */
+.plate .player-hit { position: relative; }
+.plate .think { display: none; position: absolute; left: 20px; top: -9px; z-index: 2; gap: 3px; align-items: center; padding: 4px 6px;
+  border-radius: 999px 999px 999px 4px; background: rgb(14 16 28 / 0.92); border: 1px solid rgb(var(--gold-rgb) / 0.55); pointer-events: none; }
+.plate.thinking .think { display: inline-flex; }
+.plate .think i { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); animation: think-dot 1.2s ease-in-out infinite; }
+.plate .think i:nth-child(2) { animation-delay: 0.2s; }
+.plate .think i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes think-dot { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+:root[data-eco="on"] .plate .think i, :root[data-motion="off"] .plate .think i { animation: none; opacity: 0.85; }

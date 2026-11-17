@@ -121,6 +121,10 @@ const DEFAULTS = {
   discordPresence: true,
   // Chercher une nouvelle version au lancement de l'appli.
   autoUpdate: true,
+  // Mode économie : 'auto' (sur un appareil lent), 'on' ou 'off'. Propre à chaque appareil (pas synchronisé).
+  eco: 'auto',
+  // Temps de réflexion maximal de l'IA par décision (secondes).
+  aiTimeout: '4',
   // Textes plus grands (lisibilité), et texte français des cartes récentes pris sur Scryfall.
   bigText: false,
   frenchCards: true,
@@ -188,7 +192,7 @@ export const prefs = {
   },
 };
 
-const SYNCED = ['images', 'imageLang', 'bigText', 'frenchCards', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'atelierFit', 'atelierLang', 'lastSetup', 'menuTheme', 'boardTheme', 'cardBack'];
+const SYNCED = ['images', 'imageLang', 'aiTimeout', 'bigText', 'frenchCards', 'musicOn', 'musicVolume', 'sfxOn', 'sfxVolume', 'animations', 'holdPriority', 'autoPass', 'showEnglish', 'atelierFit', 'atelierLang', 'lastSetup', 'menuTheme', 'boardTheme', 'cardBack'];
 
 export const AVATAR_COLORS = ['#7c6cf2', '#e2563a', '#3c9a5a', '#3d8fd8', '#c9973d', '#b04fb8'];
 

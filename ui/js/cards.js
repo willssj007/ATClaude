@@ -107,6 +107,52 @@ function retryLater(node, img, url) {
   }, RETRY_DELAYS[n]);
 }
 
+/**
+ * Adresse de l'image d'une carte pour cet élément. Illustration choisie dans le deck builder : cette impression
+ * précise, jamais une autre impression traduite. Carte du plateau (data-small) : la petite version.
+ */
+function imageUrlOf(node, key) {
+  return bridge.imageUrl(key, prefs.get('imageLang')) + (node.dataset.exact === '1' ? '&exact=1' : '')
+    + (node.dataset.small === '1' ? '&size=s' : '');
+}
+
+/**
+ * Passe une carte affichée à sa petite image (plateau) ou à l'entière (main) : la nouvelle est chargée à côté et
+ * ne remplace l'ancienne qu'une fois prête (pas d'illustration qui disparaît le temps du chargement).
+ */
+export function setImageSize(node, small) {
+  if ((node.dataset.small === '1') === small) {
+    return;
+  }
+  if (small) {
+    node.dataset.small = '1';
+  } else {
+    delete node.dataset.small;
+  }
+  const img = node.querySelector('img.art');
+  const key = img && img.dataset.key;
+  if (!key) {
+    return;
+  }
+  if (!node.classList.contains('has-img')) {
+    loadImage(node, key);
+    return;
+  }
+  const url = imageUrlOf(node, key);
+  const next = new Image();
+  next.decoding = 'async';
+  next.src = url;
+  (next.decode ? next.decode() : new Promise((ok, ko) => {
+    next.onload = ok;
+    next.onerror = ko;
+  })).then(() => {
+    if (imageUrlOf(node, key) === url) {
+      img.dataset.src = url;
+      img.src = url;
+    }
+  }, () => {});
+}
+
 /** Charge l'image d'une carte dans l'élément, si les images sont activées. */
 export function loadImage(node, key, bust = '') {
   const img = node.querySelector('img.art');
@@ -120,8 +166,7 @@ export function loadImage(node, key, bust = '') {
     img.dataset.src = '';
     return;
   }
-  // Illustration choisie dans le deck builder : cette impression précise, jamais une autre impression traduite.
-  const url = bridge.imageUrl(key, prefs.get('imageLang')) + (node.dataset.exact === '1' ? '&exact=1' : '');
+  const url = imageUrlOf(node, key);
   if (img.dataset.src === url && !bust) {
     return;
   }
@@ -175,7 +220,7 @@ bridge.on('imageReady', ({key}) => {
 });
 
 /** Carte face visible, pour le catalogue et les dialogues. */
-export function cardElement(card, extraClass = '') {
+export function cardElement(card, extraClass = '', {small = false} = {}) {
   if (!card || card.hidden) {
     return el(`<div class="mcard back ${extraClass}"><div class="face"></div></div>`);
   }
@@ -184,6 +229,9 @@ export function cardElement(card, extraClass = '') {
   node.title = card.nameFr || card.name || '';
   if (card.exactArt) {
     node.dataset.exact = '1';
+  }
+  if (small) {
+    node.dataset.small = '1';
   }
   loadImage(node, card.image);
   scheduleFit(node);

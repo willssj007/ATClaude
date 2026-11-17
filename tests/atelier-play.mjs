@@ -6,6 +6,7 @@
 // Sortie en erreur (code 1) si un effet ne fait pas ce qu'il dit. « à revoir » : résultat dépendant des choix de l'IA
 // ou du tirage, signalé sans faire échouer.
 import {buildScript, EFFECTS, effectsFor} from '../ui/js/cardscript.js';
+import {rehydrate} from '../ui/js/statediff.js';
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8765';
 const FILTER = process.argv[3] ? new RegExp(process.argv[3]) : null;
@@ -33,7 +34,16 @@ let stateAt = 0;
       try {
         const m = JSON.parse(d);
         if (m.type === 'response') responses[m.rid] = m;
-        if (m.type === 'state') { state = m; stateAt = Date.now(); }
+        if (m.type === 'state') {
+          // Photos différentielles : les cartes inchangées arrivent par leur numéro (voir statediff.js).
+          const full = rehydrate(m);
+          if (full) {
+            state = full;
+            stateAt = Date.now();
+          } else {
+            fetch(BASE + '/api/send', {method: 'POST', body: JSON.stringify({type: 'state', full: true})});
+          }
+        }
         if (m.type === 'dialog') dialogs.set(m.id, m);
         if (m.type === 'dialogClosed') dialogs.delete(m.id);
       } catch (e) {}
