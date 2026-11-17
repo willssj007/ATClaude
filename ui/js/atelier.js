@@ -289,7 +289,7 @@ export class Atelier {
     const help = (text) => `<details class="ate-help"><summary>Comment ça marche ?</summary><p class="muted small">${text}</p></details>`;
     const primary = tab === 'cards' ? '<button class="btn gold" data-new>＋ Nouvelle carte</button>'
       : tab === 'tokens' ? '<button class="btn gold" data-new-token>＋ Nouveau jeton</button>'
-        : tab === 'emblems' ? '<button class="btn gold" data-new-emblem>＋ Nouvel emblème</button>'
+        : tab === 'emblems' ? '<button class="btn gold" data-new-emblem>＋ Nouvel emblème</button><button class="btn" data-emblem-card>＋ Carte qui le donne</button>'
         : tab === 'sets' ? '<button class="btn gold" data-newset>＋ Nouvelle extension</button>' : '';
     const setOpt = (v, label, count) => `<option value="${esc(v)}"${setFilter === v ? ' selected' : ''}>${esc(label)} (${count})</option>`;
     this.root.innerHTML = `<div class="page atelier${sel ? ' ate-selecting' : ''}">
@@ -334,7 +334,9 @@ export class Atelier {
       ${help(`Un emblème reste dans ta zone de commandement jusqu'à la fin de la partie : rien ne peut le détruire, et ses effets
         permanents (« les créatures que vous contrôlez gagnent +1/+1 ») et ses déclencheurs (« au début de votre entretien… »)
         marchent tant que la partie dure. Tes cartes le donnent avec l'effet « Obtenir un emblème » (une capacité de loyauté de
-        planeswalker, par exemple) ; modifier un emblème met à jour les cartes qui le donnent.`)}
+        planeswalker, par exemple) ; modifier un emblème met à jour les cartes qui le donnent. « Carte qui le donne » crée une
+        carte avec « Quand vous avez au moins trois permanents d'un même type, vous gagnez un emblème » : choisis ensuite le
+        nombre, la sorte de permanents, le type et l'emblème.`)}
       <div class="ate-grid ate-emblems">${allEmblems.length ? '' : '<p class="muted">Aucun emblème perso pour l\'instant.</p>'}</div>` : ''}
       ${tab === 'types' ? `
       ${help(`Un type de créature inventé doit être déclaré ici : Forge ne connaît que les types officiels, et un effet qui cite un
@@ -515,6 +517,14 @@ export class Atelier {
         this.edit(null, {token: true});
       } else if (e.target.closest('[data-new-emblem]')) {
         this.edit(null, {emblem: true});
+      } else if (e.target.closest('[data-emblem-card]')) {
+        // Une carte toute prête à donner un emblème : « Quand vous avez au moins trois permanents d'un même type… ».
+        this.edit(null);
+        const tpl = templates('').find(t => t.a && t.a.when === 'controlCount' && t.a.whenCtlKind === 'permanent');
+        if (tpl) {
+          this.form.abilities.push(JSON.parse(JSON.stringify(tpl.a)));
+          this.renderLeft();
+        }
       } else if (tile) {
         this.edit(d.cards.find(c => c.name === tile.dataset.name));
       } else if (e.target.closest('[data-untype]')) {
@@ -1883,17 +1893,24 @@ export class Atelier {
     };
     const list = (onlyAttach ? own : [...own, ...templates(this.guessType()).map(t => ({...t, group: own.length ? 'Autres capacités' : ''}))]).filter(fits);
     const plain = (x) => String(x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    // Recherche par mots, dans n'importe quel ordre, au singulier comme au pluriel (« x permanent emblème » trouve
+    // « … au moins trois permanents …, vous gagnez un emblème »), aussi dans les mots-clés de chaque phrase.
+    const SMALL = new Set(['x', 'de', 'd', 'du', 'des', 'la', 'le', 'les', 'l', 'un', 'une', 'et', 'a', 'au', 'aux', 'en', 'qu']);
+    const stem = (w) => (w.length > 3 ? w.replace(/[sx]$/, '') : w);
+    // Les nombres tapés (« 3 permanents ») ne comptent pas : ils se règlent après coup, et les phrases les écrivent en lettres.
+    const words = (q) => plain(q).split(/[^a-z0-9+/{}-]+/).filter(w => w && !SMALL.has(w) && !/^\d+$/.test(w)).map(stem);
     customBox(onlyAttach && at ? `Pour ${at.fr}` : 'Capacité toute prête', (body, footer, close) => {
       body.innerHTML = `<p class="muted small">Touche une phrase : elle s'ajoute aux capacités, et tu peux ensuite changer le type, le mot-clé ou le nombre.</p>
         <input type="search" class="ate-tplq" placeholder="Chercher : contact mortel, +1/+1, attaque, pioche…" enterkeyhint="search">
         <div class="ate-templates"></div>`;
       const box = body.querySelector('.ate-templates');
       const paint = (q) => {
-        const f = plain(q.trim());
+        const wanted = words(q);
         let group = null;
         let html = '';
         list.forEach((t, i) => {
-          if (f && !plain(t.label).includes(f)) {
+          const hay = plain(`${t.label} ${t.tags || ''}`);
+          if (wanted.length && !wanted.every(w => hay.includes(w))) {
             return;
           }
           if (t.group && t.group !== group) {

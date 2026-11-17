@@ -2,6 +2,14 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.4 — Atelier : « Quand vous avez X permanents d'un type, vous gagnez un emblème » plus facile à trouver
+
+- **Onglet Emblèmes : bouton « Carte qui le donne »**. Il ouvre une nouvelle carte avec, déjà en place, « Quand vous avez au moins trois permanents d'un même type, vous gagnez un emblème » : il reste à choisir le nombre, la sorte de permanents (créatures, artefacts…), le type (Elfe, Équipement, un type perso…) et l'emblème (le premier de tes emblèmes perso est déjà choisi).
+- **Le déclencheur s'appelle maintenant « Quand vous avez (contrôlez) au moins X permanents d'un type »** dans la liste « Quand », au lieu de « La première fois que vous contrôlez… ». Il marche toujours de la même façon : la première fois que le compte y est, une fois par carte, et un emblème perso ne se gagne qu'une fois par joueur.
+- **Capacités toutes prêtes** :
+  - nouvelle phrase « Quand vous avez au moins trois permanents d'un même type…, vous gagnez un emblème », qui reprend le type de la carte s'il en a un ;
+  - la recherche se fait par mots, dans n'importe quel ordre et au singulier comme au pluriel : « si vous avez 3 permanents emblème » ou « x permanent d'un même type » la trouvent. Les nombres tapés sont ignorés (ils se règlent ensuite).
+
 ## 0.9.3 — Partie bloquée : la reprendre au lieu de la perdre
 
 - **Partie qui ne répond plus** : quand le moteur ne bouge plus depuis 20 secondes alors qu'il n'attend rien de toi (l'IA ou la résolution d'un effet est coincée, « En attente de … » sans fin), un bandeau le signale en haut du plateau.
