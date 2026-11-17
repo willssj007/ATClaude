@@ -140,6 +140,11 @@ final class BridgeGuiGame extends AbstractGuiGame {
     private static final boolean PROFILE = Boolean.getBoolean("atclaude.profile");
 
     private volatile long lastFlushAt;
+
+    /** Heure de la dernière photo envoyée (la partie a bougé). */
+    long lastFlushAt() {
+        return lastFlushAt;
+    }
     private volatile int lastSize;
 
     /**

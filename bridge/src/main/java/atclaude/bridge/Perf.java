@@ -82,8 +82,12 @@ final class Perf {
     static final Stat AI_MS = new Stat();
     static final AtomicInteger AI_CUT = new AtomicInteger();
 
+    /** Dernière partie bloquée : l'heure et où en étaient les fils du moteur (pour trouver la cause). */
+    static volatile String lastStuck = "";
+
     static JsonObject report() {
         final JsonObject o = new JsonObject();
+        o.addProperty("stuck", lastStuck);
         final JsonArray startup = new JsonArray();
         synchronized (STARTUP) {
             for (final Object[] s : STARTUP) {

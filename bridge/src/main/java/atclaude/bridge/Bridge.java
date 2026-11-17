@@ -208,6 +208,15 @@ public final class Bridge {
             dispatch(type, message);
             return;
         }
+        if ("unstick".equals(type)) {
+            // Partie bloquée : le fil de l'interface (EDT) peut l'être aussi (question restée ouverte, attente de la
+            // partie) ; la reprise se fait sur un fil à elle, après avoir fermé les questions ouvertes.
+            cancelDialogs();
+            final Thread t = new Thread(() -> dispatch(type, message), "atclaude-unstick");
+            t.setDaemon(true);
+            t.start();
+            return;
+        }
         if ("leaveMatch".equals(type) || "startMatch".equals(type) || "resumeSaved".equals(type)) {
             // Un dialogue ouvert depuis l'EDT (choix d'une capacité) le bloque : on le ferme d'abord, l'EDT repart.
             cancelDialogs();
@@ -696,6 +705,26 @@ public final class Bridge {
             case "deleteSaved":
                 SaveGame.delete(null);
                 return null;
+            case "unstick": {
+                // Partie bloquée : elle reprend au dernier moment calme enregistré (le fil de partie bloqué est laissé
+                // de côté : rien ne peut l'arrêter de l'extérieur).
+                final MatchSession cur = session;
+                if (cur == null) {
+                    throw new IllegalStateException("Aucune partie en cours.");
+                }
+                final java.util.List<JsonObject> older = new java.util.ArrayList<>();
+                final JsonObject target = cur.latestCalm(older);
+                if (target == null) {
+                    throw new IllegalStateException("Cette partie n'a pas de moment calme enregistré : il faut l'abandonner.");
+                }
+                final MatchSession stuck = session;
+                session = null;
+                ImageService.cancelPrefetch();
+                stuck.abandonStuck();
+                session = MatchSession.resume(this, catalog, target);
+                session.keepHistory(older);
+                return null;
+            }
             case "rewind": {
                 // Sandbox : la partie reprend depuis la photo d'avant (début de la phase précédente, à peu près).
                 final MatchSession cur = session;
@@ -806,6 +835,18 @@ public final class Bridge {
         final CompletableFuture<JsonElement> future = pendingDialogs.get(id);
         if (future != null) {
             future.complete(message.has("value") ? message.get("value") : JsonNull.INSTANCE);
+        }
+    }
+
+    /** Une question de Forge attend encore la réponse du joueur. */
+    boolean hasOpenDialogs() {
+        return !openDialogs.isEmpty();
+    }
+
+    /** Renvoie à l'écran les questions encore ouvertes (déjà affichées : l'écran les ignore). */
+    void resendDialogs() {
+        for (final JsonObject dialog : openDialogs.values()) {
+            send(dialog);
         }
     }
 

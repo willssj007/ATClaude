@@ -270,6 +270,10 @@ export async function reportText() {
     out.push(`  Réponse du moteur : ${line(j.imageMs)}${j.imageMissing ? `, ${j.imageMissing} introuvables` : ''}`);
   }
   out.push(`  Chargement à l'écran : ${line(stats.images.summary())}`);
+  if (j.stuck) {
+    out.push('');
+    out.push(`Dernier blocage de partie : ${j.stuck}`);
+  }
   return out.join('\n');
 }
 

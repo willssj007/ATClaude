@@ -2,6 +2,15 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.3 — Partie bloquée : la reprendre au lieu de la perdre
+
+- **Partie qui ne répond plus** : quand le moteur ne bouge plus depuis 20 secondes alors qu'il n'attend rien de toi (l'IA ou la résolution d'un effet est coincée, « En attente de … » sans fin), un bandeau le signale en haut du plateau.
+  - **Reprendre** relance la partie au dernier moment calme enregistré (le début de la phase, à peu près) : tu retrouves ton plateau, ta main et tes points de vie de ce moment-là. Ça marche aussi en mode Planeswalker.
+  - **Patienter** ferme le bandeau ; il disparaît aussi de lui-même si la partie repart.
+  - Archenemy, Planechase et les énigmes ne s'enregistrent pas : là, il faut abandonner la partie (menu).
+- **Relevé de performance** : il contient maintenant le dernier blocage (tour, phase, pile, joueur qui avait la priorité, et où en étaient les fils du moteur). Après un blocage, copie le relevé (Réglages → Performance) et envoie-le : c'est ce qu'il faut pour corriger la cause.
+- Une question du jeu restée sans réponse depuis 20 secondes est renvoyée à l'écran, au cas où elle s'y serait perdue.
+
 ## 0.9.2 — Zoom à deux doigts, mode économie, partie plus légère
 
 - **Zoom à deux doigts sur le plateau** (téléphone) : pince ta moitié du plateau ou celle d'un adversaire pour l'agrandir jusqu'à ×3, autour de tes doigts, et lire les cartes sans les ouvrir une à une.

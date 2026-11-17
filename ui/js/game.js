@@ -265,6 +265,37 @@ export class Game {
     }
   }
 
+  /**
+   * Partie bloquée (le moteur ne bouge plus depuis 20 s sans rien attendre de nous) : un bandeau propose de reprendre
+   * au dernier moment calme ; il disparaît de lui-même si la partie repart.
+   */
+  showStuck(m, onUnstick) {
+    const old = this.table && this.table.querySelector('.stuck-bar');
+    if (!m.stuck || !this.table) {
+      old && old.remove();
+      return;
+    }
+    if (old) {
+      return;
+    }
+    const bar = el(`<div class="stuck-bar" role="alert">
+      <div><b>La partie ne répond plus</b><span>Le moteur est bloqué depuis ${Number(m.seconds) || 20} s. ${m.resumable
+        ? 'Tu peux la reprendre au dernier moment calme (le début de la phase, à peu près).'
+        : 'Cette partie n\'a pas de moment calme enregistré : il faudra l\'abandonner (menu).'} Le relevé de performance (Réglages) contient les détails du blocage : envoie-le pour qu'il soit corrigé.</span></div>
+      <div class="stuck-actions">${m.resumable ? '<button class="btn gold small" data-unstick>Reprendre</button>' : ''}<button class="btn small" data-stuck-wait>Patienter</button></div>
+    </div>`);
+    bar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.target.closest('[data-unstick]')) {
+        bar.remove();
+        onUnstick();
+      } else if (e.target.closest('[data-stuck-wait]')) {
+        bar.remove();
+      }
+    });
+    this.table.appendChild(bar);
+  }
+
   resumed() {
     this.paused = false;
     if (this.lastState) {

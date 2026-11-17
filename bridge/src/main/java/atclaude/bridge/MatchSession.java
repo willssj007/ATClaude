@@ -119,6 +119,138 @@ final class MatchSession {
         timer.scheduleWithFixedDelay(this::watchAi, 1000, 200, TimeUnit.MILLISECONDS);
     }
 
+    // ------------------------------------------------------------------ partie bloquée
+
+    /** Au-delà, sans rien de nouveau à l'écran et sans rien attendre du joueur, la partie est considérée bloquée. */
+    private static final long STUCK_MS = 20_000;
+    private boolean stuckReported;
+    private long lastDialogResend;
+    private volatile boolean abandoned;
+    /** Essai du blocage sur ordinateur (-Datclaude.testStuck=true, triche « testStuck ») : la partie passe pour bloquée. */
+    private static final boolean TEST_STUCK = Boolean.getBoolean("atclaude.testStuck");
+    private volatile boolean testStuck;
+
+    /**
+     * Partie qui ne bouge plus : aucune photo depuis 20 s, alors que Forge n'attend rien du joueur (l'IA ou la
+     * résolution est coincée). L'écran le signale et propose de reprendre au dernier moment calme ; où en étaient
+     * les fils du moteur part dans le relevé de performance, pour trouver la cause. Une question restée sans
+     * réponse est renvoyée à l'écran (au cas où elle s'y serait perdue).
+     */
+    private void watchStuck(final Game game) {
+        final long now = System.currentTimeMillis();
+        final PlayerControllerHuman c = gui.controller();
+        final long quiet = now - gui.lastFlushAt() + (TEST_STUCK && testStuck ? STUCK_MS : 0);
+        final boolean waitingOnMe = c != null && c.getInputQueue().getInput() != null && !(TEST_STUCK && testStuck);
+        if (closed || game.isGameOver() || waitingOnMe || quiet < STUCK_MS) {
+            if (stuckReported && quiet < STUCK_MS) {
+                stuckReported = false;
+                bridge.sendEvent("gameStuck", m -> m.addProperty("stuck", false));
+            }
+            return;
+        }
+        if (bridge.hasOpenDialogs()) {
+            if (now - lastDialogResend > STUCK_MS) {
+                lastDialogResend = now;
+                bridge.resendDialogs();
+            }
+            return;
+        }
+        if (stuckReported) {
+            return;
+        }
+        stuckReported = true;
+        final String dump = threadDump();
+        Perf.lastStuck = new java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.FRANCE).format(new java.util.Date())
+                + ", tour " + game.getPhaseHandler().getTurn() + ", " + game.getPhaseHandler().getPhase()
+                + ", pile " + game.getStack().size() + ", priorité à "
+                + (game.getPhaseHandler().getPriorityPlayer() == null ? "personne" : game.getPhaseHandler().getPriorityPlayer().getName())
+                + "\n" + dump;
+        System.err.println("Partie bloquée :\n" + Perf.lastStuck);
+        final boolean resumable = latestCalm(new ArrayList<>()) != null;
+        final long seconds = quiet / 1000;
+        bridge.sendEvent("gameStuck", m -> {
+            m.addProperty("stuck", true);
+            m.addProperty("seconds", seconds);
+            m.addProperty("resumable", resumable);
+        });
+    }
+
+    /** Où en sont les fils du moteur (partie, IA, interface) : leurs dernières méthodes appelées. */
+    private static String threadDump() {
+        final StringBuilder sb = new StringBuilder();
+        try {
+            for (final java.util.Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+                final Thread t = e.getKey();
+                final StackTraceElement[] st = e.getValue();
+                if (t == Thread.currentThread() || st.length == 0) {
+                    continue;
+                }
+                boolean forge = t.getName().startsWith("Game") || t.getName().startsWith("atclaude-edt");
+                for (int i = 0; i < st.length && !forge; i++) {
+                    forge = st[i].getClassName().startsWith("forge.");
+                }
+                if (!forge) {
+                    continue;
+                }
+                sb.append(t.getName()).append(" (").append(t.getState()).append(")\n");
+                for (int i = 0; i < Math.min(st.length, 28); i++) {
+                    sb.append("  ").append(st[i].getClassName().replaceFirst("^forge\\.", "")).append('.')
+                            .append(st[i].getMethodName()).append(':').append(st[i].getLineNumber()).append('\n');
+                }
+                if (sb.length() > 12_000) {
+                    break;
+                }
+            }
+        } catch (final Throwable e) {
+            sb.append("(piles indisponibles : ").append(e).append(")\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Le dernier moment calme enregistré de cette partie (photo de l'historique, sinon la sauvegarde), et dans
+     * {@code older} l'historique jusqu'à lui. Null pour les variantes sans sauvegarde.
+     */
+    JsonObject latestCalm(final List<JsonObject> older) {
+        if (archenemy || planechase || puzzle != null) {
+            return null;
+        }
+        synchronized (history) {
+            if (!history.isEmpty()) {
+                older.addAll(history);
+                return history.peekLast();
+            }
+        }
+        final JsonObject saved = SaveGame.read();
+        return saved != null && saved.has("session") && sessionId.equals(saved.get("session").getAsString()) ? saved : null;
+    }
+
+    /**
+     * Laisse de côté une partie bloquée : plus rien d'elle n'arrive à l'écran, sa sauvegarde reste (la partie reprend
+     * de là), et elle est abandonnée en fond pour que son fil se termine s'il le peut (sans compter de défaite).
+     */
+    void abandonStuck() {
+        abandoned = true;
+        synchronized (SaveGame.class) {
+            closed = true;
+        }
+        timer.shutdownNow();
+        gui.detach();
+        final Thread t = new Thread(() -> {
+            try {
+                releaseControl();
+                final PlayerControllerHuman c = gui.controller();
+                if (c != null) {
+                    c.concede();
+                }
+            } catch (final RuntimeException e) {
+                // la partie bloquée reste où elle est
+            }
+        }, "atclaude-abandon");
+        t.setDaemon(true);
+        t.start();
+    }
+
     // ------------------------------------------------------------------ réflexion de l'IA
 
     /** Temps de réflexion maximal de l'IA par décision, en secondes (Réglages → Performance) ; 0 : celui de Forge. */
@@ -137,6 +269,7 @@ final class MatchSession {
             if (game == null) {
                 return;
             }
+            watchStuck(game);
             final int limit = aiTimeout;
             if (limit > 0 && game.AI_TIMEOUT != limit) {
                 game.AI_TIMEOUT = limit;
@@ -1195,6 +1328,10 @@ final class MatchSession {
     }
 
     void onGameFinished() {
+        // Partie bloquée laissée de côté (voir abandonStuck) : sa fin ne compte pas, la partie reprise continue.
+        if (abandoned) {
+            return;
+        }
         // Partie terminée : rien à reprendre.
         SaveGame.delete(sessionId);
         if (puzzle != null) {
@@ -1573,6 +1710,12 @@ final class MatchSession {
                 final int delta = m.get("delta").getAsInt();
                 // setCounters déclenche les mêmes événements que le jeu (poison : défaite à 10 au prochain contrôle).
                 inGame(game, () -> p.setCounters(type, Math.max(0, p.getCounters(type) + delta), null, true));
+            }
+            case "testStuck" -> {
+                if (!TEST_STUCK) {
+                    throw new IllegalArgumentException("Triche inconnue : testStuck");
+                }
+                testStuck = true;
             }
             case "skipTurn" -> {
                 final Player p = player(m);

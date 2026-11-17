@@ -782,3 +782,11 @@ svg.arrows .tgt { stroke: rgba(255, 210, 110, 0.9); marker-end: url(#arrow-gold)
 .plate .think i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes think-dot { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 :root[data-eco="on"] .plate .think i, :root[data-motion="off"] .plate .think i { animation: none; opacity: 0.85; }
+
+/* Partie bloquée (voir showStuck dans game.js) : bandeau en haut du plateau. */
+.stuck-bar { position: absolute; z-index: 60; left: 50%; top: calc(8px + var(--safe-top, 0px)); translate: -50% 0; width: min(560px, calc(100% - 24px));
+  display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgb(28 12 14 / 0.96);
+  border: 1px solid rgb(239 90 90 / 0.6); box-shadow: 0 8px 26px rgb(0 0 0 / 0.55); font-size: 12.5px; line-height: 1.35; }
+.stuck-bar b { display: block; font-size: 13.5px; color: #ffb3a8; margin-bottom: 2px; }
+.stuck-bar span { color: var(--text, #e8e6f0); opacity: 0.9; }
+.stuck-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }

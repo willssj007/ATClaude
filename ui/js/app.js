@@ -274,6 +274,29 @@ async function rewindMatch() {
   }
 }
 
+/**
+ * Partie bloquée (le moteur ne bouge plus) : elle reprend au dernier moment calme enregistré, sans revenir plus loin
+ * en arrière (le mode Planeswalker y a droit aussi : ce n'est pas un retour en arrière choisi).
+ */
+async function unstickMatch() {
+  closeAllForgeDialogs();
+  if (game) {
+    game.destroy();
+  }
+  game = newGame(() => startMatch(lastSetup || prefs.get('lastSetup')));
+  game.pauseUntilResumed('Reprise au dernier moment calme…');
+  inMatch = true;
+  showScreen('game');
+  try {
+    await bridge.request('unstick');
+    bridge.send('settings', {settings: matchSettings()});
+  } catch (e) {
+    toast(e.message, {title: 'Reprise impossible', error: true, duration: 8000});
+    bridge.send('state', {full: true});
+    game.resumed();
+  }
+}
+
 /** Reprend la partie sauvegardée (l'application avait été fermée en pleine partie). */
 async function resumeSaved() {
   closeAllForgeDialogs();
@@ -931,6 +954,7 @@ function init() {
   });
   bridge.on('resumed', () => game && game.resumed());
   bridge.on('aiThinking', (m) => game && game.aiThinking(m));
+  bridge.on('gameStuck', (m) => game && game.showStuck(m, unstickMatch));
   bridge.on('openUrl', (m) => bridge.openUrl(m.url));
   bridge.on('incorrectAction', () => {
     const p = document.querySelector('.table .actions');
