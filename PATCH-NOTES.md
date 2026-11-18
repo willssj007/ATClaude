@@ -2,6 +2,14 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.7 — « Vous inflige X blessures » dans l'Atelier
+
+- **Atelier : nouvel effet « Blessures à vous »** : « CARDNAME vous inflige X blessures », dans le groupe des points de vie, pour une capacité activée, un déclencheur, un sort ou un effet enchaîné (« Et puis »). Le nombre peut être fixe ou calculé (X).
+  - Comme les terrains douloureux : « {T} : Ajoutez un mana de la couleur de votre choix. Forge douloureuse vous inflige 1 blessure. » (deux phrases, comme sur les vraies cartes, au lieu de « …, puis … »).
+  - Deux capacités toutes prêtes : le terrain douloureux, et « {T} : elle vous inflige 1 blessure et inflige 1 blessure à chaque adversaire ».
+  - Ce sont des blessures, pas une perte de points de vie : le lien de vie, la prévention des blessures et les effets « quand une source vous inflige des blessures » en tiennent compte. Pour une simple perte de points de vie, il y a toujours « Vous perdez des points de vie ».
+- **iPhone** : l'IPA se construit de nouveau sur les deux sortes de Mac de GitHub (Intel et Apple). Pour la 0.9.6, les Mac Intel sont restés indisponibles et l'IPA n'a pas pu être construit : celui de la 0.9.7 le remplace.
+
 ## 0.9.6 — Cartes conseillées dans le deck builder, synergies des commandants perso
 
 - **Cartes conseillées directement dans la recherche du deck builder**. Dès que le deck a son commandant, la recherche se trie sur « Conseillées (EDHREC) d'abord » : les cartes que les decks EDHREC de ce commandant jouent le plus passent en tête, avec un badge bleu ◆ qui donne la part des decks qui les jouent (« ◆ 86 % »). Les staples (★) restent signalées, et viennent juste après.

@@ -652,6 +652,7 @@ export const EFFECTS = [
   {id: 'damageBlocker', group: 'life', label: 'Blessures à la créature qui la bloque ou qu\'elle bloque', n: true,
     only: ['blocksCreature', 'blocked', 'blocks', 'allyBlocked']},
   {id: 'damageOpponents', group: 'life', label: 'Blessures à chaque adversaire', n: true},
+  {id: 'damageYou', group: 'life', label: 'Blessures à vous (elle vous inflige X blessures, comme les terrains douloureux)', n: true},
   {id: 'damageEachCreature', group: 'life', label: 'Blessures à chaque créature', n: true},
   {id: 'damageEachOppCreature', group: 'life', label: 'Blessures à chaque créature que vos adversaires contrôlent', n: true},
   {id: 'earthquake', group: 'life', label: 'Blessures à chaque créature sans le vol et à chaque joueur', n: true},
@@ -1810,7 +1811,7 @@ function chainOf(a, id, lang) {
       }
       // Un effet enchaîné peut avoir sa propre condition (paliers : « puis, si au moins trois ont été engagés, … »).
       const own = conditionOf({...m, tapXWhat: a.tapXWhat, tapXType: a.tapXType});
-      items.push({name, head, extra, aux, text, own});
+      items.push({name, head, extra, aux, text, own, effect: m.effect});
     }
   });
   // Le compte des permanents touchés : retenus par l'effet d'avant, oubliés à la fin.
@@ -1873,6 +1874,11 @@ function chainOf(a, id, lang) {
     }
   }
   for (const it of coin ? [] : items.slice(1).filter(z => !z.silent)) {
+    // Comme les terrains douloureux : « Ajoutez {R}. CARDNAME vous inflige 1 blessure. » (deux phrases, pas « puis »).
+    if (a.effect === 'addMana' && !it.own && (it.effect === 'damageYou' || it.effect === 'loseLifeYou')) {
+      body += '. ' + it.text.charAt(0).toUpperCase() + it.text.slice(1);
+      continue;
+    }
     body += (en ? ', then' : ', puis') + (it.own ? `, ${en ? it.own.en : it.own.fr}, ` : ' ') + it.text;
   }
   if (cond) {
@@ -1972,6 +1978,10 @@ export function templates(type) {
     {label: '{2}, {T} : piochez une carte', a: {...base, when: 'activated', effect: 'draw', filter: {type: '', other: false}}},
     {label: '{G} : régénérez-la', a: {...base, when: 'activated', effect: 'regenerate', cost: '{G}', tap: false, filter: {type: '', other: false}}},
     {label: '{T} : ajoutez un mana de la couleur de votre choix', a: {...base, when: 'activated', effect: 'addMana', mana: 'Any', cost: '', filter: {type: '', other: false}}},
+    {label: '{T} : ajoutez un mana de la couleur de votre choix ; elle vous inflige 1 blessure (comme un terrain douloureux)',
+      a: {...base, when: 'activated', effect: 'addMana', mana: 'Any', cost: '', then: [{...newMode('damageYou'), n: 1}], filter: {type: '', other: false}}},
+    {label: '{T} : elle vous inflige 1 blessure et inflige 1 blessure à chaque adversaire',
+      a: {...base, when: 'activated', effect: 'damageYou', n: 1, cost: '', then: [{...newMode('damageOpponents'), n: 1}], filter: {type: '', other: false}}},
     {label: 'Quand elle arrive, elle explore', a: {...base, when: 'etb', effect: 'explore', filter: {type: '', other: false}}},
     {label: 'Chaque fois qu\'elle inflige des blessures de combat à un joueur, piochez une carte', a: {...base, when: 'combatDamage', effect: 'draw', filter: {type: '', other: false}}},
     {label: `Chaque fois ${t ? 'qu\'un autre ' + t : 'qu\'une autre créature'} que vous contrôlez meurt, chaque adversaire perd 1 point de vie et vous gagnez 1 point de vie`,
@@ -2732,6 +2742,9 @@ function effectBase(a, id) {
     case 'damageOpponents':
       return {p: `DealDamage | Defined$ Player.Opponent | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à chaque adversaire`,
         en: `CARDNAME deals ${n} damage to each opponent`};
+    case 'damageYou':
+      return {p: `DealDamage | Defined$ You | NumDmg$ ${n}`, fr: `CARDNAME vous inflige ${n} ${plural(n, 'blessure', 'blessures')}`,
+        en: `CARDNAME deals ${n} damage to you`};
     case 'draw':
       return {p: `Draw | Defined$ You | NumCards$ ${n}`, fr: n === 1 ? 'piochez une carte' : `piochez ${word(n, 'fr')} cartes`,
         en: n === 1 ? 'draw a card' : `draw ${word(n, 'en')} cards`};
