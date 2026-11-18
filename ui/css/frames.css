@@ -46,6 +46,12 @@
   flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-weight: 700; font-size: calc(var(--u) * 6.6 * var(--sn)); letter-spacing: 0.01em;
 }
+/* Réimpression avec un autre nom (comme les cartes Universes Beyond) : le nom officiel dans un petit bandeau sous le titre. */
+.cf-subname { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: calc(var(--u) * 0.9); max-width: 64%;
+  padding: calc(var(--u) * 0.35) calc(var(--u) * 3); border-radius: calc(var(--u) * 1.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: calc(var(--u) * 4.2); font-weight: 700; font-style: italic; line-height: 1.25; color: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0) 50%, rgb(0 0 0 / 0.14)), var(--split-b, var(--bL));
+  box-shadow: 0 0 0 calc(var(--u) * 0.35) rgb(0 0 0 / 0.7), 0 calc(var(--u) * 0.5) calc(var(--u) * 0.9) rgb(0 0 0 / 0.4); z-index: 2; }
 .cf-cost { flex: none; display: flex; align-items: center; font-size: calc(var(--u) * 6); }
 .cf-cost .mana { display: flex; gap: calc(var(--u) * 0.5); }
 .cf-cost .ms { width: 1.08em; height: 1.08em; font-size: 0.92em; box-shadow: 0 calc(var(--u) * 0.4) 0 rgb(0 0 0 / 0.7); }

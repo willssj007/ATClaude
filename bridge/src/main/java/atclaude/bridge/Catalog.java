@@ -210,6 +210,7 @@ final class Catalog {
         final List<Entry> matches = new ArrayList<>();
         // Les cartes qui passent les filtres mais pas le texte : on y cherche les noms approchants (faute de frappe).
         final List<Entry> others = new ArrayList<>();
+        final Map<String, String> aliases = text.isEmpty() ? Map.of() : Reprints.altNameIndex();
         for (final Entry e : index()) {
             if (inSet != null && !inSet.contains(e.nameEn())) continue;
             if (customSet != null && !customSet.equals(CustomCards.setOf(e.nameEn())) && Reprints.inSet(customSet, e.nameEn()) == null) continue;
@@ -226,11 +227,14 @@ final class Catalog {
             if (!text.isEmpty()) {
                 // Le nom contient ce qui est tapé, ou chaque mot est dans un nom (dans n'importe quel ordre) ; avec « Dans le
                 // texte », chaque mot peut aussi être dans le texte de la carte.
-                boolean hit = e.searchName().contains(text);
+                // L'autre nom d'une réimpression (« Hérauts de Shredder ») trouve aussi la carte.
+                final String alias = aliases.get(e.nameEn());
+                final String names = alias == null ? e.searchName() : e.searchName() + "\n" + alias;
+                boolean hit = names.contains(text);
                 if (!hit) {
                     hit = true;
                     for (final String w : stems) {
-                        if (!e.searchName().contains(w) && !(inText && e.searchText().contains(w))) {
+                        if (!names.contains(w) && !(inText && e.searchText().contains(w))) {
                             hit = false;
                             break;
                         }
@@ -260,10 +264,10 @@ final class Catalog {
             matches.sort(Comparator.comparingInt((Entry e) -> CustomCards.numberIn(customSet, e.nameEn())));
         } else if (pop != null) {
             final Comparator<Entry> byPop = Comparator.comparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0));
-            matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text, stems)).thenComparing(byPop));
+            matches.sort(text.isEmpty() ? byPop : Comparator.comparingInt((Entry e) -> rank(e, text, stems, aliases.get(e.nameEn()))).thenComparing(byPop));
         } else if (!text.isEmpty()) {
             // Les noms qui commencent par le texte cherché passent devant, puis ceux qui ont tous les mots, puis le texte.
-            matches.sort(Comparator.comparingInt((Entry e) -> rank(e, text, stems)));
+            matches.sort(Comparator.comparingInt((Entry e) -> rank(e, text, stems, aliases.get(e.nameEn()))));
         }
         final JsonObject result = new JsonObject();
         result.addProperty("total", matches.size());
@@ -279,6 +283,10 @@ final class Catalog {
             } else if (customSet != null && !customSet.equals(CustomCards.setOf(pc.getName()))) {
                 // Extension perso : une carte officielle y est sa réimpression.
                 final PaperCard print = Reprints.inSet(customSet, pc.getName());
+                pc = print != null ? print : pc;
+            } else if (!text.isEmpty() && aliases.containsKey(pc.getName()) && !nameMatches(matches.get(i), text, stems)) {
+                // Trouvée par l'autre nom d'une réimpression (« Hérauts de Shredder ») : montrée sous ce nom-là.
+                final PaperCard print = Reprints.byAltName(pc.getName(), text, stems);
                 pc = print != null ? print : pc;
             }
             final JsonObject card = paperJson(pc);
@@ -313,15 +321,31 @@ final class Catalog {
      * Pertinence d'une carte trouvée : le nom exact, le nom qui commence par le texte, un mot du nom qui commence par lui,
      * le nom qui le contient, tous les mots dans le nom (dans n'importe quel ordre), puis le texte de la carte.
      */
-    private static int rank(final Entry e, final String text, final String[] stems) {
-        final String en = normalize(e.nameEn());
-        final String fr = normalize(e.nameFr());
-        if (en.equals(text) || fr.equals(text)) return 0;
-        if (en.startsWith(text) || fr.startsWith(text)) return 1;
-        if (wordStarts(e.searchName(), text)) return 2;
-        if (e.searchName().contains(text)) return 3;
+    /** Le texte tapé correspond-il aux noms de la carte elle-même (pas seulement à l'autre nom d'une réimpression) ? */
+    private static boolean nameMatches(final Entry e, final String text, final String[] stems) {
+        if (e.searchName().contains(text)) {
+            return true;
+        }
         for (final String w : stems) {
             if (!e.searchName().contains(w)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int rank(final Entry e, final String text, final String[] stems, final String alias) {
+        final String en = normalize(e.nameEn());
+        final String fr = normalize(e.nameFr());
+        // Autre nom d'une réimpression (une ligne par réimpression) : compté comme un nom de la carte.
+        final java.util.List<String> alts = alias == null ? java.util.List.of() : java.util.List.of(alias.split("\n"));
+        if (en.equals(text) || fr.equals(text) || alts.contains(text)) return 0;
+        if (en.startsWith(text) || fr.startsWith(text) || alts.stream().anyMatch(a -> a.startsWith(text))) return 1;
+        final String names = alias == null ? e.searchName() : e.searchName() + "\n" + alias;
+        if (wordStarts(names, text)) return 2;
+        if (names.contains(text)) return 3;
+        for (final String w : stems) {
+            if (!names.contains(w)) {
                 return 5;
             }
         }

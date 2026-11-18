@@ -852,7 +852,8 @@ export class Atelier {
     this.form = {...NEW_CARD(), frame: (rec && rec.frame) || 'modern', frameColor: (rec && rec.frameColor) || 'auto', frameText: (rec && rec.frameText) || 'dark',
       fx: (rec && rec.fx) || 'none', lang: rec ? (rec.lang === 'en' ? 'en' : 'fr') : defaultLang(), set: rec ? rec.set || '' : (this.setFilter && this.setFilter !== '-' ? this.setFilter : ''),
       rarity: rec ? rec.rarity || '' : base.crarity || rarityOf[base.rarity] || '', artist: rec ? rec.artist || '' : base.artist || lastArtist(),
-      landText: rec ? rec.landText || '' : '', flavor: rec ? rec.flavor || '' : ''};
+      landText: rec ? rec.landText || '' : '', flavor: rec ? rec.flavor || '' : '',
+      altName: rec ? rec.altName || '' : '', altInText: rec ? rec.altInText !== 'no' : true, shownText: rec ? rec.shownText || '' : ''};
     this.mode = 'form';
     this.formUsed = false;
     this.tab = 'look';
@@ -895,7 +896,18 @@ export class Atelier {
     const langRow = this.reprint.base.custom ? '' : `<div class="ate-field"><span>Langue de la carte</span>
       <div class="chips ate-rplang">${LANGS.map(([v, l]) => `<button class="chip${v === (this.form.lang || 'fr') ? ' on' : ''}" data-rlang="${v}">${esc(l)}</button>`).join('')}</div>
       <p class="muted small">Le nom, le type et le texte de la carte officielle, comme sur son impression dans cette langue.</p></div>`;
-    return `${langRow}${basic ? `<div class="ate-field"><span>Texte du terrain</span>
+    const altRow = `<label class="ate-field"><span>Autre nom <span class="muted small">(facultatif)</span></span>
+        <input type="text" data-raltname maxlength="60" placeholder="Hérauts de Shredder" value="${esc(this.form.altName || '')}">
+        <p class="muted small">Comme les cartes Universes Beyond : ce nom s'affiche en grand, le nom officiel en petit dessous. La carte reste la même
+          pour les règles, les decks et la recherche (son autre nom la trouve aussi).</p></label>
+      ${this.form.altName ? `<label class="ate-check"><input type="checkbox" data-raltintext${this.form.altInText !== false ? ' checked' : ''}>
+        Le texte de la carte cite aussi l'autre nom</label>` : ''}
+      <details class="ate-field ate-shown"${this.form.shownText ? ' open' : ''}><summary>Texte affiché sur la carte <span class="muted small">(facultatif)</span></summary>
+        <textarea data-rshown rows="5" maxlength="1500" placeholder="Vide : le texte de la carte officielle">${esc(this.form.shownText || '')}</textarea>
+        <p class="muted small">Pour recopier le texte d'une carte imprimée (« Quand les Hérauts de Shredder sont mis dans un cimetière… ») :
+          seulement ce que la carte montre, les règles restent celles de la carte officielle.</p>
+        <button class="btn small" data-rshown-fill>Partir du texte actuel</button></details>`;
+    return `${langRow}${altRow}${basic ? `<div class="ate-field"><span>Texte du terrain</span>
       <div class="chips ate-landtext">${[['', 'Rappel « {T} : Ajoutez… »'], ['symbol', 'Grand symbole de mana'], ['none', 'Pas de texte']].map(([v, l]) =>
         `<button class="chip${v === lt ? ' on' : ''}" data-rland="${v}">${esc(l)}</button>`).join('')}</div>
       <p class="muted small">Sans texte et avec le cadre « Illustration pleine » ou « Sans bord », l'illustration occupe toute la carte (full art).</p></div>` : ''}
@@ -923,6 +935,27 @@ export class Atelier {
       lang: base.custom ? base.lang || 'fr' : en ? 'en' : 'fr',
       crarity: look.rarity || undefined, artist: cleanArtist(look.artist) || undefined,
       cset: set ? {id: set.id, code: set.code, name: set.name, tint: !!set.tint, logo: set.logo, ...(keepNumber ? {n: base.cset.n, total: base.cset.total} : {})} : undefined};
+    // Autre nom : en titre, le nom officiel en petit dessous, et cité dans le texte (comme le pont le fera partout) ; l'article
+    // du nom officiel (« l'Ardeur ») part avec lui.
+    const alt = String(this.form.altName || '').replace(/\s+/g, ' ').trim();
+    if (alt) {
+      const official = card.nameFr || card.name || '';
+      card.subName = official;
+      card.nameFr = alt;
+      if (this.form.altInText !== false && card.text) {
+        for (const n of new Set([official, base.name])) {
+          if (n && n.length >= 2) {
+            card.text = String(card.text).replace(new RegExp(`(?<![\\p{L}\\p{N}])(?:[Ll](?:['’]|[ae] ))?${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu'), alt);
+          }
+        }
+      }
+    }
+    // Le texte tel que la carte l'aurait sans texte choisi (« Partir du texte actuel »), puis le texte choisi.
+    this.autoText = String(card.text || '').replace(/\r/g, '').replace(/\n{2,}/g, '\n').trim();
+    if (String(this.form.shownText || '').trim()) {
+      card.text = this.form.shownText.trim();
+      delete card.landSymbol;
+    }
     this.lastCard = card;
     this.renderLook();
     const preview = this.root.querySelector('.ate-preview');
@@ -935,7 +968,8 @@ export class Atelier {
     const msg = this.root.querySelector('.ate-msg');
     if (msg) {
       msg.className = 'ate-msg small ok';
-      msg.textContent = `« ${en ? base.name : this.reprint.nameFr} » garde son nom et ses règles : seule l'apparence change.`;
+      msg.textContent = alt ? `« ${alt} » est « ${en ? base.name : this.reprint.nameFr} » sous un autre nom : les règles, les decks et la recherche ne changent pas.`
+        : `« ${en ? base.name : this.reprint.nameFr} » garde son nom et ses règles : seule l'apparence change.`;
     }
     const title = this.root.querySelector('.ate-top h1');
     if (title) {
@@ -948,6 +982,8 @@ export class Atelier {
     const look = this.look();
     const req = {id: this.reprint.id, name: this.reprint.name, set: look.set || '', rarity: look.rarity || '', artist: cleanArtist(look.artist),
       frame: look.frame, frameColor: look.frameColor, frameText: look.frameText, fx: look.fx, landText: this.form.landText || '', flavor: (this.form.flavor || '').trim(),
+      altName: String(this.form.altName || '').replace(/\s+/g, ' ').trim(), altInText: this.form.altInText === false ? 'no' : '',
+      shownText: String(this.form.shownText || '').trim(),
       lang: !this.reprint.base.custom && this.form.lang === 'en' ? 'en' : ''};
     if (this.art !== null) {
       req.art = this.art;
@@ -2670,6 +2706,15 @@ export class Atelier {
       this.form.landText = b.dataset.rland;
       this.root.querySelectorAll('[data-rland]').forEach(x => x.classList.toggle('on', x === b));
       this.check();
+    } else if (b.dataset.rshownFill !== undefined) {
+      // Le texte que la carte montre déjà (officiel, avec l'autre nom), à retoucher.
+      const area = this.root.querySelector('[data-rshown]');
+      if (area) {
+        area.value = this.autoText || '';
+        this.form.shownText = area.value;
+        area.focus();
+        this.check();
+      }
     } else if (b.dataset.altArt !== undefined) {
       // Une autre illustration de cette carte perso : une réimpression (la carte enregistrée, sans les changements en cours).
       const entry = (this.data.cards || []).find(c => c.name === this.previous);
@@ -2703,6 +2748,26 @@ export class Atelier {
   editInput(e) {
     if (e.target && e.target.dataset && e.target.dataset.rflavor !== undefined) {
       this.form.flavor = e.target.value;
+      this.check();
+      return;
+    }
+    if (e.target && e.target.dataset && e.target.dataset.raltname !== undefined) {
+      const had = !!String(this.form.altName || '').trim();
+      this.form.altName = e.target.value;
+      // La case « le texte cite l'autre nom » apparaît avec le premier caractère (et disparaît avec le dernier).
+      if (had !== !!e.target.value.trim() && e.type === 'change') {
+        this.renderLeft();
+      }
+      this.check();
+      return;
+    }
+    if (e.target && e.target.dataset && e.target.dataset.rshown !== undefined) {
+      this.form.shownText = e.target.value;
+      this.check();
+      return;
+    }
+    if (e.target && e.target.dataset && e.target.dataset.raltintext !== undefined) {
+      this.form.altInText = e.target.checked;
       this.check();
       return;
     }

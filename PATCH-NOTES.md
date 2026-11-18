@@ -2,8 +2,13 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
-## 0.9.4 — Atelier : « Quand vous avez X permanents d'un type, vous gagnez un emblème » plus facile à trouver
+## 0.9.4 — Réimpressions sous un autre nom, emblèmes plus faciles à donner
 
+- **Réimpressions : un autre nom**, comme les cartes Universes Beyond (« Hérauts de Shredder », avec « Ardeur » en petit dessous).
+  - Dans l'éditeur d'une réimpression, le champ **Autre nom** : il s'affiche en grand sur la carte, et le nom officiel passe dans un petit bandeau sous le titre.
+  - Le texte de la carte cite l'autre nom à la place du nom officiel (« … autre que Hérauts de Shredder… ») ; une case permet de garder le nom officiel dans le texte.
+  - **Texte affiché** (facultatif) : pour recopier exactement le texte d'une carte imprimée (« Quand les Hérauts de Shredder sont mis dans un cimetière… »). « Partir du texte actuel » le préremplit. Ce n'est que ce que la carte montre : les règles restent celles de la carte officielle.
+  - La carte reste la même pour les règles, les decks et la partie. La recherche la trouve aussi par son autre nom, et la montre alors sous ce nom-là.
 - **Onglet Emblèmes : bouton « Carte qui le donne »**. Il ouvre une nouvelle carte avec, déjà en place, « Quand vous avez au moins trois permanents d'un même type, vous gagnez un emblème » : il reste à choisir le nombre, la sorte de permanents (créatures, artefacts…), le type (Elfe, Équipement, un type perso…) et l'emblème (le premier de tes emblèmes perso est déjà choisi).
 - **Le déclencheur s'appelle maintenant « Quand vous avez (contrôlez) au moins X permanents d'un type »** dans la liste « Quand », au lieu de « La première fois que vous contrôlez… ». Il marche toujours de la même façon : la première fois que le compte y est, une fois par carte, et un emblème perso ne se gagne qu'une fois par joueur.
 - **Capacités toutes prêtes** :

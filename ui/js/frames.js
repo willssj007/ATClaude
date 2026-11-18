@@ -351,7 +351,8 @@ export function customFrameHtml(card, art, frameUrl = '', logoUrl = '') {
     <div class="cf-art"${art}></div>
     ${overlay}
     <div class="cf-crown"></div>
-    <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span></div>
+    <div class="cf-title"><span class="cf-name">${esc(name)}</span><span class="cf-cost">${manaHtml(card.cost)}</span>${card.subName
+      ? `<span class="cf-subname">${esc(card.subName)}</span>` : ''}</div>
     <div class="cf-type"><span class="cf-tl">${esc(typeLine)}</span>${setSymbol(card, logoUrl)}</div>
     <div class="cf-icon">${typeIcon(typeLine)}</div>
     <div class="cf-box">${pw ? `<div class="cf-rules cf-pwrules">${planeswalkerRules(text)}</div>`

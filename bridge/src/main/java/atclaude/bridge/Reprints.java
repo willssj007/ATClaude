@@ -366,6 +366,8 @@ final class Reprints {
                 default -> o.addProperty("text", english ? "({T}: Add " + mana + ".)" : "({T} : Ajoutez " + mana + ".)");
             }
         }
+        altName(o, r);
+        shownText(o, r);
         final JsonObject cs = CustomCards.csetJson(str(r, "set"), indexKey(r));
         o.remove("cset");
         if (cs != null) {
@@ -376,6 +378,76 @@ final class Reprints {
         if (art != null) {
             o.addProperty("customArt", art);
         }
+    }
+
+    /**
+     * Autre nom (comme les cartes Universes Beyond : « Hérauts de Shredder » sur la carte, « Ardeur » en petit dessous) :
+     * il s'affiche en titre, le nom officiel passe dans un bandeau sous le titre, et le texte de la carte cite l'autre
+     * nom (sauf si la réimpression le refuse). Le nom officiel reste celui de la carte pour les règles, les decks et la
+     * recherche.
+     */
+    private static void altName(final JsonObject o, final JsonObject r) {
+        final String alt = str(r, "altName");
+        if (alt.isEmpty()) {
+            return;
+        }
+        final String shown = str(o, "nameFr").isEmpty() ? str(o, "name") : str(o, "nameFr");
+        o.addProperty("altName", alt);
+        o.addProperty("subName", shown);
+        o.addProperty("nameFr", alt);
+        if (!"no".equals(str(r, "altInText")) && o.has("text") && !o.get("text").isJsonNull()) {
+            String text = o.get("text").getAsString();
+            for (final String n : new java.util.LinkedHashSet<>(java.util.List.of(shown, str(o, "name"), str(r, "name")))) {
+                if (n.length() >= 2) {
+                    // « l'Ardeur », « la Ardeur » : l'article du nom officiel part avec lui (« l'Hérauts de Shredder » sonnerait faux).
+                    text = Pattern.compile("(?<![\\p{L}\\p{N}])(?:[Ll](?:['’]|[ae] ))?" + Pattern.quote(n) + "(?![\\p{L}\\p{N}])")
+                            .matcher(text).replaceAll(Matcher.quoteReplacement(alt));
+                }
+            }
+            o.addProperty("text", text);
+        }
+    }
+
+    /** Texte affiché choisi pour la réimpression (seulement ce que la carte montre : les règles ne changent pas). */
+    private static void shownText(final JsonObject o, final JsonObject r) {
+        final String shown = str(r, "shownText");
+        if (!shown.isEmpty()) {
+            o.addProperty("text", shown);
+            o.remove("landSymbol");
+        }
+    }
+
+    /** Autres noms des réimpressions, par carte officielle (normalisés pour la recherche : « shredder » trouve la carte). */
+    static java.util.Map<String, String> altNameIndex() {
+        final java.util.Map<String, String> out = new java.util.HashMap<>();
+        for (final JsonObject r : all()) {
+            final String alt = str(r, "altName");
+            if (!alt.isEmpty()) {
+                out.merge(str(r, "name"), Catalog.normalize(alt), (a, b) -> a + "\n" + b);
+            }
+        }
+        return out;
+    }
+
+    /** La réimpression de cette carte dont l'autre nom correspond à ce qui est tapé (texte et mots normalisés), ou null. */
+    static PaperCard byAltName(final String name, final String text, final String[] stems) {
+        for (final JsonObject r : all()) {
+            final String alt = Catalog.normalize(str(r, "altName"));
+            if (alt.isEmpty() || !str(r, "name").equalsIgnoreCase(name)) {
+                continue;
+            }
+            boolean hit = alt.contains(text);
+            if (!hit) {
+                hit = true;
+                for (final String w : stems) {
+                    hit &= alt.contains(w);
+                }
+            }
+            if (hit) {
+                return paper(r);
+            }
+        }
+        return null;
     }
 
     /** « Stomp {1}{R} — Instant - Adventure » : le tiret de Forge devient le tiret long des cartes. */
@@ -512,6 +584,13 @@ final class Reprints {
         r.addProperty("landText", str(m, "landText").matches("symbol|none") ? str(m, "landText") : "");
         // Langue du nom, du type et du texte d'une carte officielle réimprimée (« en » ; sinon le français).
         r.addProperty("lang", "en".equals(str(m, "lang")) ? "en" : "");
+        // Autre nom (comme les cartes Universes Beyond), 60 caractères au plus ; « no » : le texte garde le nom officiel.
+        final String alt = str(m, "altName").replaceAll("[|\\r\\n]+", " ").replaceAll("\\s+", " ").trim();
+        r.addProperty("altName", alt.length() > 60 ? alt.substring(0, 60).trim() : alt);
+        r.addProperty("altInText", "no".equals(str(m, "altInText")) ? "no" : "");
+        // Texte affiché à la place du texte officiel (1500 caractères au plus) ; vide : le texte de la carte.
+        final String shownText = str(m, "shownText").replace("\r", "").replace("|", "/").trim();
+        r.addProperty("shownText", shownText.length() > 1500 ? shownText.substring(0, 1500) : shownText);
         final String flavor = str(m, "flavor").replace("\r", "").replace("|", "/").trim();
         r.addProperty("flavor", flavor.length() > 240 ? flavor.substring(0, 240) : flavor);
         r.addProperty("at", System.currentTimeMillis());
