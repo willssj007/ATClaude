@@ -142,6 +142,11 @@ function deckText(deck) {
   return lines.join('\n');
 }
 
+/** Le nom court d'un commandant (« Krenko, chef de la bande » → « Krenko »). */
+function shortName(name) {
+  return String(name || '').split(/,| \/\/ /)[0].trim();
+}
+
 /** « Kathrill, distorseur d'aspect », ou « Thrasios & Tymna » pour des partenaires. */
 function commanderNames(deck) {
   return ((deck.sections && deck.sections.commander) || []).map(l => l.card.nameFr || l.card.name).join(' & ');
@@ -260,6 +265,9 @@ export class Decks {
         ? '<p class="muted small">Ajoute la carte puis touche ♛ dans le deck pour en faire le commandant.</p>' : ''),
       counts: (name) => this.count(name),
       identityLock: () => this.deck.format === 'commander' && this.deck.sections.commander.length ? this.identity() : null,
+      deckNames: () => [...this.deck.sections.commander, ...this.deck.sections.main].map(l => l.card.name),
+      // Mode Planeswalker : pas de fenêtre des conseils (on n'y ajoute que des cartes de sa collection, par la recherche).
+      onRecommendOpen: deck.career ? null : () => this.openRecommendations(),
     });
     this.root.querySelector('.tabs-mobile').addEventListener('click', (e) => {
       const b = e.target.closest('[data-tab]');
@@ -275,7 +283,49 @@ export class Decks {
     this.renderDeck();
     this.analyze();
     this.loadPrices();
+    this.recKey = null;
+    this.loadRecommendations();
     this.search.search(true);
+  }
+
+  /**
+   * Les cartes conseillées pour le commandant : sa page EDHREC, ou pour un commandant perso (qu'EDHREC ne connaît
+   * pas) les synergies calculées par l'appli. Elles passent en tête de la recherche (ordre « Conseillées »).
+   */
+  async loadRecommendations() {
+    const s = this.deck.sections;
+    const names = this.deck.format === 'commander' ? s.commander.map(l => l.card.name) : [];
+    const key = names.join('|');
+    if (key === this.recKey) {
+      return;
+    }
+    this.recKey = key;
+    if (!names.length) {
+      this.search.setRecommend(null);
+      return;
+    }
+    const title = s.commander.map(l => shortName(l.card.nameFr || l.card.name)).join(' & ');
+    this.search.setRecommend({names, title, loading: true});
+    try {
+      const r = await bridge.request('recommend', {commanders: names});
+      if (this.recKey === key) {
+        this.search.setRecommend({names, title, ready: true, ...r});
+      }
+    } catch (e) {
+      if (this.recKey === key) {
+        this.search.setRecommend({names, title, error: e.message});
+      }
+    }
+  }
+
+  /** La fenêtre des conseils : EDHREC, ou les synergies d'un commandant perso. */
+  openRecommendations() {
+    const s = this.deck.sections;
+    if (!s.commander.length) {
+      toast('Choisis d\'abord le commandant (♛) : les conseils dépendent de lui.', {error: true});
+      return;
+    }
+    openEdhrec(s.commander.map(l => l.card), {add: (card) => this.add(card), count: (name) => this.count(name)});
   }
 
   identity() {
@@ -451,6 +501,7 @@ export class Decks {
     this.remove(name, s.main.includes(line) ? 'main' : 'side');
     s.commander.push({count: 1, card: line.card});
     this.changed();
+    this.loadRecommendations();
     this.search.search(true);
   }
 
@@ -460,6 +511,7 @@ export class Decks {
     if (i >= 0) {
       const [line] = s.commander.splice(i, 1);
       this.add(line.card, 'main');
+      this.loadRecommendations();
       this.search.search(true);
     }
   }
@@ -572,7 +624,9 @@ export class Decks {
         <button class="btn small" data-act="analysis">Analyse</button>
         <button class="btn small" data-act="hand" title="Piocher une main de départ au hasard, faire des mulligans, voir les chances d'avoir des terrains">${icon('cards')} Tester la main</button>
         <button class="btn small" data-act="basics" title="Compléter le deck avec des terrains de base aux couleurs du commandant">${icon('mountain')} Terrains de base</button>
-        ${d.format === 'commander' && !d.career ? '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>' : ''}
+        ${d.format === 'commander' && !d.career ? (s.commander.some(l => l.card.custom)
+    ? '<button class="btn small" data-act="edhrec" title="Cartes en synergie avec ton commandant perso (thèmes, types de créature, commandants officiels semblables sur EDHREC)">◆ Synergies</button>'
+    : '<button class="btn small" data-act="edhrec" title="Cartes et combos conseillés par EDHREC pour ce commandant">EDHREC</button>') : ''}
         <details class="db-more"><summary class="btn small" title="Autres actions">⋯ Plus</summary>
           <div class="db-menu panel">
             ${d.previousName ? '<button class="btn small" data-act="stats">Statistiques du deck</button>' : ''}
@@ -700,11 +754,7 @@ export class Decks {
             toast('Analyse en cours, réessaie dans un instant.');
           }
         } else if (a === 'edhrec') {
-          if (!s.commander.length) {
-            toast('Choisis d\'abord le commandant (♛) : EDHREC donne les cartes jouées avec lui.', {error: true});
-          } else {
-            openEdhrec(s.commander.map(l => l.card), {add: (card) => this.add(card), count: (name) => this.count(name)});
-          }
+          this.openRecommendations();
         } else if (a === 'basics') {
           this.basicsDialog();
         } else if (a === 'stats') {

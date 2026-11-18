@@ -967,6 +967,25 @@ body.in-game #topbar, body.in-replay #topbar { display: none; }
 .edh-th { white-space: nowrap; flex: none; }
 .edh-grid .cell .add { bottom: 30px; }
 .edh-grid .cell .staple { bottom: 38px; }
+/* Synergies calculées (commandant perso) : la raison en clair, sur deux lignes au plus. */
+.edh-stat .edh-why { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+.edh-stat:has(.edh-why) { flex-direction: column; gap: 1px; }
+.edh-note { margin: 0 0 6px; color: var(--text); }
+.edh-themes .chip[data-similar] { cursor: pointer; }
+/* Recherche du deck builder : carte conseillée pour le commandant (part des decks EDHREC, ou raison de la synergie). */
+.card-grid .cell .rec { position: absolute; left: 6px; bottom: 14px; z-index: 2; max-width: calc(100% - 88px); overflow: hidden; text-overflow: ellipsis;
+  padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none;
+  color: #eaf6ff; background: linear-gradient(180deg, rgb(64 128 196 / 0.95), rgb(34 78 140 / 0.95)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.6); }
+.card-grid .cell.in-deck .rec { bottom: 46px; max-width: calc(100% - 12px); }
+.card-grid .cell:not(:has(.staple)) .rec { max-width: calc(100% - 50px); }
+.edh-grid .cell .rec { display: none; }
+.sh-status .rec-note { color: var(--gold-2); }
+/* Sur grand écran, le nombre de cartes est dans la barre de recherche : la ligne ne montre que les conseils. */
+@media (min-width: 521px) {
+  .sh-status.has-rec:not(.sh-note) { display: block; }
+  .sh-status.has-rec .sh-count, .sh-status.has-rec .sh-sep { display: none; }
+}
+.sh-status [data-rec-sort], .sh-status [data-rec-open] { margin-left: 4px; vertical-align: baseline; padding: 2px 10px; }
 
 /* ---------- Icônes (trait gravé, couleur du texte) ---------- */
 .ic { width: 1.2em; height: 1.2em; flex: none; vertical-align: -0.22em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

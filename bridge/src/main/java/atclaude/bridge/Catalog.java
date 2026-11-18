@@ -64,7 +64,7 @@ final class Catalog {
     }
 
     /** Une carte de l'index de recherche, avec ses textes déjà normalisés. */
-    private record Entry(PaperCard card, String nameEn, String nameFr, String searchName, String searchText,
+    record Entry(PaperCard card, String nameEn, String nameFr, String searchName, String searchText,
                          String typeEn, int cmc, String identity, boolean commanderLegal, boolean canBeCommander) { }
 
     private volatile List<Entry> index;
@@ -91,6 +91,16 @@ final class Catalog {
             }
         }
         return java.util.Collections.emptyMap();
+    }
+
+    /** Toutes les cartes de la recherche (pour les synergies : thèmes, commandants semblables). */
+    List<Entry> entries() {
+        return index();
+    }
+
+    /** L'identité d'une carte tient-elle dans celle du commandant (« » : incolore) ? */
+    static boolean inIdentity(final String card, final String commander) {
+        return colorsMatch(card, commander.isEmpty() ? "C" : commander, "identity");
     }
 
     private List<Entry> index() {
@@ -256,7 +266,19 @@ final class Catalog {
         // Ordre « les plus jouées » : les cartes des préconstruits Commander (les staples) d'abord ; avec un texte, les noms
         // qui commencent par lui restent devant.
         final Map<String, Integer> pop = bool(q, "popular") && customSet == null ? Precons.popularity() : null;
-        if (fuzzy) {
+        // Ordre « Conseillées » du deck builder : les cartes conseillées pour le commandant (EDHREC ou synergies), celles
+        // déjà dans le deck après les autres ; puis les plus jouées.
+        final Map<String, Recommend.Rec> rec = q.has("recommend") && customSet == null ? Recommend.scores(this, strings(q, "recommend")) : null;
+        final java.util.Set<String> inDeck = rec == null ? java.util.Set.of() : new java.util.HashSet<>(strings(q, "deck"));
+        if (rec != null && !fuzzy) {
+            final Map<String, Integer> p = Precons.popularity();
+            Comparator<Entry> byRec = Comparator.comparingInt((Entry e) -> inDeck.contains(e.nameEn()) ? 1 : 0);
+            byRec = byRec.thenComparingDouble((Entry e) -> {
+                final Recommend.Rec r = rec.get(e.nameEn());
+                return r == null ? 0 : -r.score;
+            }).thenComparingInt((Entry e) -> -p.getOrDefault(e.nameEn(), 0));
+            matches.sort(text.isEmpty() ? byRec : Comparator.comparingInt((Entry e) -> rank(e, text, stems, aliases.get(e.nameEn()))).thenComparing(byRec));
+        } else if (fuzzy) {
             final Comparator<Entry> byDistance = Comparator.comparingInt(distance::get);
             matches.sort(pop == null ? byDistance.thenComparing(Entry::nameFr, String.CASE_INSENSITIVE_ORDER)
                     : byDistance.thenComparingInt((Entry e) -> -pop.getOrDefault(e.nameEn(), 0)));
@@ -295,6 +317,11 @@ final class Catalog {
             }
             if (pop != null && pop.getOrDefault(pc.getName(), 0) > 0) {
                 card.addProperty("precons", pop.get(pc.getName()));
+            }
+            final Recommend.Rec r = rec == null ? null : rec.get(pc.getName());
+            if (r != null) {
+                card.addProperty("rec", r.label);
+                card.addProperty("recTitle", r.title);
             }
             cards.add(card);
         }
@@ -1747,6 +1774,19 @@ final class Catalog {
         }
         final String decomposed = Normalizer.normalize(s, Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT).replace('’', '\'').trim();
+    }
+
+    /** Un tableau de textes de la requête (vide s'il manque). */
+    private static List<String> strings(final JsonObject o, final String key) {
+        final List<String> out = new ArrayList<>();
+        if (o.has(key) && o.get(key).isJsonArray()) {
+            for (final JsonElement e : o.getAsJsonArray(key)) {
+                if (e.isJsonPrimitive()) {
+                    out.add(e.getAsString());
+                }
+            }
+        }
+        return out;
     }
 
     private static String str(final JsonObject o, final String key) {

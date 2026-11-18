@@ -124,6 +124,11 @@ final class Edhrec {
 
     /** Lecture réseau (fil réseau du pont). Renvoie les deux pages brutes : commandant et combos. */
     static JsonObject fetch(final List<String> commanders) {
+        return fetch(commanders, true);
+    }
+
+    /** Comme {@link #fetch(List)} ; sans les combos si {@code withCombos} est faux (une page de moins à lire). */
+    static JsonObject fetch(final List<String> commanders, final boolean withCombos) {
         final String slug = slug(commanders);
         if (slug.isEmpty()) {
             throw new IllegalArgumentException("Choisis d'abord un commandant.");
@@ -134,6 +139,10 @@ final class Edhrec {
         raw.add("page", (JsonElement) page[1]);
         raw.addProperty("fetchedAt", (Long) page[0]);
         raw.addProperty("offline", (Boolean) page[2]);
+        if (!withCombos) {
+            raw.add("combos", new JsonObject());
+            return raw;
+        }
         try {
             raw.add("combos", (JsonElement) page("combos/" + slug)[1]);
         } catch (final RuntimeException e) {

@@ -246,7 +246,7 @@ public final class Bridge {
             analyzer.execute(() -> dispatch(type, message));
             return;
         }
-        if ("edhrec".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type)) {
+        if ("edhrec".equals(type) || "recommend".equals(type) || "deckPrices".equals(type) || "fetchMoxfield".equals(type)) {
             // Lecture d'EDHREC : à part, pour ne pas attendre derrière une synchronisation.
             web.execute(() -> dispatch(type, message));
             return;
@@ -587,12 +587,14 @@ public final class Bridge {
                 return Trophies.all();
             case "stats":
                 return Stats.load();
-            case "edhrec": {
+            case "edhrec":
+            case "recommend": {
+                // Conseils pour les commandants du deck : EDHREC, ou les synergies calculées par l'appli (commandant perso).
                 final List<String> names = new java.util.ArrayList<>();
                 for (final JsonElement e : m.getAsJsonArray("commanders")) {
                     names.add(e.getAsString());
                 }
-                return Edhrec.present(catalog, Edhrec.fetch(names));
+                return "edhrec".equals(type) ? Recommend.full(catalog, names) : Recommend.summary(catalog, names);
             }
             case "deckPrices":
                 try {

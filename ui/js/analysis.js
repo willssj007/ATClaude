@@ -129,8 +129,11 @@ export async function openDeckStats(key, name) {
  * {@code count(name)} donne le nombre d'exemplaires déjà présents.
  */
 export function openEdhrec(commanders, {add, count}) {
-  customBox(`EDHREC — ${commanders.map(c => c.nameFr || c.name).join(' & ')}`, async (body, footer, close) => {
-    body.innerHTML = '<p class="muted">Lecture d\'EDHREC…</p>';
+  // Commandant perso : EDHREC ne le connaît pas, l'appli calcule les synergies (même fenêtre).
+  const custom = commanders.some(c => c.custom);
+  customBox(`${custom ? 'Synergies' : 'EDHREC'} — ${commanders.map(c => c.nameFr || c.name).join(' & ')}`, async (body, footer, close) => {
+    body.innerHTML = custom ? '<p class="muted">Recherche des cartes en synergie (thèmes, types de créature, commandants semblables sur EDHREC)…</p>'
+      : '<p class="muted">Lecture d\'EDHREC…</p>';
     const done = el('<button class="btn gold">Fermer</button>');
     done.addEventListener('click', close);
     footer.append(done);
@@ -141,9 +144,13 @@ export function openEdhrec(commanders, {add, count}) {
       body.innerHTML = `<p>${esc(e.message)}</p><p class="muted small">EDHREC recense les decks Commander publiés en ligne : les cartes les plus jouées avec chaque commandant, leur synergie et les combos connus. Il faut une connexion Internet.</p>`;
       return;
     }
-    const site = el('<button class="btn">Ouvrir sur EDHREC</button>');
-    site.addEventListener('click', () => bridge.openUrl(data.url));
-    footer.prepend(site);
+    if (data.url) {
+      const site = el('<button class="btn">Ouvrir sur EDHREC</button>');
+      site.addEventListener('click', () => bridge.openUrl(data.url));
+      footer.prepend(site);
+    }
+    const local = data.source === 'local';
+    const similar = (data.similar || []).filter(x => x.found);
     let tab = 'synergy';
     let list = data.lists.length ? data.lists[0].tag : '';
     let hideOwned = true;
@@ -154,8 +161,12 @@ export function openEdhrec(commanders, {add, count}) {
       const cards = tab === 'synergy' ? data.synergy : tab === 'lists' && lists ? lists.cards : [];
       const shown = hideOwned ? cards.filter(c => !count(c.name)) : cards;
       body.innerHTML = `<div class="edh">
-        <div class="edh-head small muted">${Number(data.decks || 0).toLocaleString('fr-FR')} decks recensés · données du ${when.toLocaleDateString('fr-FR')}${data.offline ? ' (hors connexion : dernière version gardée)' : ''}
-          ${data.themes.length ? `<div class="edh-themes"><span class="edh-th">Thèmes :</span> ${data.themes.map(t => `<span class="chip">${esc(t.name)} <span class="muted">${Number(t.decks).toLocaleString('fr-FR')}</span></span>`).join('')}</div>` : ''}</div>
+        ${local ? `<div class="edh-head small muted">${data.note ? `<p class="edh-note">${esc(data.note)} Voici les cartes en synergie calculées par l'appli.</p>` : ''}
+          Calculé par l'appli : les thèmes et les types de créature du commandant${similar.length ? ', et les decks EDHREC de commandants semblables' : ''}.${data.offline && !data.note ? ' (Sans connexion : EDHREC n\'a pas pu être lu.)' : ''}
+          ${data.themes.length ? `<div class="edh-themes"><span class="edh-th">Thèmes repérés :</span> ${data.themes.map(t => `<span class="chip">${esc(t.name)}</span>`).join('')}</div>` : ''}
+          ${similar.length ? `<div class="edh-themes"><span class="edh-th">Commandants semblables :</span> ${similar.map((x, i) => `<span class="chip" data-similar="${i}" title="Voir la carte">${esc(x.card.nameFr || x.name)}</span>`).join('')}</div>` : ''}</div>`
+    : `<div class="edh-head small muted">${Number(data.decks || 0).toLocaleString('fr-FR')} decks recensés · données du ${when.toLocaleDateString('fr-FR')}${data.offline ? ' (hors connexion : dernière version gardée)' : ''}
+          ${data.themes.length ? `<div class="edh-themes"><span class="edh-th">Thèmes :</span> ${data.themes.map(t => `<span class="chip">${esc(t.name)} <span class="muted">${Number(t.decks).toLocaleString('fr-FR')}</span></span>`).join('')}</div>` : ''}</div>`}
         <div class="edh-bar">
           <div class="seg" data-seg="tab">
             <button data-v="synergy" class="${tab === 'synergy' ? 'on' : ''}">Meilleures synergies</button>
@@ -165,8 +176,9 @@ export function openEdhrec(commanders, {add, count}) {
           ${tab !== 'combos' ? `<label class="check small"><input type="checkbox" data-hide ${hideOwned ? 'checked' : ''}> Masquer celles déjà dans le deck</label>` : ''}
         </div>
         ${tab === 'lists' ? `<div class="chips edh-lists">${data.lists.map(l => `<span class="chip ${l.tag === list ? 'on' : ''}" data-list="${esc(l.tag)}">${esc(l.title)}</span>`).join('')}</div>` : ''}
-        ${tab === 'synergy' ? '<p class="muted small">Cartes jouées bien plus souvent avec ce commandant qu\'avec les autres decks de mêmes couleurs (synergie), et part des decks de ce commandant qui les jouent.</p>' : ''}
-        ${tab === 'combos' ? combosHtml(data.combos, count) : `<div class="card-grid edh-grid">${shown.length ? '' : '<p class="muted">Toutes ces cartes sont déjà dans le deck.</p>'}</div>`}
+        ${tab === 'synergy' ? (local ? '<p class="muted small">Cartes qui partagent les thèmes et les types de créature du commandant (les plus rares comptent le plus), départagées par leur popularité et par les decks EDHREC des commandants semblables.</p>'
+    : '<p class="muted small">Cartes jouées bien plus souvent avec ce commandant qu\'avec les autres decks de mêmes couleurs (synergie), et part des decks de ce commandant qui les jouent.</p>') : ''}
+        ${tab === 'combos' ? combosHtml(data.combos, count, local) : `<div class="card-grid edh-grid">${shown.length ? '' : '<p class="muted">Toutes ces cartes sont déjà dans le deck.</p>'}</div>`}
       </div>`;
       const grid = body.querySelector('.edh-grid');
       if (grid) {
@@ -175,7 +187,9 @@ export function openEdhrec(commanders, {add, count}) {
           cell._card = c;
           cell.appendChild(cardElement(c));
           cell.appendChild(el('<button class="add always" title="Ajouter au deck">+</button>'));
-          cell.appendChild(el(`<div class="edh-stat small"><span title="Synergie">${c.synergy > 0 ? '+' : ''}${Math.round(c.synergy)} %</span><span class="muted" title="Part des decks de ce commandant">${Math.round(c.inclusion)} % des decks</span></div>`));
+          cell.appendChild(el(local
+            ? `<div class="edh-stat small"><span class="edh-why" title="Ce qu'elle partage avec le commandant">${esc(c.why || 'Populaire dans ces couleurs')}</span>${c.inclusion >= 1 ? `<span class="muted" title="Part des decks EDHREC de commandants semblables qui la jouent">${Math.round(c.inclusion)} % des decks semblables</span>` : ''}</div>`
+            : `<div class="edh-stat small"><span title="Synergie">${c.synergy > 0 ? '+' : ''}${Math.round(c.synergy)} %</span><span class="muted" title="Part des decks de ce commandant">${Math.round(c.inclusion)} % des decks</span></div>`));
           const n = count(c.name);
           if (n) {
             cell.appendChild(el(`<div class="count">×${n}</div>`));
@@ -191,6 +205,11 @@ export function openEdhrec(commanders, {add, count}) {
     const consumed = onLongPress(body, '.cell, .combo-card', (node) => node._card && showZoom(node._card));
     body.addEventListener('click', (e) => {
       if (consumed()) {
+        return;
+      }
+      const sim = e.target.closest('[data-similar]');
+      if (sim) {
+        showZoom(similar[Number(sim.dataset.similar)].card);
         return;
       }
       const seg = e.target.closest('[data-seg] button');
@@ -252,11 +271,13 @@ export function openEdhrec(commanders, {add, count}) {
   }, {full: true});
 }
 
-function combosHtml(combos, count) {
+function combosHtml(combos, count, local = false) {
   if (!combos.length) {
-    return '<p class="muted">EDHREC ne connaît pas de combo pour ce commandant.</p>';
+    return local ? '<p class="muted">Pas de combo connu chez les commandants semblables (ou EDHREC injoignable).</p>'
+      : '<p class="muted">EDHREC ne connaît pas de combo pour ce commandant.</p>';
   }
-  return `<p class="muted small">Combos les plus joués avec ce commandant (d'après Commander Spellbook). Un combo à deux cartes compte pour le bracket.</p>
+  return `<p class="muted small">${local ? 'Combos joués avec des commandants semblables, dont toutes les cartes vont dans tes couleurs (d\'après Commander Spellbook).'
+    : 'Combos les plus joués avec ce commandant (d\'après Commander Spellbook).'} Un combo à deux cartes compte pour le bracket.</p>
     <div class="combos">${combos.map((c, i) => {
       const missing = c.cards.filter(x => !count(x.name));
       return `<div class="combo panel">
@@ -264,7 +285,7 @@ function combosHtml(combos, count) {
         <div class="combo-body">
           <b>${c.cards.map(x => esc(x.nameFr)).join(' + ')}</b>
           <div class="small">${c.results.map(esc).join(' · ')}</div>
-          <div class="muted small">${Number(c.decks).toLocaleString('fr-FR')} decks${c.bracket ? ` · bracket voté : ${esc(c.bracket === 'any' ? 'tous' : c.bracket)}` : ''}</div>
+          <div class="muted small">${Number(c.decks).toLocaleString('fr-FR')} decks${c.with ? ` avec ${esc(c.withFr || c.with)}` : ''}${c.bracket ? ` · bracket voté : ${esc(c.bracket === 'any' ? 'tous' : c.bracket)}` : ''}</div>
           <div class="combo-state small">${missing.length ? `Manque : ${missing.map(x => esc(x.nameFr)).join(', ')} <button class="btn small" data-add-combo="${i}">Ajouter ${missing.length > 1 ? 'les cartes manquantes' : 'la carte'}</button>` : '<span class="ok">✓ Toutes les cartes sont dans le deck</span>'}</div>
         </div>
       </div>`;

@@ -2,6 +2,19 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.6 — Cartes conseillées dans le deck builder, synergies des commandants perso
+
+- **Cartes conseillées directement dans la recherche du deck builder**. Dès que le deck a son commandant, la recherche se trie sur « Conseillées (EDHREC) d'abord » : les cartes que les decks EDHREC de ce commandant jouent le plus passent en tête, avec un badge bleu ◆ qui donne la part des decks qui les jouent (« ◆ 86 % »). Les staples (★) restent signalées, et viennent juste après.
+  - Les cartes déjà dans le deck passent après les autres ; les filtres (type, valeur de mana, texte…) gardent cet ordre.
+  - « Tout voir », au-dessus des cartes, ouvre la fenêtre EDHREC complète (synergies, catégories, combos).
+  - Le tri se change comme avant (« Les plus jouées d'abord », « Par nom ») ; un bouton permet de revenir aux cartes conseillées.
+- **Commandants perso : les cartes qui vont bien avec eux, façon EDHREC**. EDHREC ne connaît pas les cartes de l'Atelier : l'application lit le script de ton commandant et cherche elle-même.
+  - Les thèmes : ce qu'il fait et ce dont il profite (jetons, marqueurs +1/+1, sacrifice et morts, cimetière, gain de vie, éphémères et rituels, artefacts, enchantements, équipements et auras, terrains, arrivées et clignotements, poison, énergie…), et les types de créature dont il parle ou qu'il crée (tribal).
+  - Chaque carte de ses couleurs est lue de la même façon, avec les indices de construction de Forge : elle gagne des points pour chaque thème partagé, d'autant plus que le thème est rare. Le badge ◆ dit pourquoi (« ◆ Gobelin », « ◆ Jetons »).
+  - Les commandants officiels les plus semblables (mêmes couleurs, mêmes thèmes) sont lus sur EDHREC : les cartes de leurs decks s'ajoutent au classement, et leurs combos dont toutes les cartes vont dans tes couleurs sont proposés.
+  - Le bouton **◆ Synergies** (à la place d'EDHREC) ouvre la même fenêtre : meilleures synergies, par catégorie, combos, thèmes repérés et commandants semblables. Tes cartes perso y sont aussi, si elles vont bien avec lui.
+- **Commandant officiel trop récent pour EDHREC, ou pas de connexion** : le même calcul prend le relais, au lieu d'un message d'erreur.
+
 ## 0.9.5 — iPhone stable, terrains réimprimés, une fois par tour
 
 - **iPhone : plantage corrigé**. Depuis la 0.9.3, quand une partie restait bloquée, l'application relevait l'état des fils du moteur pour le relevé de performance ; sur iPhone, cette lecture pouvait faire planter l'application au lieu d'afficher le bandeau « La partie ne répond plus ». Elle n'est plus faite sur iPhone (le relevé garde le tour, la phase, la pile et le joueur qui avait la priorité).

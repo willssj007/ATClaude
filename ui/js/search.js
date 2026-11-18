@@ -107,8 +107,14 @@ export class SearchPanel {
    * @param options.counts   fonction nom -> exemplaires déjà dans le deck
    * @param options.onRemove si présent, un bouton « − » retire un exemplaire (cartes déjà dans le deck)
    */
-  constructor(root, {onPick, onAdd, onRemove, counts, identityLock, owned = false, onBought, popularFirst = false} = {}) {
+  constructor(root, {onPick, onAdd, onRemove, counts, identityLock, owned = false, onBought, popularFirst = false, deckNames, onRecommendOpen} = {}) {
     this.root = root;
+    // Deck builder : les cartes du deck (mises après les autres dans l'ordre « Conseillées ») et la fenêtre des conseils.
+    this.deckNames = deckNames || (() => []);
+    this.onRecommendOpen = onRecommendOpen;
+    // Cartes conseillées pour le commandant (EDHREC ou synergies calculées) : voir setRecommend.
+    this.recommend = null;
+    this.sortTouched = false;
     this.onBought = onBought;
     // Mode Planeswalker : seulement les cartes de la collection, avec le nombre d'exemplaires possédés.
     this.owned = owned;
@@ -118,7 +124,8 @@ export class SearchPanel {
     this.counts = counts || (() => 0);
     this.identityLock = identityLock || (() => null);
     // Le texte cherché : dans le nom, et dans le texte des cartes (chaque mot, n'importe où) sauf si on décoche « Dans le texte ».
-    this.query = {text: '', inText: true, colors: [], colorMode: 'any', types: [], typeMode: 'all', commanderLegal: false, commandersOnly: false, popular: popularFirst};
+    this.query = {text: '', inText: true, colors: [], colorMode: 'any', types: [], typeMode: 'all', commanderLegal: false, commandersOnly: false, popular: popularFirst,
+      sort: popularFirst ? 'popular' : 'name'};
     this.offset = 0;
     this.total = 0;
     this.loading = false;
@@ -258,7 +265,9 @@ export class SearchPanel {
       }
     });
     r.querySelector('.sort').addEventListener('change', (e) => {
-      this.query.popular = e.target.value === 'popular';
+      this.sortTouched = true;
+      this.query.sort = e.target.value;
+      this.query.popular = e.target.value !== 'name';
       run();
     });
     r.querySelector('.ctype').addEventListener('input', async (e) => {
@@ -285,6 +294,15 @@ export class SearchPanel {
       }
     });
     r.querySelector('.sh-status').addEventListener('click', (e) => {
+      if (e.target.closest('[data-rec-open]')) {
+        this.onRecommendOpen && this.onRecommendOpen();
+        return;
+      }
+      if (e.target.closest('[data-rec-sort]')) {
+        this.sortTouched = false;
+        this.useRecommendSort(true);
+        return;
+      }
       if (e.target.closest('[data-clear-all]')) {
         this.clearFilter('all');
         this.countFilters();
@@ -367,8 +385,9 @@ export class SearchPanel {
       status.innerHTML = result.fuzzy ? `Aucune carte ne s'appelle « ${typed} » : voici les noms les plus proches.`
         : !result.total ? `Aucune carte ne correspond${typed ? ` à « ${typed} »` : ''}. Essaie un autre mot, en français ou en anglais${filters
           ? `, ou retire un filtre. <button class="btn small" data-clear-all>Retirer les filtres</button>` : '.'}`
-          : `${result.total.toLocaleString('fr-FR')} carte${result.total > 1 ? 's' : ''}`;
+          : `<span class="sh-count">${result.total.toLocaleString('fr-FR')} carte${result.total > 1 ? 's' : ''}</span>${this.recommendNote()}`;
       status.classList.toggle('sh-note', !!result.fuzzy || !result.total);
+      status.classList.toggle('has-rec', !!status.querySelector('.rec-part'));
       this.root.querySelector('.more').textContent = this.offset < this.total ? 'Faites défiler pour voir la suite…' : '';
       this.refreshCounts();
       this.prefetchNext(seq);
@@ -389,7 +408,106 @@ export class SearchPanel {
       query.colorMode = 'identity';
       query.commanderLegal = true;
     }
+    delete query.sort;
+    if (this.recommendSorted()) {
+      query.recommend = this.recommend.names;
+      query.deck = this.deckNames();
+    }
     return query;
+  }
+
+  /** L'ordre « Conseillées » est-il en cours (conseils prêts et choisis) ? */
+  recommendSorted() {
+    return !!this.recommend && this.recommend.ready && this.query.sort === 'recommend';
+  }
+
+  /**
+   * Cartes conseillées pour le commandant du deck : {names, title, loading} pendant le calcul, puis {names, title,
+   * ready, source, count, note} (ou {error}). Ajoute l'ordre « Conseillées » aux choix de tri et le prend tant qu'on
+   * n'a pas choisi soi-même un autre ordre ; null : plus de commandant, l'ordre revient aux plus jouées.
+   */
+  setRecommend(rec) {
+    const select = this.root.querySelector('.sort');
+    let opt = select.querySelector('option[value="recommend"]');
+    this.recommend = rec;
+    if (!rec || rec.error || (rec.ready && !rec.count)) {
+      if (opt) {
+        if (select.value === 'recommend') {
+          select.value = 'popular';
+        }
+        opt.remove();
+      }
+      if (this.query.sort === 'recommend') {
+        this.query.sort = 'popular';
+        this.query.popular = true;
+        this.search(true);
+      }
+      this.updateRecommendNote();
+      return;
+    }
+    if (!opt) {
+      opt = document.createElement('option');
+      opt.value = 'recommend';
+      select.prepend(opt);
+    }
+    opt.textContent = rec.source === 'edhrec' ? 'Conseillées (EDHREC) d\'abord' : 'Synergies d\'abord';
+    if (rec.ready && !this.sortTouched) {
+      this.useRecommendSort(false);
+    } else {
+      this.updateRecommendNote();
+    }
+  }
+
+  /** Passe à l'ordre « Conseillées » ; sans {@code force}, seulement si l'on n'est pas en train de faire défiler. */
+  useRecommendSort(force) {
+    const select = this.root.querySelector('.sort');
+    if (!this.recommend || !this.recommend.ready || !select.querySelector('option[value="recommend"]')) {
+      return;
+    }
+    const results = this.root.querySelector('.results');
+    if (!force && results.scrollTop > 400 && this.query.sort !== 'recommend') {
+      this.updateRecommendNote();
+      return;
+    }
+    select.value = 'recommend';
+    const changed = this.query.sort !== 'recommend';
+    this.query.sort = 'recommend';
+    this.query.popular = true;
+    if (changed || force) {
+      this.search(true);
+    } else {
+      this.updateRecommendNote();
+    }
+  }
+
+  /** Ce que la ligne d'état dit des conseils (à la suite du nombre de cartes). */
+  recommendNote() {
+    const r = this.recommend;
+    if (!r) {
+      return '';
+    }
+    const who = esc(r.title || 'ce commandant');
+    const part = (html) => `<span class="sh-sep"> · </span><span class="rec-part">${html}</span>`;
+    if (r.loading) {
+      return part(`<span class="rec-note">◆ Recherche des cartes conseillées pour ${who}…</span>`);
+    }
+    if (!r.ready || !r.count) {
+      return '';
+    }
+    const what = r.source === 'edhrec' ? `conseillées par EDHREC pour ${who}` : `en synergie avec ${who}`;
+    if (this.recommendSorted()) {
+      return part(`<span class="rec-note">◆ Les cartes ${what} d'abord</span>${this.onRecommendOpen ? ' <button class="btn small" data-rec-open>Tout voir</button>' : ''}`);
+    }
+    return part(`<button class="btn small" data-rec-sort>◆ Cartes ${what} d'abord</button>`);
+  }
+
+  updateRecommendNote() {
+    const status = this.root.querySelector('.sh-status');
+    if (!status || status.classList.contains('sh-note') || !this.total) {
+      return;
+    }
+    status.innerHTML = `<span class="sh-count">${this.total.toLocaleString('fr-FR')} carte${this.total > 1 ? 's' : ''}</span>${this.recommendNote()}`;
+    status.classList.toggle('has-rec', !!status.querySelector('.rec-part'));
   }
 
   /**
@@ -442,6 +560,10 @@ export class SearchPanel {
     // Les staples : la carte se joue dans beaucoup de préconstruits Commander.
     if (card.precons >= 10 && !card.basic) {
       cell.appendChild(el(`<div class="staple" title="Jouée dans ${card.precons} préconstruits Commander">★ ${card.precons}</div>`));
+    }
+    // Conseillée pour le commandant : la part des decks EDHREC qui la jouent, ou la raison de la synergie.
+    if (card.rec) {
+      cell.appendChild(el(`<div class="rec" title="${esc(card.recTitle || '')}">◆ ${esc(card.rec)}</div>`));
     }
     if (card.owned === 0) {
       const r = rarityKey(card);
