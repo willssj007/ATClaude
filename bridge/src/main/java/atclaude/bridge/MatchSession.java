@@ -178,6 +178,11 @@ final class MatchSession {
     /** Où en sont les fils du moteur (partie, IA, interface) : leurs dernières méthodes appelées. */
     private static String threadDump() {
         final StringBuilder sb = new StringBuilder();
+        if (Bridge.isIos()) {
+            // iPhone : MobiVM lit la pile des autres fils en les interrompant par un signal, ce qui peut faire planter
+            // l'application au lieu d'afficher le bandeau. On s'en passe : le tour, la phase et la pile suffisent à situer.
+            return "(piles des fils non relevées sur iPhone)\n";
+        }
         try {
             for (final java.util.Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
                 final Thread t = e.getKey();

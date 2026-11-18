@@ -52,6 +52,10 @@ public final class Bridge {
         ios = value;
     }
 
+    static boolean isIos() {
+        return ios;
+    }
+
     private final Transport transport;
     private final ExecutorService edt;
     private volatile Thread edtThread;

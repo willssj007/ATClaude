@@ -2,6 +2,15 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.5 — iPhone stable, terrains réimprimés, une fois par tour
+
+- **iPhone : plantage corrigé**. Depuis la 0.9.3, quand une partie restait bloquée, l'application relevait l'état des fils du moteur pour le relevé de performance ; sur iPhone, cette lecture pouvait faire planter l'application au lieu d'afficher le bandeau « La partie ne répond plus ». Elle n'est plus faite sur iPhone (le relevé garde le tour, la phase, la pile et le joueur qui avait la priorité).
+- **Terrains de base réimprimés** :
+  - ils n'affichent plus une lettre (« R ») à la place du rappel de mana ou du grand symbole. La mise à jour des textes français des cartes récentes prenait le texte imprimé de Scryfall, qui pour les terrains de base n'est que la lettre du mana ; elle ne touche plus aux terrains de base, et ce qu'elle avait déjà enregistré est oublié ;
+  - le cadre d'un terrain prend la couleur du mana qu'il produit (une Montagne en rouge, un terrain rouge-blanc en deux couleurs), au lieu de rester incolore. Un terrain incolore ou de plus de deux couleurs garde le cadre des terrains.
+- **Cartes récentes restées en anglais** (« Massif scintillant » : « This land enters tapped. ») : quand Forge a le nom français mais un texte resté en anglais, le texte et le type de l'impression française de Scryfall le remplacent. Il arrive à la vérification quotidienne, ou tout de suite avec Réglages → « Mettre à jour maintenant ».
+- **Atelier : « une seule fois par tour » pour les déclencheurs** (case à côté de « ou aussi ») : « À chaque fois que vous lancez un sort historique, créez un jeton Trésor. Cette capacité ne se déclenche qu'une fois par tour. », comme sur les vraies cartes. Elle existait déjà pour les capacités activées.
+
 ## 0.9.4 — Réimpressions sous un autre nom, emblèmes plus faciles à donner
 
 - **Réimpressions : un autre nom**, comme les cartes Universes Beyond (« Hérauts de Shredder », avec « Ardeur » en petit dessous).

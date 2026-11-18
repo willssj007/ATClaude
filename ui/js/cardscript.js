@@ -4167,8 +4167,13 @@ export function abilityLines(a, i, lang = 'fr', card = null) {
     return {lines: [`A:AB$ ${e.p} | Cost$ ${c.forge}${lim.forge} | CostDesc$ ${withWord(e.aw, head)} | SpellDescription$ ${desc} | StackDescription$ SpellDescription`, ...extra, ...(a.tapX && !tapCount(a) ? ['SVar:X:Count$xPaid'] : [])], text};
   }
   const head = orTrigger(a, card, triggerHead(a, card));
-  const text = withWord(e.aw, endDot(`${head[en ? 2 : 1]}, ${body}`));
-  return {lines: [`T:${head[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, ...orLines(head, id, text), `SVar:${id}:DB$ ${e.p}`, ...extra], text};
+  // « Cette capacité ne se déclenche qu'une fois par tour » (Forge : ActivationLimit$ 1), comme pour les capacités activées.
+  const once = a.oncePerTurn && !w.control;
+  const lim = once ? ' | ActivationLimit$ 1' : '';
+  const text = withWord(e.aw, endDot(`${head[en ? 2 : 1]}, ${body}`))
+    + (once ? (en ? ' This ability triggers only once each turn.' : ' Cette capacité ne se déclenche qu\'une fois par tour.') : '');
+  const limited = once ? head.map((h, k) => ((k === 0 || k === 3) && h ? h + lim : h)) : head;
+  return {lines: [`T:${limited[0]} | Execute$ ${id} | TriggerDescription$ ${text}`, ...orLines(limited, id, text), `SVar:${id}:DB$ ${e.p}`, ...extra], text};
 }
 
 /**

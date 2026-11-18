@@ -63,6 +63,8 @@ const lookOf = (f) => ({frame: f.frame, frameColor: f.frameColor, lang: f.lang, 
   set: f.set, rarity: f.rarity, artist: f.artist});
 /** Le dernier artiste écrit : il est repris sur les nouvelles cartes. */
 const ARTIST_KEY = 'at.atelier.artist';
+/** Mana des terrains de base (nom anglais), pour leur texte réimprimé : rappel, grand symbole ou rien. */
+const BASIC_MANA = {Plains: '{W}', Island: '{U}', Swamp: '{B}', Mountain: '{R}', Forest: '{G}', Wastes: '{C}'};
 function lastArtist() {
   try {
     return cleanArtist(localStorage.getItem(ARTIST_KEY) || '');
@@ -890,7 +892,8 @@ export class Atelier {
 
   /** Réimpression : le texte d'un terrain de base (rappel, grand symbole, rien) et un texte d'ambiance. */
   reprintTextHtml() {
-    const basic = /^\(\{T\}\s?: (?:Add|Ajoutez) (?:\{[WUBRGCS]\})+(?: à votre réserve)?\.\)$/.test(String(this.reprint.base.text || '').trim());
+    const basic = /^\(\{T\}\s?: (?:Add|Ajoutez) (?:\{[WUBRGCS]\})+(?: à votre réserve)?\.\)$/.test(String(this.reprint.base.text || '').trim())
+      || !!BASIC_MANA[String(this.reprint.name || '').replace(/^Snow-Covered /, '')];
     const lt = this.form.landText || '';
     // Une carte officielle : son nom, son type et son texte en français ou en anglais (une carte perso garde sa langue).
     const langRow = this.reprint.base.custom ? '' : `<div class="ate-field"><span>Langue de la carte</span>
@@ -923,7 +926,10 @@ export class Atelier {
     // Le numéro dans l'extension : celui de la réimpression enregistrée (pas celui de la carte perso qu'elle réimprime).
     const keepNumber = this.reprint.id && base.cset && set && base.cset.id === set.id;
     // Terrain de base : rappel de mana en français, grand symbole ou rien (comme le pont le fera en partie).
-    const basicText = String(base.text || '').trim().match(/^\(\{T\}\s?: (?:Add|Ajoutez) ((?:\{[WUBRGCS]\})+)(?: à votre réserve)?\.\)$/);
+    // Un terrain de base garde son mana même si son texte est autre chose (ancien texte de Scryfall : « R »).
+    const basicMana = BASIC_MANA[String(this.reprint.name || '').replace(/^Snow-Covered /, '')];
+    const basicText = String(base.text || '').trim().match(/^\(\{T\}\s?: (?:Add|Ajoutez) ((?:\{[WUBRGCS]\})+)(?: à votre réserve)?\.\)$/)
+      || (basicMana ? [null, basicMana] : null);
     // Carte officielle en anglais : son nom, son type et son texte anglais (comme le pont le fera partout).
     const en = !base.custom && this.form.lang === 'en';
     const english = (face) => (face && face.textEn !== undefined ? {...face, nameFr: face.name, typeLine: String(face.typeEn || face.typeLine || '').replace(' - ', ' — '),
@@ -2153,7 +2159,8 @@ export class Atelier {
       ${misfit.map(([l, need]) => `<p class="ate-misfit small">⚠ « ${esc(l)} » ne va qu'avec ${esc(needWords(need))}.</p>`).join('')}
       ${w.kind === 'T' && !w.control ? `<div class="ate-ab-row"><span class="muted small" title="Un deuxième moment où la capacité se déclenche, avec le même effet (« Quand elle arrive ou attaque »)">ou aussi</span>
         <select data-a="when2" aria-label="Ou aussi quand">${[['', 'rien d\'autre'], ...WHEN.filter(x => x.id !== a.when && orTriggerFits(x) && ((whenFits(x, this.form) && fitsCard('when', x, card)) || x.id === a.when2))
-          .map(x => [x.id, whenLabel(x, this.form)])].map(([v, l]) => `<option value="${esc(v)}"${v === (a.when2 || '') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
+          .map(x => [x.id, whenLabel(x, this.form)])].map(([v, l]) => `<option value="${esc(v)}"${v === (a.when2 || '') ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <label class="ate-check" title="« Cette capacité ne se déclenche qu'une fois par tour », comme sur les vraies cartes"><input type="checkbox" data-a="oncePerTurn"${a.oncePerTurn ? ' checked' : ''}> une seule fois par tour</label></div>` : ''}
       ${w.counterSel ? `<div class="ate-ab-row"><span class="muted small">Marqueur</span>${counterSelect('a', 'whenCounter', a.whenCounter, 'CHARGE')}
         ${w.nth ? `<span class="muted small">X =</span><input type="number" data-a="whenN" value="${esc(a.whenN ?? 3)}" min="1" max="20" style="width:64px">` : ''}</div>` : ''}
       ${w.kinds || w.nLabel ? `<div class="ate-ab-row">${w.kinds ? `${sel('whenKind', WHEN_KINDS[w.kinds].map(k => [k[0], k[1]]), whenKindOf(w, a.whenKind)[0])}` : ''}

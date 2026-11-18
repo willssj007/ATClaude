@@ -72,6 +72,11 @@ final class FrenchCards {
             final JsonObject o = JsonParser.parseString(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8)).getAsJsonObject();
             if (o.has("cards")) {
                 for (final Map.Entry<String, JsonElement> e : o.getAsJsonObject("cards").entrySet()) {
+                    // Terrain de base : la version française de Scryfall n'a que la lettre du mana (« R ») ; elle remplaçait
+                    // le rappel « ({T} : Ajoutez {R}.) ». Les anciennes entrées sont oubliées.
+                    if (Reprints.basicMana(e.getKey()) != null) {
+                        continue;
+                    }
                     final JsonArray a = e.getValue().getAsJsonArray();
                     CARDS.put(e.getKey(), new String[]{a.get(0).getAsString(), a.get(1).getAsString(), a.get(2).getAsString()});
                 }
@@ -181,7 +186,9 @@ final class FrenchCards {
                     types.put(en, fr[1]);
                     added = true;
                 }
-                if (!fr[2].isEmpty() && !known(oracles, en)) {
+                // Texte « traduit » par Forge mais resté en anglais (« Massif scintillant » : « This land enters tapped. ») :
+                // le texte français de Scryfall le remplace.
+                if (!fr[2].isEmpty() && (!known(oracles, en) || sameText(oracles.get(en), englishOracle(en)))) {
                     oracles.put(en, fr[2].replace("\n", "\r\n\r\n"));
                     added = true;
                 }
@@ -189,6 +196,33 @@ final class FrenchCards {
             }
         }
         return n;
+    }
+
+    /** Deux textes de règles identiques (aux retours à la ligne et aux espaces près) : une « traduction » restée anglaise. */
+    private static boolean sameText(final String a, final String b) {
+        if (a == null || b == null || b.isBlank()) {
+            return false;
+        }
+        final java.util.function.Function<String, String> norm = s -> s.replace("\\n", "\n").replaceAll("\\s+", " ").trim();
+        return norm.apply(a).equalsIgnoreCase(norm.apply(b));
+    }
+
+    /** Le texte anglais (Oracle de Forge) de la face qui porte ce nom, ou null. */
+    private static String englishOracle(final String faceName) {
+        try {
+            final CardRules r = FModel.getMagicDb().getCommonCards().getRules(faceName, true);
+            if (r == null) {
+                return null;
+            }
+            for (final ICardFace face : new ICardFace[]{r.getMainPart(), r.getOtherPart()}) {
+                if (face != null && faceName.equals(face.getName())) {
+                    return face.getOracleText();
+                }
+            }
+            return r.getMainPart() == null ? null : r.getMainPart().getOracleText();
+        } catch (final RuntimeException e) {
+            return null;
+        }
     }
 
     /** Forge a-t-il déjà le nom français de cette face ? */
@@ -245,7 +279,8 @@ final class FrenchCards {
             return true;
         }
         final String oracle = face.getOracleText();
-        return oracles != null && oracle != null && !oracle.isBlank() && !known(oracles, face.getName());
+        return oracles != null && oracle != null && !oracle.isBlank()
+                && (!known(oracles, face.getName()) || sameText(oracles.get(face.getName()), oracle));
     }
 
     /** Les extensions (code Scryfall) des cartes sans nom ou sans texte français, de la plus fournie à la moins fournie. */
@@ -345,8 +380,12 @@ final class FrenchCards {
         for (final JsonObject f : faces) {
             final String en = str(f, "name");
             final String nameFr = str(f, "printed_name");
+            if (Reprints.basicMana(en) != null || str(c, "type_line").startsWith("Basic ")) {
+                continue; // terrain de base : rien à prendre (voir init)
+            }
             final boolean hasName = names != null && known(names, en);
-            final boolean hasText = oracles != null && known(oracles, en) || str(f, "printed_text").isEmpty();
+            final boolean hasText = oracles != null && known(oracles, en) && !sameText(oracles.get(en), str(f, "oracle_text"))
+                    || str(f, "printed_text").isEmpty();
             if (en.isEmpty() || nameFr.isEmpty() || nameFr.equals(en) && str(f, "printed_text").isEmpty()
                     || hasName && hasText || found.containsKey(en)) {
                 continue;

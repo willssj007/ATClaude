@@ -43,7 +43,12 @@ export function frameColors(card) {
     return [pick];
   }
   if (card.land) {
-    return ['L'];
+    // Terrain : la couleur du mana qu'il produit (une Montagne en rouge, un terrain rouge-blanc partagé), comme les vrais ;
+    // incolore ou plus de deux couleurs : le cadre des terrains.
+    const id = card.identity !== undefined ? String(card.identity)
+      : `${card.landSymbol || ''} ${card.text || ''}`.match(/\{[WUBRG]\}/g)?.join('') || '';
+    const produced = [...new Set([...id].filter(c => 'WUBRG'.includes(c)))];
+    return produced.length === 1 || produced.length === 2 ? produced : ['L'];
   }
   const colors = [...String(card.colors || '')].filter(c => 'WUBRG'.includes(c));
   if (!colors.length) {

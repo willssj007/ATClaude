@@ -355,7 +355,9 @@ final class Reprints {
         // de texte aux terrains de base : leur mana vient alors de leur nom.
         final String text = o.has("text") && !o.get("text").isJsonNull() ? o.get("text").getAsString().trim() : "";
         final Matcher m = BASIC_REMINDER.matcher(text);
-        final String mana = m.matches() ? m.group(1) : text.isEmpty() ? basicMana(str(r, "name")) : null;
+        // Un terrain de base garde son mana même si son texte est autre chose (ancien texte de Scryfall : « R »).
+        final String basic = basicMana(str(r, "name"));
+        final String mana = m.matches() ? m.group(1) : text.isEmpty() || basic != null ? basic : null;
         if (mana != null) {
             switch (str(r, "landText")) {
                 case "symbol" -> {
