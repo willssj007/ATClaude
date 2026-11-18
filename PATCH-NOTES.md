@@ -5,7 +5,8 @@ La version la plus récente est en haut. La page de téléchargement de chaque v
 ## 0.9.6 — Cartes conseillées dans le deck builder, synergies des commandants perso
 
 - **Cartes conseillées directement dans la recherche du deck builder**. Dès que le deck a son commandant, la recherche se trie sur « Conseillées (EDHREC) d'abord » : les cartes que les decks EDHREC de ce commandant jouent le plus passent en tête, avec un badge bleu ◆ qui donne la part des decks qui les jouent (« ◆ 86 % »). Les staples (★) restent signalées, et viennent juste après.
-  - Les cartes déjà dans le deck passent après les autres ; les filtres (type, valeur de mana, texte…) gardent cet ordre.
+  - Les cartes déjà dans le deck passent après les autres ; les filtres (type, valeur de mana…) gardent cet ordre. Un mot tapé (« gobelin ») met en tête les cartes conseillées qui ont ce mot dans leur nom (Matrone gobeline, Chef de clan gobelin…) ; un nom exact reste en premier.
+  - En mode Planeswalker, le même ordre s'applique aux cartes de ta collection (sans la fenêtre EDHREC, où l'on pourrait ajouter des cartes qu'on n'a pas).
   - « Tout voir », au-dessus des cartes, ouvre la fenêtre EDHREC complète (synergies, catégories, combos).
   - Le tri se change comme avant (« Les plus jouées d'abord », « Par nom ») ; un bouton permet de revenir aux cartes conseillées.
 - **Commandants perso : les cartes qui vont bien avec eux, façon EDHREC**. EDHREC ne connaît pas les cartes de l'Atelier : l'application lit le script de ton commandant et cherche elle-même.

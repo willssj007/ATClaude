@@ -277,7 +277,13 @@ final class Catalog {
                 final Recommend.Rec r = rec.get(e.nameEn());
                 return r == null ? 0 : -r.score;
             }).thenComparingInt((Entry e) -> -p.getOrDefault(e.nameEn(), 0));
-            matches.sort(text.isEmpty() ? byRec : Comparator.comparingInt((Entry e) -> rank(e, text, stems, aliases.get(e.nameEn()))).thenComparing(byRec));
+            // Avec un texte : le nom exact d'abord, puis les cartes dont le nom contient le texte, puis celles qui ne l'ont
+            // que dans leur texte ; dans chaque groupe, les conseillées d'abord (« gobelin » : Matrone gobeline en tête).
+            final Comparator<Entry> byRank = Comparator.comparingInt((Entry e) -> rank(e, text, stems, aliases.get(e.nameEn())));
+            matches.sort(text.isEmpty() ? byRec : Comparator.comparingInt((Entry e) -> {
+                final int r = rank(e, text, stems, aliases.get(e.nameEn()));
+                return r == 0 ? 0 : r <= 4 ? 1 : 2;
+            }).thenComparing(byRec).thenComparing(byRank));
         } else if (fuzzy) {
             final Comparator<Entry> byDistance = Comparator.comparingInt(distance::get);
             matches.sort(pop == null ? byDistance.thenComparing(Entry::nameFr, String.CASE_INSENSITIVE_ORDER)
