@@ -284,8 +284,19 @@ export class Decks {
     this.analyze();
     this.loadPrices();
     this.recKey = null;
+    // Conseils déjà prêts (gardés par le moteur, quelques millisecondes) : la grille n'est dessinée qu'une fois, déjà dans
+    // l'ordre « Conseillées ». Sinon (EDHREC à lire, premier calcul) : les plus jouées tout de suite, réordonnées ensuite.
+    const seq0 = this.search.seq;
     this.loadRecommendations();
-    this.search.search(true);
+    if (deck.format === 'commander' && deck.sections.commander.length) {
+      setTimeout(() => {
+        if (this.search.seq === seq0) {
+          this.search.search(true);
+        }
+      }, 300);
+    } else {
+      this.search.search(true);
+    }
   }
 
   /**

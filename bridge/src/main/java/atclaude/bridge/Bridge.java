@@ -41,6 +41,11 @@ public final class Bridge {
     /** Version de l'application (Android : celle de l'APK ; Windows : celle que jpackage donne au moteur). */
     private static volatile String appVersion = System.getProperty("jpackage.app-version", "");
 
+    /** Version de l'appli (vide en développement). */
+    static String version() {
+        return appVersion;
+    }
+
     public static void setAppVersion(final String version) {
         appVersion = version == null ? "" : version;
     }
@@ -305,7 +310,7 @@ public final class Bridge {
                 () -> catalog.search(new JsonObject()),
                 catalog::listDecks,
                 Career::boosterSets,
-                () -> catalog.refillRandomPool(0)), 0);
+                () -> catalog.refillRandomPool(0, 1)), 0);
         // L'analyse des préconstruits (plus d'une minute sur iPhone, longue aussi sur les téléphones Android modestes) a
         // son propre fil : le profil, les decks et les statistiques du menu n'attendent plus derrière elle.
         final Thread precons = new Thread(() -> {

@@ -189,11 +189,7 @@ final class Synergy {
             w("$GainControl", "B$Clone", "P$Clone"), null, w("YouDontOwn", "OwnedBy"), null, null, NONE, NONE, NONE),
     };
 
-    private static final Pattern PIPE_SPACE = Pattern.compile("[ \\t]*\\|[ \\t]*");
-    private static final Pattern DOLLAR_SPACE = Pattern.compile("\\$[ \\t]+");
-    private static final Pattern DESCRIPTIONS = Pattern.compile("[A-Za-z]*(?:Description|Desc)\\$[^|\\n]*");
     private static final Pattern TOKEN_SCRIPT = Pattern.compile("TokenScript\\$([a-z0-9_,]+)");
-    private static final Pattern WORD = Pattern.compile("(?<![A-Za-z])([A-Z][a-z]+)(?![a-z])");
 
     // ------------------------------------------------------------------ profil d'une carte
 
@@ -225,37 +221,78 @@ final class Synergy {
     }
 
     /** Le script de la carte (toutes ses faces), sans les textes affichés. */
-    private static String rawScript(final CardRules r) {
+    /**
+     * Le script de la carte (toutes ses faces), sans les textes affichés (« …Description$ », « CostDesc$ »), espaces
+     * retirés autour des « | » et après les « $ » (« Mode$ChangesZone|Origin$Any… »). Lu caractère par caractère : des
+     * dizaines de milliers de cartes au premier calcul des synergies.
+     */
+    private static String script(final CardRules r) {
         final StringBuilder sb = new StringBuilder(512);
         for (final ICardFace f : new ICardFace[] {r.getMainPart(), r.getOtherPart()}) {
             if (f == null) {
                 continue;
             }
             for (final String s : f.getKeywords()) {
-                sb.append("K:").append(s).append('\n');
+                sb.append("K:");
+                appendClean(sb, s);
             }
-            for (final String s : f.getAbilities()) {
-                sb.append(s).append('\n');
-            }
-            for (final String s : f.getTriggers()) {
-                sb.append(s).append('\n');
-            }
-            for (final String s : f.getStaticAbilities()) {
-                sb.append(s).append('\n');
-            }
-            for (final String s : f.getReplacements()) {
-                sb.append(s).append('\n');
+            for (final Iterable<String> lines : java.util.List.of(f.getAbilities(), f.getTriggers(), f.getStaticAbilities(), f.getReplacements())) {
+                for (final String s : lines) {
+                    appendClean(sb, s);
+                }
             }
             for (final Map.Entry<String, String> v : f.getVariables()) {
-                sb.append(v.getKey()).append(':').append(v.getValue()).append('\n');
+                sb.append(v.getKey()).append(':');
+                appendClean(sb, v.getValue());
             }
         }
-        return DESCRIPTIONS.matcher(sb).replaceAll("");
+        return sb.toString();
     }
 
-    /** Le script, espaces retirés autour des « | » et après les « $ » (« Mode$ChangesZone|Origin$Any… »). */
-    private static String script(final CardRules r) {
-        return DOLLAR_SPACE.matcher(PIPE_SPACE.matcher(rawScript(r)).replaceAll("|")).replaceAll("\\$");
+    /** Une ligne de script nettoyée (voir {@link #script}), puis un saut de ligne. */
+    private static void appendClean(final StringBuilder sb, final String line) {
+        final int n = line.length();
+        boolean first = true;
+        for (int start = 0; start <= n; ) {
+            int bar = line.indexOf('|', start);
+            if (bar < 0) {
+                bar = n;
+            }
+            int a = start;
+            int b = bar;
+            while (a < b && line.charAt(a) <= ' ') {
+                a++;
+            }
+            while (b > a && line.charAt(b - 1) <= ' ') {
+                b--;
+            }
+            final int dollar = line.indexOf('$', a);
+            final boolean keyed = dollar >= 0 && dollar < b;
+            final boolean shown = keyed && (endsWith(line, a, dollar, "Description") || endsWith(line, a, dollar, "Desc"));
+            if (a < b && !shown) {
+                if (!first) {
+                    sb.append('|');
+                }
+                first = false;
+                if (keyed) {
+                    sb.append(line, a, dollar + 1);
+                    int v = dollar + 1;
+                    while (v < b && line.charAt(v) <= ' ') {
+                        v++;
+                    }
+                    sb.append(line, v, b);
+                } else {
+                    sb.append(line, a, b);
+                }
+            }
+            start = bar + 1;
+        }
+        sb.append('\n');
+    }
+
+    private static boolean endsWith(final String s, final int from, final int to, final String suffix) {
+        final int at = to - suffix.length();
+        return at >= from && s.startsWith(suffix, at);
     }
 
     private static boolean any(final String s, final String[] needles) {
@@ -313,12 +350,24 @@ final class Synergy {
                 }
             }
         }
-        final Matcher wm = WORD.matcher(s);
-        while (wm.find()) {
-            final String word = wm.group(1);
-            if (all.contains(word)) {
-                p.refs.add(word);
+        // Les mots en majuscule (« Creature.Elf », « Goblin.YouCtrl ») qui sont des types de créature.
+        final int len = s.length();
+        for (int i = 0; i < len; i++) {
+            final char c = s.charAt(i);
+            if (c < 'A' || c > 'Z' || (i > 0 && isAsciiLetter(s.charAt(i - 1)))) {
+                continue;
             }
+            int j = i + 1;
+            while (j < len && s.charAt(j) >= 'a' && s.charAt(j) <= 'z') {
+                j++;
+            }
+            if (j > i + 1) {
+                final String word = s.substring(i, j);
+                if (all.contains(word)) {
+                    p.refs.add(word);
+                }
+            }
+            i = j - 1;
         }
         p.anyTribe = s.contains("ChosenType") || s.contains("sharesCreatureTypeWith");
         // Gardé pour toute la session (des dizaines de milliers de cartes) : des ensembles aussi petits que possible.
@@ -332,6 +381,10 @@ final class Synergy {
             return java.util.Collections.emptySet();
         }
         return set.size() == 1 ? java.util.Collections.singleton(set.iterator().next()) : set;
+    }
+
+    private static boolean isAsciiLetter(final char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
     }
 
     private static DeckHints valid(final DeckHints h) {
@@ -938,7 +991,7 @@ final class Synergy {
     /** Empreinte d'une carte perso (script, types, couleurs) : modifiée dans l'Atelier, ses conseils sont recalculés. */
     static int signature(final PaperCard pc) {
         final CardRules r = pc.getRules();
-        return (rawScript(r) + "|" + r.getType() + "|" + r.getColorIdentity()).hashCode();
+        return (script(r) + "|" + r.getType() + "|" + r.getColorIdentity()).hashCode();
     }
 
     /** Pour les tests et le relevé : combien de profils sont gardés. */

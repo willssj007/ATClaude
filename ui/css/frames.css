@@ -10,6 +10,8 @@
   --u: calc(var(--w) / 100);
   padding: 0; display: block; gap: 0; border: 0; border-radius: inherit; overflow: hidden;
   background: #0d0c0b; color: #15130f; box-shadow: none;
+  /* Le texte ajusté (js/frames.js, fitFrame) ne fait recalculer que ce cadre : sa taille vient de la carte. */
+  contain: strict;
   font: 400 calc(var(--u) * 5.6) / 1.18 "Palatino Linotype", "Book Antiqua", Palatino, Georgia, "Noto Serif", serif;
 }
 .frame.cf > * { position: absolute; }

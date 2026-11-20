@@ -421,23 +421,37 @@ final class Catalog {
         if (typed.isEmpty()) {
             return out;
         }
+        // Les mots de chaque nom sont lus sur place (ni découpage ni expression régulière) : des dizaines de milliers de
+        // noms à chaque frappe.
         for (final Entry e : pool) {
+            final String names = e.searchName();
+            final int len = names.length();
             int best = Integer.MAX_VALUE;
-            for (final String name : e.searchName().split("\n")) {
-                final String[] nameWords = name.split("[^\\p{L}\\p{N}]+");
+            for (int lineStart = 0; lineStart <= len; ) {
+                int lineEnd = names.indexOf('\n', lineStart);
+                if (lineEnd < 0) {
+                    lineEnd = len;
+                }
                 int total = 0;
                 for (final String w : typed) {
                     final int allowed = w.length() <= 3 ? 0 : w.length() <= 5 ? 1 : 2;
                     int min = Integer.MAX_VALUE;
-                    for (final String nw : nameWords) {
-                        if (nw.isEmpty() || Math.abs(nw.length() - w.length()) > allowed && !nw.startsWith(w)) {
-                            continue;
+                    for (int i = lineStart; i < lineEnd && min > 0; ) {
+                        while (i < lineEnd && !Character.isLetterOrDigit(names.charAt(i))) {
+                            i++;
                         }
-                        final int d = nw.startsWith(w) ? 0 : typos(w, nw, allowed);
-                        min = Math.min(min, d);
-                        if (min == 0) {
-                            break;
+                        int j = i;
+                        while (j < lineEnd && Character.isLetterOrDigit(names.charAt(j))) {
+                            j++;
                         }
+                        if (j > i) {
+                            if (j - i >= w.length() && names.startsWith(w, i)) {
+                                min = 0;
+                            } else if (Math.abs(j - i - w.length()) <= allowed) {
+                                min = Math.min(min, typos(w, names, i, j, allowed));
+                            }
+                        }
+                        i = j;
                     }
                     if (min > allowed) {
                         total = Integer.MAX_VALUE;
@@ -446,6 +460,7 @@ final class Catalog {
                     total += min;
                 }
                 best = Math.min(best, total);
+                lineStart = lineEnd + 1;
             }
             if (best != Integer.MAX_VALUE) {
                 out.put(e, best);
@@ -456,8 +471,13 @@ final class Catalog {
 
     /** Nombre de fautes entre deux mots (lettre en trop, en moins, changée, deux lettres inversées), au plus max + 1. */
     static int typos(final String a, final String b, final int max) {
+        return typos(a, b, 0, b.length(), max);
+    }
+
+    /** Comme {@link #typos(String, String, int)}, avec le mot b lu entre from et to (sans le recopier). */
+    static int typos(final String a, final String text, final int from, final int to, final int max) {
         final int n = a.length();
-        final int m = b.length();
+        final int m = to - from;
         int[] prev2 = new int[m + 1];
         int[] prev = new int[m + 1];
         int[] cur = new int[m + 1];
@@ -468,9 +488,9 @@ final class Catalog {
             cur[0] = i;
             int rowMin = cur[0];
             for (int j = 1; j <= m; j++) {
-                final int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                final int cost = a.charAt(i - 1) == text.charAt(from + j - 1) ? 0 : 1;
                 int v = Math.min(Math.min(prev[j] + 1, cur[j - 1] + 1), prev[j - 1] + cost);
-                if (i > 1 && j > 1 && a.charAt(i - 1) == b.charAt(j - 2) && a.charAt(i - 2) == b.charAt(j - 1)) {
+                if (i > 1 && j > 1 && a.charAt(i - 1) == text.charAt(from + j - 2) && a.charAt(i - 2) == text.charAt(from + j - 1)) {
                     v = Math.min(v, prev2[j - 2] + 1);
                 }
                 cur[j] = v;
@@ -1185,18 +1205,30 @@ final class Catalog {
 
     /** Complète la réserve de decks aléatoires, dans delaySeconds secondes (0 : tout de suite). */
     void refillRandomPool(final int delaySeconds) {
+        refillRandomPool(delaySeconds, RANDOM_POOL);
+    }
+
+    /**
+     * Complète la réserve jusqu'à target decks. Au démarrage : un seul tout de suite (la première partie rapide), les
+     * autres une minute plus tard, quand l'appli n'a plus rien d'autre à préparer (chaque deck coûte plusieurs secondes
+     * de calcul sur un téléphone).
+     */
+    void refillRandomPool(final int delaySeconds, final int target) {
         if (!refilling.compareAndSet(false, true)) {
             return;
         }
         deckMaker.schedule(() -> {
             try {
-                while (randomPool.size() < RANDOM_POOL && ForgeRuntime.isReady()) {
+                while (randomPool.size() < target && ForgeRuntime.isReady()) {
                     randomPool.add(DeckgenUtil.generateCommanderDeck(true, GameType.Commander));
                 }
             } catch (final RuntimeException e) {
                 e.printStackTrace();
             } finally {
                 refilling.set(false);
+                if (target < RANDOM_POOL) {
+                    refillRandomPool(60, RANDOM_POOL);
+                }
             }
         }, delaySeconds, java.util.concurrent.TimeUnit.SECONDS);
     }

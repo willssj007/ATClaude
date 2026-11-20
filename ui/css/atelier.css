@@ -7,7 +7,9 @@
 .ate-grid, .ate-tile { --tw: 150px; }
 .ate-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--tw)); gap: 16px; margin: 14px 0 26px; }
 .ate-grid > :not(.ate-tile) { grid-column: 1 / -1; }
-.ate-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; width: var(--tw); }
+.ate-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; width: var(--tw);
+  /* Des centaines de cartes perso : celles loin de l'écran ne sont ni calculées ni dessinées (taille retenue ensuite). */
+  content-visibility: auto; contain-intrinsic-size: auto 150px auto 238px; }
 /* La vignette a la largeur de sa carte : un nom long est coupé (…) au lieu d'élargir sa colonne et de décaler la grille. */
 .ate-tile .mcard { --w: var(--tw); transition: transform 0.15s; }
 .ate-tile:hover .mcard { transform: translateY(-3px); }

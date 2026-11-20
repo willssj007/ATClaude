@@ -7,7 +7,9 @@ import forge.deck.DeckFormat;
 import forge.deck.DeckProxy;
 import forge.deck.DeckSection;
 import forge.item.PaperCard;
+import forge.localinstance.properties.ForgeConstants;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +45,87 @@ final class Precons {
     private static volatile List<Info> all;
     private static volatile Map<String, Integer> popularity;
 
+    /**
+     * L'analyse des préconstruits (plus d'une minute sur iPhone) et la popularité des cartes, gardées sur l'appareil :
+     * refaites seulement quand la liste des préconstruits de Forge, la version de l'appli ou cette version de l'analyse
+     * change (à augmenter quand DeckAnalyzer change sa façon de compter).
+     */
+    private static final int ANALYSIS_VERSION = 1;
+    private static final String CACHE_NAME = "precons-analysis.json";
+    /** Le contenu gardé, lu une fois (null : rien de valable). */
+    private static JsonObject cached;
+    private static boolean cacheRead;
+
     private Precons() { }
+
+    private static File cacheFile() {
+        return new File(ForgeConstants.CACHE_DIR, CACHE_NAME);
+    }
+
+    private static String signature() {
+        final List<String> names = new ArrayList<>();
+        for (final DeckProxy p : DeckProxy.getAllCommanderPreconDecks()) {
+            names.add(p.getName());
+        }
+        java.util.Collections.sort(names);
+        return ANALYSIS_VERSION + "|" + Bridge.version() + "|" + names.size() + "|" + String.join("\n", names).hashCode();
+    }
+
+    /** Ce qui est gardé sur l'appareil, s'il correspond aux préconstruits et à la version de maintenant. */
+    private static JsonObject cache() {
+        if (!cacheRead) {
+            cacheRead = true;
+            try {
+                final File f = cacheFile();
+                if (f.isFile()) {
+                    final JsonObject o = com.google.gson.JsonParser.parseString(Io.read(f)).getAsJsonObject();
+                    if (o.has("sig") && signature().equals(o.get("sig").getAsString())) {
+                        cached = o;
+                    }
+                }
+            } catch (final Exception e) {
+                cached = null; // abîmé : refait
+            }
+        }
+        return cached;
+    }
+
+    /** Garde l'analyse et la popularité calculées (en plus de ce qui l'était déjà). */
+    private static void save() {
+        try {
+            final JsonObject o = cached != null ? cached : new JsonObject();
+            o.addProperty("sig", signature());
+            if (all != null) {
+                final JsonArray list = new JsonArray();
+                for (final Info i : all) {
+                    final JsonObject j = new JsonObject();
+                    j.addProperty("key", i.key());
+                    j.addProperty("name", i.name());
+                    j.addProperty("fullName", i.fullName());
+                    j.add("commandersEn", i.commandersEn());
+                    if (i.image() != null) {
+                        j.addProperty("image", i.image());
+                    }
+                    j.addProperty("identity", i.identity());
+                    j.addProperty("bracket", i.bracket());
+                    j.addProperty("power", i.power());
+                    list.add(j);
+                }
+                o.add("precons", list);
+            }
+            if (popularity != null) {
+                final JsonObject pop = new JsonObject();
+                popularity.forEach(pop::addProperty);
+                o.add("popularity", pop);
+            }
+            cached = o;
+            final File f = cacheFile();
+            f.getParentFile().mkdirs();
+            Io.write(f, o.toString());
+        } catch (final Exception e) {
+            // pas de cache : ce sera recalculé au prochain lancement
+        }
+    }
 
     /**
      * Les cartes les plus jouées : pour chaque carte, le nombre de préconstruits Commander de Forge qui la jouent
@@ -58,6 +140,15 @@ final class Precons {
         synchronized (Precons.class) {
             if (popularity != null) {
                 return popularity;
+            }
+            final JsonObject c = cache();
+            if (c != null && c.has("popularity")) {
+                final Map<String, Integer> fromCache = new java.util.HashMap<>();
+                for (final Map.Entry<String, com.google.gson.JsonElement> e : c.getAsJsonObject("popularity").entrySet()) {
+                    fromCache.put(e.getKey(), e.getValue().getAsInt());
+                }
+                popularity = fromCache;
+                return fromCache;
             }
             final Map<String, Integer> counts = new java.util.HashMap<>();
             final java.util.Set<String> seen = new java.util.HashSet<>();
@@ -88,6 +179,7 @@ final class Precons {
                 }
             }
             popularity = counts;
+            save();
             return counts;
         }
     }
@@ -99,6 +191,24 @@ final class Precons {
         }
         synchronized (Precons.class) {
             if (all != null) {
+                return all;
+            }
+            final JsonObject c = cache();
+            if (c != null && c.has("precons")) {
+                final List<Info> fromCache = new ArrayList<>();
+                for (final com.google.gson.JsonElement e : c.getAsJsonArray("precons")) {
+                    final JsonObject j = e.getAsJsonObject();
+                    final JsonArray en = j.getAsJsonArray("commandersEn");
+                    // Les noms français relus maintenant (les textes français des cartes récentes arrivent après coup).
+                    final JsonArray fr = new JsonArray();
+                    for (final com.google.gson.JsonElement n : en) {
+                        fr.add(Catalog.translated(n.getAsString()));
+                    }
+                    fromCache.add(new Info(j.get("key").getAsString(), j.get("name").getAsString(), j.get("fullName").getAsString(), fr, en,
+                            j.has("image") ? j.get("image").getAsString() : null, j.get("identity").getAsString(),
+                            j.get("bracket").getAsInt(), j.get("power").getAsDouble()));
+                }
+                all = List.copyOf(fromCache);
                 return all;
             }
             final List<Info> out = new ArrayList<>();
@@ -130,6 +240,7 @@ final class Precons {
                 byDeck.merge(i.name() + "|" + i.commandersEn(), i, (a, b) -> year(b) < year(a) ? b : a);
             }
             all = List.copyOf(byDeck.values());
+            save();
             return all;
         }
     }

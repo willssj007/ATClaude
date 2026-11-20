@@ -238,20 +238,57 @@ export function cardElement(card, extraClass = '', {small = false} = {}) {
   return node;
 }
 
-/** Carte perso : son texte est vérifié une fois affiché (mesure réelle), au besoin réduit pour tenir dans le cadre. */
+/**
+ * Carte perso : son texte est vérifié une fois affiché (mesure réelle), au besoin réduit pour tenir dans le cadre.
+ * Seulement quand la carte arrive à l'écran (une longue liste de l'Atelier ne mesure que ce qu'on voit), et toutes les
+ * cartes qui arrivent ensemble dans la même image.
+ */
+const fitQueue = new Set();
+let fitFrameId = 0;
+const fitObserver = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (e.isIntersecting) {
+      fitObserver.unobserve(e.target);
+      fitQueue.add(e.target);
+    }
+  }
+  if (fitQueue.size && !fitFrameId) {
+    fitFrameId = requestAnimationFrame(runFits);
+  }
+}, {rootMargin: '300px'});
+
+function runFits() {
+  fitFrameId = 0;
+  const now = [...fitQueue];
+  fitQueue.clear();
+  for (const node of now) {
+    const frame = node.querySelector('.cf[data-fit]');
+    if (!frame || fitFrame(frame)) {
+      continue;
+    }
+    // Pas encore mise en page : réessayée à l'image suivante (au plus 120 fois).
+    node._fitTries = (node._fitTries || 0) + 1;
+    if (node._fitTries <= 120 && node.isConnected) {
+      fitQueue.add(node);
+    }
+  }
+  if (fitQueue.size) {
+    fitFrameId = requestAnimationFrame(runFits);
+  }
+}
+
 function scheduleFit(node) {
   if (!node.querySelector('.cf[data-fit]')) {
     return;
   }
-  let tries = 0;
-  const step = () => {
-    const frame = node.querySelector('.cf[data-fit]');
-    if (!frame || fitFrame(frame) || ++tries > 120) {
-      return;
+  if (fitObserver) {
+    fitObserver.observe(node);
+  } else {
+    fitQueue.add(node);
+    if (!fitFrameId) {
+      fitFrameId = requestAnimationFrame(runFits);
     }
-    requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+  }
 }
 
 /** Remplace le cadre dessiné d'une carte déjà affichée (après un changement de caractéristiques). */

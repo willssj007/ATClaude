@@ -141,15 +141,62 @@ function clampScale(v) {
 
 // Tailles mesurées (nom, type, texte) par carte et par cadre : les polices de l'appareil ne sont pas celles de
 // l'estimation, et le texte ne doit jamais être coupé. Tout est relatif à la largeur : une mesure vaut pour toutes les tailles.
+// Gardées d'un lancement à l'autre (stockage du navigateur) : une liste de cartes perso déjà vue s'affiche sans rien
+// remesurer. Clé : une empreinte courte du cadre, du nom, du type, du coût et du texte.
 const FITTED = new Map();
+const FIT_STORE = 'at.fitCache.v1';
+const FIT_MAX = 1500;
+/** Mesures faites avant que les polices soient prêtes : fausses, oubliées dès qu'elles le sont (jamais gardées). */
+const EARLY = new Set();
 
 function fitKey(style, name, type, text, cost) {
-  return [style, name, type, cost || '', text].join('\u0001');
+  const s = [style, name, type, cost || '', text].join('\u0001');
+  // Deux empreintes FNV-1a de 32 bits (avant, arrière) : 16 caractères, collision improbable.
+  let a = 0x811c9dc5;
+  let b = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    a = Math.imul(a ^ s.charCodeAt(i), 16777619);
+    b = Math.imul(b ^ s.charCodeAt(s.length - 1 - i), 16777619);
+  }
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
+}
+
+function fontsReady() {
+  return typeof document === 'undefined' || !document.fonts || document.fonts.status === 'loaded';
+}
+
+(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FIT_STORE) || '[]');
+    for (const [k, sn, st, sr] of saved) {
+      FITTED.set(k, {sn, st, sr});
+    }
+  } catch (e) {
+    // rien de gardé (ou stockage indisponible) : tout sera mesuré
+  }
+})();
+
+let saveTimer = 0;
+function saveFitted() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      const list = [...FITTED.entries()].filter(([k]) => !EARLY.has(k)).slice(-FIT_MAX).map(([k, v]) => [k, v.sn, v.st, v.sr]);
+      localStorage.setItem(FIT_STORE, JSON.stringify(list));
+    } catch (e) {
+      // stockage plein ou indisponible : les mesures restent pour cette fois
+    }
+  }, 2500);
 }
 
 // Une mesure faite avant que les polices soient prêtes (symboles de mana, police du texte) est fausse : on l'oublie.
 if (typeof document !== 'undefined' && document.fonts && document.fonts.addEventListener) {
-  document.fonts.addEventListener('loadingdone', () => FITTED.clear());
+  document.fonts.addEventListener('loadingdone', () => {
+    for (const k of EARLY) {
+      FITTED.delete(k);
+    }
+    EARLY.clear();
+  });
 }
 
 /**
@@ -188,7 +235,16 @@ export function fitFrame(frame) {
     }
     return v;
   };
-  const wide = (el) => el.scrollWidth > el.clientWidth + 0.5;
+  // Largeur exacte du texte (scrollWidth est arrondi au pixel : un nom qui dépasse d'une fraction de pixel était coupé
+  // « Cyclops, Mutant Lea… » sans que la mesure le voie).
+  const range = document.createRange();
+  const wide = (el) => {
+    if (el.scrollWidth > el.clientWidth + 0.5) {
+      return true;
+    }
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect().width > el.getBoundingClientRect().width - 0.25;
+  };
   const tall = (el) => el.scrollHeight > el.clientHeight + 0.5;
   const sn = shrink('.cf-name', '--sn', wide);
   const st = shrink('.cf-tl', '--st', wide);
@@ -198,10 +254,20 @@ export function fitFrame(frame) {
   // Une petite carte peut garder un texte plus grand que demandé (taille minimale du système) : on ne retient que
   // les mesures faites sur une carte assez grande.
   if (frame.offsetWidth >= 150) {
-    if (FITTED.size > 500) {
-      FITTED.clear();
+    if (FITTED.size > FIT_MAX) {
+      // Les plus anciennes d'abord (ordre d'insertion).
+      for (const k of [...FITTED.keys()].slice(0, FITTED.size - FIT_MAX + 200)) {
+        FITTED.delete(k);
+      }
     }
+    FITTED.delete(key);
     FITTED.set(key, {sn, st, sr});
+    if (fontsReady()) {
+      EARLY.delete(key);
+      saveFitted();
+    } else {
+      EARLY.add(key);
+    }
   }
   return true;
 }

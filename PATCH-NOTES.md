@@ -2,6 +2,25 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.8 — Optimisation générale : Atelier, démarrage, recherche
+
+Mesures faites avec le processeur ralenti quatre fois (comme un téléphone moyen), avant → après.
+
+- **Atelier beaucoup plus rapide**, surtout avec beaucoup de cartes perso :
+  - ouverture de l'écran : 2,1 s → 0,4 s ; plus grand blocage : 1 s → 0,09 s ;
+  - les cartes de la liste ne sont créées qu'à l'approche de l'écran (1 900 éléments au lieu de 15 000 pour 325 cartes) ;
+  - le texte des cartes n'est ajusté (nom, type, capacités réduits pour tenir) que pour celles qu'on voit, et chaque carte ne fait recalculer qu'elle-même au lieu de toute la page (148 recalculs → 6) ;
+  - ces ajustements sont gardés d'un lancement à l'autre : une liste déjà vue s'affiche sans rien remesurer ;
+  - taper dans l'éditeur ne saccade plus (à-coups de 0,7 s → 0,1 s), et revenir de l'éditeur à la liste non plus.
+- **Nom de carte perso coupé** (« Cyclops, Mutant Lea… ») : un nom qui dépassait d'une fraction de pixel n'était pas vu par la mesure ; il est maintenant réduit pour tenir en entier.
+- **Démarrage** :
+  - l'analyse des préconstruits (bracket et puissance de chacun, plus d'une minute sur iPhone) est gardée sur l'appareil : 1,5 s → 0,04 s sur ordinateur ; elle n'est refaite qu'à la mise à jour de l'appli. Même chose pour la popularité des cartes (le tri « les plus jouées ») ;
+  - un seul deck aléatoire est préparé tout de suite pour la première partie rapide, les trois autres une minute plus tard : moins de calcul pendant les premières secondes.
+- **Cartes conseillées d'un commandant perso** : premier calcul 2,8 s → 1,1 s sur ordinateur (lecture des scripts sans expressions régulières lentes), les suivants en 0,1 s.
+- **Recherche avec une faute de frappe** (« lightnig bolte », « sol rign ») : deux à trois fois plus rapide (les noms sont lus sur place au lieu d'être découpés à chaque frappe).
+- **Deck builder** : quand les cartes conseillées sont déjà prêtes, la grille n'est dessinée qu'une fois (dans le bon ordre) au lieu de deux.
+- Écrans Decks, Accueil, Cartes et Trophées : 20 à 50 % plus rapides à s'afficher.
+
 ## 0.9.7 — « Vous inflige X blessures » dans l'Atelier
 
 - **Atelier : nouvel effet « Blessures à vous »** : « CARDNAME vous inflige X blessures », dans le groupe des points de vie, pour une capacité activée, un déclencheur, un sort ou un effet enchaîné (« Et puis »). Le nombre peut être fixe ou calculé (X).

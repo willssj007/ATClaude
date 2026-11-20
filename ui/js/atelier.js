@@ -137,6 +137,32 @@ function simpleCost(text) {
   return costParts(text).every(p => /^\d+$/.test(p) || 'WUBRGCX'.includes(p) || HYBRIDS.includes(p));
 }
 
+/**
+ * Liste de l'Atelier : chaque vignette reçoit sa carte (un cadre dessiné de plusieurs dizaines d'éléments) seulement à
+ * l'approche de l'écran ; des centaines de cartes perso s'affichent sans attendre. En attendant : une carte vide.
+ */
+const lazyTiles = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (e.isIntersecting && e.target._fill) {
+      lazyTiles.unobserve(e.target);
+      const fill = e.target._fill;
+      e.target._fill = null;
+      fill();
+    }
+  }
+}, {rootMargin: '900px 0px'});
+
+function lazyCard(tile, make) {
+  if (!lazyTiles) {
+    tile.appendChild(make());
+    return;
+  }
+  const ph = el('<div class="mcard ate-ph"><div class="face"></div></div>');
+  tile.appendChild(ph);
+  tile._fill = () => ph.replaceWith(make());
+  lazyTiles.observe(tile);
+}
+
 export class Atelier {
   constructor(root, {onChanged = () => {}, onTry = null} = {}) {
     this.root = root;
@@ -199,7 +225,10 @@ export class Atelier {
       return;
     }
     this.renderList();
-    scroller.scrollTop = y;
+    // Remettre la liste à sa hauteur force sa mise en page : seulement s'il y a une hauteur à retrouver.
+    if (y) {
+      scroller.scrollTop = y;
+    }
   }
 
   /** Cartes et jetons perso ; les jetons deviennent des choix de « Créer des jetons ». */
@@ -350,12 +379,16 @@ export class Atelier {
     const tileOf = (c) => {
       if (c.reprint) {
         const tile = el(`<div class="ate-tile ate-rptile" data-reprint="${esc(c.reprint.id)}"></div>`);
-        tile.appendChild(cardElement(c.card));
+        lazyCard(tile, () => cardElement(c.card));
         tile.appendChild(el(`<div class="ate-name ate-rpname"><span>${esc(c.name)}</span><span class="ate-rpbadge" title="Réimpression d'une carte officielle">↻</span></div>`));
         return tile;
       }
       const tile = el(`<div class="ate-tile${sel && sel.has(c.name) ? ' picked' : ''}" data-name="${esc(c.name)}"></div>`);
-      tile.appendChild(c.card ? cardElement(c.card) : el(`<div class="mcard"><div class="face"></div></div>`));
+      if (c.card) {
+        lazyCard(tile, () => cardElement(c.card));
+      } else {
+        tile.appendChild(el(`<div class="mcard"><div class="face"></div></div>`));
+      }
       tile.appendChild(el(`<div class="ate-name">${esc(c.name)}</div>`));
       if (sel) {
         tile.appendChild(el(`<span class="ate-pick">${sel.has(c.name) ? '✓' : ''}</span>`));
