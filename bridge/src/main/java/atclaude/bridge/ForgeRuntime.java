@@ -56,9 +56,19 @@ public final class ForgeRuntime {
         if (ready) {
             return;
         }
+        // Les ressources de l'appli, ou leur copie où sont déjà les dernières cartes de Forge (voir DataUpdates).
+        final String assets = Paths.withSlash(DataUpdates.select(paths.assetsDir(), paths.cacheDir()));
+        try {
+            start(bridge, paths, desktop, assets);
+        } catch (final RuntimeException | Error e) {
+            DataUpdates.failed();
+            throw e;
+        }
+    }
+
+    private static void start(final Bridge bridge, final Paths paths, final boolean desktop, final String assets) {
         final long started = System.nanoTime();
         Perf.step("Démarrage de Forge");
-        final String assets = Paths.withSlash(paths.assetsDir());
         final String user = Paths.withSlash(paths.userDir());
         final String cache = Paths.withSlash(paths.cacheDir());
         new File(user).mkdirs();
@@ -152,6 +162,7 @@ public final class ForgeRuntime {
         ImageService.onLateImage = key -> bridge.sendEvent("imageReady", m -> m.addProperty("key", key));
         status = "Prêt";
         Perf.step("Prêt");
+        DataUpdates.launched();
         ready = true;
         bridge.sendEvent("ready", m -> m.addProperty("version", version()));
         bridge.warmUp();

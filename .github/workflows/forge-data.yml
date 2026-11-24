@@ -1,0 +1,162 @@
+name: Nouvelles cartes de Forge
+
+# Chaque jour : les cartes, éditions, decks préconstruits, jetons et formats ajoutés à Forge depuis la version de Forge
+# de l'appli (forge.commit de main et de test), vérifiés avec le moteur de l'appli, puis publiés dans la version
+# « forge-data » : l'appli les télécharge en arrière-plan et les ajoute au lancement suivant (voir DataUpdates.java).
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Refaire le paquet même si le dernier Forge est déjà publié'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: forge-data
+  cancel-in-progress: false
+
+jobs:
+  bases:
+    runs-on: ubuntu-latest
+    outputs:
+      bases: ${{ steps.bases.outputs.bases }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Les versions de Forge des applis publiées (main) et de test : un paquet pour chacune.
+      - name: Bases de cartes
+        id: bases
+        run: |
+          {
+            cat forge.commit
+            git show origin/test:forge.commit 2>/dev/null || true
+          } | grep -E '^[0-9a-f]{40}$' | sort -u > bases.txt
+          echo "bases=$(python3 -c "import json;print(json.dumps(open('bases.txt').read().split()))")" >> "$GITHUB_OUTPUT"
+          cat bases.txt
+
+  data:
+    needs: bases
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ${{ fromJson(needs.bases.outputs.bases) }}
+    env:
+      BASE: ${{ matrix.base }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dernier Forge
+        id: latest
+        run: |
+          LATEST="$(git ls-remote https://github.com/Card-Forge/forge refs/heads/master | cut -f1)"
+          B12="${BASE:0:12}"
+          echo "LATEST=$LATEST" >> "$GITHUB_ENV"
+          echo "B12=$B12" >> "$GITHUB_ENV"
+          echo "L12=${LATEST:0:12}" >> "$GITHUB_ENV"
+          PUBLISHED="$(curl -sfL "https://github.com/${{ github.repository }}/releases/download/forge-data/manifest-$B12.json" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin)['forge'])" 2>/dev/null || true)"
+          echo "Base $BASE, dernier Forge $LATEST, déjà publié : ${PUBLISHED:-rien}"
+          if [ "$LATEST" = "$BASE" ] || { [ "$LATEST" = "$PUBLISHED" ] && [ "${{ inputs.force }}" != "true" ]; }; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Java 17
+        if: steps.latest.outputs.skip != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # Le moteur de l'appli (cette base) : c'est lui qui doit savoir jouer les nouvelles cartes.
+      - name: Compiler Forge (base) et le pont
+        if: steps.latest.outputs.skip != 'true'
+        run: |
+          echo "$BASE" > forge.commit
+          scripts/build-forge.sh "$RUNNER_TEMP/forge-base"
+          mvn -B -q install -DskipTests
+
+      - name: Ressources du dernier Forge
+        if: steps.latest.outputs.skip != 'true'
+        run: |
+          git clone -q --depth 1 --filter=blob:none --sparse https://github.com/Card-Forge/forge "$RUNNER_TEMP/forge-latest"
+          cd "$RUNNER_TEMP/forge-latest"
+          git fetch -q --depth 1 origin "$LATEST" && git checkout -q "$LATEST"
+          git sparse-checkout set forge-gui/res/cardsfolder forge-gui/res/editions forge-gui/res/ai forge-gui/res/blockdata \
+            forge-gui/res/cube forge-gui/res/defaults forge-gui/res/effects forge-gui/res/formats forge-gui/res/lists \
+            forge-gui/res/setlookup forge-gui/res/tokenscripts forge-gui/res/puzzle forge-gui/res/draft/rankings \
+            forge-gui/res/quest/commanderprecons forge-gui/res/quest/precons forge-gui/res/quest/themes forge-gui/res/languages
+
+      - name: Paquet et vérification
+        if: steps.latest.outputs.skip != 'true'
+        run: |
+          W="$RUNNER_TEMP/data"
+          scripts/package-res.sh "$RUNNER_TEMP/forge-base/forge-gui/res" "$W/base"
+          scripts/package-res.sh "$RUNNER_TEMP/forge-latest/forge-gui/res" "$W/latest"
+          python3 scripts/forge-data.py diff "$W/base" "$W/latest" "$RUNNER_TEMP/forge-base/forge-gui/res/cardsfolder" \
+            "$RUNNER_TEMP/forge-latest/forge-gui/res/cardsfolder" "$W/delta"
+          if [ -z "$(find "$W/delta/res" -type f | head -1)" ]; then
+            echo "Rien de nouveau pour l'appli dans ce Forge : rien n'est publié."
+            echo "NOTHING=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p dist
+          ZIP="dist/forge-data-$B12-$L12.zip"
+          FICHE="dist/manifest-$B12.json"
+          CP="desktop/target/desktop-0.1.0.jar:desktop/target/lib/*"
+          # Une carte refusée peut en entraîner d'autres (deck préconstruit qui la cite) : on recommence sans elles.
+          ok=false
+          for pass in 1 2 3 4 5; do
+            python3 scripts/forge-data.py pack "$W/delta" "$ZIP" "$FICHE"
+            rm -f "$W/report.json"
+            # Le journal de Forge (long) à part : affiché seulement si la vérification n'a pas pu se faire.
+            java -Xmx3g -cp "$CP" atclaude.bridge.DataCheck "$W/base" "$ZIP" "$FICHE" "$W/report.json" "$W/check" \
+              > "$W/check.log" 2>&1 || true
+            grep -aE '^(Refus|V.rification)' "$W/check.log" || true
+            [ -f "$W/report.json" ] || { tail -80 "$W/check.log"; exit 1; }
+            if python3 -c "import json,sys;sys.exit(0 if json.load(open('$W/report.json')).get('ok') else 1)"; then
+              ok=true
+              break
+            fi
+            python3 scripts/forge-data.py drop "$W/delta" "$W/report.json"
+          done
+          [ "$ok" = true ] || { echo "Le paquet ne passe pas la vérification : rien n'est publié."; exit 1; }
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          echo "FICHE=$FICHE" >> "$GITHUB_ENV"
+          python3 -c "import json;d=json.load(open('$FICHE'));s=d['summary'];print('Publié :', s['cards'], 'cartes,', s['editions'], 'éditions,', s['precons'], 'decks préconstruits,', s['refused'], 'refus')"
+
+      - name: Publier
+        if: steps.latest.outputs.skip != 'true' && env.NOTHING != '1'
+        run: |
+          REPO="${{ github.repository }}"
+          if ! gh release view forge-data --repo "$REPO" > /dev/null 2>&1; then
+            gh release create forge-data --repo "$REPO" --prerelease --latest=false --title "Données de Forge" \
+              --notes "Nouvelles cartes, éditions et decks préconstruits de Forge pour Arcane Table, refaits chaque jour. L'appli les télécharge toute seule : rien à installer à la main."
+          fi
+          # La fiche en dernier : une appli qui la lit trouve toujours son paquet.
+          gh release upload forge-data "$ZIP" --repo "$REPO" --clobber
+          gh release upload forge-data "$FICHE" --repo "$REPO" --clobber
+          NEW="$(basename "$ZIP")"
+          gh release view forge-data --repo "$REPO" --json assets -q '.assets[].name' \
+            | grep -E "^forge-data-$B12-[0-9a-f]+\.zip$" | grep -vx "$NEW" \
+            | while read -r old; do gh release delete-asset forge-data "$old" --repo "$REPO" --yes; done
+
+  # GitHub suspend les tâches planifiées d'un dépôt sans activité depuis 60 jours : celle-ci se réactive à chaque passage.
+  keepalive:
+    needs: data
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/forge-data.yml/enable" || true

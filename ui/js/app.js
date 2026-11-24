@@ -235,6 +235,60 @@ async function refreshFrenchCards(force = false) {
   }
 }
 
+/** « 378 cartes, 3 éditions, 2 decks préconstruits » : ce qu'apporte un paquet de données de Forge. */
+function dataSummary(p) {
+  const n = (k, one, many) => (p[k] ? `${p[k]} ${p[k] > 1 ? many : one}` : '');
+  return [n('cards', 'carte', 'cartes'), n('editions', 'édition', 'éditions'), n('precons', 'deck préconstruit', 'decks préconstruits')]
+    .filter(Boolean).join(', ');
+}
+
+function dataDay(iso) {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d) ? d.toLocaleDateString('fr-FR') : '';
+}
+
+/** Réglages : les cartes de Forge utilisées, le paquet qui attend le prochain lancement, la dernière vérification. */
+function dataStatusText(st) {
+  if (!st.supported) {
+    return 'Indisponible avec ces ressources (version de développement).';
+  }
+  const bits = [];
+  if (st.active) {
+    const eds = (st.active.editionNames || []).slice(0, 3).join(', ');
+    bits.push(`Cartes de Forge du ${dataDay(st.active.forgeDate)} : ${dataSummary(st.active) || 'corrections'} de plus que l'appli${eds ? ` (${eds}${st.active.editions > 3 ? '…' : ''})` : ''}.`);
+  } else {
+    bits.push(`Cartes de Forge du ${dataDay(st.baseDate)}, celles de l'appli.`);
+  }
+  if (st.pending) {
+    bits.push(`Téléchargées : les cartes de Forge du ${dataDay(st.pending.forgeDate)}${dataSummary(st.pending) ? ` (${dataSummary(st.pending)})` : ''}, au prochain lancement.`);
+  } else if (st.status) {
+    bits.push(st.status);
+  }
+  if (st.at) {
+    bits.push(`Dernière vérification à ${new Date(st.at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}.`);
+  }
+  return bits.join(' ');
+}
+
+/**
+ * Nouvelles cartes de Forge (paquet publié chaque jour) : annonce celles arrivées avec ce lancement, puis vérifie s'il y
+ * en a d'autres, en tâche de fond. Le paquet trouvé est préparé pour le lancement suivant : le chargement n'attend jamais.
+ */
+async function checkForgeData() {
+  let st = null;
+  try {
+    st = await bridge.request('dataUpdate');
+  } catch (e) {
+    return;
+  }
+  if (st && st.announce && st.active && !inMatch) {
+    const decks = (st.active.preconNames || []).map((n) => n.replace(/\s*\[[^\]]*\]/g, '')).slice(0, 4).join(', ');
+    toast(`${dataSummary(st.active)} de Forge du ${dataDay(st.active.forgeDate)}${decks ? ` (decks : ${decks})` : ''}.`,
+      {title: 'Nouvelles cartes', duration: 7000});
+  }
+  setTimeout(() => bridge.request('dataUpdate', {check: true}).catch(() => {}), 20000);
+}
+
 /** Gauntlet : la manche suivante tout de suite, ou l'écran de la Gauntlet si la série est finie. */
 async function nextGauntletRound() {
   const g = gauntlet.current();
@@ -549,6 +603,7 @@ function settingsScreen() {
           <select data-pref-select="imageLang" aria-label="Langue des images"><option value="fr">Français</option><option value="en">Anglais</option></select></div>
         ${row('frenchCards', 'Texte français des cartes récentes', 'Les cartes plus récentes que les traductions de Forge prennent le nom, le type et le texte de leur impression française (Scryfall), vérifiés une fois par jour.')}
         <div class="row fr-cards"><div><p class="muted small fr-status">…</p></div><button class="btn small" data-fr-refresh>Mettre à jour maintenant</button></div>
+        <div class="row data-cards"><div><b>Nouvelles cartes de Forge</b><p class="muted small">Les cartes, éditions et decks préconstruits ajoutés à Forge depuis cette version de l'appli : vérifiés à chaque lancement, téléchargés en arrière-plan, puis là au lancement suivant.</p><p class="muted small data-status">…</p></div><button class="btn small" data-data-check>Vérifier maintenant</button></div>
         ${row('animations', 'Animations', 'Déplacements de cartes, bannières de tour, effets de points de vie.')}
         ${row('musicOn', 'Musique d\'ambiance', 'Musiques douces, médiévales et féeriques, dans les menus et en partie.')}
         <div class="row"><div><b>Volume de la musique</b></div><input type="range" min="0" max="100" data-pref-range="musicVolume"></div>
@@ -647,6 +702,14 @@ function settingsScreen() {
       };
       bridge.request('frenchCards').then(frStatus).catch(() => {});
       this.frStatus = frStatus;
+      const dataStatus = (st) => {
+        const node = root.querySelector('.data-status');
+        if (node && st) {
+          node.textContent = dataStatusText(st);
+        }
+      };
+      bridge.request('dataUpdate').then(dataStatus).catch(() => {});
+      this.dataStatus = dataStatus;
       root.onclick = (e) => {
         if (e.target.closest('[data-update-check]')) {
           checkUpdates();
@@ -654,6 +717,10 @@ function settingsScreen() {
         }
         if (e.target.closest('[data-fr-refresh]')) {
           refreshFrenchCards(true).then(frStatus);
+          return;
+        }
+        if (e.target.closest('[data-data-check]')) {
+          bridge.request('dataUpdate', {check: true}).then(dataStatus).catch(() => {});
           return;
         }
         if (e.target.closest('[data-perf-report]')) {
@@ -752,6 +819,8 @@ function onReady(hello) {
   }), 8000);
   // Texte français des cartes récentes : vérifié en tâche de fond, au plus une fois par jour.
   setTimeout(() => refreshFrenchCards(false), 20000);
+  // Nouvelles cartes de Forge : l'annonce de celles de ce lancement, puis la recherche d'un nouveau paquet.
+  setTimeout(checkForgeData, 6000);
   if (!(hello && hello.inMatch)) {
     whatsNew(hello && hello.appVersion);
   }
@@ -918,6 +987,16 @@ function init() {
   bridge.on('frenchCards', (m) => {
     if (screens.settings && screens.settings.frStatus) {
       screens.settings.frStatus(m.status);
+    }
+  });
+  bridge.on('dataUpdate', (m) => {
+    if (screens.settings && screens.settings.dataStatus) {
+      screens.settings.dataStatus(m.status);
+    }
+    const p = m.status && m.status.staged && m.status.pending;
+    if (p && !inMatch) {
+      toast(`${dataSummary(p) || 'Des corrections'} de Forge du ${dataDay(p.forgeDate)} : là au prochain lancement de l'appli.`,
+        {title: 'Nouvelles cartes téléchargées', duration: 6000});
     }
   });
   bridge.on('dialogClosed', (m) => closeForgeDialog(m.id));

@@ -267,7 +267,7 @@ public final class Bridge {
             "careerStartChoices", "careerDeckChoices", "careerChooseDeck", "careerBuyDeck", "careerDuel", "careerBuyCard", "careerAdjust", "careerBuyCosmetic",
             "careerSwapChallenge", "creatureTypes", "customCards", "customValidate", "customSave", "customDelete", "customTypes",
             "customSets", "customSetSave", "customSetDelete", "reprintSave", "reprintDelete", "limitedSets", "limitedSealed", "draftStart",
-            "draftState", "draftPick", "limitedPool", "limitedAuto", "limitedSetup", "puzzles", "frenchCards", "shareExport", "shareImport", "shareImage", "whatsNew");
+            "draftState", "draftPick", "limitedPool", "limitedAuto", "limitedSetup", "puzzles", "frenchCards", "dataUpdate", "shareExport", "shareImport", "shareImage", "whatsNew");
     private final java.util.concurrent.ExecutorService catalogThread = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         final Thread t = new Thread(r, "atclaude-catalog");
         t.setDaemon(true);
@@ -664,6 +664,10 @@ public final class Bridge {
                 return Career.boosterSets();
             case "puzzles":
                 return Puzzles.list();
+            case "dataUpdate":
+                // Nouvelles cartes de Forge : l'état, ou une vérification en tâche de fond (fin annoncée par un événement).
+                return m.has("check") ? DataUpdates.check(st -> sendEvent("dataUpdate", e -> e.add("status", st)))
+                        : DataUpdates.status();
             case "frenchCards":
                 return m.has("refresh") ? FrenchCards.refresh(m.has("force") && m.get("force").getAsBoolean(), () -> {
                     catalog.invalidateIndex();

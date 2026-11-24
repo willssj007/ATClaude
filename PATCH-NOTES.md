@@ -2,6 +2,20 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.9 — Nouvelles cartes de Forge sans attendre une nouvelle version
+
+- **Les cartes, éditions et decks préconstruits sortis dans Forge arrivent tout seuls**, sans nouvelle version de l'appli :
+  - chaque jour, GitHub compare le dernier Forge à celui de l'appli et publie un petit paquet (moins d'1 Mo) avec ce qui a changé : nouvelles cartes et jetons, nouvelles éditions, decks préconstruits, formats et listes de bannissement, boosters, listes de types ;
+  - à chaque lancement, l'appli regarde s'il y a un nouveau paquet, le télécharge et le prépare en arrière-plan : il est là au lancement suivant ;
+  - **aucun temps de chargement en plus** : le démarrage ne télécharge rien et ne prépare rien, il choisit seulement entre les cartes de l'appli et celles déjà préparées (deux petits fichiers lus) ;
+  - un message annonce les nouveautés au premier lancement qui les a (« 378 cartes, 3 éditions, 2 decks préconstruits ») ;
+  - les textes français de ces cartes sont cherchés tout de suite sur Scryfall, et l'analyse des préconstruits est refaite.
+- **Chaque nouvelle carte est vérifiée avec le moteur de l'appli avant d'être publiée** : elle est lue puis créée avec toutes ses capacités, et ses effets, déclencheurs et mots-clés doivent être connus de ce moteur (sinon la capacité ne ferait rien en partie). Une carte qui a besoin d'un Forge plus récent attend la prochaine version de l'appli, ainsi que les decks préconstruits qui la contiennent.
+  - Aujourd'hui, par rapport aux cartes de l'appli (Forge du 22 octobre) : 378 cartes, 3 éditions (Nauctis: The Sunken Realm Commander, Prismatic Pride, Wizards Play Network 2027) et 2 decks préconstruits (Klingon Fury, We Are the Borg). Restent pour la prochaine version : 4 cartes qui utilisent un effet ajouté depuis à Forge, et les decks Federation Fleet et Landing Party qui en contiennent.
+  - Les scripts de cartes déjà présentes ne sont pas remplacés : une correction de Forge suit souvent un changement de son moteur, et la version de l'appli est faite pour le sien.
+- **Garde-fou** : si Forge ne démarre pas avec les nouvelles données (deux fois de suite, ou une erreur au chargement), l'appli repart avec ses propres cartes et attend le paquet suivant.
+- **Réglages → Nouvelles cartes de Forge** : la date des cartes utilisées, ce qu'elles ajoutent, le paquet qui attend le prochain lancement, et « Vérifier maintenant ».
+
 ## 0.9.8 — Optimisation générale : Atelier, démarrage, recherche
 
 Mesures faites avec le processeur ralenti quatre fois (comme un téléphone moyen), avant → après.

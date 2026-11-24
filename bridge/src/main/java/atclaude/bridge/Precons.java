@@ -68,7 +68,7 @@ final class Precons {
             names.add(p.getName());
         }
         java.util.Collections.sort(names);
-        return ANALYSIS_VERSION + "|" + Bridge.version() + "|" + names.size() + "|" + String.join("\n", names).hashCode();
+        return ANALYSIS_VERSION + "|" + Bridge.version() + "|" + DataUpdates.id() + "|" + names.size() + "|" + String.join("\n", names).hashCode();
     }
 
     /** Ce qui est gardé sur l'appareil, s'il correspond aux préconstruits et à la version de maintenant. */

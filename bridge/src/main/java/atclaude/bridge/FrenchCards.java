@@ -52,6 +52,8 @@ final class FrenchCards {
     /** Code Scryfall d'une extension → date de la dernière demande. */
     private static final Map<String, Long> SETS = new HashMap<>();
     private static long lastRun;
+    /** Les données de cartes de la dernière recherche : de nouvelles cartes de Forge relancent la recherche sans attendre un jour. */
+    private static String lastData = "";
     private static volatile boolean running;
     private static volatile String status = "";
 
@@ -87,6 +89,7 @@ final class FrenchCards {
                 }
             }
             lastRun = o.has("at") ? o.get("at").getAsLong() : 0;
+            lastData = o.has("data") ? o.get("data").getAsString() : "";
         } catch (final IOException | RuntimeException e) {
             System.err.println("Cache des textes français illisible : " + e.getMessage());
         }
@@ -133,6 +136,7 @@ final class FrenchCards {
     private static synchronized void save() {
         final JsonObject o = new JsonObject();
         o.addProperty("at", lastRun);
+        o.addProperty("data", lastData);
         final JsonObject cards = new JsonObject();
         for (final Map.Entry<String, String[]> e : CARDS.entrySet()) {
             final JsonArray a = new JsonArray();
@@ -247,7 +251,7 @@ final class FrenchCards {
      * {@code done} est appelé à la fin si de nouvelles cartes ont été traduites.
      */
     static synchronized JsonObject refresh(final boolean force, final Runnable done) {
-        if (running || !force && System.currentTimeMillis() - lastRun < DAILY) {
+        if (running || !force && System.currentTimeMillis() - lastRun < DAILY && DataUpdates.id().equals(lastData)) {
             return status();
         }
         running = true;
@@ -338,6 +342,7 @@ final class FrenchCards {
             CARDS.putAll(found);
             added = inject(found);
             lastRun = System.currentTimeMillis();
+            lastData = DataUpdates.id();
             save();
         }
         status = added > 0 ? added + " carte(s) traduite(s)." : "Rien de nouveau.";

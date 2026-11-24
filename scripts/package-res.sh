@@ -46,6 +46,12 @@ python3 "$HERE/fix-french.py" "$OUT/res"
 mkdir -p "$OUT/res/cardsfolder"
 (cd "$SRC/cardsfolder" && zip -q -r -9 "$OUT/res/cardsfolder/cardsfolder.zip" . -x "cardsfolder.zip")
 
+# D'où viennent ces ressources (commit de Forge, date, empreinte du contenu) : les mises à jour de données publiées
+# chaque jour (.github/workflows/forge-data.yml) ne s'appliquent qu'à la base de cartes pour laquelle elles sont faites.
+FORGE_COMMIT="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || cat "$HERE/../forge.commit")"
+FORGE_DATE="$(git -C "$SRC" log -1 --format=%cI 2>/dev/null || true)"
+python3 "$HERE/res-id.py" "$OUT" "$FORGE_COMMIT" "$FORGE_DATE"
+
 if [ -n "$ZIP" ]; then
   rm -f "$ZIP"
   mkdir -p "$(dirname "$ZIP")"
