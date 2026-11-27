@@ -649,6 +649,9 @@ const COLOR_WORDS = {W: 'white', U: 'blue', B: 'black', R: 'red', G: 'green'};
 export const EFFECTS = [
   {id: 'damageAny', group: 'life', label: 'Blessures à n\'importe quelle cible', n: true},
   {id: 'damageCreature', group: 'life', label: 'Blessures à une créature ciblée', n: true},
+  {id: 'damageOppCreature', group: 'life', label: 'Blessures à une créature ciblée qu\'un adversaire contrôle', n: true},
+  {id: 'damageCreaturePw', group: 'life', label: 'Blessures à une créature ou un planeswalker ciblé', n: true},
+  {id: 'damageOppCreaturePw', group: 'life', label: 'Blessures à une créature ou un planeswalker ciblé qu\'un adversaire contrôle', n: true},
   {id: 'damageBlocker', group: 'life', label: 'Blessures à la créature qui la bloque ou qu\'elle bloque', n: true,
     only: ['blocksCreature', 'blocked', 'blocks', 'allyBlocked']},
   {id: 'damageOpponents', group: 'life', label: 'Blessures à chaque adversaire', n: true},
@@ -2739,6 +2742,18 @@ function effectBase(a, id) {
     case 'damageCreature':
       return {p: `DealDamage | ${target(creature)} | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à une créature ciblée`,
         en: `CARDNAME deals ${n} damage to target creature`};
+    case 'damageOppCreature':
+      return {p: `DealDamage | ${target({v: 'Creature.OppCtrl', prompt: 'Choisissez une créature ciblée qu\'un adversaire contrôle'})} | NumDmg$ ${n}`,
+        fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à une créature ciblée qu'un adversaire contrôle`,
+        en: `CARDNAME deals ${n} damage to target creature an opponent controls`};
+    case 'damageCreaturePw':
+      return {p: `DealDamage | ${target({v: 'Creature,Planeswalker', prompt: 'Choisissez une créature ou un planeswalker ciblé'})} | NumDmg$ ${n}`,
+        fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à une créature ou un planeswalker ciblé`,
+        en: `CARDNAME deals ${n} damage to target creature or planeswalker`};
+    case 'damageOppCreaturePw':
+      return {p: `DealDamage | ${target({v: 'Creature.OppCtrl,Planeswalker.OppCtrl', prompt: 'Choisissez une créature ou un planeswalker ciblé qu\'un adversaire contrôle'})} | NumDmg$ ${n}`,
+        fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à une créature ou un planeswalker ciblé qu'un adversaire contrôle`,
+        en: `CARDNAME deals ${n} damage to target creature or planeswalker an opponent controls`};
     case 'damageOpponents':
       return {p: `DealDamage | Defined$ Player.Opponent | NumDmg$ ${n}`, fr: `CARDNAME inflige ${n} ${plural(n, 'blessure', 'blessures')} à chaque adversaire`,
         en: `CARDNAME deals ${n} damage to each opponent`};

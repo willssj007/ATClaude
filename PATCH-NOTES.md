@@ -2,6 +2,14 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.10 — Blessures à une créature qu'un adversaire contrôle
+
+- **Atelier : trois nouveaux effets de blessures ciblées**, dans le groupe des points de vie, pour un sort, une capacité activée, un déclencheur ou un effet enchaîné (« Et puis »), avec un nombre fixe ou calculé (X) :
+  - « CARDNAME inflige X blessures à une créature ciblée qu'un adversaire contrôle » : impossible de viser ses propres créatures ;
+  - « … à une créature ou un planeswalker ciblé » ;
+  - « … à une créature ou un planeswalker ciblé qu'un adversaire contrôle ».
+- Les trois ont été vérifiés par Forge dans tous les contextes de l'Atelier, puis joués par l'IA en vraie partie : ils touchent bien la cible annoncée.
+
 ## 0.9.9 — Nouvelles cartes de Forge sans attendre une nouvelle version
 
 - **Les cartes, éditions et decks préconstruits sortis dans Forge arrivent tout seuls**, sans nouvelle version de l'appli :

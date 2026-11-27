@@ -194,6 +194,9 @@ const NONE = null;
 // [vérification, sûre ?] : sûre = l'effet doit le faire quels que soient les choix de l'IA et les cartes tirées.
 const EXPECT = {
   damageAny: [hurtMe, false], damageCreature: [any(down('creatures', 'me'), up('damage', 'me'), down('creatures', 'ai'), up('damage', 'ai')), true],
+  damageOppCreature: [any(down('creatures', 'me'), up('damage', 'me')), true],
+  damageCreaturePw: [any(down('creatures', 'me'), up('damage', 'me'), down('creatures', 'ai'), up('damage', 'ai')), true],
+  damageOppCreaturePw: [any(down('creatures', 'me'), up('damage', 'me')), true],
   damageOpponents: [down('life', 'me'), true], damageYou: [down('life', 'ai'), true], damageEachCreature: [down('creatures', 'me'), true], damageEachOppCreature: [down('creatures', 'me'), true],
   earthquake: [all(down('life', 'me'), down('life', 'ai')), true], gainLife: [up('life', 'ai'), true], loseLifeYou: [down('life', 'ai'), true],
   drain: [all(down('life', 'me'), up('life', 'ai')), true], oppNoLifeTurn: [NONE], playersNoLifeTurn: [NONE], fog: [NONE], preventDamage: [NONE],
