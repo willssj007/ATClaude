@@ -2,6 +2,14 @@
 
 La version la plus récente est en haut. La page de téléchargement de chaque version reprend sa section.
 
+## 0.9.11 — Vaisseaux spatiaux et véhicules de l'Atelier : plus d'attaque sans marqueurs ni pilote
+
+- **Corrigé : un vaisseau spatial de l'Atelier pouvait attaquer sans ses marqueurs charge.** Quand on ajoutait le mot-clé Station à une créature-artefact (ou qu'on recochait « Créature »), la carte restait imprimée « Créature-artefact — Vaisseau spatial » : une créature dès son arrivée, qui attaquait et bloquait à 0 marqueur.
+  - Un vaisseau spatial n'est maintenant qu'un artefact, et devient une créature-artefact à STATION N+ (N marqueurs charge), comme les vrais. Même chose pour un véhicule (Pilotage) : une créature seulement une fois piloté.
+  - Dans l'Atelier, le type « Créature » est retiré tout seul d'un vaisseau ou d'un véhicule, avec une ligne qui explique pourquoi sous les sous-types.
+  - **Les cartes déjà faites sont réparées au lancement** : rien à refaire. Une planète (terrain avec Station) ne change pas.
+- Vérifié en partie : un vaisseau Station 4 ne peut pas attaquer à 0 marqueur, et attaque à 4 ; son type devient « Créature-artefact — Vaisseau spatial » à ce moment-là.
+
 ## 0.9.10 — Blessures à une créature qu'un adversaire contrôle
 
 - **Atelier : trois nouveaux effets de blessures ciblées**, dans le groupe des points de vie, pour un sort, une capacité activée, un déclencheur ou un effet enchaîné (« Et puis »), avec un nombre fixe ou calculé (X) :

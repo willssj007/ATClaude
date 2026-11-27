@@ -142,8 +142,22 @@ final class CustomCards {
         final File[] list = cardsDir().listFiles((d, n) -> n.endsWith(".txt"));
         if (list != null) {
             for (final File f : list) {
-                final String text = read(f);
+                String text = read(f);
                 final String name = nameOf(text);
+                final String fixed = name == null ? text : repairMachines(text);
+                if (!fixed.equals(text)) {
+                    // Véhicule ou vaisseau spatial enregistré « Créature » : corrigé sur le disque et dans la base de Forge.
+                    try {
+                        final CardRules rules = new CardRules.Reader().readCard(Arrays.asList(fixed.replace("\r", "").split("\n")), base(name));
+                        rules.setCustom();
+                        write(f, fixed);
+                        FModel.getMagicDb().getCommonCards().getEditor().putCard(rules);
+                        text = fixed;
+                        System.out.println("Carte perso réparée (type Créature retiré) : " + name);
+                    } catch (final RuntimeException e) {
+                        System.err.println("Carte perso non réparée : " + name + " (" + e.getMessage() + ")");
+                    }
+                }
                 if (name != null) {
                     FILES.put(name, f);
                     registerBack(name, text);
@@ -866,6 +880,47 @@ final class CustomCards {
                 }
             }
         }
+    }
+
+    /**
+     * Véhicule (Pilotage) et vaisseau spatial (Station) : l'Atelier jusqu'à la 0.9.10 pouvait les écrire « Creature »
+     * (une créature-artefact à qui l'on ajoutait le mot-clé). Ils attaquaient alors sans pilote ni marqueur charge : le
+     * type Créature est retiré de chaque face concernée (l'artefact ajouté au besoin). Une planète (terrain) ne change pas.
+     */
+    static String repairMachines(final String text) {
+        final String[] lines = text.split("\n", -1);
+        boolean changed = false;
+        int start = 0;
+        for (int i = 0; i <= lines.length; i++) {
+            if (i < lines.length && !"ALTERNATE".equals(lines[i].trim())) {
+                continue;
+            }
+            int types = -1;
+            boolean machine = false;
+            for (int j = start; j < i; j++) {
+                final String l = lines[j].trim();
+                if (l.startsWith("Types:")) {
+                    types = j;
+                } else if (l.startsWith("K:Crew") || l.startsWith("K:Station")) {
+                    machine = true;
+                }
+            }
+            if (machine && types >= 0) {
+                final List<String> words = new ArrayList<>(Arrays.asList(lines[types].trim().substring(6).trim().split("\\s+")));
+                final boolean planet = words.contains("Land") && !words.contains("Artifact") && !words.contains("Spacecraft");
+                final int creature = words.indexOf("Creature");
+                if (!planet && creature >= 0) {
+                    words.remove(creature);
+                    if (!words.contains("Artifact")) {
+                        words.add(creature, "Artifact");
+                    }
+                    lines[types] = "Types:" + String.join(" ", words) + (lines[types].endsWith("\r") ? "\r" : "");
+                    changed = true;
+                }
+            }
+            start = i + 1;
+        }
+        return changed ? String.join("\n", lines) : text;
     }
 
     private static boolean knownSubtype(final String t) {

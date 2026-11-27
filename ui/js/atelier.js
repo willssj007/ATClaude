@@ -12,7 +12,7 @@ import {icon} from './icons.js';
 import {DFC_MODES, facePart, scriptToForm, OPP_PERM_TYPES, ACT_ZONES, AMOUNTS, CARD_KINDS, CARD_TYPES, COND_KINDS, CONDITIONS, CONDITIONS_N, COUNTER_TYPES, EFFECT_GROUPS, EMBLEMS, KEYWORDS, PERM_TYPES, PICKS, ROMAN, SAC_WHAT, SCOPES,
   SPELL_COSTS, SPELL_TYPES, STATIC_REPLACEMENTS, TAP_COUNTS, TAP_WHAT, tapCount, KW_ALL, KW_GROUPS, KW_OPTIONS, LANGS, MANA_CHOICES, TOKENS, WHEN, WHEN_GROUPS, WHEN_KINDS, whenKindOf, ANIM_KINDS, AIR_KINDS, MECH_WHO, MANA_KINDS, allTokens, buildScript, costParts,
   cardTraits, effectsFor, eminenceOk, fitsCard, keywordNeed, needOf, needWords, setTypeFit, orTriggerFits, keywordNumber, keywordOptions, keywordValue, modeEffectsFor, needsPT, newMode, readDisplay, setCustomEmblems, setCustomTokens, setTypeNames, emblemChoices, templates, withDisplay,
-  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
+  PLAYER_EFFECTS, PLAYER_WHO, RARITIES, SAC_KINDS, SUBTYPES, whoChoices, attachOf, attachTemplates, cleanArtist, forgeSubtypes, typeLabel, cardSubtypes, linkSubtypes, machineTypes, scopesFor, subtypeAbilityText, subtypeInfo, subtypeIssues, whenFits, whenLabel} from './cardscript.js';
 import {FRAMES, FRAME_COLORS, FRAME_TEXT, FX, IMPORTED, absoluteUrl} from './frames.js';
 
 /** Le nom de chaque liste déroulante du formulaire, en titre de la liste ouverte au téléphone. */
@@ -1081,7 +1081,8 @@ export class Atelier {
     }
     // Les groupes (avant la 0.6.6) ont laissé la place aux extensions.
     delete this.form.group;
-    this.subNotes = [];
+    // Véhicule ou vaisseau spatial enregistré « Créature » (avant la 0.9.11) : montré tel qu'il sera enregistré.
+    this.subNotes = machineTypes(this.form);
     // Un emblème est rangé avec les jetons (pas une carte de deck), mais son formulaire est le sien.
     this.form.emblem = !!(this.form.emblem || (entry && entry.emblem));
     this.form.token = !this.form.emblem && !!(this.form.token || (entry && entry.token));
@@ -2647,6 +2648,11 @@ export class Atelier {
     } else if (b.dataset.type) {
       const t = b.dataset.type;
       f.types = f.types.includes(t) ? f.types.filter(x => x !== t) : [...f.types, t];
+      // « Créature » sur un véhicule ou un vaisseau spatial : refusé, avec la raison sous les sous-types.
+      const notes = machineTypes(f);
+      if (notes.length) {
+        this.subNotes = notes;
+      }
       this.renderLeft();
     } else if (b.dataset.kw) {
       const k = b.dataset.kw;
@@ -2657,6 +2663,13 @@ export class Atelier {
       // Station sur un terrain : une planète (pas un vaisseau spatial).
       if (adding && o.base && !f.types.includes(o.base) && !(k === 'Station' && f.types.includes('Land'))) {
         f.types = [...f.types.filter(t => !(o.base === 'Enchantment' && t === 'Creature' && k === 'Enchant') && !(o.base === 'Artifact' && t === 'Creature' && k !== 'Reconfigure' && k !== 'Living metal')), o.base];
+      }
+      // Une créature-artefact qui reçoit Pilotage ou Station : elle n'est plus une créature avant d'être pilotée ou à STATION N+.
+      if (adding && (k === 'Crew' || k === 'Station')) {
+        const notes = machineTypes(f);
+        if (notes.length) {
+          this.subNotes = notes;
+        }
       }
       this.renderLeft();
     } else if (b.dataset.template !== undefined) {

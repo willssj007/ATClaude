@@ -1341,7 +1341,33 @@ export function linkSubtypes(f, {keepTypes = false} = {}) {
       added.push(`${fr} : la carte est légendaire`);
     }
   }
+  added.push(...machineTypes(f));
   return added;
+}
+
+/**
+ * Véhicule (Pilotage) et vaisseau spatial (Station) : des artefacts, qui ne deviennent des créatures qu'une fois pilotés,
+ * ou à STATION N+. Imprimés « Créature », ils attaqueraient et bloqueraient sans pilote ni marqueur charge : le type
+ * Créature est retiré (et l'artefact ajouté). Change la carte (f) et renvoie ce qui a changé, en français.
+ */
+export function machineTypes(f) {
+  const notes = [];
+  f.types = f.types || [];
+  const kws = f.keywords || [];
+  const station = Math.max(1, Number(keywordValue(f, 'Station')) || 1);
+  for (const [k, fr, when] of [['Crew', 'Véhicule', 'une fois piloté'], ['Station', 'Vaisseau spatial', `à STATION ${station}+ (${station} marqueurs charge)`]]) {
+    if (!kws.includes(k) || (k === 'Station' && isPlanet(f))) {
+      continue;
+    }
+    if (f.types.includes('Creature')) {
+      f.types = f.types.filter(t => t !== 'Creature');
+      notes.push(`${fr} : une créature seulement ${when}, pas avant (type Créature retiré)`);
+    }
+    if (!f.types.includes('Artifact')) {
+      f.types.push('Artifact');
+    }
+  }
+  return notes;
 }
 
 /** « un artefact », « un enchantement »… : le type de carte avec son article, pour les messages. */
